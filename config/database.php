@@ -93,6 +93,12 @@ function migratePermissionsSchema($pdo) {
             }
         }
 
+        // Check and add link column to tasks table if missing
+        $taskLinkCheck = $pdo->query("SHOW COLUMNS FROM tasks LIKE 'link'")->fetch();
+        if (!$taskLinkCheck) {
+            $pdo->exec("ALTER TABLE tasks ADD COLUMN link TEXT AFTER description");
+        }
+
         // Ensure all admin accounts have full permissions enabled (1)
         $pdo->exec("
             UPDATE employees 
@@ -191,6 +197,7 @@ function initDatabaseSchema($pdo) {
         assigned_to INT NOT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT,
+        link TEXT,
         content_type VARCHAR(100),
         department VARCHAR(100),
         priority ENUM('low', 'medium', 'high', 'urgent') DEFAULT 'medium',

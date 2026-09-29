@@ -92,10 +92,13 @@ switch ($action) {
         $assignedTo = (int)($data['assigned_to'] ?? 0);
         $title = trim($data['title'] ?? '');
         $description = trim($data['description'] ?? '');
-        $contentType = trim($data['content_type'] ?? 'FB Videos');
+        $rawLink = trim($data['link'] ?? '');
+        // Automatically strip surrounding quotes (e.g. from Windows "Copy as path" -> "C:\path")
+        $link = trim($rawLink, " \t\n\r\0\x0B\"'");
+        $contentType = trim($data['content_type'] ?? 'General');
         $department = trim($data['department'] ?? 'Digital');
         $priority = $data['priority'] ?? 'medium';
-        $dueDate = $data['due_date'] ?? date('Y-m-d');
+        $dueDate = !empty($data['due_date']) ? $data['due_date'] : null;
 
         if (!$assignedTo || empty($title)) {
             http_response_code(400);
@@ -104,10 +107,10 @@ switch ($action) {
         }
 
         $stmt = $pdo->prepare("
-            INSERT INTO tasks (assigned_by, assigned_to, title, description, content_type, department, priority, status, due_date) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            INSERT INTO tasks (assigned_by, assigned_to, title, description, link, content_type, department, priority, status, due_date) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
         ");
-        $stmt->execute([$currentUserId, $assignedTo, $title, $description, $contentType, $department, $priority, $dueDate]);
+        $stmt->execute([$currentUserId, $assignedTo, $title, $description, $link, $contentType, $department, $priority, $dueDate]);
 
         echo json_encode(['success' => true, 'message' => 'Task assigned successfully.', 'task_id' => $pdo->lastInsertId()]);
         break;
@@ -151,11 +154,14 @@ switch ($action) {
         $assignedTo = (int)($data['assigned_to'] ?? 0);
         $title = trim($data['title'] ?? '');
         $description = trim($data['description'] ?? '');
-        $contentType = trim($data['content_type'] ?? 'FB Videos');
+        $rawLink = trim($data['link'] ?? '');
+        // Automatically strip surrounding quotes
+        $link = trim($rawLink, " \t\n\r\0\x0B\"'");
+        $contentType = trim($data['content_type'] ?? 'General');
         $department = trim($data['department'] ?? 'Digital');
         $priority = $data['priority'] ?? 'medium';
         $status = $data['status'] ?? 'pending';
-        $dueDate = $data['due_date'] ?? date('Y-m-d');
+        $dueDate = !empty($data['due_date']) ? $data['due_date'] : null;
 
         if (!$taskId || !$assignedTo || empty($title)) {
             http_response_code(400);
@@ -183,10 +189,10 @@ switch ($action) {
 
         $stmt = $pdo->prepare("
             UPDATE tasks 
-            SET assigned_to = ?, title = ?, description = ?, content_type = ?, department = ?, priority = ?, status = ?, due_date = ?, completed_at = ?
+            SET assigned_to = ?, title = ?, description = ?, link = ?, content_type = ?, department = ?, priority = ?, status = ?, due_date = ?, completed_at = ?
             WHERE id = ?
         ");
-        $stmt->execute([$assignedTo, $title, $description, $contentType, $department, $priority, $status, $dueDate, $completedAt, $taskId]);
+        $stmt->execute([$assignedTo, $title, $description, $link, $contentType, $department, $priority, $status, $dueDate, $completedAt, $taskId]);
 
         echo json_encode(['success' => true, 'message' => 'Task updated successfully.']);
         break;

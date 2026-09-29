@@ -10,7 +10,7 @@
                 <span id="main-nav-tab-label">📝 Hourly Sheet</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
-                🎯 Task Assigner <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
+                <span id="tasks-nav-tab-label">🎯 Task Assigner</span> <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-reports" data-route="reports">
                 📊 Matrix Reports

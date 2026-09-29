@@ -17,13 +17,135 @@ function formatTaskDateTime(dateStr) {
         const minutes = String(d.getMinutes()).padStart(2, '0');
         const ampm = hours >= 12 ? 'PM' : 'AM';
         hours = hours % 12;
-        hours = hours ? hours : 12; // the hour '0' should be '12'
+        hours = hours ? hours : 12;
         const strHours = String(hours).padStart(2, '0');
 
         return `${day}-${month}-${year} ${strHours}:${minutes} ${ampm}`;
     } catch (e) {
         return dateStr;
     }
+}
+
+// Compact short date/time for concise table columns
+function formatTaskDateTimeShort(dateStr) {
+    if (!dateStr) return null;
+    try {
+        const d = new Date(dateStr.replace(/-/g, '/'));
+        if (isNaN(d.getTime())) return { date: dateStr, time: '', full: dateStr };
+        
+        const day = String(d.getDate()).padStart(2, '0');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = months[d.getMonth()];
+        const year = d.getFullYear();
+        
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const strHours = String(hours).padStart(2, '0');
+
+        return {
+            date: `${day} ${month} ${year}`,
+            time: `${strHours}:${minutes} ${ampm}`,
+            full: `${day} ${month} ${year}, ${strHours}:${minutes} ${ampm}`
+        };
+    } catch (e) {
+        return { date: dateStr, time: '', full: dateStr };
+    }
+}
+
+// Clean and strip quotes from copied Windows paths (e.g. "C:\xampp\htdocs\Worksheet")
+function sanitizePathString(str) {
+    if (!str) return '';
+    return String(str).replace(/^["']+|["']+$/g, '').trim();
+}
+
+// Smart Path / Link Renderer for Task Lists, Tables & Modals
+function renderPathLinkHtml(rawLink, isCompact = false) {
+    if (!rawLink) return '';
+    const cleanLink = sanitizePathString(rawLink);
+    if (!cleanLink) return '';
+
+    const isWebUrl = cleanLink.startsWith('http://') || cleanLink.startsWith('https://');
+
+    if (isWebUrl) {
+        return `
+            <div style="display: inline-flex; align-items: center; gap: 4px; max-width: 100%;">
+                <a href="${escapeHtml(cleanLink)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; color: var(--primary); border-color: rgba(59, 130, 246, 0.4); text-decoration: none; border-radius: var(--radius-sm); font-weight: 600;" title="${escapeHtml(cleanLink)}">
+                    🔗 <span>Open Link</span>
+                </a>
+            </div>
+        `;
+    } else {
+        // Windows Local Path or Shared Network Drive
+        const fileUrl = 'file:///' + cleanLink.replace(/\\/g, '/');
+        return `
+            <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm); padding: 3px 8px; max-width: 100%;">
+                <a href="${escapeHtml(fileUrl)}" target="_blank" data-path="${escapeHtml(cleanLink)}" onclick="handleLocalPathClick(event, this)" style="font-size: 11.5px; font-weight: 600; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: ${isCompact ? '160px' : '320px'}; cursor: pointer;" title="Click to copy & open: ${escapeHtml(cleanLink)}">
+                    📁 <span style="font-family: 'JetBrains Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(cleanLink)}</span>
+                </a>
+                <button type="button" class="btn btn-outline" data-path="${escapeHtml(cleanLink)}" style="padding: 1px 6px; font-size: 10.5px; border-radius: 4px; font-weight: 700; cursor: pointer; border-color: var(--primary); color: var(--primary); flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px;" onclick="event.stopPropagation(); handleCopyButtonClick(this)" title="Copy clean path to clipboard">
+                    📋 <span>Copy</span>
+                </button>
+            </div>
+        `;
+    }
+}
+
+function handleCopyButtonClick(btn) {
+    const raw = btn.getAttribute('data-path') || '';
+    copyPathToClipboard(raw);
+}
+
+function handleLocalPathClick(e, linkEl) {
+    const raw = linkEl.getAttribute('data-path') || '';
+    copyPathToClipboard(raw);
+}
+
+function copyPathToClipboard(path) {
+    const clean = sanitizePathString(path);
+    if (!clean) return;
+
+    let successful = false;
+
+    // Fallback method via textarea (works 100% reliably in all browsers/localhost/HTTP/HTTPS)
+    try {
+        const textarea = document.createElement('textarea');
+        textarea.value = clean;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        successful = document.execCommand('copy');
+        document.body.removeChild(textarea);
+    } catch (err) {
+        successful = false;
+    }
+
+    if (successful) {
+        showToast(`📋 Copied: ${clean}`, "success");
+        return;
+    }
+
+    // Modern Clipboard API if available
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(clean).then(() => {
+            showToast(`📋 Copied: ${clean}`, "success");
+        }).catch(() => {
+            prompt("Copy path below (Ctrl+C):", clean);
+        });
+    } else {
+        prompt("Copy path below (Ctrl+C):", clean);
+    }
+}
+
+function openOrCopyLocalPath(path, e) {
+    const clean = sanitizePathString(path);
+    copyPathToClipboard(clean);
 }
 
 async function loadAssignedTasks() {
@@ -106,15 +228,13 @@ function createTaskCard(task) {
     const card = document.createElement('div');
     card.className = `task-item-card status-${task.status}`;
 
-    const priorityClass = task.priority || 'medium';
     const isCompleted = task.status === 'completed';
     const assignedFormatted = formatTaskDateTime(task.created_at);
     const completedFormatted = formatTaskDateTime(task.completed_at);
 
     card.innerHTML = `
-        <div class="task-header">
-            <span class="task-priority-pill ${priorityClass}">${task.priority}</span>
-            <select class="input-control" style="font-size: 11px; padding: 2px 6px;" onchange="updateTaskStatus(${task.id}, this.value)">
+        <div class="task-header" style="justify-content: flex-end;">
+            <select class="input-control" style="font-size: 11px; padding: 2px 6px; font-weight: 600;" onchange="updateTaskStatus(${task.id}, this.value)">
                 <option value="pending" ${task.status === 'pending' ? 'selected' : ''}>⏳ Pending</option>
                 <option value="in_progress" ${task.status === 'in_progress' ? 'selected' : ''}>⚡ In Progress</option>
                 <option value="completed" ${task.status === 'completed' ? 'selected' : ''}>✅ Completed</option>
@@ -122,14 +242,14 @@ function createTaskCard(task) {
         </div>
         <div class="task-title" style="${isCompleted ? 'text-decoration: line-through; opacity: 0.7;' : ''}">${escapeHtml(task.title)}</div>
         ${task.description ? `<div class="task-desc">${escapeHtml(task.description)}</div>` : ''}
+        ${task.link ? `<div style="margin-top: 6px;">${renderPathLinkHtml(task.link, false)}</div>` : ''}
         
-        <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px; display: flex; flex-direction: column; gap: 2px;">
-            ${assignedFormatted ? `<div>📅 <strong style="color: var(--text-muted);">Assigned:</strong> ${escapeHtml(assignedFormatted)}</div>` : ''}
+        <div style="font-size: 11.5px; color: var(--text-dim); margin-top: 6px; display: flex; flex-direction: column; gap: 3px;">
+            ${assignedFormatted ? `<div>🕒 <strong style="color: var(--text-muted);">Assigned:</strong> ${escapeHtml(assignedFormatted)}</div>` : ''}
             ${isCompleted && completedFormatted ? `<div style="color: #10b981;">✅ <strong>Completed:</strong> ${escapeHtml(completedFormatted)}</div>` : ''}
         </div>
 
-        <div class="task-footer-bar" style="margin-top: 10px;">
-            <span class="task-category-tag">📂 ${escapeHtml(task.content_type || 'General')} • ${escapeHtml(task.department || 'Digital')}</span>
+        <div class="task-footer-bar" style="margin-top: 10px; justify-content: flex-end;">
             <button type="button" class="btn-convert-task" onclick="convertTaskToSheetEntry(${JSON.stringify(task).replace(/"/g, '&quot;')})">
                 + Add to Sheet
             </button>
@@ -169,31 +289,279 @@ function convertTaskToSheetEntry(task) {
         return;
     }
 
-    const defaultTimeSlot = "11:30 AM to 01:00 PM";
+    const cleanLink = sanitizePathString(task.link);
+
     addTableRow({
-        time_slot: defaultTimeSlot,
-        content_type: task.content_type || 'FB Videos',
-        department: task.department || 'Digital',
-        link: '',
+        time_slot: '',
+        content_type: '',
+        department: '',
+        link: cleanLink,
         title: task.title
     }, true);
 
     showToast(`Added "${task.title}" to your daily worksheet!`, 'success');
 }
 
-// Admin Task Creation Modal & Actions
-function openAssignTaskModal() {
-    const empSelect = document.getElementById('assign-task-emp-select');
-    if (empSelect) {
-        empSelect.innerHTML = '<option value="">-- Select Employee --</option>';
-        AppState.employees.forEach(emp => {
-            const opt = document.createElement('option');
-            opt.value = emp.id;
-            opt.textContent = `${emp.name} (${emp.email}) [${emp.team_name || 'General'}]`;
-            empSelect.appendChild(opt);
-        });
+// Helper: Format Date object to YYYY-MM-DD
+function formatDateToYMD(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Date Stepper Adjusters for Assign Modal
+function adjustAssignDueDate(deltaDays) {
+    const input = document.getElementById('assign-task-due-date');
+    if (!input) return;
+    const current = input.value ? new Date(input.value + 'T00:00:00') : new Date();
+    current.setDate(current.getDate() + deltaDays);
+    input.value = formatDateToYMD(current);
+}
+
+function setAssignDueDateToday() {
+    const input = document.getElementById('assign-task-due-date');
+    if (input) input.value = formatDateToYMD(new Date());
+}
+
+// Date Stepper Adjusters for Edit Modal
+function adjustEditDueDate(deltaDays) {
+    const input = document.getElementById('edit-task-due-date');
+    if (!input) return;
+    const current = input.value ? new Date(input.value + 'T00:00:00') : new Date();
+    current.setDate(current.getDate() + deltaDays);
+    input.value = formatDateToYMD(current);
+}
+
+function setEditDueDateToday() {
+    const input = document.getElementById('edit-task-due-date');
+    if (input) input.value = formatDateToYMD(new Date());
+}
+
+// Searchable Employee Dropdown for Assign Task Modal
+function renderAssignTaskEmpDropdownList(employees) {
+    const list = document.getElementById('assign-task-emp-dropdown-list');
+    if (!list) return;
+
+    list.innerHTML = '';
+    if (!employees || employees.length === 0) {
+        list.innerHTML = '<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 12px;">No employee found</div>';
+        return;
     }
 
+    const currentVal = document.getElementById('assign-task-emp-select')?.value;
+
+    employees.forEach(emp => {
+        const isSelected = currentVal == emp.id;
+        const item = document.createElement('div');
+        item.className = `searchable-emp-item ${isSelected ? 'selected' : ''}`;
+        item.style.cssText = `padding: 7px 10px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12.5px; transition: background 0.15s; ${isSelected ? 'background: rgba(59, 130, 246, 0.12); font-weight: 700;' : ''}`;
+        item.onclick = () => selectAssignTaskEmpFromDropdown(emp.id);
+
+        const avatarInitial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+        const avatarHtml = emp.avatar 
+            ? `<img src="${escapeHtml(emp.avatar)}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;\\'>${escapeHtml(avatarInitial)}</div>';">`
+            : `<div style="width: 26px; height: 26px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
+
+        item.innerHTML = `
+            ${avatarHtml}
+            <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <div style="color: var(--text-main); line-height: 1.2;">${escapeHtml(emp.name)}</div>
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.designation || 'Staff')} • ${escapeHtml(emp.team_name || emp.department_name || 'Team')}</div>
+            </div>
+            ${isSelected ? '<span style="color: var(--primary); font-size: 12px; font-weight: 800;">✓</span>' : ''}
+        `;
+        list.appendChild(item);
+    });
+}
+
+function filterAssignTaskEmpDropdown(query) {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) {
+        renderAssignTaskEmpDropdownList(AppState.employees);
+        return;
+    }
+    const filtered = (AppState.employees || []).filter(emp => 
+        emp.name.toLowerCase().includes(q) || 
+        (emp.email && emp.email.toLowerCase().includes(q)) ||
+        (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
+        (emp.department_name && emp.department_name.toLowerCase().includes(q))
+    );
+    renderAssignTaskEmpDropdownList(filtered);
+}
+
+function toggleAssignTaskEmpDropdown() {
+    const menu = document.getElementById('assign-task-emp-dropdown-menu');
+    const input = document.getElementById('assign-task-emp-search-input');
+    if (!menu) return;
+
+    const isVisible = menu.style.display === 'block';
+    if (isVisible) {
+        menu.style.display = 'none';
+    } else {
+        menu.style.display = 'block';
+        if (input) {
+            input.value = '';
+            filterAssignTaskEmpDropdown('');
+            setTimeout(() => input.focus(), 60);
+        }
+    }
+}
+
+function selectAssignTaskEmpFromDropdown(empId) {
+    const menu = document.getElementById('assign-task-emp-dropdown-menu');
+    if (menu) menu.style.display = 'none';
+
+    const hiddenInput = document.getElementById('assign-task-emp-select');
+    if (hiddenInput) hiddenInput.value = empId;
+
+    const emp = (AppState.employees || []).find(e => e.id == empId);
+    const labelSpan = document.getElementById('assign-task-emp-selected-name');
+    const avatarBox = document.getElementById('assign-task-emp-avatar');
+
+    if (labelSpan && emp) {
+        labelSpan.textContent = emp.name;
+    }
+
+    if (avatarBox && emp) {
+        const initial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+        if (emp.avatar) {
+            avatarBox.innerHTML = `<img src="${escapeHtml(emp.avatar)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<span>${escapeHtml(initial)}</span>';">`;
+        } else {
+            avatarBox.innerHTML = `<span>${escapeHtml(initial)}</span>`;
+        }
+    }
+
+    renderAssignTaskEmpDropdownList(AppState.employees);
+}
+
+// Searchable Employee Dropdown for Edit Task Modal
+function renderEditTaskEmpDropdownList(employees) {
+    const list = document.getElementById('edit-task-emp-dropdown-list');
+    if (!list) return;
+
+    list.innerHTML = '';
+    if (!employees || employees.length === 0) {
+        list.innerHTML = '<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 12px;">No employee found</div>';
+        return;
+    }
+
+    const currentVal = document.getElementById('edit-task-emp-select')?.value;
+
+    employees.forEach(emp => {
+        const isSelected = currentVal == emp.id;
+        const item = document.createElement('div');
+        item.className = `searchable-emp-item ${isSelected ? 'selected' : ''}`;
+        item.style.cssText = `padding: 7px 10px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12.5px; transition: background 0.15s; ${isSelected ? 'background: rgba(59, 130, 246, 0.12); font-weight: 700;' : ''}`;
+        item.onclick = () => selectEditTaskEmpFromDropdown(emp.id);
+
+        const avatarInitial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+        const avatarHtml = emp.avatar 
+            ? `<img src="${escapeHtml(emp.avatar)}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;\\'>${escapeHtml(avatarInitial)}</div>';">`
+            : `<div style="width: 26px; height: 26px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
+
+        item.innerHTML = `
+            ${avatarHtml}
+            <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <div style="color: var(--text-main); line-height: 1.2;">${escapeHtml(emp.name)}</div>
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.designation || 'Staff')} • ${escapeHtml(emp.team_name || emp.department_name || 'Team')}</div>
+            </div>
+            ${isSelected ? '<span style="color: var(--primary); font-size: 12px; font-weight: 800;">✓</span>' : ''}
+        `;
+        list.appendChild(item);
+    });
+}
+
+function filterEditTaskEmpDropdown(query) {
+    const q = (query || '').trim().toLowerCase();
+    if (!q) {
+        renderEditTaskEmpDropdownList(AppState.employees);
+        return;
+    }
+    const filtered = (AppState.employees || []).filter(emp => 
+        emp.name.toLowerCase().includes(q) || 
+        (emp.email && emp.email.toLowerCase().includes(q)) ||
+        (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
+        (emp.department_name && emp.department_name.toLowerCase().includes(q))
+    );
+    renderEditTaskEmpDropdownList(filtered);
+}
+
+function toggleEditTaskEmpDropdown() {
+    const menu = document.getElementById('edit-task-emp-dropdown-menu');
+    const input = document.getElementById('edit-task-emp-search-input');
+    if (!menu) return;
+
+    const isVisible = menu.style.display === 'block';
+    if (isVisible) {
+        menu.style.display = 'none';
+    } else {
+        menu.style.display = 'block';
+        if (input) {
+            input.value = '';
+            filterEditTaskEmpDropdown('');
+            setTimeout(() => input.focus(), 60);
+        }
+    }
+}
+
+function selectEditTaskEmpFromDropdown(empId) {
+    const menu = document.getElementById('edit-task-emp-dropdown-menu');
+    if (menu) menu.style.display = 'none';
+
+    const hiddenInput = document.getElementById('edit-task-emp-select');
+    if (hiddenInput) hiddenInput.value = empId;
+
+    const emp = (AppState.employees || []).find(e => e.id == empId);
+    const labelSpan = document.getElementById('edit-task-emp-selected-name');
+    const avatarBox = document.getElementById('edit-task-emp-avatar');
+
+    if (labelSpan && emp) {
+        labelSpan.textContent = emp.name;
+    }
+
+    if (avatarBox && emp) {
+        const initial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+        if (emp.avatar) {
+            avatarBox.innerHTML = `<img src="${escapeHtml(emp.avatar)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<span>${escapeHtml(initial)}</span>';">`;
+        } else {
+            avatarBox.innerHTML = `<span>${escapeHtml(initial)}</span>`;
+        }
+    }
+
+    renderEditTaskEmpDropdownList(AppState.employees);
+}
+
+// Admin Task Creation Modal & Actions
+function openAssignTaskModal() {
+    // Default to the currently inspected admin employee or the first available employee
+    const defaultEmpId = AppState.adminSelectedEmpId || (AppState.employees && AppState.employees[0] ? AppState.employees[0].id : '');
+    
+    const hiddenInput = document.getElementById('assign-task-emp-select');
+    if (hiddenInput) hiddenInput.value = defaultEmpId;
+
+    const titleInput = document.getElementById('assign-task-title');
+    if (titleInput) titleInput.value = '';
+
+    const descInput = document.getElementById('assign-task-desc');
+    if (descInput) descInput.value = '';
+
+    const linkInput = document.getElementById('assign-task-link');
+    if (linkInput) linkInput.value = '';
+
+    const dateInput = document.getElementById('assign-task-due-date');
+    if (dateInput) dateInput.value = formatDateToYMD(new Date());
+
+    if (defaultEmpId) {
+        selectAssignTaskEmpFromDropdown(defaultEmpId);
+    } else {
+        const labelSpan = document.getElementById('assign-task-emp-selected-name');
+        if (labelSpan) labelSpan.textContent = '-- Select Employee --';
+        const avatarBox = document.getElementById('assign-task-emp-avatar');
+        if (avatarBox) avatarBox.innerHTML = '👤';
+    }
+
+    renderAssignTaskEmpDropdownList(AppState.employees);
     openModal('assign-task-modal');
 }
 
@@ -203,10 +571,8 @@ async function handleCreateTaskSubmit(e) {
     const empId = document.getElementById('assign-task-emp-select')?.value;
     const title = document.getElementById('assign-task-title')?.value;
     const desc = document.getElementById('assign-task-desc')?.value;
-    const contentType = document.getElementById('assign-task-content-type')?.value;
-    const department = document.getElementById('assign-task-dept')?.value;
-    const priority = document.getElementById('assign-task-priority')?.value;
-    const dueDate = document.getElementById('assign-task-due-date')?.value || new Date().toISOString().split('T')[0];
+    const rawLink = document.getElementById('assign-task-link')?.value || '';
+    const cleanLink = sanitizePathString(rawLink);
 
     if (!empId || !title) {
         showToast("Please select an employee and enter a task title.", "error");
@@ -222,10 +588,7 @@ async function handleCreateTaskSubmit(e) {
                 assigned_to: empId,
                 title: title,
                 description: desc,
-                content_type: contentType,
-                department: department,
-                priority: priority,
-                due_date: dueDate
+                link: cleanLink
             })
         });
         const data = await res.json();
@@ -255,29 +618,14 @@ function openEditTaskModal(taskId) {
         return;
     }
 
-    // Populate employee select options
-    const empSelect = document.getElementById('edit-task-emp-select');
-    if (empSelect) {
-        empSelect.innerHTML = '<option value="">-- Select Employee --</option>';
-        AppState.employees.forEach(emp => {
-            const opt = document.createElement('option');
-            opt.value = emp.id;
-            opt.textContent = `${emp.name} (${emp.email}) [${emp.team_name || 'General'}]`;
-            if (emp.id == task.assigned_to) {
-                opt.selected = true;
-            }
-            empSelect.appendChild(opt);
-        });
-    }
+    // Pre-select employee in searchable dropdown
+    selectEditTaskEmpFromDropdown(task.assigned_to);
 
     // Pre-fill inputs
     document.getElementById('edit-task-id').value = task.id;
     document.getElementById('edit-task-title').value = task.title || '';
     document.getElementById('edit-task-desc').value = task.description || '';
-    document.getElementById('edit-task-content-type').value = task.content_type || 'FB Videos';
-    document.getElementById('edit-task-dept').value = task.department || 'Digital';
-    document.getElementById('edit-task-priority').value = task.priority || 'medium';
-    document.getElementById('edit-task-due-date').value = task.due_date || '';
+    document.getElementById('edit-task-link').value = sanitizePathString(task.link);
     document.getElementById('edit-task-status').value = task.status || 'pending';
 
     // Set Timestamps Display
@@ -300,6 +648,7 @@ function openEditTaskModal(taskId) {
         }
     }
 
+    renderEditTaskEmpDropdownList(AppState.employees);
     openModal('edit-task-modal');
 }
 
@@ -315,10 +664,8 @@ async function handleEditTaskSubmit(e) {
     const empId = document.getElementById('edit-task-emp-select')?.value;
     const title = document.getElementById('edit-task-title')?.value;
     const desc = document.getElementById('edit-task-desc')?.value;
-    const contentType = document.getElementById('edit-task-content-type')?.value;
-    const department = document.getElementById('edit-task-dept')?.value;
-    const priority = document.getElementById('edit-task-priority')?.value;
-    const dueDate = document.getElementById('edit-task-due-date')?.value || '';
+    const rawLink = document.getElementById('edit-task-link')?.value || '';
+    const cleanLink = sanitizePathString(rawLink);
     const status = document.getElementById('edit-task-status')?.value || 'pending';
 
     if (!taskId || !empId || !title) {
@@ -336,10 +683,7 @@ async function handleEditTaskSubmit(e) {
                 assigned_to: empId,
                 title: title,
                 description: desc,
-                content_type: contentType,
-                department: department,
-                priority: priority,
-                due_date: dueDate,
+                link: cleanLink,
                 status: status
             })
         });
@@ -356,6 +700,62 @@ async function handleEditTaskSubmit(e) {
     }
 }
 
+// View Full Task Details Modal
+function openViewTaskModal(taskId) {
+    const task = (AppState.tasks || []).find(t => t.id == taskId);
+    if (!task) return;
+
+    const titleEl = document.getElementById('view-task-title');
+    const empEl = document.getElementById('view-task-emp-name');
+    const statusBadgeEl = document.getElementById('view-task-status-badge');
+    const descEl = document.getElementById('view-task-desc');
+    const linkEl = document.getElementById('view-task-link');
+    const createdEl = document.getElementById('view-task-created-at');
+    const completedEl = document.getElementById('view-task-completed-at');
+    const editBtn = document.getElementById('view-task-edit-btn');
+
+    if (titleEl) titleEl.textContent = task.title || '—';
+    if (empEl) empEl.textContent = `${task.employee_name || 'Unassigned'} • ${task.employee_designation || 'Staff'}`;
+
+    const statusBadges = {
+        'pending': '<span class="status-badge pending" style="background: rgba(234, 179, 8, 0.15); color: #ca8a04; border: 1px solid rgba(234, 179, 8, 0.3); padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11.5px;">⏳ Pending</span>',
+        'in_progress': '<span class="status-badge progress" style="background: rgba(59, 130, 246, 0.15); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.3); padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11.5px;">⚡ In Progress</span>',
+        'completed': '<span class="status-badge completed" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 8px; border-radius: 4px; font-weight: 700; font-size: 11.5px;">✅ Completed</span>'
+    };
+    if (statusBadgeEl) statusBadgeEl.innerHTML = statusBadges[task.status] || task.status;
+
+    if (descEl) descEl.textContent = task.description ? task.description : 'No description provided.';
+    if (linkEl) linkEl.innerHTML = task.link ? renderPathLinkHtml(task.link, false) : '<span style="color: var(--text-dim); font-size: 12px;">No path or link attached</span>';
+
+    const shortCreated = formatTaskDateTimeShort(task.created_at);
+    const shortCompleted = formatTaskDateTimeShort(task.completed_at);
+
+    if (createdEl) createdEl.textContent = shortCreated ? shortCreated.full : '—';
+    if (completedEl) {
+        if (task.status === 'completed' && shortCompleted) {
+            completedEl.textContent = shortCompleted.full;
+            completedEl.style.color = '#10b981';
+        } else {
+            completedEl.textContent = '— Not Completed (Pending)';
+            completedEl.style.color = 'var(--text-dim)';
+        }
+    }
+
+    if (editBtn) {
+        if (hasPermission('can_edit_tasks')) {
+            editBtn.style.display = 'inline-flex';
+            editBtn.onclick = () => {
+                closeModal('view-task-modal');
+                openEditTaskModal(task.id);
+            };
+        } else {
+            editBtn.style.display = 'none';
+        }
+    }
+
+    openModal('view-task-modal');
+}
+
 function renderAdminTaskList(tasks) {
     const tbody = document.getElementById('admin-tasks-tbody');
     if (!tbody) return;
@@ -370,66 +770,67 @@ function renderAdminTaskList(tasks) {
 
     tasks.forEach(t => {
         const tr = document.createElement('tr');
-        const assignedTimeFormatted = formatTaskDateTime(t.created_at) || '—';
-        const completedTimeFormatted = formatTaskDateTime(t.completed_at);
+        const assignedShort = formatTaskDateTimeShort(t.created_at);
+        const completedShort = formatTaskDateTimeShort(t.completed_at);
         const isCompleted = t.status === 'completed';
 
         tr.innerHTML = `
             <td>
-                <strong>${escapeHtml(t.employee_name)}</strong>
+                <strong style="color: var(--text-main); font-size: 12.5px;">${escapeHtml(t.employee_name)}</strong>
                 <div style="font-size: 11px; color: var(--text-dim);">${escapeHtml(t.employee_designation || 'Staff')}</div>
             </td>
             <td>
-                <div style="font-weight: 700; ${isCompleted ? 'text-decoration: line-through; opacity: 0.75;' : ''}">${escapeHtml(t.title)}</div>
-                ${t.description ? `<div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(t.description)}</div>` : ''}
-                ${t.due_date ? `<div style="font-size: 11px; color: var(--text-dim); margin-top: 3px;">📅 Due: ${escapeHtml(t.due_date)}</div>` : ''}
-            </td>
-            <td>
-                <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
-                    <span class="task-priority-pill ${t.priority}">${t.priority}</span>
-                    <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(t.content_type || 'General')} • ${escapeHtml(t.department || 'Digital')}</span>
+                <div style="font-weight: 700; font-size: 13px; color: var(--primary); cursor: pointer; ${isCompleted ? 'text-decoration: line-through; opacity: 0.75;' : ''}" onclick="openViewTaskModal(${t.id})" title="Click to view complete details">
+                    ${escapeHtml(t.title)}
                 </div>
             </td>
             <td>
-                <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-main);">
-                    <span>📅</span>
-                    <span>${escapeHtml(assignedTimeFormatted)}</span>
-                </div>
+                ${t.description ? `
+                    <div style="font-size: 12.5px; color: var(--text-main); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; cursor: pointer;" onclick="openViewTaskModal(${t.id})" title="Click to view full description: ${escapeHtml(t.description)}">
+                        ${escapeHtml(t.description)}
+                    </div>
+                ` : `<div style="color: var(--text-dim); font-size: 11.5px; font-style: italic;">No description</div>`}
+                ${t.link ? `<div style="margin-top: 6px;">${renderPathLinkHtml(t.link, false)}</div>` : ''}
             </td>
             <td>
-                ${isCompleted && completedTimeFormatted ? `
-                    <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #10b981;">
-                        <span>✅</span>
-                        <span>${escapeHtml(completedTimeFormatted)}</span>
+                ${assignedShort ? `
+                    <div style="line-height: 1.25;">
+                        <div style="font-weight: 700; font-size: 11.5px; color: var(--text-main);">${escapeHtml(assignedShort.date)}</div>
+                        <div style="font-size: 10.5px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace;">${escapeHtml(assignedShort.time)}</div>
+                    </div>
+                ` : `<span style="color: var(--text-dim); font-size: 11.5px;">—</span>`}
+            </td>
+            <td>
+                ${isCompleted && completedShort ? `
+                    <div style="line-height: 1.25; color: #10b981;">
+                        <div style="font-weight: 700; font-size: 11.5px;">${escapeHtml(completedShort.date)}</div>
+                        <div style="font-size: 10.5px; font-family: 'JetBrains Mono', monospace;">${escapeHtml(completedShort.time)}</div>
                     </div>
                 ` : `
-                    <span style="font-size: 11.5px; color: var(--text-dim); background: var(--bg-card-elevated); padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border-color);">
-                        ⏳ ${t.status === 'in_progress' ? 'In Progress' : 'Pending'}
-                    </span>
+                    <span style="font-size: 13px; color: var(--text-dim); font-weight: 600;">—</span>
                 `}
             </td>
             <td>
-                <select class="input-control" style="font-size: 11.5px; padding: 4px 8px; font-weight: 600;" onchange="updateTaskStatus(${t.id}, this.value)">
+                <select class="input-control" style="font-size: 11.5px; padding: 4px 8px; font-weight: 700; width: 100%; min-width: 115px; border-radius: var(--radius-sm); cursor: pointer;" onchange="updateTaskStatus(${t.id}, this.value)">
                     <option value="pending" ${t.status === 'pending' ? 'selected' : ''}>⏳ Pending</option>
                     <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>⚡ In Progress</option>
                     <option value="completed" ${t.status === 'completed' ? 'selected' : ''}>✅ Completed</option>
                 </select>
             </td>
             <td>
-                ${canEdit ? `
-                    <div style="display: flex; align-items: center; gap: 8px; justify-content: center; white-space: nowrap;">
-                        <button type="button" class="btn btn-outline" style="padding: 5px 10px; font-size: 11.5px; white-space: nowrap;" onclick="openEditTaskModal(${t.id})" title="Edit Task Details">
-                            ✏️ Edit
+                <div style="display: flex; align-items: center; gap: 4px; justify-content: center; white-space: nowrap;">
+                    <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px;" onclick="openViewTaskModal(${t.id})" title="View Details">
+                        👁️
+                    </button>
+                    ${canEdit ? `
+                        <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px;" onclick="openEditTaskModal(${t.id})" title="Edit Task">
+                            ✏️
                         </button>
-                        <button type="button" class="btn-icon-del" style="padding: 5px 9px; font-size: 13px;" onclick="deleteTask(${t.id})" title="Delete Task">
+                        <button type="button" class="btn-icon-del" style="padding: 4px 6px; font-size: 11.5px;" onclick="deleteTask(${t.id})" title="Delete Task">
                             🗑️
                         </button>
-                    </div>
-                ` : `
-                    <div style="text-align: center; color: var(--text-muted); font-size: 11.5px; opacity: 0.6;">
-                        —
-                    </div>
-                `}
+                    ` : ''}
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
@@ -585,10 +986,26 @@ function selectTaskEmpFromDropdown(empId) {
     loadAssignedTasks();
 }
 
+// Global click outside listener to auto-close dropdowns
 document.addEventListener('click', (e) => {
-    const wrapper = document.getElementById('task-emp-search-wrapper');
-    const menu = document.getElementById('task-emp-dropdown-menu');
-    if (wrapper && menu && !wrapper.contains(e.target)) {
-        menu.style.display = 'none';
+    // Task Filter Dropdown
+    const filterWrapper = document.getElementById('task-emp-search-wrapper');
+    const filterMenu = document.getElementById('task-emp-dropdown-menu');
+    if (filterWrapper && filterMenu && !filterWrapper.contains(e.target)) {
+        filterMenu.style.display = 'none';
+    }
+
+    // Assign Task Modal Dropdown
+    const assignWrapper = document.getElementById('assign-task-emp-search-wrapper');
+    const assignMenu = document.getElementById('assign-task-emp-dropdown-menu');
+    if (assignWrapper && assignMenu && !assignWrapper.contains(e.target)) {
+        assignMenu.style.display = 'none';
+    }
+
+    // Edit Task Modal Dropdown
+    const editWrapper = document.getElementById('edit-task-emp-search-wrapper');
+    const editMenu = document.getElementById('edit-task-emp-dropdown-menu');
+    if (editWrapper && editMenu && !editWrapper.contains(e.target)) {
+        editMenu.style.display = 'none';
     }
 });

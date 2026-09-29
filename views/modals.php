@@ -1,38 +1,71 @@
-    <!-- MODAL: MANDATORY LOGIN WITH EMAIL & PASSWORD -->
-    <div id="login-modal" class="modal-overlay">
-        <div class="modal-card" style="max-width: 460px; text-align: center;">
-            <div style="padding: 24px 24px 0; display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                <img src="assets/img/logo.svg" alt="Discover Pakistan UHD TV" style="height: 48px; width: auto; object-fit: contain;">
-                <h3 style="font-size: 18px; font-weight: 800; margin: 0; color: var(--text-main);">Sign In to Your Account</h3>
+    <!-- MODAL: MANDATORY LOGIN WITH FRESH & UPLIFTING UI -->
+    <div id="login-modal" class="modal-overlay login-overlay-backdrop">
+        <!-- Floating ambient glowing orbs -->
+        <div class="login-ambient-orb orb-1"></div>
+        <div class="login-ambient-orb orb-2"></div>
+        <div class="login-ambient-orb orb-3"></div>
+
+        <div class="modal-card login-card-fresh">
+            <!-- Joyful Header Banner -->
+            <div class="login-header-fresh">
+                <div class="login-brand-pill">
+                    <img src="assets/img/logo.svg" alt="Discover Pakistan UHD TV" class="login-logo-img">
+                </div>
+                <h3 id="login-greeting-title" class="login-greeting-title">Welcome Back, Creator! ✨</h3>
+                <p class="login-greeting-sub">Ready to make today impactful? Sign in to your workspace.</p>
             </div>
+
             <form id="login-form" onsubmit="handleLoginSubmit(event)">
-                <div class="modal-body" style="padding: 16px 24px 20px;">
-                    <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 2px;">
-                        Please sign in with your official employee email and password to access your daily worksheet.
-                    </p>
-
-                    <div class="form-group" style="text-align: left;">
-                        <label class="form-label">Quick Select Account (Optional)</label>
-                        <select id="login-quick-email" class="input-control" onchange="if(this.value){ document.getElementById('login-email').value = this.value; document.getElementById('login-password').value = 'DiscoverPakistan123'; }">
-                            <!-- Populated via app.js -->
-                        </select>
+                <div class="modal-body login-body-fresh">
+                    <!-- Quick Account Selector (Pill / Avatar styled) -->
+                    <div class="form-group login-field-group">
+                        <label class="form-label login-label">
+                            <span>⚡ Quick Choose Profile</span>
+                            <span class="login-optional-tag">1-Click Auto Fill</span>
+                        </label>
+                        <div class="login-input-wrapper">
+                            <span class="login-input-icon">👤</span>
+                            <select id="login-quick-email" class="input-control login-input-control" onchange="handleQuickAccountSelect(this.value)">
+                                <!-- Populated via app.js -->
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="form-group" style="text-align: left;">
-                        <label class="form-label">Employee Email *</label>
-                        <input type="email" id="login-email" class="input-control" placeholder="e.g. zeeeguest@gmail.com" value="zeeeguest@gmail.com" required>
+                    <!-- Email Input -->
+                    <div class="form-group login-field-group">
+                        <label class="form-label login-label">Official Employee Email *</label>
+                        <div class="login-input-wrapper">
+                            <span class="login-input-icon">✉️</span>
+                            <input type="email" id="login-email" class="input-control login-input-control" placeholder="e.g. yourname@discoverpakistan.tv" value="zeeeguest@gmail.com" required autocomplete="username">
+                        </div>
                     </div>
 
-                    <div class="form-group" style="text-align: left;">
-                        <label class="form-label">Password *</label>
-                        <input type="password" id="login-password" class="input-control" placeholder="Default: DiscoverPakistan123" value="DiscoverPakistan123" required>
-                        <small style="color: var(--text-dim); font-size: 11px;">Default password: <code style="color: var(--primary);">DiscoverPakistan123</code></small>
+                    <!-- Password Input with Show/Hide Toggle -->
+                    <div class="form-group login-field-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <label class="form-label login-label" style="margin-bottom: 0;">Password *</label>
+                            <span class="login-default-hint" onclick="fillDefaultPassword()" title="Click to auto-fill default password">
+                                🔑 Default: <code>DiscoverPakistan123</code>
+                            </span>
+                        </div>
+                        <div class="login-input-wrapper" style="margin-top: 6px;">
+                            <span class="login-input-icon">🔒</span>
+                            <input type="password" id="login-password" class="input-control login-input-control" placeholder="Enter password" value="DiscoverPakistan123" required autocomplete="current-password">
+                            <button type="button" class="btn-toggle-password" onclick="toggleLoginPasswordVisibility()" title="Show/Hide Password">
+                                <span id="login-password-eye-icon">👁️</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer" style="padding: 16px 24px; background: var(--bg-card-elevated);">
-                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight: 700;">
-                        🔑 Sign In to WorkSheet Pro
+
+                <div class="modal-footer login-footer-fresh">
+                    <button type="submit" id="login-submit-btn" class="btn btn-primary login-cta-btn">
+                        <span>🚀</span>
+                        <span>Sign In to WorkSheet Pro</span>
                     </button>
+                    <div class="login-motivational-quote">
+                        🌟 Discover Pakistan UHD TV • Teamwork & Creativity
+                    </div>
                 </div>
             </form>
         </div>
@@ -48,11 +81,29 @@
             </div>
             <form id="assign-task-form" onsubmit="handleCreateTaskSubmit(event)">
                 <div class="modal-body">
+                    <!-- Assign to Employee (Searchable with Avatar like Dashboard) -->
                     <div class="form-group">
                         <label class="form-label">Assign To Employee *</label>
-                        <select id="assign-task-emp-select" class="input-control" required>
-                            <!-- Populated dynamically -->
-                        </select>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                            <div id="assign-task-emp-avatar" class="admin-inspector-avatar" style="width: 38px; height: 38px; font-size: 16px;">👤</div>
+                            <div class="searchable-dropdown-wrapper" id="assign-task-emp-search-wrapper" style="position: relative; flex: 1;">
+                                <button type="button" id="assign-task-emp-dropdown-btn" class="input-control" style="font-weight: 700; font-size: 13.5px; padding: 8px 12px; width: 100%; border-color: var(--primary); background: var(--bg-card); cursor: pointer; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;" onclick="toggleAssignTaskEmpDropdown()">
+                                    <span id="assign-task-emp-selected-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-- Select Employee --</span>
+                                    <span style="font-size: 10px; color: var(--text-muted);">▼</span>
+                                </button>
+                                <input type="hidden" id="assign-task-emp-select" value="" required>
+
+                                <!-- Floating Search Dropdown Menu -->
+                                <div id="assign-task-emp-dropdown-menu" class="searchable-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 1050; padding: 8px; text-align: left;">
+                                    <div style="padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 6px;">
+                                        <input type="text" id="assign-task-emp-search-input" class="input-control" placeholder="🔍 Search employee by name, team..." style="width: 100%; padding: 6px 10px; font-size: 12.5px;" oninput="filterAssignTaskEmpDropdown(this.value)" autocomplete="off">
+                                    </div>
+                                    <div id="assign-task-emp-dropdown-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -62,46 +113,12 @@
 
                     <div class="form-group">
                         <label class="form-label">Instructions / Description</label>
-                        <textarea id="assign-task-desc" class="form-textarea" placeholder="Specific guidelines, format, or tags..."></textarea>
+                        <textarea id="assign-task-desc" class="form-textarea" placeholder="Specific guidelines, format, or tags..." rows="3"></textarea>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div class="form-group">
-                            <label class="form-label">Content Type</label>
-                            <select id="assign-task-content-type" class="input-control">
-                                <option value="Reel">Reel</option>
-                                <option value="YT Videos">YT Videos</option>
-                                <option value="Post Card">Post Card</option>
-                                <option value="FB Videos" selected>FB Videos</option>
-                                <option value="Podcast">Podcast</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Department</label>
-                            <select id="assign-task-dept" class="input-control">
-                                <option value="Digital" selected>Digital</option>
-                                <option value="News Room">News Room</option>
-                                <option value="Programming">Programming</option>
-                                <option value="Documentary">Documentary</option>
-                                <option value="Others">Others</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div class="form-group">
-                            <label class="form-label">Priority</label>
-                            <select id="assign-task-priority" class="input-control">
-                                <option value="low">Low</option>
-                                <option value="medium" selected>Medium</option>
-                                <option value="high">High</option>
-                                <option value="urgent">Urgent</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Due Date</label>
-                            <input type="date" id="assign-task-due-date" class="input-control" value="<?= date('Y-m-d') ?>">
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label">Path / Link (Local Folder or Web URL)</label>
+                        <input type="text" id="assign-task-link" class="input-control" placeholder="e.g. C:\xampp\htdocs\Worksheet or https://drive.google.com/..." oninput="this.value = this.value.replace(/^[&quot;']+|[&quot;']+$/g, '').trim()" style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -122,11 +139,29 @@
             <form id="edit-task-form" onsubmit="handleEditTaskSubmit(event)">
                 <input type="hidden" id="edit-task-id">
                 <div class="modal-body">
+                    <!-- Assign to Employee (Searchable with Avatar like Dashboard) -->
                     <div class="form-group">
                         <label class="form-label">Assign To Employee *</label>
-                        <select id="edit-task-emp-select" class="input-control" required>
-                            <!-- Populated dynamically -->
-                        </select>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                            <div id="edit-task-emp-avatar" class="admin-inspector-avatar" style="width: 38px; height: 38px; font-size: 16px;">👤</div>
+                            <div class="searchable-dropdown-wrapper" id="edit-task-emp-search-wrapper" style="position: relative; flex: 1;">
+                                <button type="button" id="edit-task-emp-dropdown-btn" class="input-control" style="font-weight: 700; font-size: 13.5px; padding: 8px 12px; width: 100%; border-color: var(--primary); background: var(--bg-card); cursor: pointer; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;" onclick="toggleEditTaskEmpDropdown()">
+                                    <span id="edit-task-emp-selected-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-- Select Employee --</span>
+                                    <span style="font-size: 10px; color: var(--text-muted);">▼</span>
+                                </button>
+                                <input type="hidden" id="edit-task-emp-select" value="" required>
+
+                                <!-- Floating Search Dropdown Menu -->
+                                <div id="edit-task-emp-dropdown-menu" class="searchable-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 1050; padding: 8px; text-align: left;">
+                                    <div style="padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 6px;">
+                                        <input type="text" id="edit-task-emp-search-input" class="input-control" placeholder="🔍 Search employee by name, team..." style="width: 100%; padding: 6px 10px; font-size: 12.5px;" oninput="filterEditTaskEmpDropdown(this.value)" autocomplete="off">
+                                    </div>
+                                    <div id="edit-task-emp-dropdown-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -136,54 +171,21 @@
 
                     <div class="form-group">
                         <label class="form-label">Instructions / Description</label>
-                        <textarea id="edit-task-desc" class="form-textarea" placeholder="Specific guidelines, format, or tags..."></textarea>
+                        <textarea id="edit-task-desc" class="form-textarea" placeholder="Specific guidelines, format, or tags..." rows="3"></textarea>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div class="form-group">
-                            <label class="form-label">Content Type</label>
-                            <select id="edit-task-content-type" class="input-control">
-                                <option value="Reel">Reel</option>
-                                <option value="YT Videos">YT Videos</option>
-                                <option value="Post Card">Post Card</option>
-                                <option value="FB Videos">FB Videos</option>
-                                <option value="Podcast">Podcast</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Department</label>
-                            <select id="edit-task-dept" class="input-control">
-                                <option value="Digital">Digital</option>
-                                <option value="News Room">News Room</option>
-                                <option value="Programming">Programming</option>
-                                <option value="Documentary">Documentary</option>
-                                <option value="Others">Others</option>
-                            </select>
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label">Path / Link (Local Folder or Web URL)</label>
+                        <input type="text" id="edit-task-link" class="input-control" placeholder="e.g. C:\xampp\htdocs\Worksheet or https://drive.google.com/..." oninput="this.value = this.value.replace(/^[&quot;']+|[&quot;']+$/g, '').trim()" style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
-                        <div class="form-group">
-                            <label class="form-label">Priority</label>
-                            <select id="edit-task-priority" class="input-control">
-                                <option value="low">Low</option>
-                                <option value="medium">Medium</option>
-                                <option value="high">High</option>
-                                <option value="urgent">Urgent</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Due Date</label>
-                            <input type="date" id="edit-task-due-date" class="input-control">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Status</label>
-                            <select id="edit-task-status" class="input-control">
-                                <option value="pending">⏳ Pending</option>
-                                <option value="in_progress">⚡ In Progress</option>
-                                <option value="completed">✅ Completed</option>
-                            </select>
-                        </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select id="edit-task-status" class="input-control" style="padding: 7px 12px; font-weight: 600;">
+                            <option value="pending">⏳ Pending</option>
+                            <option value="in_progress">⚡ In Progress</option>
+                            <option value="completed">✅ Completed</option>
+                        </select>
                     </div>
 
                     <!-- Timestamps Log Display -->
@@ -203,6 +205,58 @@
                     <button type="submit" class="btn btn-primary">Save Task Changes</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: VIEW FULL TASK DETAILS -->
+    <div id="view-task-modal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 540px;">
+            <div class="modal-header">
+                <h3>📌 Task Details</h3>
+                <button type="button" class="btn-modal-close" onclick="closeModal('view-task-modal')">✕</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+                <div>
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Task Title</div>
+                    <div id="view-task-title" style="font-size: 16px; font-weight: 800; color: var(--text-main); margin-top: 3px;">—</div>
+                </div>
+
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                    <div>
+                        <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Assigned To</div>
+                        <div id="view-task-emp-name" style="font-weight: 700; color: var(--text-main); font-size: 13.5px;">—</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Status</div>
+                        <div id="view-task-status-badge">—</div>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Instructions / Description</div>
+                    <div id="view-task-desc" style="margin-top: 4px; padding: 10px 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 13px; color: var(--text-main); white-space: pre-wrap; line-height: 1.5; min-height: 48px;">—</div>
+                </div>
+
+                <div>
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Path / Link</div>
+                    <div id="view-task-link" style="margin-top: 4px;">—</div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; padding: 10px 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                    <div>
+                        <span style="color: var(--text-muted); font-weight: 600;">🕒 Assigned:</span>
+                        <div id="view-task-created-at" style="font-weight: 700; color: var(--text-main); font-family: 'JetBrains Mono', monospace; margin-top: 2px;">—</div>
+                    </div>
+                    <div>
+                        <span style="color: var(--text-muted); font-weight: 600;">✅ Completed:</span>
+                        <div id="view-task-completed-at" style="font-weight: 700; color: #10b981; font-family: 'JetBrains Mono', monospace; margin-top: 2px;">—</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <button type="button" id="view-task-edit-btn" class="btn btn-outline" onclick="">✏️ Edit Task</button>
+                <button type="button" class="btn btn-primary" onclick="closeModal('view-task-modal')">Close</button>
+            </div>
         </div>
     </div>
 

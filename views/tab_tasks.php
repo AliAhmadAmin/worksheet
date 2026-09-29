@@ -3,8 +3,8 @@
             <div class="worksheet-card">
                 <div class="card-header-flex">
                     <div class="card-title-group">
-                        <h3>🎯 Task Assignment Command Center</h3>
-                        <p>Assign specific tasks to individual team members, filter by status, and monitor real-time completion.</p>
+                        <h3 id="tasks-page-title">🎯 Task Assignment Command Center</h3>
+                        <p id="tasks-page-desc">Assign specific tasks to individual team members, filter by status, and monitor real-time completion.</p>
                     </div>
                     <div class="controls-group">
                         <select id="task-filter-status" class="input-control" onchange="loadAssignedTasks()">
@@ -68,13 +68,13 @@
                     <table class="interactive-table">
                         <thead>
                             <tr>
-                                <th style="width: 14%;">Assigned To</th>
-                                <th style="width: 20%;">Task Title / Instructions</th>
-                                <th style="width: 12%;">Category & Priority</th>
-                                <th style="width: 15%;">Assigned Date & Time</th>
-                                <th style="width: 15%;">Completion Date & Time</th>
-                                <th style="width: 12%;">Status</th>
-                                <th style="width: 12%; text-align: center;">Actions</th>
+                                <th style="width: 15%;">Assigned To</th>
+                                <th style="width: 20%;">Task Title</th>
+                                <th style="width: 26%;">Description & Link</th>
+                                <th style="width: 10%;">Assigned</th>
+                                <th style="width: 10%;">Completed</th>
+                                <th style="width: 11%;">Status</th>
+                                <th style="width: 8%; text-align: center;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="admin-tasks-tbody">

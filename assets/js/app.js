@@ -122,6 +122,7 @@ async function initApp() {
             loadUserData();
         } else {
             // Show mandatory login modal
+            updateLoginGreeting();
             openModal('login-modal');
         }
 
@@ -133,14 +134,59 @@ async function initApp() {
     }
 }
 
+function updateLoginGreeting() {
+    const titleEl = document.getElementById('login-greeting-title');
+    if (!titleEl) return;
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) {
+        titleEl.textContent = 'Good morning, Superstar! ☀️';
+    } else if (hour >= 12 && hour < 17) {
+        titleEl.textContent = 'Good afternoon, Creator! 🚀';
+    } else {
+        titleEl.textContent = 'Welcome Back, Champion! ✨';
+    }
+}
+
+function handleQuickAccountSelect(email) {
+    if (!email) return;
+    const emailInput = document.getElementById('login-email');
+    const passInput = document.getElementById('login-password');
+    if (emailInput) emailInput.value = email;
+    if (passInput) passInput.value = 'DiscoverPakistan123';
+    showToast(`Selected ${email}`, "info");
+}
+
+function fillDefaultPassword() {
+    const passInput = document.getElementById('login-password');
+    if (passInput) {
+        passInput.value = 'DiscoverPakistan123';
+        showToast("🔑 Default password auto-filled!", "success");
+    }
+}
+
+function toggleLoginPasswordVisibility() {
+    const passInput = document.getElementById('login-password');
+    const eyeIcon = document.getElementById('login-password-eye-icon');
+    if (!passInput) return;
+
+    if (passInput.type === 'password') {
+        passInput.type = 'text';
+        if (eyeIcon) eyeIcon.textContent = '🙈';
+    } else {
+        passInput.type = 'password';
+        if (eyeIcon) eyeIcon.textContent = '👁️';
+    }
+}
+
 function populateEmailSelectors() {
+    updateLoginGreeting();
     const loginEmailSelect = document.getElementById('login-quick-email');
     if (loginEmailSelect) {
-        loginEmailSelect.innerHTML = '<option value="">-- Or Choose Employee Account --</option>';
+        loginEmailSelect.innerHTML = '<option value="">-- Choose Employee Account to Auto Fill --</option>';
         AppState.employees.forEach(emp => {
             const opt = document.createElement('option');
             opt.value = emp.email;
-            opt.textContent = `${emp.name} — ${emp.email} [${emp.team_name || 'Team'}]`;
+            opt.textContent = `${emp.name} — ${emp.designation || 'Staff'} [${emp.team_name || 'Team'}]`;
             loginEmailSelect.appendChild(opt);
         });
     }
@@ -193,6 +239,7 @@ async function handleLogout() {
         AppState.currentUser = null;
         stopLiveTimer();
         showToast("Logged out successfully.", "info");
+        updateLoginGreeting();
         openModal('login-modal');
     } catch (err) {
         location.reload();
@@ -411,12 +458,16 @@ function renderUserBar() {
 
     // Dynamic Tab & Section Labeling
     const navTabLabel = document.getElementById('main-nav-tab-label');
+    const tasksNavLabel = document.getElementById('tasks-nav-tab-label');
     const wsHeading = document.getElementById('worksheet-title-heading');
     const wsDesc = document.getElementById('worksheet-title-desc');
     const sideHeading = document.getElementById('sidebar-tasks-heading');
     const sideDesc = document.getElementById('sidebar-tasks-desc');
+    const tasksPageTitle = document.getElementById('tasks-page-title');
+    const tasksPageDesc = document.getElementById('tasks-page-desc');
 
     const canInspect = hasPermission('can_inspect_sheets');
+    const canAssign = user.role === 'admin' || hasPermission('can_assign_tasks');
 
     if (user.role === 'admin' || canInspect) {
         if (navTabLabel) navTabLabel.innerHTML = '🏠 Dashboard';
@@ -430,6 +481,16 @@ function renderUserBar() {
         if (wsDesc) wsDesc.textContent = 'Record your work batches, content types, departments, and links.';
         if (sideHeading) sideHeading.textContent = '🎯 My Assigned Tasks';
         if (sideDesc) sideDesc.textContent = 'Tasks assigned exclusively to you. Click "+ Add to Sheet" when done.';
+    }
+
+    if (canAssign) {
+        if (tasksNavLabel) tasksNavLabel.innerHTML = '🎯 Task Assigner';
+        if (tasksPageTitle) tasksPageTitle.textContent = '🎯 Task Assignment Command Center';
+        if (tasksPageDesc) tasksPageDesc.textContent = 'Assign specific tasks to individual team members, filter by status, and monitor real-time completion.';
+    } else {
+        if (tasksNavLabel) tasksNavLabel.innerHTML = '🎯 Tasks';
+        if (tasksPageTitle) tasksPageTitle.textContent = '🎯 My Assigned Tasks';
+        if (tasksPageDesc) tasksPageDesc.textContent = 'View your assigned tasks, access project paths/links, and track completion.';
     }
 
     // User Badge Interactivity: Opens My Profile & Settings for all users
