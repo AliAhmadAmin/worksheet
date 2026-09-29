@@ -12,28 +12,40 @@
                     <img src="assets/img/logo.svg" alt="Discover Pakistan UHD TV" class="login-logo-img">
                 </div>
                 <h3 id="login-greeting-title" class="login-greeting-title">Welcome Back, Creator! ✨</h3>
-                <p class="login-greeting-sub">Ready to make today impactful? Sign in to your workspace.</p>
             </div>
 
             <form id="login-form" onsubmit="handleLoginSubmit(event)">
                 <div class="modal-body login-body-fresh">
-                    <!-- Quick Account Selector (Pill / Avatar styled) -->
+                    <!-- Quick Account Selector (Searchable Dropdown with Avatar like Hourly Sheet) -->
                     <div class="form-group login-field-group">
                         <label class="form-label login-label">
-                            <span>⚡ Quick Choose Profile</span>
-                            <span class="login-optional-tag">1-Click Auto Fill</span>
+                            <span>Select Your Profile</span>
                         </label>
-                        <div class="login-input-wrapper">
-                            <span class="login-input-icon">👤</span>
-                            <select id="login-quick-email" class="input-control login-input-control" onchange="handleQuickAccountSelect(this.value)">
-                                <!-- Populated via app.js -->
-                            </select>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                            <div id="login-emp-avatar" class="admin-inspector-avatar" style="width: 40px; height: 40px; font-size: 16px; border-radius: 50%; flex-shrink: 0;">👤</div>
+                            <div class="searchable-dropdown-wrapper" id="login-emp-search-wrapper" style="position: relative; flex: 1;">
+                                <button type="button" id="login-emp-dropdown-btn" class="input-control" style="font-weight: 700; font-size: 13.5px; padding: 9px 14px; width: 100%; border-color: var(--primary); background: var(--bg-card); cursor: pointer; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;" onclick="toggleLoginEmpDropdown()">
+                                    <span id="login-emp-selected-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-- Choose Employee Profile --</span>
+                                    <span style="font-size: 10px; color: var(--text-muted);">▼</span>
+                                </button>
+                                <input type="hidden" id="login-quick-email" value="">
+
+                                <!-- Floating Search Dropdown Menu -->
+                                <div id="login-emp-dropdown-menu" class="searchable-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 1050; padding: 8px; text-align: left;">
+                                    <div style="padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 6px;">
+                                        <input type="text" id="login-emp-search-input" class="input-control" placeholder="🔍 Search employee by name, team..." style="width: 100%; padding: 7px 10px; font-size: 12.5px; border-radius: 8px;" oninput="filterLoginEmpDropdown(this.value)" autocomplete="off">
+                                    </div>
+                                    <div id="login-emp-dropdown-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Email Input -->
                     <div class="form-group login-field-group">
-                        <label class="form-label login-label">Official Employee Email *</label>
+                        <label class="form-label login-label">Email / Username *</label>
                         <div class="login-input-wrapper">
                             <span class="login-input-icon">✉️</span>
                             <input type="email" id="login-email" class="input-control login-input-control" placeholder="e.g. yourname@discoverpakistan.tv" value="zeeeguest@gmail.com" required autocomplete="username">

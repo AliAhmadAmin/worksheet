@@ -5,6 +5,12 @@ scratch/
 # Exported SQL backups with timestamps
 worksheet_export_*.sql
 
+# User-uploaded files (avatars, images)
+uploads/*
+!uploads/.gitkeep
+uploads/avatars/*
+!uploads/avatars/.gitkeep
+
 # OS / IDE
 .DS_Store
 Thumbs.db
