@@ -1,0 +1,12 @@
+# Scratch and temporary debug scripts
+scratch/
+*.log
+
+# Exported SQL backups with timestamps
+worksheet_export_*.sql
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
