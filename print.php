@@ -543,13 +543,15 @@ $emptyRowsNeeded = $entryCount < 8 ? (8 - $entryCount) : 0;
         </footer>
     </div>
 
-    <!-- Direct Print Trigger -->
+    <!-- Direct Print Trigger (Only when opened directly, to avoid double-firing when loaded via iframe) -->
     <script>
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                window.print();
-            }, 100);
-        });
+        if (window.self === window.top) {
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    window.print();
+                }, 200);
+            });
+        }
     </script>
 </body>
 </html>

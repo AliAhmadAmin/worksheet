@@ -170,12 +170,12 @@
                     <table class="interactive-table">
                         <thead>
                             <tr>
-                                <th class="col-time-slot" style="width: 20%; min-width: 165px;">Time Slot</th>
-                                <th class="col-content-type" style="width: 15%; min-width: 155px;">Content Type</th>
-                                <th class="col-department" style="width: 15%; min-width: 155px;">Department</th>
-                                <th class="col-link" style="width: 20%; min-width: 180px;">Link / Upload</th>
-                                <th class="col-description" style="width: 25%; min-width: 200px;">Work Description / Title</th>
-                                <th class="col-action" style="width: 5%; min-width: 45px; text-align: center;">Action</th>
+                                <th class="col-time-slot" style="width: 18%; min-width: 160px;">Time Slot</th>
+                                <th class="col-content-type" style="width: 15%; min-width: 150px;">Content Type</th>
+                                <th class="col-department" style="width: 15%; min-width: 150px;">Department</th>
+                                <th class="col-link" style="width: 20%; min-width: 170px;">Link / Upload</th>
+                                <th class="col-description" style="width: 28%; min-width: 210px;">Work Description / Title</th>
+                                <th class="col-action" style="width: 4%; min-width: 45px; text-align: center;">Action</th>
                             </tr>
                         </thead>
                         <tbody id="worksheet-table-body">

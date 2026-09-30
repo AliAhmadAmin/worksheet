@@ -574,6 +574,11 @@ body {
     box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
 }
 
+.interactive-table input.input-time {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
 /* Lock Status Badge */
 .badge-lock {
     display: inline-flex;

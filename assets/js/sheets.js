@@ -323,6 +323,40 @@ function renderWorksheetTable(entries, canEdit) {
     setupWorksheetAutoSaveListeners();
 }
 
+// Helper to calculate consecutive next hour slot for adding rows seamlessly
+function getSuggestedNextTimeSlot() {
+    const rows = document.querySelectorAll('#worksheet-table-body tr.sheet-entry-row');
+    if (rows.length === 0) return '';
+    const lastRow = rows[rows.length - 1];
+    const timeInput = lastRow.querySelector('.input-time');
+    if (!timeInput || !timeInput.value.trim()) return '';
+
+    const prevSlot = timeInput.value.trim();
+    const match = prevSlot.match(/^(\d{1,2}(?::\d{1,2})?)\s*(AM|PM)?\s*(?:to|-)\s*(\d{1,2}(?::\d{1,2})?)\s*(AM|PM)?$/i);
+    if (match) {
+        let eTime = match[3];
+        const sAmpm = (match[2] || 'PM').toUpperCase();
+        const eAmpm = (match[4] || sAmpm || 'PM').toUpperCase();
+
+        const parts = eTime.split(':');
+        let h = parseInt(parts[0], 10);
+        let m = parts[1] || '00';
+        if (!isNaN(h)) {
+            let nextH = h + 1;
+            let nextAmpm = eAmpm;
+            if (nextH === 12) {
+                if (eAmpm === 'AM') nextAmpm = 'PM';
+                else if (eAmpm === 'PM') nextAmpm = 'AM';
+            } else if (nextH > 12) {
+                nextH = 1;
+            }
+            const nextEndStr = (parts.length > 1) ? `${String(nextH).padStart(2, '0')}:${m}` : `${nextH}:00`;
+            return `${eTime} to ${nextEndStr} ${nextAmpm}`;
+        }
+    }
+    return '';
+}
+
 function addTableRow(data = {}, canEdit = true, focusNew = false) {
     const tbody = document.getElementById('worksheet-table-body');
     if (!tbody) return;
@@ -336,16 +370,6 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
     const rawLink = data.link || '';
     const linkVal = (rawLink === 'upload') ? '' : rawLink;
     const titleVal = data.title || '';
-
-    // Generate 12-Hour Time Slot options with default unselected prompt
-    let timeOptions = `<option value="" ${!timeVal ? 'selected' : ''}>-- Select Time Slot --</option>`;
-    const isCustomTime = timeVal && !defaultTimeSlots.includes(timeVal);
-    if (isCustomTime) {
-        timeOptions += `<option value="${escapeHtml(timeVal)}" selected>${escapeHtml(timeVal)}</option>`;
-    }
-    timeOptions += defaultTimeSlots.map(t => 
-        `<option value="${t}" ${t === timeVal ? 'selected' : ''}>${t}</option>`
-    ).join('');
 
     // Generate Content Type options with default unselected prompt
     let typeOptions = `<option value="" ${!selectedType ? 'selected' : ''}>-- Select Content Type --</option>`;
@@ -363,9 +387,7 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
 
     row.innerHTML = `
         <td class="col-time-slot">
-            <select class="select-time input-control" style="width: 100%; font-weight: 600;" ${disabledAttr}>
-                ${timeOptions}
-            </select>
+            <input type="text" class="input-time input-control" placeholder="e.g. 5:00 to 6:00 AM" value="${escapeHtml(timeVal)}" style="width: 100%; font-weight: 600;" ${disabledAttr}>
         </td>
         <td class="col-content-type">
             <select class="select-content-type input-control" style="width: 100%;" ${disabledAttr}>
@@ -392,7 +414,7 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
 
     if (focusNew) {
         setTimeout(() => {
-            const focusTarget = row.querySelector('.select-time') || row.querySelector('.input-title');
+            const focusTarget = row.querySelector('.input-time') || row.querySelector('.input-title');
             if (focusTarget) {
                 focusTarget.focus();
                 focusTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -414,8 +436,10 @@ function addNewRowBelow() {
         return;
     }
 
+    const suggestedTimeSlot = getSuggestedNextTimeSlot();
+
     addTableRow({
-        time_slot: '',
+        time_slot: suggestedTimeSlot,
         content_type: '',
         department: '',
         link: '',
@@ -480,13 +504,13 @@ function setupWorksheetAutoSaveListeners() {
         tbody._hasAutoSaveListeners = true;
 
         tbody.addEventListener('input', (e) => {
-            if (e.target.matches('.input-link, .input-title')) {
+            if (e.target.matches('.input-time, .input-link, .input-title')) {
                 triggerAutoSave(700);
             }
         });
 
         tbody.addEventListener('change', (e) => {
-            if (e.target.matches('.select-time, .select-content-type, .select-dept')) {
+            if (e.target.matches('.input-time, .select-content-type, .select-dept')) {
                 triggerAutoSave(200);
             }
         });
@@ -814,7 +838,7 @@ async function saveCurrentWorksheet(notify = true, isAuto = false) {
     const entries = [];
 
     rows.forEach(r => {
-        const timeSlot = r.querySelector('.select-time')?.value || r.querySelector('.input-time')?.value || '';
+        const timeSlot = r.querySelector('.input-time')?.value || r.querySelector('.select-time')?.value || '';
         const contentType = r.querySelector('.select-content-type')?.value || '';
         const department = r.querySelector('.select-dept')?.value || '';
         const rawLink = r.querySelector('.input-link')?.value || '';
@@ -908,34 +932,44 @@ async function toggleSheetLock() {
 }
 
 // Print Current Day Sheet (Direct Print: Opens system print dialog directly)
+let isPrintingSheet = false;
+
 function triggerPrintSheet() {
+    if (isPrintingSheet) return;
+    isPrintingSheet = true;
+    setTimeout(() => { isPrintingSheet = false; }, 2000);
+
     const empId = getActiveWorksheetEmpId();
     const date = AppState.selectedDate;
     const printUrl = `print.php?employee_id=${empId}&date=${date}`;
 
     let printIframe = document.getElementById('direct-print-frame');
-    if (!printIframe) {
-        printIframe = document.createElement('iframe');
-        printIframe.id = 'direct-print-frame';
-        printIframe.style.position = 'fixed';
-        printIframe.style.right = '0';
-        printIframe.style.bottom = '0';
-        printIframe.style.width = '0';
-        printIframe.style.height = '0';
-        printIframe.style.border = 'none';
-        printIframe.style.visibility = 'hidden';
-        document.body.appendChild(printIframe);
+    if (printIframe) {
+        printIframe.remove();
     }
 
+    printIframe = document.createElement('iframe');
+    printIframe.id = 'direct-print-frame';
+    printIframe.style.position = 'fixed';
+    printIframe.style.right = '0';
+    printIframe.style.bottom = '0';
+    printIframe.style.width = '0';
+    printIframe.style.height = '0';
+    printIframe.style.border = 'none';
+    printIframe.style.visibility = 'hidden';
+
     printIframe.onload = function() {
-        try {
-            printIframe.contentWindow.focus();
-            printIframe.contentWindow.print();
-        } catch (err) {
-            window.open(printUrl, '_blank');
-        }
+        setTimeout(() => {
+            try {
+                printIframe.contentWindow.focus();
+                printIframe.contentWindow.print();
+            } catch (err) {
+                window.open(printUrl, '_blank');
+            }
+        }, 150);
     };
 
+    document.body.appendChild(printIframe);
     printIframe.src = printUrl;
 }
 
