@@ -117,13 +117,12 @@ async function initApp() {
 
         if (userData.success && userData.user) {
             AppState.currentUser = userData.user;
-            closeModal('login-modal');
             renderUserBar();
             loadUserData();
         } else {
-            // Show mandatory login modal
-            updateLoginGreeting();
-            openModal('login-modal');
+            // Redirect to dedicated login page
+            window.location.href = 'login.php';
+            return;
         }
 
         setupTabNavigation();
@@ -147,23 +146,6 @@ function updateLoginGreeting() {
     }
 }
 
-function handleQuickAccountSelect(email) {
-    if (!email) return;
-    const emailInput = document.getElementById('login-email');
-    const passInput = document.getElementById('login-password');
-    if (emailInput) emailInput.value = email;
-    if (passInput) passInput.value = 'DiscoverPakistan123';
-    showToast(`Selected ${email}`, "info");
-}
-
-function fillDefaultPassword() {
-    const passInput = document.getElementById('login-password');
-    if (passInput) {
-        passInput.value = 'DiscoverPakistan123';
-        showToast("🔑 Default password auto-filled!", "success");
-    }
-}
-
 function toggleLoginPasswordVisibility() {
     const passInput = document.getElementById('login-password');
     const eyeIcon = document.getElementById('login-password-eye-icon');
@@ -178,111 +160,28 @@ function toggleLoginPasswordVisibility() {
     }
 }
 
-function renderLoginEmpDropdownList(employees) {
-    const list = document.getElementById('login-emp-dropdown-list');
-    if (!list) return;
-
-    list.innerHTML = '';
-    if (!employees || employees.length === 0) {
-        list.innerHTML = '<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 12px;">No employee found</div>';
-        return;
-    }
-
-    const currentEmail = document.getElementById('login-quick-email')?.value;
-
-    employees.forEach(emp => {
-        const isSelected = currentEmail === emp.email;
-        const item = document.createElement('div');
-        item.className = `searchable-emp-item ${isSelected ? 'selected' : ''}`;
-        item.style.cssText = `padding: 7px 10px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12.5px; transition: background 0.15s; ${isSelected ? 'background: rgba(59, 130, 246, 0.12); font-weight: 700;' : ''}`;
-        item.onclick = () => selectLoginEmpFromDropdown(emp.id);
-
-        const avatarInitial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
-        const avatarHtml = emp.avatar 
-            ? `<img src="${escapeHtml(emp.avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:28px;height:28px;border-radius:50%;background:#0284c7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;\\'>${escapeHtml(avatarInitial)}</div>';">`
-            : `<div style="width: 28px; height: 28px; border-radius: 50%; background: #0284c7; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
-
-        item.innerHTML = `
-            ${avatarHtml}
-            <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;">
-                <div style="color: var(--text-main); line-height: 1.2; font-weight: 700;">${escapeHtml(emp.name)}</div>
-                <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.team_name || emp.department_name || 'Team')}</div>
-            </div>
-            ${isSelected ? '<span style="color: #10b981; font-size: 13px; font-weight: 800;">✓</span>' : ''}
-        `;
-        list.appendChild(item);
-    });
-}
-
-function filterLoginEmpDropdown(query) {
-    const q = (query || '').trim().toLowerCase();
-    if (!q) {
-        renderLoginEmpDropdownList(AppState.employees);
-        return;
-    }
-    const filtered = (AppState.employees || []).filter(emp => 
-        emp.name.toLowerCase().includes(q) || 
-        (emp.email && emp.email.toLowerCase().includes(q)) ||
-        (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
-        (emp.department_name && emp.department_name.toLowerCase().includes(q))
-    );
-    renderLoginEmpDropdownList(filtered);
-}
-
-function toggleLoginEmpDropdown() {
-    const menu = document.getElementById('login-emp-dropdown-menu');
-    const input = document.getElementById('login-emp-search-input');
-    if (!menu) return;
-
-    const isVisible = menu.style.display === 'block';
-    if (isVisible) {
-        menu.style.display = 'none';
-    } else {
-        menu.style.display = 'block';
-        if (input) {
-            input.value = '';
-            filterLoginEmpDropdown('');
-            setTimeout(() => input.focus(), 60);
-        }
-    }
-}
-
-function selectLoginEmpFromDropdown(empId) {
-    const emp = (AppState.employees || []).find(e => e.id == empId);
-    if (!emp) return;
-
-    const emailInput = document.getElementById('login-email');
-    const passInput = document.getElementById('login-password');
-    const hiddenEmail = document.getElementById('login-quick-email');
-    const nameSpan = document.getElementById('login-emp-selected-name');
-    const avatarBox = document.getElementById('login-emp-avatar');
-    const menu = document.getElementById('login-emp-dropdown-menu');
-
-    if (hiddenEmail) hiddenEmail.value = emp.email;
-    if (emailInput) emailInput.value = emp.email;
-    if (passInput) passInput.value = 'DiscoverPakistan123';
-    if (nameSpan) nameSpan.textContent = emp.name;
-
-    if (avatarBox) {
-        const initial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
-        if (emp.avatar) {
-            avatarBox.innerHTML = `<img src="${escapeHtml(emp.avatar)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div style=\\'width:100%;height:100%;border-radius:50%;background:#0284c7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;\\'>${escapeHtml(initial)}</div>';">`;
-        } else {
-            avatarBox.innerHTML = `<div style="width: 100%; height: 100%; border-radius: 50%; background: #0284c7; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700;">${escapeHtml(initial)}</div>`;
-        }
-    }
-
-    if (menu) menu.style.display = 'none';
-    renderLoginEmpDropdownList(AppState.employees);
-    showToast(`⚡ Selected profile: ${emp.name}`, "info");
-}
-
 function populateEmailSelectors() {
     updateLoginGreeting();
-    renderLoginEmpDropdownList(AppState.employees);
-
     if (typeof populateTaskEmployeeFilter === 'function') {
         populateTaskEmployeeFilter();
+    }
+}
+
+let selectedLoginWorkspace = (window.location.pathname.includes('hr.php')) ? 'hr' : 'digital';
+
+function selectLoginWorkspace(ws) {
+    selectedLoginWorkspace = ws;
+    document.querySelectorAll('.login-dept-pill').forEach(pill => pill.classList.remove('active'));
+    const targetPill = document.getElementById(`login-dept-pill-${ws}`);
+    if (targetPill) targetPill.classList.add('active');
+    const radio = document.getElementById(`login-ws-${ws}`);
+    if (radio) radio.checked = true;
+}
+
+function togglePortalMenu() {
+    const menu = document.getElementById('portal-dropdown-menu');
+    if (menu) {
+        menu.style.display = (menu.style.display === 'none' || !menu.style.display) ? 'flex' : 'none';
     }
 }
 
@@ -312,7 +211,31 @@ async function handleLoginSubmit(e) {
         if (data.success && data.user) {
             AppState.currentUser = data.user;
             closeModal('login-modal');
+
+            // Handle Remember My Email preference
+            const rememberMe = document.getElementById('login-remember-me')?.checked;
+            if (rememberMe) {
+                localStorage.setItem('worksheet_remembered_email', email);
+            } else {
+                localStorage.removeItem('worksheet_remembered_email');
+            }
+
+            // Clear password field for security
+            const passInput = document.getElementById('login-password');
+            if (passInput) passInput.value = '';
+
             showToast(`Welcome back, ${data.user.name}!`, "success");
+
+            // Redirect to appropriate workspace page if needed
+            const isHrPage = window.location.pathname.includes('hr.php');
+            if (selectedLoginWorkspace === 'hr' && !isHrPage) {
+                window.location.href = 'hr.php';
+                return;
+            } else if (selectedLoginWorkspace === 'digital' && isHrPage) {
+                window.location.href = 'index.php';
+                return;
+            }
+
             renderUserBar();
             loadUserData();
         } else {
@@ -323,48 +246,53 @@ async function handleLoginSubmit(e) {
     }
 }
 
-async function handleLogout() {
-    try {
-        await fetch('api/auth.php?action=logout');
-        AppState.currentUser = null;
-        stopLiveTimer();
-        showToast("Logged out successfully.", "info");
-        updateLoginGreeting();
-        openModal('login-modal');
-    } catch (err) {
-        location.reload();
+async function handleLogout(e) {
+    if (e) {
+        e.preventDefault();
     }
+    try {
+        if (typeof saveLocalDraft === 'function') {
+            saveLocalDraft();
+        }
+        if (typeof saveCurrentWorksheet === 'function') {
+            await saveCurrentWorksheet(false, false);
+        }
+        await fetch('api/auth.php?action=logout');
+    } catch (err) {}
+    window.location.href = 'logout.php';
+    return false;
 }
 
 function hasPermission(permKey) {
     if (!AppState.currentUser) return false;
-    if (AppState.currentUser.role === 'admin') return true;
+    if (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'hod') return true;
     return !!parseInt(AppState.currentUser[permKey] || 0);
 }
 
 async function loadUserData() {
     if (!AppState.currentUser) return;
 
-    const isAdmin = AppState.currentUser.role === 'admin';
-    const canInspect = hasPermission('can_inspect_sheets');
-    const canManage = hasPermission('can_manage_employees');
-    const canAttendance = hasPermission('can_view_attendance');
-    const canReports = hasPermission('can_view_reports');
+    const isSuperAdmin = AppState.currentUser.role === 'super_admin';
+    const isHod = AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'admin';
+    const canInspect = isSuperAdmin || isHod || hasPermission('can_inspect_sheets');
+    const canManage = isSuperAdmin || isHod || hasPermission('can_manage_employees');
+    const canAttendance = isSuperAdmin || isHod || hasPermission('can_view_attendance');
+    const canReports = isSuperAdmin || isHod || hasPermission('can_view_reports');
 
-    if (isAdmin || canInspect) {
+    if (canInspect) {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
         document.querySelectorAll('.employee-only').forEach(el => el.style.display = 'none');
         populateAdminEmployeeSelector();
         if (typeof populateTaskEmployeeFilter === 'function') {
             populateTaskEmployeeFilter();
         }
-        // Default inspected employee to first staff member (e.g. Zahra Kazmi id=2 or Abaid)
+        // Default inspected employee to first staff member of their department
         if (!AppState.adminSelectedEmpId) {
-            const firstStaff = AppState.employees.find(e => e.role !== 'admin');
-            AppState.adminSelectedEmpId = firstStaff ? firstStaff.id : 2;
+            const firstStaff = (AppState.employees || []).find(e => e.id !== AppState.currentUser.id && e.role !== 'super_admin');
+            AppState.adminSelectedEmpId = firstStaff ? firstStaff.id : (AppState.employees[0] ? AppState.employees[0].id : null);
         }
         const adminSelect = document.getElementById('admin-employee-select');
-        if (adminSelect) adminSelect.value = AppState.adminSelectedEmpId;
+        if (adminSelect && AppState.adminSelectedEmpId) adminSelect.value = AppState.adminSelectedEmpId;
     } else {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.employee-only').forEach(el => el.style.display = '');
@@ -374,21 +302,30 @@ async function loadUserData() {
     // Toggle specific navigation tab buttons based on permissions
     const btnAttendance = document.querySelector('.nav-btn[data-tab="tab-attendance"]');
     if (btnAttendance) {
-        btnAttendance.style.display = (isAdmin || canAttendance) ? '' : 'none';
+        btnAttendance.style.display = canAttendance ? '' : 'none';
     }
 
     const btnEmployees = document.querySelector('.nav-btn[data-tab="tab-employees"]');
     if (btnEmployees) {
-        btnEmployees.style.display = (isAdmin || canManage) ? '' : 'none';
+        btnEmployees.style.display = canManage ? '' : 'none';
     }
 
     const btnReports = document.querySelector('.nav-btn[data-tab="tab-reports"]');
     if (btnReports) {
-        btnReports.style.display = (isAdmin || canReports) ? '' : 'none';
+        btnReports.style.display = canReports ? '' : 'none';
+    }
+
+    const portalSwitcher = document.querySelector('.portal-switcher-wrapper');
+    if (portalSwitcher) {
+        // Portal switcher only available for Super Admin
+        portalSwitcher.style.display = isSuperAdmin ? '' : 'none';
     }
 
     await loadDailyWorksheet();
     await loadAssignedTasks();
+    if (typeof loadHrDashboard === 'function') {
+        loadHrDashboard();
+    }
     if (isAdmin || canAttendance) {
         loadLiveAttendance();
     }
@@ -519,10 +456,28 @@ document.addEventListener('click', (e) => {
         adminMenu.style.display = 'none';
     }
 
+    const repAttWrapper = document.getElementById('rep-att-emp-search-wrapper');
+    const repAttMenu = document.getElementById('rep-att-emp-dropdown-menu');
+    if (repAttWrapper && repAttMenu && !repAttWrapper.contains(e.target)) {
+        repAttMenu.style.display = 'none';
+    }
+
+    const taskWrapper = document.getElementById('task-emp-search-wrapper');
+    const taskMenu = document.getElementById('task-emp-dropdown-menu');
+    if (taskWrapper && taskMenu && !taskWrapper.contains(e.target)) {
+        taskMenu.style.display = 'none';
+    }
+
     const loginWrapper = document.getElementById('login-emp-search-wrapper');
     const loginMenu = document.getElementById('login-emp-dropdown-menu');
     if (loginWrapper && loginMenu && !loginWrapper.contains(e.target)) {
         loginMenu.style.display = 'none';
+    }
+
+    const portalWrapper = document.querySelector('.portal-switcher-wrapper');
+    const portalMenu = document.getElementById('portal-dropdown-menu');
+    if (portalWrapper && portalMenu && !portalWrapper.contains(e.target)) {
+        portalMenu.style.display = 'none';
     }
 });
 
@@ -589,6 +544,12 @@ function renderUserBar() {
         if (tasksPageDesc) tasksPageDesc.textContent = 'View your assigned tasks, access project paths/links, and track completion.';
     }
 
+    const hrNavLabel = document.getElementById('hr-nav-tab-label');
+    const canManageHr = user.role === 'admin' || hasPermission('can_manage_hr');
+    if (hrNavLabel) {
+        hrNavLabel.innerHTML = canManageHr ? '💼 HR Management' : '🏖️ Leaves & HR';
+    }
+
     // User Badge Interactivity: Opens My Profile & Settings for all users
     const userBadge = document.getElementById('nav-user-badge');
     if (userBadge) {
@@ -624,10 +585,20 @@ function handleAdminSelectEmployee(empId) {
     loadDailyWorksheet();
 }
 
+function toggleMobileSidebar() {
+    document.body.classList.toggle('sidebar-open');
+}
+
+function closeMobileSidebar() {
+    document.body.classList.remove('sidebar-open');
+}
+
 // Tab Navigation & URL Hash Routing
 function navigateToTab(tabId, updateHash = true) {
     const targetSection = document.getElementById(tabId);
     if (!targetSection) return;
+
+    closeMobileSidebar();
 
     const tabButtons = document.querySelectorAll('.nav-btn');
     tabButtons.forEach(b => {
@@ -649,6 +620,16 @@ function navigateToTab(tabId, updateHash = true) {
         loadReports();
     } else if (tabId === 'tab-attendance') {
         loadLiveAttendance();
+    } else if (tabId === 'tab-hr') {
+        if (typeof loadHrDashboard === 'function') loadHrDashboard();
+    } else if (tabId === 'tab-hr-leaves') {
+        if (typeof loadHrLeaves === 'function') loadHrLeaves();
+    } else if (tabId === 'tab-hr-loans') {
+        if (typeof loadHrLoans === 'function') loadHrLoans();
+    } else if (tabId === 'tab-hr-notices') {
+        if (typeof loadHrNotices === 'function') loadHrNotices();
+    } else if (tabId === 'tab-hr-payroll') {
+        if (typeof loadHrPayroll === 'function') loadHrPayroll();
     } else if (tabId === 'tab-employees') {
         loadEmployeeDirectory();
     } else if (tabId === 'tab-tasks') {
@@ -675,7 +656,15 @@ function setupTabNavigation() {
             if (matchedBtn) {
                 const tabId = matchedBtn.getAttribute('data-tab');
                 navigateToTab(tabId, false);
+                return;
             }
+        }
+
+        // Default: activate whichever tab button has .active on page render
+        const defaultActiveBtn = document.querySelector('.nav-btn.active');
+        if (defaultActiveBtn) {
+            const tabId = defaultActiveBtn.getAttribute('data-tab');
+            if (tabId) navigateToTab(tabId, false);
         }
     }
 
@@ -694,16 +683,58 @@ function closeModal(id) {
     if (m) m.classList.remove('active');
 }
 
-function startLiveTimer(initialSeconds = 0) {
-    stopLiveTimer();
-    AppState.elapsedSeconds = initialSeconds;
-    const timerElem = document.getElementById('duty-timer-digits');
-    if (timerElem) timerElem.textContent = formatDuration(AppState.elapsedSeconds);
+function parseDateTime(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return null;
+    let d = new Date(`${dateStr} ${timeStr}`);
+    if (!isNaN(d.getTime())) return d;
+    
+    // Parse manual formats like 'HH:mm:ss', 'HH:mm', 'hh:mm A', etc.
+    const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+    if (match) {
+        let [_, hour, minute, second, meridiem] = match;
+        hour = parseInt(hour, 10);
+        minute = parseInt(minute, 10);
+        second = second ? parseInt(second, 10) : 0;
+        if (meridiem) {
+            if (meridiem.toUpperCase() === 'PM' && hour < 12) hour += 12;
+            if (meridiem.toUpperCase() === 'AM' && hour === 12) hour = 0;
+        }
+        const [y, m, day] = dateStr.split('-').map(n => parseInt(n, 10));
+        return new Date(y, m - 1, day, hour, minute, second);
+    }
+    return null;
+}
 
-    AppState.timerInterval = setInterval(() => {
-        AppState.elapsedSeconds++;
-        if (timerElem) timerElem.textContent = formatDuration(AppState.elapsedSeconds);
-    }, 1000);
+function startLiveTimer(initialSeconds = 0, checkInTimeStr = null, shiftDateStr = null) {
+    stopLiveTimer();
+    
+    let startTimestamp = null;
+    if (shiftDateStr && checkInTimeStr) {
+        const inDate = parseDateTime(shiftDateStr, checkInTimeStr);
+        if (inDate && !isNaN(inDate.getTime())) {
+            startTimestamp = inDate.getTime();
+        }
+    }
+    
+    if (!startTimestamp) {
+        startTimestamp = Date.now() - (Math.max(0, initialSeconds) * 1000);
+    }
+    
+    AppState.timerStartTimestamp = startTimestamp;
+
+    const tick = () => {
+        if (!AppState.timerStartTimestamp) return;
+        const now = Date.now();
+        const elapsed = Math.max(0, Math.floor((now - AppState.timerStartTimestamp) / 1000));
+        AppState.elapsedSeconds = elapsed;
+        const timerElem = document.getElementById('duty-timer-digits');
+        if (timerElem) {
+            timerElem.textContent = formatDuration(elapsed);
+        }
+    };
+
+    tick();
+    AppState.timerInterval = setInterval(tick, 1000);
 }
 
 function stopLiveTimer() {
@@ -711,23 +742,70 @@ function stopLiveTimer() {
         clearInterval(AppState.timerInterval);
         AppState.timerInterval = null;
     }
+    AppState.timerStartTimestamp = null;
+}
+
+// Auto-resync timer immediately when switching tabs or focusing window
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && AppState.timerStartTimestamp) {
+        const now = Date.now();
+        const elapsed = Math.max(0, Math.floor((now - AppState.timerStartTimestamp) / 1000));
+        AppState.elapsedSeconds = elapsed;
+        const timerElem = document.getElementById('duty-timer-digits');
+        if (timerElem) {
+            timerElem.textContent = formatDuration(elapsed);
+        }
+    }
+});
+
+window.addEventListener('focus', () => {
+    if (AppState.timerStartTimestamp) {
+        const now = Date.now();
+        const elapsed = Math.max(0, Math.floor((now - AppState.timerStartTimestamp) / 1000));
+        AppState.elapsedSeconds = elapsed;
+        const timerElem = document.getElementById('duty-timer-digits');
+        if (timerElem) {
+            timerElem.textContent = formatDuration(elapsed);
+        }
+    }
+});
+
+function applyTheme(theme) {
+    document.body.setAttribute('data-theme', theme);
+    localStorage.setItem('worksheet_theme', theme);
+    
+    // Update theme toggle icons
+    const themeIcon = theme === 'dark' ? '☀️' : '🌙';
+    const themeLabel = theme === 'dark' ? 'Light' : 'Dark';
+    
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    if (themeBtn) {
+        const iconSpan = themeBtn.querySelector('.theme-icon');
+        const labelSpan = themeBtn.querySelector('.theme-label');
+        if (iconSpan) iconSpan.textContent = themeIcon;
+        if (labelSpan) labelSpan.textContent = themeLabel;
+        if (!iconSpan && !labelSpan) themeBtn.textContent = themeIcon;
+    }
+    
+    document.querySelectorAll('.theme-icon-indicator').forEach(el => {
+        el.textContent = themeIcon;
+    });
+}
+
+function toggleThemeQuick() {
+    const currentTheme = document.body.getAttribute('data-theme') || 'light';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(newTheme);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Ensure Light Mode by default
+    // Ensure Light Mode by default unless user prefers dark
     const savedTheme = localStorage.getItem('worksheet_theme') || 'light';
-    document.body.setAttribute('data-theme', savedTheme);
+    applyTheme(savedTheme);
 
     const themeBtn = document.getElementById('theme-toggle-btn');
     if (themeBtn) {
-        themeBtn.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
-        themeBtn.addEventListener('click', () => {
-            const currentTheme = document.body.getAttribute('data-theme') || 'light';
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            document.body.setAttribute('data-theme', newTheme);
-            localStorage.setItem('worksheet_theme', newTheme);
-            themeBtn.textContent = newTheme === 'dark' ? '🌙' : '☀️';
-        });
+        themeBtn.addEventListener('click', toggleThemeQuick);
     }
 
     initApp();
@@ -740,4 +818,20 @@ document.addEventListener('DOMContentLoaded', () => {
             loadDailyWorksheet();
         });
     }
+
+    // Keep session alive periodically while tab is open
+    setInterval(async () => {
+        if (AppState.currentUser) {
+            try {
+                await fetch('api/auth.php?action=current_user');
+            } catch (e) {}
+        }
+    }, 300000);
+
+    // Save offline draft on window close / tab navigation
+    window.addEventListener('beforeunload', () => {
+        if (typeof saveLocalDraft === 'function') {
+            saveLocalDraft();
+        }
+    });
 });

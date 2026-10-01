@@ -3,9 +3,9 @@
  * Hourly Work Sheet, Task Assigner & Reporting System
  * Main Application Dashboard (Modular View Architecture)
  */
-require_once __DIR__ . '/config/database.php';
-// Initialize MySQL database connection & seed records
-$pdo = getDbConnection();
+require_once __DIR__ . '/includes/auth_check.php';
+
+$currentPortal = 'digital';
 
 // 1. Header (HTML DocType, Head, Styles)
 require_once __DIR__ . '/includes/header.php';
@@ -20,6 +20,7 @@ require_once __DIR__ . '/includes/navbar.php';
     // Modular Feature Views
     require_once __DIR__ . '/views/tab_worksheet.php';
     require_once __DIR__ . '/views/tab_tasks.php';
+    require_once __DIR__ . '/views/tab_hr.php';
     require_once __DIR__ . '/views/tab_reports.php';
     require_once __DIR__ . '/views/tab_attendance.php';
     require_once __DIR__ . '/views/tab_employees.php';

@@ -29,9 +29,13 @@ async function loadEmployeeDirectory() {
         AppState.employees.forEach(emp => {
             const tr = document.createElement('tr');
             const isSelf = AppState.currentUser && AppState.currentUser.id === emp.id;
+            const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+            
             const roleConfig = {
+                super_admin: { label: '👑 Super Admin', bg: 'rgba(56, 189, 248, 0.15)', color: '#0284c7' },
                 admin: { label: '👑 Super Admin', bg: 'rgba(56, 189, 248, 0.15)', color: '#0284c7' },
-                hod: { label: '🎖️ HOD / Manager', bg: 'rgba(245, 158, 11, 0.15)', color: '#d97706' },
+                hr: { label: '👥 HR Manager', bg: 'rgba(236, 72, 153, 0.15)', color: '#db2777' },
+                hod: { label: '🏢 HOD / Manager', bg: 'rgba(245, 158, 11, 0.15)', color: '#d97706' },
                 team_lead: { label: '⭐ Team Lead', bg: 'rgba(16, 185, 129, 0.15)', color: '#059669' },
                 coordinator: { label: '🎯 Coordinator', bg: 'rgba(59, 130, 246, 0.15)', color: '#2563eb' },
                 employee: { label: '👤 Staff Member', bg: 'rgba(148, 163, 184, 0.15)', color: '#64748b' }
@@ -42,8 +46,10 @@ async function loadEmployeeDirectory() {
 
             // Collect active permissions pills
             const permPills = [];
-            if (emp.role === 'admin') {
-                permPills.push('<span style="font-size: 10px; color: #0284c7; background: rgba(56, 189, 248, 0.1); padding: 1px 5px; border-radius: 4px;">Full Access</span>');
+            if (emp.role === 'super_admin' || emp.role === 'admin') {
+                permPills.push('<span style="font-size: 10px; color: #0284c7; background: rgba(56, 189, 248, 0.1); padding: 1px 5px; border-radius: 4px;">Full Company Control</span>');
+            } else if (emp.role === 'hr') {
+                permPills.push('<span style="font-size: 10px; color: #db2777; background: rgba(236, 72, 153, 0.1); padding: 1px 5px; border-radius: 4px;">HR Management</span>');
             } else {
                 if (emp.can_assign_tasks) permPills.push('<span style="font-size: 10px; color: #3b82f6; background: rgba(59,130,246,0.1); padding: 1px 5px; border-radius: 4px;">Assign Tasks</span>');
                 if (emp.can_edit_tasks) permPills.push('<span style="font-size: 10px; color: #f59e0b; background: rgba(245,158,11,0.1); padding: 1px 5px; border-radius: 4px;">Edit Tasks</span>');
@@ -58,12 +64,22 @@ async function loadEmployeeDirectory() {
                 ? `<img src="${escapeHtml(emp.avatar)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 32px; height: 32px; font-size: 12px;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
                 : `<div class="user-avatar" style="width: 32px; height: 32px; font-size: 12px; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
 
+            const isFlexible = (emp.shift_policy === 'open_flexible' || parseFloat(emp.expected_hours || 8) === 0);
+            const shiftBadge = isFlexible
+                ? `<span style="display: inline-block; font-size: 10.5px; color: #0369a1; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; font-weight: 600; margin-top: 3px;">🌐 Flexible (Open)</span>`
+                : `<span style="display: inline-block; font-size: 10.5px; color: #475569; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 600; margin-top: 3px;">⏱️ ${parseFloat(emp.expected_hours || 8)}h Shift</span>`;
+
+            const salaryBadge = (parseFloat(emp.basic_salary) > 0 && (isSuperAdmin || (AppState.currentUser && AppState.currentUser.role === 'hr')))
+                ? `<div style="font-size: 10.5px; color: #15803d; font-weight: 700; margin-top: 2px;">💵 PKR ${Number(emp.basic_salary).toLocaleString()}</div>`
+                : '';
+
             tr.innerHTML = `
                 <td>
                     <div style="display: flex; align-items: center; gap: 10px;">
                         ${avatarHtml}
                         <div>
                             <strong>${escapeHtml(emp.name)}</strong> ${isSelf ? '<small style="color: var(--primary); font-weight: 700;">(You)</small>' : ''}
+                            <div>${shiftBadge}</div>
                         </div>
                     </div>
                 </td>
@@ -74,21 +90,26 @@ async function loadEmployeeDirectory() {
                         ${permPills.length > 0 ? `<div style="display: flex; flex-wrap: wrap; gap: 3px; max-width: 140px;">${permPills.join('')}</div>` : ''}
                     </div>
                 </td>
-                <td>${escapeHtml(emp.designation || 'Staff')}</td>
+                <td>
+                    <div>${escapeHtml(emp.designation || 'Staff')}</div>
+                    ${salaryBadge}
+                </td>
                 <td>${escapeHtml(emp.team_name || 'General')}</td>
                 <td>${escapeHtml(emp.department_name || 'Digital')}</td>
                 <td>
                     <div style="display: flex; align-items: center; gap: 6px; justify-content: flex-end; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700; border-color: rgba(59, 130, 246, 0.4); color: var(--primary);" onclick="openPermissionsModal(${emp.id})" title="Role & Access Delegation">
-                            🛡️ Roles
-                        </button>
+                        ${isSuperAdmin ? `
+                            <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700; border-color: rgba(59, 130, 246, 0.4); color: var(--primary);" onclick="openPermissionsModal(${emp.id})" title="Role & Access Delegation">
+                                🛡️ Roles
+                            </button>
+                        ` : ''}
                         <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px;" onclick="openEditEmployeeModal(${emp.id})" title="Edit Profile">
                             ✏️ Edit
                         </button>
                         <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px;" onclick="openPasswordModal(${emp.id})" title="Change Password">
                             🔑 Pwd
                         </button>
-                        ${!isSelf ? `
+                        ${(isSuperAdmin && !isSelf && emp.role !== 'super_admin' && emp.role !== 'admin') ? `
                             <button type="button" class="btn-icon-del" style="padding: 4px 8px; font-size: 12px;" onclick="deleteEmployee(${emp.id})" title="Remove Employee">
                                 🗑️
                             </button>
@@ -145,6 +166,24 @@ function openAddEmployeeModal() {
     const hiddenBase64 = document.getElementById('add-emp-avatar-base64');
     if (hiddenBase64) hiddenBase64.value = '';
 
+    const shiftSelect = document.getElementById('add-emp-shift-hours');
+    if (shiftSelect) shiftSelect.value = '8.0';
+
+    const salaryInput = document.getElementById('add-emp-salary');
+    if (salaryInput) salaryInput.value = '';
+
+    const joinInput = document.getElementById('add-emp-joining-date');
+    if (joinInput) joinInput.value = new Date().toISOString().slice(0, 10);
+
+    const annInput = document.getElementById('add-emp-annual-quota');
+    if (annInput) annInput.value = '14';
+
+    const casInput = document.getElementById('add-emp-casual-quota');
+    if (casInput) casInput.value = '10';
+
+    const sickInput = document.getElementById('add-emp-sick-quota');
+    if (sickInput) sickInput.value = '8';
+
     openModal('add-employee-modal');
 }
 
@@ -159,6 +198,13 @@ async function handleAddEmployeeSubmit(e) {
     const deptId = document.getElementById('add-emp-dept')?.value;
     const teamId = document.getElementById('add-emp-team')?.value;
     const avatar = document.getElementById('add-emp-avatar-base64')?.value || '';
+
+    const expectedHours = parseFloat(document.getElementById('add-emp-shift-hours')?.value || '8.0');
+    const basicSalary = parseFloat(document.getElementById('add-emp-salary')?.value || '0');
+    const joiningDate = document.getElementById('add-emp-joining-date')?.value || '';
+    const annualQuota = parseInt(document.getElementById('add-emp-annual-quota')?.value || '14', 10);
+    const casualQuota = parseInt(document.getElementById('add-emp-casual-quota')?.value || '10', 10);
+    const sickQuota = parseInt(document.getElementById('add-emp-sick-quota')?.value || '8', 10);
 
     if (!name || !email) {
         showToast("Name and email are required.", "error");
@@ -178,7 +224,13 @@ async function handleAddEmployeeSubmit(e) {
                 designation,
                 department_id: deptId,
                 team_id: teamId,
-                avatar
+                avatar,
+                expected_hours: expectedHours,
+                basic_salary: basicSalary,
+                joining_date: joiningDate,
+                annual_leave_quota: annualQuota,
+                casual_leave_quota: casualQuota,
+                sick_leave_quota: sickQuota
             })
         });
         const data = await res.json();
@@ -207,10 +259,38 @@ function openEditEmployeeModal(empId) {
     document.getElementById('edit-emp-id').value = emp.id;
     document.getElementById('edit-emp-name').value = emp.name;
     document.getElementById('edit-emp-email').value = emp.email;
-    document.getElementById('edit-emp-role').value = emp.role;
+    let editRole = emp.role || 'employee';
+    if (editRole === 'admin') editRole = 'super_admin';
+    document.getElementById('edit-emp-role').value = editRole;
     document.getElementById('edit-emp-designation').value = emp.designation || '';
     document.getElementById('edit-emp-dept').value = emp.department_id || 2;
     document.getElementById('edit-emp-team').value = emp.team_id || 2;
+
+    const shiftSelect = document.getElementById('edit-emp-shift-hours');
+    if (shiftSelect) {
+        const empHours = emp.expected_hours !== undefined ? parseFloat(emp.expected_hours).toFixed(1) : '8.0';
+        shiftSelect.value = empHours;
+        if (!shiftSelect.value) shiftSelect.value = '8.0';
+    }
+
+    const salaryInput = document.getElementById('edit-emp-salary');
+    if (salaryInput) {
+        salaryInput.value = (emp.basic_salary && parseFloat(emp.basic_salary) > 0) ? parseFloat(emp.basic_salary) : '';
+    }
+
+    const joinInput = document.getElementById('edit-emp-joining-date');
+    if (joinInput) {
+        joinInput.value = emp.joining_date || '';
+    }
+
+    const annInput = document.getElementById('edit-emp-annual-quota');
+    if (annInput) annInput.value = emp.annual_leave_quota !== undefined ? emp.annual_leave_quota : 14;
+
+    const casInput = document.getElementById('edit-emp-casual-quota');
+    if (casInput) casInput.value = emp.casual_leave_quota !== undefined ? emp.casual_leave_quota : 10;
+
+    const sickInput = document.getElementById('edit-emp-sick-quota');
+    if (sickInput) sickInput.value = emp.sick_leave_quota !== undefined ? emp.sick_leave_quota : 8;
 
     const prev = document.getElementById('edit-emp-avatar-preview');
     const hiddenBase64 = document.getElementById('edit-emp-avatar-base64');
@@ -245,6 +325,13 @@ async function handleEditEmployeeSubmit(e) {
     const teamId = document.getElementById('edit-emp-team')?.value;
     const avatar = document.getElementById('edit-emp-avatar-base64')?.value || '';
 
+    const expectedHours = parseFloat(document.getElementById('edit-emp-shift-hours')?.value || '8.0');
+    const basicSalary = parseFloat(document.getElementById('edit-emp-salary')?.value || '0');
+    const joiningDate = document.getElementById('edit-emp-joining-date')?.value || '';
+    const annualQuota = parseInt(document.getElementById('edit-emp-annual-quota')?.value || '14', 10);
+    const casualQuota = parseInt(document.getElementById('edit-emp-casual-quota')?.value || '10', 10);
+    const sickQuota = parseInt(document.getElementById('edit-emp-sick-quota')?.value || '8', 10);
+
     if (!id || !name || !email) {
         showToast("ID, name and email are required.", "error");
         return;
@@ -259,7 +346,13 @@ async function handleEditEmployeeSubmit(e) {
             role,
             designation,
             department_id: deptId,
-            team_id: teamId
+            team_id: teamId,
+            expected_hours: expectedHours,
+            basic_salary: basicSalary,
+            joining_date: joiningDate,
+            annual_leave_quota: annualQuota,
+            casual_leave_quota: casualQuota,
+            sick_leave_quota: sickQuota
         };
         if (avatar) payload.avatar = avatar;
 
@@ -558,6 +651,11 @@ async function handleMyProfileSubmit(e) {
 
 // Role & Permissions Delegation Modal Handler
 function openPermissionsModal(empId) {
+    if (!AppState.currentUser || (AppState.currentUser.role !== 'super_admin' && AppState.currentUser.role !== 'admin')) {
+        showToast("Only Super Admin can manage roles & permissions.", "error");
+        return;
+    }
+
     const emp = AppState.employees.find(e => e.id == empId);
     if (!emp) {
         showToast("Employee record not found.", "error");
@@ -583,17 +681,21 @@ function openPermissionsModal(empId) {
     // Set Role Select
     const roleSelect = document.getElementById('perm-role-select');
     if (roleSelect) {
-        roleSelect.value = emp.role || 'employee';
+        let r = emp.role || 'employee';
+        if (r === 'admin') r = 'super_admin';
+        roleSelect.value = r;
     }
 
+    const isFullAccess = (emp.role === 'super_admin' || emp.role === 'admin' || emp.role === 'hr');
+
     // Set Checkboxes
-    document.getElementById('perm-can-assign-tasks').checked = !!parseInt(emp.can_assign_tasks || (emp.role === 'admin' ? 1 : 0));
-    document.getElementById('perm-can-edit-tasks').checked = !!parseInt(emp.can_edit_tasks || (emp.role === 'admin' ? 1 : 0));
-    document.getElementById('perm-can-unlock-sheets').checked = !!parseInt(emp.can_unlock_sheets || (emp.role === 'admin' ? 1 : 0));
-    document.getElementById('perm-can-inspect-sheets').checked = !!parseInt(emp.can_inspect_sheets || (emp.role === 'admin' ? 1 : 0));
-    document.getElementById('perm-can-view-reports').checked = !!parseInt(emp.can_view_reports || (emp.role === 'admin' ? 1 : 0));
-    document.getElementById('perm-can-view-attendance').checked = !!parseInt(emp.can_view_attendance || (emp.role === 'admin' ? 1 : 0));
-    document.getElementById('perm-can-manage-employees').checked = !!parseInt(emp.can_manage_employees || (emp.role === 'admin' ? 1 : 0));
+    document.getElementById('perm-can-assign-tasks').checked = !!parseInt(emp.can_assign_tasks || (isFullAccess ? 1 : 0));
+    document.getElementById('perm-can-edit-tasks').checked = !!parseInt(emp.can_edit_tasks || (isFullAccess ? 1 : 0));
+    document.getElementById('perm-can-unlock-sheets').checked = !!parseInt(emp.can_unlock_sheets || (isFullAccess ? 1 : 0));
+    document.getElementById('perm-can-inspect-sheets').checked = !!parseInt(emp.can_inspect_sheets || (isFullAccess ? 1 : 0));
+    document.getElementById('perm-can-view-reports').checked = !!parseInt(emp.can_view_reports || (isFullAccess ? 1 : 0));
+    document.getElementById('perm-can-view-attendance').checked = !!parseInt(emp.can_view_attendance || (isFullAccess ? 1 : 0));
+    document.getElementById('perm-can-manage-employees').checked = !!parseInt(emp.can_manage_employees || (isFullAccess ? 1 : 0));
 
     openModal('permissions-modal');
 }
@@ -607,7 +709,7 @@ function applyRolePreset(roleValue) {
     const isAttendance = document.getElementById('perm-can-view-attendance');
     const isManageEmp = document.getElementById('perm-can-manage-employees');
 
-    if (roleValue === 'admin') {
+    if (roleValue === 'super_admin' || roleValue === 'admin' || roleValue === 'hr') {
         if (isAssign) isAssign.checked = true;
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;

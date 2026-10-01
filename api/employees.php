@@ -11,7 +11,8 @@ require_once __DIR__ . '/../config/database.php';
 $pdo = getDbConnection();
 $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$data = [];
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $rawInput = file_get_contents('php://input');
     $data = json_decode($rawInput, true) ?? $_POST;
     $action = $data['action'] ?? $action;
@@ -23,27 +24,56 @@ $stmtUserCheck->execute([$currentUserId]);
 $currentUserObj = $stmtUserCheck->fetch() ?: [];
 
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
-$canManageEmp = ($currentUserRole === 'admin') || !empty($currentUserObj['can_manage_employees']);
+$isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
+$isHod = ($currentUserRole === 'hod');
+$isHr = ($currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr'));
+$canManageEmp = $isSuperAdmin || $isHr || !empty($currentUserObj['can_manage_employees']);
 
 switch ($action) {
     case 'list':
-        $employees = $pdo->query("
+        $requestedDeptId = isset($_GET['department_id']) ? (int)$_GET['department_id'] : null;
+
+        $whereClauses = ["e.is_active = 1"];
+        $params = [];
+
+        if (!$isSuperAdmin && !$isHr) {
+            // HOD and employees are restricted to their own department
+            $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+            if ($userDeptId > 0) {
+                $whereClauses[] = "e.department_id = ?";
+                $params[] = $userDeptId;
+            }
+        } else if ($requestedDeptId) {
+            $whereClauses[] = "e.department_id = ?";
+            $params[] = $requestedDeptId;
+        }
+
+        $whereSql = implode(' AND ', $whereClauses);
+
+        $stmt = $pdo->prepare("
             SELECT e.*,
+                   p.basic_salary, p.hourly_rate, p.expected_hours, p.shift_policy, p.joining_date,
+                   p.annual_leave_quota, p.casual_leave_quota, p.sick_leave_quota,
                    d.name as department_name, t.name as team_name 
             FROM employees e 
+            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
             LEFT JOIN departments d ON e.department_id = d.id 
             LEFT JOIN teams t ON e.team_id = t.id 
-            WHERE e.is_active = 1 
+            WHERE {$whereSql}
             ORDER BY 
                 CASE e.role 
+                    WHEN 'super_admin' THEN 1 
                     WHEN 'admin' THEN 1 
-                    WHEN 'hod' THEN 2 
-                    WHEN 'team_lead' THEN 3 
-                    WHEN 'coordinator' THEN 4 
-                    ELSE 5 
+                    WHEN 'hr' THEN 2 
+                    WHEN 'hod' THEN 3 
+                    WHEN 'team_lead' THEN 4 
+                    WHEN 'coordinator' THEN 5 
+                    ELSE 6 
                 END, 
                 t.id ASC, e.name ASC
-        ")->fetchAll();
+        ");
+        $stmt->execute($params);
+        $employees = $stmt->fetchAll();
 
         // Strip password hashes
         foreach ($employees as &$emp) {
@@ -64,9 +94,10 @@ switch ($action) {
         break;
 
     case 'update_permissions':
-        if (!$canManageEmp) {
+        // STRICT SECURITY: Only Super Admin can modify roles and delegate access permissions
+        if (!$isSuperAdmin) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'You do not have authorization to manage roles & permissions.']);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized: Only Super Admin can modify organizational roles and permissions.']);
             exit;
         }
 
@@ -86,8 +117,15 @@ switch ($action) {
             exit;
         }
 
-        // If target is made admin, enable all permissions
-        if ($role === 'admin') {
+        // Prevent accidental self-demotion lockout of Super Admin
+        if ($targetId === $currentUserId && $role !== 'super_admin' && $role !== 'admin') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'You cannot remove Super Admin permissions from your own account.']);
+            exit;
+        }
+
+        // If target is made Super Admin or HR, enable all capabilities
+        if ($role === 'super_admin' || $role === 'admin' || $role === 'hr') {
             $canAssignTasks = 1;
             $canEditTasks = 1;
             $canUnlockSheets = 1;
@@ -122,9 +160,9 @@ switch ($action) {
         break;
 
     case 'create_employee':
-        if ($currentUserRole !== 'admin') {
+        if (!$canManageEmp) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Admin authorization required']);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
             exit;
         }
 
@@ -136,6 +174,14 @@ switch ($action) {
         $deptId = (int)($data['department_id'] ?? 2);
         $teamId = (int)($data['team_id'] ?? 2);
         $avatar = trim($data['avatar'] ?? '');
+
+        $expectedHours = isset($data['expected_hours']) ? (float)$data['expected_hours'] : 8.0;
+        $shiftPolicy = trim($data['shift_policy'] ?? ($expectedHours == 0.0 ? 'open_flexible' : 'standard_' . intval($expectedHours) . 'h'));
+        $basicSalary = isset($data['basic_salary']) ? (float)$data['basic_salary'] : 0.0;
+        $joiningDate = !empty($data['joining_date']) ? $data['joining_date'] : date('Y-m-d');
+        $annualQuota = isset($data['annual_leave_quota']) ? (int)$data['annual_leave_quota'] : 14;
+        $casualQuota = isset($data['casual_leave_quota']) ? (int)$data['casual_leave_quota'] : 10;
+        $sickQuota = isset($data['sick_leave_quota']) ? (int)$data['sick_leave_quota'] : 8;
 
         if (empty($name) || empty($email)) {
             http_response_code(400);
@@ -171,8 +217,16 @@ switch ($action) {
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
         $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)");
         $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar]);
+        $newEmpId = $pdo->lastInsertId();
 
-        echo json_encode(['success' => true, 'message' => "Employee {$name} added successfully!", 'id' => $pdo->lastInsertId()]);
+        // Create initial HR profile
+        $stmtProf = $pdo->prepare("
+            INSERT INTO hr_employee_profiles (employee_id, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmtProf->execute([$newEmpId, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
+
+        echo json_encode(['success' => true, 'message' => "Employee {$name} added successfully with shift and salary settings!", 'id' => $newEmpId]);
         break;
 
     case 'update_profile':
@@ -277,9 +331,9 @@ switch ($action) {
         break;
 
     case 'update_employee':
-        if ($currentUserRole !== 'admin') {
+        if (!$canManageEmp) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Admin authorization required']);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
             exit;
         }
 
@@ -291,6 +345,14 @@ switch ($action) {
         $deptId = (int)($data['department_id'] ?? 2);
         $teamId = (int)($data['team_id'] ?? 2);
         $avatar = trim($data['avatar'] ?? '');
+
+        $expectedHours = isset($data['expected_hours']) ? (float)$data['expected_hours'] : 8.0;
+        $shiftPolicy = trim($data['shift_policy'] ?? ($expectedHours == 0.0 ? 'open_flexible' : 'standard_' . intval($expectedHours) . 'h'));
+        $basicSalary = isset($data['basic_salary']) ? (float)$data['basic_salary'] : 0.0;
+        $joiningDate = !empty($data['joining_date']) ? $data['joining_date'] : null;
+        $annualQuota = isset($data['annual_leave_quota']) ? (int)$data['annual_leave_quota'] : 14;
+        $casualQuota = isset($data['casual_leave_quota']) ? (int)$data['casual_leave_quota'] : 10;
+        $sickQuota = isset($data['sick_leave_quota']) ? (int)$data['sick_leave_quota'] : 8;
 
         if (!$id || empty($name) || empty($email)) {
             http_response_code(400);
@@ -331,6 +393,21 @@ switch ($action) {
             $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $id]);
         }
 
+        // Update / Insert into hr_employee_profiles
+        $stmtProf = $pdo->prepare("
+            INSERT INTO hr_employee_profiles (employee_id, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                basic_salary = VALUES(basic_salary),
+                expected_hours = VALUES(expected_hours),
+                shift_policy = VALUES(shift_policy),
+                joining_date = COALESCE(VALUES(joining_date), joining_date),
+                annual_leave_quota = VALUES(annual_leave_quota),
+                casual_leave_quota = VALUES(casual_leave_quota),
+                sick_leave_quota = VALUES(sick_leave_quota)
+        ");
+        $stmtProf->execute([$id, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
+
         // If updated user is current session user, update session name/role
         if (($_SESSION['user_id'] ?? 0) === $id) {
             $_SESSION['user_name'] = $name;
@@ -338,13 +415,13 @@ switch ($action) {
             $_SESSION['email'] = $email;
         }
 
-        echo json_encode(['success' => true, 'message' => "Employee {$name} profile updated successfully!"]);
+        echo json_encode(['success' => true, 'message' => "Employee {$name} details & shift settings updated successfully!"]);
         break;
 
     case 'update_password':
-        if ($currentUserRole !== 'admin') {
+        if (!$isSuperAdmin) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Admin authorization required']);
+            echo json_encode(['success' => false, 'message' => 'Super Admin authorization required.']);
             exit;
         }
 
@@ -365,9 +442,9 @@ switch ($action) {
         break;
 
     case 'delete_employee':
-        if ($currentUserRole !== 'admin') {
+        if (!$isSuperAdmin) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Admin authorization required']);
+            echo json_encode(['success' => false, 'message' => 'Super Admin authorization required.']);
             exit;
         }
 

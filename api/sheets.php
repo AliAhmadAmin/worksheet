@@ -11,7 +11,8 @@ require_once __DIR__ . '/../config/database.php';
 $pdo = getDbConnection();
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$data = [];
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $rawInput = file_get_contents('php://input');
     $data = json_decode($rawInput, true) ?? $_POST;
     $action = $data['action'] ?? $action;
@@ -23,8 +24,10 @@ $stmtUserCheck->execute([$currentUserId]);
 $currentUserObj = $stmtUserCheck->fetch() ?: [];
 
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
-$canUnlock = ($currentUserRole === 'admin') || !empty($currentUserObj['can_unlock_sheets']);
-$canInspect = ($currentUserRole === 'admin') || !empty($currentUserObj['can_inspect_sheets']);
+$isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
+$isHod = ($currentUserRole === 'hod');
+$canUnlock = $isSuperAdmin || $isHod || !empty($currentUserObj['can_unlock_sheets']);
+$canInspect = $isSuperAdmin || $isHod || !empty($currentUserObj['can_inspect_sheets']);
 
 switch ($action) {
     case 'get_sheet':
@@ -60,13 +63,29 @@ switch ($action) {
             $entries = $entriesStmt->fetchAll();
         }
 
+        // Check if there is an active unclosed overnight shift from yesterday (e.g. 6PM to 2AM)
+        $activeOvernightSheet = null;
+        if ($date === date('Y-m-d') && (!$sheet || empty($sheet['check_in_time']))) {
+            $yesterday = date('Y-m-d', strtotime('-1 day'));
+            $yStmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ? AND check_in_time IS NOT NULL AND (is_locked = 0 OR is_locked IS NULL)");
+            $yStmt->execute([$empId, $yesterday]);
+            $ySheet = $yStmt->fetch();
+            if ($ySheet) {
+                $inDateTime = strtotime($ySheet['sheet_date'] . ' ' . $ySheet['check_in_time']);
+                if ($inDateTime && (time() - $inDateTime) <= 129600) { // within 36 hours
+                    $activeOvernightSheet = $ySheet;
+                }
+            }
+        }
+
         echo json_encode([
             'success' => true,
             'employee' => $employee,
             'sheet' => $sheet,
             'entries' => $entries,
             'is_locked' => $sheet ? (int)$sheet['is_locked'] : 0,
-            'can_edit' => ($currentUserRole === 'admin') || (!$sheet || $sheet['is_locked'] == 0)
+            'active_overnight_sheet' => $activeOvernightSheet,
+            'can_edit' => $isSuperAdmin || ($isHod && $employee['department_id'] == ($currentUserObj['department_id'] ?? 0)) || (!$sheet || $sheet['is_locked'] == 0)
         ]);
         break;
 
@@ -99,11 +118,11 @@ switch ($action) {
                 $updateFields = ["remarks = ?", "work_summary = ?", "updated_at = CURRENT_TIMESTAMP"];
                 $params = [$remarks, $workSummary];
 
-                if ($checkInTime !== null && ($currentUserRole === 'admin' || !$sheet['is_locked'])) {
+                if ($checkInTime !== null && ($isSuperAdmin || !$sheet['is_locked'])) {
                     $updateFields[] = "check_in_time = ?";
                     $params[] = $checkInTime;
                 }
-                if ($checkOutTime !== null && $currentUserRole === 'admin') {
+                if ($checkOutTime !== null && $isSuperAdmin) {
                     $updateFields[] = "check_out_time = ?";
                     $params[] = $checkOutTime;
                 }

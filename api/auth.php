@@ -69,10 +69,22 @@ switch ($action) {
         $_SESSION['role'] = $user['role'];
         $_SESSION['email'] = $user['email'];
 
+        // Determine destination landing dashboard
+        $redirectUrl = 'index.php';
+        $deptLower = strtolower($user['department_name'] ?? '');
+        if ($deptLower === 'hr' || $deptLower === 'human resources') {
+            $redirectUrl = 'hr.php';
+        }
+
         // Remove sensitive hash from output
         unset($user['password_hash']);
 
-        echo json_encode(['success' => true, 'message' => 'Login successful', 'user' => $user]);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Login successful',
+            'user' => $user,
+            'redirect_url' => $redirectUrl
+        ]);
         break;
 
     case 'current_user':
@@ -103,7 +115,19 @@ switch ($action) {
         break;
 
     case 'logout':
-        session_unset();
+        $_SESSION = [];
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(
+                session_name(),
+                '',
+                time() - 42000,
+                $params["path"],
+                $params["domain"],
+                $params["secure"],
+                $params["httponly"]
+            );
+        }
         session_destroy();
         echo json_encode(['success' => true, 'message' => 'Logged out successfully']);
         break;

@@ -11,7 +11,8 @@ require_once __DIR__ . '/../config/database.php';
 $pdo = getDbConnection();
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$data = [];
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $rawInput = file_get_contents('php://input');
     $data = json_decode($rawInput, true) ?? $_POST;
     $action = $data['action'] ?? $action;
@@ -23,8 +24,11 @@ $stmtUserCheck->execute([$currentUserId]);
 $currentUserObj = $stmtUserCheck->fetch() ?: [];
 
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
-$canAssign = ($currentUserRole === 'admin') || !empty($currentUserObj['can_assign_tasks']);
-$canEdit = ($currentUserRole === 'admin') || !empty($currentUserObj['can_edit_tasks']);
+$isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
+$isHod = ($currentUserRole === 'hod');
+$canAssign = $isSuperAdmin || $isHod || !empty($currentUserObj['can_assign_tasks']);
+$canEdit = $isSuperAdmin || $isHod || !empty($currentUserObj['can_edit_tasks']);
+$userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 
 switch ($action) {
     case 'get_tasks':
@@ -43,6 +47,13 @@ switch ($action) {
                 WHERE 1=1
             ";
             $params = [];
+
+            if (!$isSuperAdmin && $userDeptId > 0) {
+                $sql .= " AND (e.department_id = ? OR t.assigned_by = ?)";
+                $params[] = $userDeptId;
+                $params[] = $currentUserId;
+            }
+
             if ($empFilter) {
                 $sql .= " AND t.assigned_to = ?";
                 $params[] = $empFilter;
@@ -126,7 +137,7 @@ switch ($action) {
         }
 
         // Verify task owner if employee
-        if ($currentUserRole !== 'admin') {
+        if (!$isSuperAdmin && !$canEdit) {
             $check = $pdo->prepare("SELECT id FROM tasks WHERE id = ? AND assigned_to = ?");
             $check->execute([$taskId, $currentUserId]);
             if (!$check->fetch()) {

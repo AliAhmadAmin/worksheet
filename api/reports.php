@@ -100,6 +100,16 @@ switch ($action) {
         }
 
         // 4. Build Team & Employee Breakdown
+        $currentUserId = $_SESSION['user_id'] ?? 0;
+        $stmtUserCheck = $pdo->prepare("SELECT * FROM employees WHERE id = ?");
+        $stmtUserCheck->execute([$currentUserId]);
+        $currentUserObj = $stmtUserCheck->fetch() ?: [];
+        $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
+        $isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
+        $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+
+        $empWhere = (!$isSuperAdmin && $userDeptId > 0) ? "WHERE e.is_active = 1 AND e.department_id = {$userDeptId}" : "WHERE e.is_active = 1";
+
         $empSql = "
             SELECT 
                 t.name as team_name,
@@ -111,7 +121,7 @@ switch ($action) {
             LEFT JOIN teams t ON e.team_id = t.id
             LEFT JOIN daily_sheets ds ON ds.employee_id = e.id AND ds.sheet_date BETWEEN ? AND ?
             LEFT JOIN sheet_entries se ON se.sheet_id = ds.id
-            WHERE e.is_active = 1
+            {$empWhere}
             GROUP BY t.name, e.id, e.name, se.content_type
             ORDER BY t.id ASC, e.name ASC
         ";
@@ -121,8 +131,8 @@ switch ($action) {
 
         $empMap = [];
 
-        // Pre-initialize all active employees
-        $allEmps = $pdo->query("SELECT e.id, e.name, t.name as team_name FROM employees e LEFT JOIN teams t ON e.team_id = t.id WHERE e.is_active = 1 ORDER BY t.id ASC, e.name ASC")->fetchAll();
+        // Pre-initialize active employees for this department
+        $allEmps = $pdo->query("SELECT e.id, e.name, t.name as team_name FROM employees e LEFT JOIN teams t ON e.team_id = t.id {$empWhere} ORDER BY t.id ASC, e.name ASC")->fetchAll();
         foreach ($allEmps as $emp) {
             $empMap[$emp['id']] = [
                 'team_name' => $emp['team_name'] ?? 'General',

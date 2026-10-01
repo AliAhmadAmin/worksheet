@@ -10,9 +10,21 @@
 define('DB_HOST', '127.0.0.1');
 define('DB_NAME', 'worksheet');
 define('DB_USER', 'root');
-define('DB_PASS', 'Ahmad@@**786Ali');
-
+define('DB_PASS', '');
 date_default_timezone_set('Asia/Karachi');
+
+// Configure 30-day persistent session lifetime so user sessions never expire unexpectedly
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.gc_maxlifetime', 2592000); // 30 days
+    ini_set('session.cookie_lifetime', 2592000); // 30 days
+    session_set_cookie_params([
+        'lifetime' => 2592000,
+        'path' => '/',
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    session_start();
+}
 
 function getDbConnection() {
     static $pdo = null;
@@ -83,7 +95,8 @@ function migratePermissionsSchema($pdo) {
             'can_inspect_sheets' => "TINYINT DEFAULT 0",
             'can_view_reports' => "TINYINT DEFAULT 0",
             'can_view_attendance' => "TINYINT DEFAULT 0",
-            'can_manage_employees' => "TINYINT DEFAULT 0"
+            'can_manage_employees' => "TINYINT DEFAULT 0",
+            'can_manage_hr' => "TINYINT DEFAULT 0"
         ];
 
         foreach ($columns as $col => $def) {
@@ -104,9 +117,122 @@ function migratePermissionsSchema($pdo) {
             UPDATE employees 
             SET can_assign_tasks = 1, can_edit_tasks = 1, can_unlock_sheets = 1, 
                 can_inspect_sheets = 1, can_view_reports = 1, can_view_attendance = 1, 
-                can_manage_employees = 1 
+                can_manage_employees = 1, can_manage_hr = 1 
             WHERE role = 'admin'
         ");
+
+        // Create HR Management tables if they don't exist
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS hr_leaves (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            leave_type ENUM('annual', 'casual', 'sick', 'unpaid', 'other') DEFAULT 'casual',
+            start_date DATE NOT NULL,
+            end_date DATE NOT NULL,
+            days_count DECIMAL(4,1) DEFAULT 1.0,
+            reason TEXT NOT NULL,
+            status ENUM('pending', 'approved', 'rejected', 'cancelled') DEFAULT 'pending',
+            admin_notes TEXT,
+            action_by INT NULL,
+            action_at DATETIME NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+            FOREIGN KEY (action_by) REFERENCES employees(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS hr_employee_profiles (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL UNIQUE,
+            phone VARCHAR(50),
+            cnic VARCHAR(50),
+            joining_date DATE,
+            employment_type ENUM('full_time', 'part_time', 'contract', 'internship', 'probation') DEFAULT 'full_time',
+            basic_salary DECIMAL(10,2) DEFAULT 0.00,
+            hourly_rate DECIMAL(8,2) DEFAULT 0.00,
+            emergency_contact VARCHAR(100),
+            emergency_phone VARCHAR(50),
+            address TEXT,
+            annual_leave_quota INT DEFAULT 14,
+            casual_leave_quota INT DEFAULT 10,
+            sick_leave_quota INT DEFAULT 8,
+            expected_hours DECIMAL(4,1) DEFAULT 8.0,
+            shift_policy VARCHAR(50) DEFAULT 'standard_8h',
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        try {
+            $pdo->exec("ALTER TABLE hr_employee_profiles ADD COLUMN expected_hours DECIMAL(4,1) DEFAULT 8.0");
+        } catch (Exception $e) {}
+        try {
+            $pdo->exec("ALTER TABLE hr_employee_profiles ADD COLUMN shift_policy VARCHAR(50) DEFAULT 'standard_8h'");
+        } catch (Exception $e) {}
+
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS hr_payroll (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            salary_month VARCHAR(7) NOT NULL,
+            basic_salary DECIMAL(10,2) DEFAULT 0.00,
+            working_days INT DEFAULT 30,
+            present_days INT DEFAULT 0,
+            approved_leaves INT DEFAULT 0,
+            unpaid_leaves INT DEFAULT 0,
+            late_days INT DEFAULT 0,
+            total_duty_hours DECIMAL(6,2) DEFAULT 0.00,
+            bonus DECIMAL(10,2) DEFAULT 0.00,
+            deductions DECIMAL(10,2) DEFAULT 0.00,
+            deduction_reason TEXT,
+            bonus_reason TEXT,
+            net_salary DECIMAL(10,2) NOT NULL,
+            payment_status ENUM('draft', 'approved', 'paid') DEFAULT 'draft',
+            payment_date DATE NULL,
+            payment_method VARCHAR(50) DEFAULT 'Bank Transfer',
+            generated_by INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_emp_month (employee_id, salary_month),
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+            FOREIGN KEY (generated_by) REFERENCES employees(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS hr_loans (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            request_type ENUM('advance_salary', 'emergency_loan', 'medical_aid') DEFAULT 'advance_salary',
+            amount DECIMAL(10,2) NOT NULL,
+            repayment_months INT DEFAULT 1,
+            monthly_deduction DECIMAL(10,2) NOT NULL,
+            deduction_start_month VARCHAR(7) NOT NULL,
+            paid_amount DECIMAL(10,2) DEFAULT 0.00,
+            reason TEXT NOT NULL,
+            status ENUM('pending', 'approved', 'rejected', 'repaid', 'cancelled') DEFAULT 'pending',
+            admin_notes TEXT,
+            action_by INT NULL,
+            action_at DATETIME NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+            FOREIGN KEY (action_by) REFERENCES employees(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS hr_notices (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            message TEXT NOT NULL,
+            priority ENUM('normal', 'urgent', 'holiday', 'event') DEFAULT 'normal',
+            target_department_id INT NULL,
+            posted_by INT NOT NULL,
+            is_active TINYINT DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (posted_by) REFERENCES employees(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_department_id) REFERENCES departments(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
     } catch (Exception $e) {
         // Ignore if already migrated
     }

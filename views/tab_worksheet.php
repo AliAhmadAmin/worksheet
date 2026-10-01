@@ -165,6 +165,33 @@
                     </div>
                 </div>
 
+                <!-- Offline Draft Recovery Notification Banner -->
+                <div id="worksheet-draft-banner" style="display: none; margin-bottom: 14px; padding: 12px 16px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: var(--radius-md); align-items: center; justify-content: space-between; font-size: 13px; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 18px;">💾</span>
+                        <span><strong>Unsaved Offline Draft Found:</strong> We detected unsynced entries saved locally in your browser for this date (<span id="draft-banner-time">recent</span>).</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-primary" style="padding: 4px 12px; font-size: 12px; font-weight: 700;" onclick="restoreLocalDraft()">
+                            ⚡ Restore My Entries
+                        </button>
+                        <button type="button" class="btn btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="discardLocalDraft()">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Yesterday Night Shift Helper Notice Banner -->
+                <div id="worksheet-yesterday-notice" style="display: none; margin-bottom: 14px; padding: 12px 16px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); align-items: center; justify-content: space-between; font-size: 13px; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 18px;">🌙</span>
+                        <span><strong>Looking for your Night Shift work?</strong> Your entries for yesterday's shift are logged on <strong id="yesterday-notice-date">Yesterday</strong>.</span>
+                    </div>
+                    <button type="button" class="btn btn-outline" style="padding: 4px 12px; font-size: 12px; font-weight: 700; border-color: #f59e0b; color: #f59e0b;" onclick="goToPrevDay()">
+                        👉 View Yesterday's Sheet
+                    </button>
+                </div>
+
                 <!-- Worksheet Table -->
                 <div class="table-responsive">
                     <table class="interactive-table">

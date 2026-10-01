@@ -48,7 +48,7 @@ function getActiveWorksheetEmpId() {
     return AppState.currentUser ? AppState.currentUser.id : 2;
 }
 
-async function loadDailyWorksheet() {
+async function loadDailyWorksheet(allowOvernightRedirect = true) {
     const empId = getActiveWorksheetEmpId();
     const date = AppState.selectedDate;
 
@@ -66,6 +66,14 @@ async function loadDailyWorksheet() {
             return;
         }
 
+        // If viewing today with no check-in, check if employee has an active overnight shift from yesterday (e.g. 6PM to 2AM)
+        const isEmployee = !AppState.currentUser || AppState.currentUser.role !== 'admin';
+        if (allowOvernightRedirect && isEmployee && data.active_overnight_sheet && date === getLocalDateString()) {
+            AppState.selectedDate = data.active_overnight_sheet.sheet_date;
+            showToast(`🌙 Active Night Shift detected (Started: ${data.active_overnight_sheet.check_in_time}). Live duty timer is running!`, "info");
+            return loadDailyWorksheet(false);
+        }
+
         AppState.currentSheet = data.sheet;
         AppState.currentEntries = data.entries || [];
         AppState.isLocked = data.is_locked;
@@ -74,6 +82,40 @@ async function loadDailyWorksheet() {
         renderWorksheetTable(data.entries, data.can_edit);
         renderWorksheetSummary(data.sheet);
         updateLockBadge(data.is_locked, data.can_edit);
+
+        // Draft & Night Shift Recovery Banners
+        const draftBanner = document.getElementById('worksheet-draft-banner');
+        const yesterdayNotice = document.getElementById('worksheet-yesterday-notice');
+
+        if (!data.entries || data.entries.length === 0) {
+            const draft = getLocalDraft(empId, date);
+            if (draft && draft.entries && draft.entries.length > 0) {
+                if (draftBanner) {
+                    const timeStr = draft.timestamp ? new Date(draft.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently';
+                    const timeEl = document.getElementById('draft-banner-time');
+                    if (timeEl) timeEl.textContent = `${timeStr} (${draft.entries.length} unsaved rows)`;
+                    draftBanner.style.display = 'flex';
+                }
+            } else if (draftBanner) {
+                draftBanner.style.display = 'none';
+            }
+
+            if (yesterdayNotice && date === getLocalDateString()) {
+                const yDate = new Date();
+                yDate.setDate(yDate.getDate() - 1);
+                const yStr = yDate.toISOString().split('T')[0];
+                const yLabel = document.getElementById('yesterday-notice-date');
+                if (yLabel) yLabel.textContent = yStr;
+                yesterdayNotice.style.display = 'flex';
+            } else if (yesterdayNotice) {
+                yesterdayNotice.style.display = 'none';
+            }
+        } else {
+            if (draftBanner) draftBanner.style.display = 'none';
+            if (yesterdayNotice) yesterdayNotice.style.display = 'none';
+            // Sync current saved entries to local cache
+            saveLocalDraft();
+        }
 
     } catch (err) {
         console.error("Error loading worksheet:", err);
@@ -180,6 +222,9 @@ function renderWorksheetHero(sheet, empData) {
 
         const timerElem = document.getElementById('duty-timer-digits');
 
+        // Check if this is an active overnight shift from yesterday (check-in exists and not checked out/locked)
+        const isOvernightActive = checkIn && !checkOut && (!sheet || !sheet.is_locked);
+
         if (isFuture && !isAdmin) {
             // Future dates: completely disable live check-in/out
             stopLiveTimer();
@@ -193,8 +238,8 @@ function renderWorksheetHero(sheet, empData) {
                 btnCheckOut.title = "";
             }
             if (nextDayBanner) nextDayBanner.style.display = 'none';
-        } else if (isPast && !isAdmin) {
-            // Past dates: show completed duty time if exists, disable live check in
+        } else if (isPast && !isOvernightActive && !isAdmin) {
+            // Past dates with completed shift: show completed duty time
             stopLiveTimer();
             if (timerElem) timerElem.textContent = sheet ? (sheet.total_duty_hours || '0:00:00') : '0:00:00';
             if (btnCheckIn) {
@@ -207,31 +252,31 @@ function renderWorksheetHero(sheet, empData) {
             }
             if (nextDayBanner) nextDayBanner.style.display = 'none';
         } else {
-            // Today (or Admin override)
+            // Today OR Active Overnight Shift from yesterday (or Admin override)
             if (checkIn && !checkOut) {
-                // Active duty today
-                const inDate = new Date(`${AppState.selectedDate} ${checkIn}`);
+                // Active duty (Today or Overnight Shift from yesterday)
+                const inDate = parseDateTime(AppState.selectedDate, checkIn);
                 const now = new Date();
-                const diffSecs = isNaN(inDate.getTime()) ? 0 : Math.max(0, Math.floor((now - inDate) / 1000));
-                startLiveTimer(diffSecs);
+                const diffSecs = (inDate && !isNaN(inDate.getTime())) ? Math.max(0, Math.floor((now - inDate) / 1000)) : 0;
+                startLiveTimer(diffSecs, checkIn, AppState.selectedDate);
 
                 if (btnCheckIn) {
                     btnCheckIn.disabled = true;
-                    btnCheckIn.title = "Currently active on duty.";
+                    btnCheckIn.title = isPast ? "Active Night Shift in progress." : "Currently active on duty.";
                 }
                 if (btnCheckOut) {
                     btnCheckOut.disabled = false;
-                    btnCheckOut.title = "Click to finish shift and submit sheet";
+                    btnCheckOut.title = isPast ? "Click to finish your night shift and lock sheet" : "Click to finish shift and submit sheet";
                 }
                 if (nextDayBanner) nextDayBanner.style.display = 'none';
             } else if (checkIn && checkOut) {
-                // Completed duty today
+                // Completed duty
                 stopLiveTimer();
                 if (timerElem) timerElem.textContent = sheet.total_duty_hours || '0:00:00';
 
                 if (btnCheckIn) {
                     btnCheckIn.disabled = true;
-                    btnCheckIn.title = "Shift completed for today.";
+                    btnCheckIn.title = "Shift completed.";
                 }
                 if (btnCheckOut) {
                     btnCheckOut.disabled = true;
@@ -476,8 +521,8 @@ function updateSaveIndicator(status, text) {
         textEl.style.color = '#10b981';
     } else if (status === 'error') {
         if (iconEl) iconEl.textContent = '⚠️';
-        textEl.textContent = text || 'Failed to auto-save';
-        textEl.style.color = '#ef4444';
+        textEl.textContent = text || 'Saved locally in browser';
+        textEl.style.color = '#f59e0b';
     } else {
         if (iconEl) iconEl.textContent = '☁️';
         textEl.textContent = text || 'Auto-save ready';
@@ -485,7 +530,102 @@ function updateSaveIndicator(status, text) {
     }
 }
 
+// Local Draft & Offline Protection Helpers
+function getDraftStorageKey(empId, date) {
+    return `worksheet_draft_${empId || 1}_${date || getLocalDateString()}`;
+}
+
+function saveLocalDraft() {
+    const empId = getActiveWorksheetEmpId();
+    const date = AppState.selectedDate;
+    if (!empId || !date) return;
+
+    const rows = document.querySelectorAll('#worksheet-table-body tr.sheet-entry-row');
+    const entries = [];
+    rows.forEach(r => {
+        const timeSlot = r.querySelector('.input-time')?.value || r.querySelector('.select-time')?.value || '';
+        const contentType = r.querySelector('.select-content-type')?.value || '';
+        const department = r.querySelector('.select-dept')?.value || '';
+        const rawLink = r.querySelector('.input-link')?.value || '';
+        const link = (rawLink === 'upload') ? '' : rawLink;
+        const title = r.querySelector('.input-title')?.value || '';
+
+        if (title.trim() || timeSlot.trim() || link.trim()) {
+            entries.push({ time_slot: timeSlot, content_type: contentType, department: department, link: link, title: title, count_val: 1 });
+        }
+    });
+
+    const workSummary = document.getElementById('worksheet-work-summary')?.value || '';
+    const remarks = document.getElementById('worksheet-remarks')?.value || '';
+
+    try {
+        const draft = {
+            entries,
+            work_summary: workSummary,
+            remarks: remarks,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(getDraftStorageKey(empId, date), JSON.stringify(draft));
+    } catch (e) {
+        console.warn("Could not save local draft:", e);
+    }
+}
+
+function getLocalDraft(empId, date) {
+    try {
+        const raw = localStorage.getItem(getDraftStorageKey(empId, date));
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (e) {
+        return null;
+    }
+}
+
+function clearLocalDraft(empId, date) {
+    try {
+        localStorage.removeItem(getDraftStorageKey(empId, date));
+    } catch (e) {}
+}
+
+function restoreLocalDraft() {
+    const empId = getActiveWorksheetEmpId();
+    const date = AppState.selectedDate;
+    const draft = getLocalDraft(empId, date);
+    if (!draft || !draft.entries || draft.entries.length === 0) {
+        showToast("No offline draft entries found to restore.", "info");
+        return;
+    }
+
+    renderWorksheetTable(draft.entries, true);
+    if (draft.work_summary !== undefined) {
+        const summaryEl = document.getElementById('worksheet-work-summary');
+        if (summaryEl) summaryEl.value = draft.work_summary;
+    }
+    if (draft.remarks !== undefined) {
+        const remarksEl = document.getElementById('worksheet-remarks');
+        if (remarksEl) remarksEl.value = draft.remarks;
+    }
+
+    const banner = document.getElementById('worksheet-draft-banner');
+    if (banner) banner.style.display = 'none';
+
+    showToast("Draft entries restored! Syncing to database...", "success");
+    saveCurrentWorksheet(true);
+}
+
+function discardLocalDraft() {
+    const empId = getActiveWorksheetEmpId();
+    const date = AppState.selectedDate;
+    clearLocalDraft(empId, date);
+    const banner = document.getElementById('worksheet-draft-banner');
+    if (banner) banner.style.display = 'none';
+    showToast("Offline draft dismissed.", "info");
+}
+
 function triggerAutoSave(delayMs = 700) {
+    // 1. Instantly write to browser local storage on every single keystroke (Zero data loss guarantee)
+    saveLocalDraft();
+
     updateSaveIndicator('saving', 'Saving changes...');
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
 
@@ -493,7 +633,7 @@ function triggerAutoSave(delayMs = 700) {
         try {
             await saveCurrentWorksheet(false, true);
         } catch (e) {
-            updateSaveIndicator('error', 'Auto-save failed');
+            updateSaveIndicator('error', 'Saved offline in browser');
         }
     }, delayMs);
 }
@@ -602,10 +742,10 @@ async function handleCheckOut() {
         });
         const data = await res.json();
         if (data.success) {
-            showToast("Checked out successfully! Sheet is locked. Next day check-in will automatically appear tomorrow.", 'success');
-            await loadDailyWorksheet();
+            showToast(data.message || "Checked out successfully! Sheet is locked.", 'success');
+            await loadDailyWorksheet(false);
         } else {
-            showToast(data.message, 'error');
+            showToast(data.message || "Check-out failed.", 'error');
         }
     } catch (err) {
         showToast("Check-out failed.", "error");
@@ -694,13 +834,13 @@ async function handleAdminCheckOut() {
     }
 }
 
-// Open Detailed Shift & Duty Modal for Admin
-function openAdminShiftModal() {
-    const empId = getActiveWorksheetEmpId();
-    const date = AppState.selectedDate;
-    const empName = document.getElementById('admin-emp-dropdown-selected-name')?.textContent || 'Employee';
-    const desig = document.getElementById('admin-meta-designation')?.textContent || 'Staff';
-    const dept = document.getElementById('admin-meta-dept')?.textContent || 'Digital';
+// Open Detailed Shift & Duty Modal for Admin / HR
+function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime, isLocked) {
+    if (!empId) empId = getActiveWorksheetEmpId();
+    if (!date) date = AppState.selectedDate || new Date().toISOString().split('T')[0];
+    if (!empName) empName = document.getElementById('admin-emp-dropdown-selected-name')?.textContent || 'Employee';
+    if (!desig) desig = document.getElementById('admin-meta-designation')?.textContent || 'Staff';
+    if (!dept) dept = document.getElementById('admin-meta-dept')?.textContent || 'Digital';
 
     const empIdInput = document.getElementById('admin-shift-emp-id');
     const dateInput = document.getElementById('admin-shift-date');
@@ -715,17 +855,15 @@ function openAdminShiftModal() {
     if (metaLabel) metaLabel.textContent = `${desig} • ${dept}`;
     if (dateLabel) dateLabel.textContent = date;
 
-    const currentIn = AppState.currentSheet ? (AppState.currentSheet.check_in_time || '') : '';
-    const currentOut = AppState.currentSheet ? (AppState.currentSheet.check_out_time || '') : '';
-    const isLocked = AppState.currentSheet ? (parseInt(AppState.currentSheet.is_locked) === 1) : false;
+    const currentIn = inTime !== undefined ? inTime : (AppState.currentSheet ? (AppState.currentSheet.check_in_time || '') : '');
+    const currentOut = outTime !== undefined ? outTime : (AppState.currentSheet ? (AppState.currentSheet.check_out_time || '') : '');
+    const isLockedVal = isLocked !== undefined ? !!isLocked : (AppState.currentSheet ? (parseInt(AppState.currentSheet.is_locked) === 1) : false);
 
     const inInput = document.getElementById('admin-shift-in-time');
     const outInput = document.getElementById('admin-shift-out-time');
-    const lockCheckbox = document.getElementById('admin-shift-lock-checkbox');
 
     if (inInput) inInput.value = currentIn;
     if (outInput) outInput.value = currentOut;
-    if (lockCheckbox) lockCheckbox.checked = isLocked;
 
     if (avatarEl) {
         avatarEl.textContent = empName ? empName.charAt(0).toUpperCase() : '👤';
@@ -748,10 +886,6 @@ function setShiftTimePreset(type, val) {
         const outInput = document.getElementById('admin-shift-out-time');
         if (outInput) {
             outInput.value = finalVal;
-            const lockCheckbox = document.getElementById('admin-shift-lock-checkbox');
-            if (lockCheckbox && finalVal) {
-                lockCheckbox.checked = true;
-            }
         }
     }
 }
@@ -763,7 +897,6 @@ async function handleAdminSaveShiftSubmit(e) {
     const date = document.getElementById('admin-shift-date')?.value || AppState.selectedDate;
     const inTime = document.getElementById('admin-shift-in-time')?.value.trim() || '';
     const outTime = document.getElementById('admin-shift-out-time')?.value.trim() || '';
-    const isLocked = document.getElementById('admin-shift-lock-checkbox')?.checked ? 1 : 0;
 
     try {
         const res = await fetch('api/attendance.php', {
@@ -774,8 +907,7 @@ async function handleAdminSaveShiftSubmit(e) {
                 employee_id: empId,
                 date: date,
                 check_in_time: inTime,
-                check_out_time: outTime,
-                is_locked: isLocked
+                check_out_time: outTime
             })
         });
         const data = await res.json();

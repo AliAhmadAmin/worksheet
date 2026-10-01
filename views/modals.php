@@ -1,89 +1,3 @@
-    <!-- MODAL: MANDATORY LOGIN WITH FRESH & UPLIFTING UI -->
-    <div id="login-modal" class="modal-overlay login-overlay-backdrop">
-        <!-- Floating ambient glowing orbs -->
-        <div class="login-ambient-orb orb-1"></div>
-        <div class="login-ambient-orb orb-2"></div>
-        <div class="login-ambient-orb orb-3"></div>
-
-        <div class="modal-card login-card-fresh">
-            <!-- Joyful Header Banner -->
-            <div class="login-header-fresh">
-                <div class="login-brand-pill">
-                    <img src="assets/img/logo.svg" alt="Discover Pakistan UHD TV" class="login-logo-img">
-                </div>
-                <h3 id="login-greeting-title" class="login-greeting-title">Welcome Back, Creator! ✨</h3>
-            </div>
-
-            <form id="login-form" onsubmit="handleLoginSubmit(event)">
-                <div class="modal-body login-body-fresh">
-                    <!-- Quick Account Selector (Searchable Dropdown with Avatar like Hourly Sheet) -->
-                    <div class="form-group login-field-group">
-                        <label class="form-label login-label">
-                            <span>Select Your Profile</span>
-                        </label>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
-                            <div id="login-emp-avatar" class="admin-inspector-avatar" style="width: 40px; height: 40px; font-size: 16px; border-radius: 50%; flex-shrink: 0;">👤</div>
-                            <div class="searchable-dropdown-wrapper" id="login-emp-search-wrapper" style="position: relative; flex: 1;">
-                                <button type="button" id="login-emp-dropdown-btn" class="input-control" style="font-weight: 700; font-size: 13.5px; padding: 9px 14px; width: 100%; border-color: var(--primary); background: var(--bg-card); cursor: pointer; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;" onclick="toggleLoginEmpDropdown()">
-                                    <span id="login-emp-selected-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-- Choose Employee Profile --</span>
-                                    <span style="font-size: 10px; color: var(--text-muted);">▼</span>
-                                </button>
-                                <input type="hidden" id="login-quick-email" value="">
-
-                                <!-- Floating Search Dropdown Menu -->
-                                <div id="login-emp-dropdown-menu" class="searchable-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 1050; padding: 8px; text-align: left;">
-                                    <div style="padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 6px;">
-                                        <input type="text" id="login-emp-search-input" class="input-control" placeholder="🔍 Search employee by name, team..." style="width: 100%; padding: 7px 10px; font-size: 12.5px; border-radius: 8px;" oninput="filterLoginEmpDropdown(this.value)" autocomplete="off">
-                                    </div>
-                                    <div id="login-emp-dropdown-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
-                                        <!-- Populated dynamically -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Email Input -->
-                    <div class="form-group login-field-group">
-                        <label class="form-label login-label">Email / Username *</label>
-                        <div class="login-input-wrapper">
-                            <span class="login-input-icon">✉️</span>
-                            <input type="email" id="login-email" class="input-control login-input-control" placeholder="e.g. yourname@discoverpakistan.tv" value="zeeeguest@gmail.com" required autocomplete="username">
-                        </div>
-                    </div>
-
-                    <!-- Password Input with Show/Hide Toggle -->
-                    <div class="form-group login-field-group">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <label class="form-label login-label" style="margin-bottom: 0;">Password *</label>
-                            <span class="login-default-hint" onclick="fillDefaultPassword()" title="Click to auto-fill default password">
-                                🔑 Default: <code>DiscoverPakistan123</code>
-                            </span>
-                        </div>
-                        <div class="login-input-wrapper" style="margin-top: 6px;">
-                            <span class="login-input-icon">🔒</span>
-                            <input type="password" id="login-password" class="input-control login-input-control" placeholder="Enter password" value="DiscoverPakistan123" required autocomplete="current-password">
-                            <button type="button" class="btn-toggle-password" onclick="toggleLoginPasswordVisibility()" title="Show/Hide Password">
-                                <span id="login-password-eye-icon">👁️</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer login-footer-fresh">
-                    <button type="submit" id="login-submit-btn" class="btn btn-primary login-cta-btn">
-                        <span>🚀</span>
-                        <span>Sign In to WorkSheet Pro</span>
-                    </button>
-                    <div class="login-motivational-quote">
-                        🌟 Discover Pakistan UHD TV • Teamwork & Creativity
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-
-
     <!-- MODAL: ASSIGN NEW TASK -->
     <div id="assign-task-modal" class="modal-overlay">
         <div class="modal-card">
@@ -274,68 +188,130 @@
 
     <!-- MODAL: ADD EMPLOYEE -->
     <div id="add-employee-modal" class="modal-overlay">
-        <div class="modal-card">
+        <div class="modal-card modal-card-lg">
             <div class="modal-header">
-                <h3>➕ Add New Employee</h3>
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">➕ Add New Employee</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Create employee credentials, role assignments, shift hours, and basic compensation.</p>
+                </div>
                 <button type="button" class="btn-modal-close" onclick="closeModal('add-employee-modal')">✕</button>
             </div>
             <form id="add-employee-form" onsubmit="handleAddEmployeeSubmit(event)">
-                <div class="modal-body">
-                    <!-- Avatar Upload & Live Preview -->
-                    <div class="form-group">
-                        <label class="form-label">Employee Profile Picture (Image)</label>
-                        <div style="display: flex; align-items: center; gap: 14px;">
-                            <div id="add-emp-avatar-preview" class="user-avatar" style="width: 52px; height: 52px; font-size: 22px; flex-shrink: 0; background-size: cover; background-position: center; border: 2px solid var(--border-color);">👤</div>
+                <div class="modal-body" style="gap: 16px;">
+                    <!-- Section 1: Identity & Credentials -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">👤 Account & Login Credentials</div>
+                        
+                        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 2px;">
+                            <div id="add-emp-avatar-preview" class="user-avatar" style="width: 48px; height: 48px; font-size: 20px; flex-shrink: 0; background-size: cover; background-position: center; border: 2px solid var(--border-color); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">👤</div>
                             <div style="flex: 1;">
-                                <input type="file" id="add-emp-avatar-file" class="input-control" accept="image/*" onchange="handleAvatarFileSelect(this, 'add-emp-avatar-preview', 'add-emp-avatar-base64')">
+                                <label class="form-label" style="margin-bottom: 3px;">Profile Photo (Optional)</label>
+                                <input type="file" id="add-emp-avatar-file" class="input-control" accept="image/*" style="padding: 5px 8px; font-size: 12px;" onchange="handleAvatarFileSelect(this, 'add-emp-avatar-preview', 'add-emp-avatar-base64')">
                                 <input type="hidden" id="add-emp-avatar-base64">
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Full Name *</label>
+                                <input type="text" id="add-emp-name" class="input-control" placeholder="e.g. Ali Raza" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Official Email Address *</label>
+                                <input type="email" id="add-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv" required>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Initial Password *</label>
+                                <input type="text" id="add-emp-password" class="input-control" value="DiscoverPakistan123" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">System Role & Access</label>
+                                <select id="add-emp-role" class="input-control" style="font-weight: 600;">
+                                    <option value="employee" selected>👤 Staff Member</option>
+                                    <option value="super_admin">👑 Super Admin</option>
+                                    <option value="hr">👥 HR Manager</option>
+                                    <option value="hod">🏢 Head of Department (HOD)</option>
+                                    <option value="team_lead">⭐ Team Lead</option>
+                                    <option value="coordinator">🎯 Task Coordinator</option>
+                                </select>
                             </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Full Name *</label>
-                        <input type="text" id="add-emp-name" class="input-control" placeholder="e.g. Ali Raza" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Official Email Address *</label>
-                        <input type="email" id="add-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Initial Password *</label>
-                        <input type="text" id="add-emp-password" class="input-control" value="DiscoverPakistan123" required>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div class="form-group">
-                            <label class="form-label">System Role</label>
-                            <select id="add-emp-role" class="input-control">
-                                <option value="employee" selected>Employee</option>
-                                <option value="admin">Admin</option>
-                            </select>
+                    <!-- Section 2: Department, Team & Shift -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">🏢 Department & Shift Schedule</div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Designation / Title</label>
+                                <input type="text" id="add-emp-designation" class="input-control" placeholder="e.g. Content Creator, Video Editor" value="Content Creator">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Department</label>
+                                <select id="add-emp-dept" class="input-control">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Designation / Title</label>
-                            <input type="text" id="add-emp-designation" class="input-control" placeholder="e.g. Video Editor" value="Content Creator">
+
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Assigned Team</label>
+                                <select id="add-emp-team" class="input-control">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Expected Shift / Duty Hours</label>
+                                <select id="add-emp-shift-hours" class="input-control" style="font-weight: 700; color: var(--primary);">
+                                    <option value="8.0" selected>⏱️ 8.0 Hours / Day (Standard Shift)</option>
+                                    <option value="9.0">⏱️ 9.0 Hours / Day</option>
+                                    <option value="7.0">⏱️ 7.0 Hours / Day</option>
+                                    <option value="6.0">⏱️ 6.0 Hours / Day</option>
+                                    <option value="10.0">⏱️ 10.0 Hours / Day</option>
+                                    <option value="12.0">⏱️ 12.0 Hours / Day</option>
+                                    <option value="0.0">🌐 Flexible / Open Shift (No fixed hours)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div class="form-group">
-                            <label class="form-label">Department</label>
-                            <select id="add-emp-dept" class="input-control">
-                                <!-- Populated dynamically -->
-                            </select>
+
+                    <!-- Section 3: Salary & Leave Quotas -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">💵 Salary & Leave Entitlements</div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Basic Monthly Salary (PKR)</label>
+                                <input type="number" id="add-emp-salary" class="input-control" placeholder="e.g. 75000" min="0" step="500" style="font-weight: 700;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Joining Date</label>
+                                <input type="date" id="add-emp-joining-date" class="input-control">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Assigned Team</label>
-                            <select id="add-emp-team" class="input-control">
-                                <!-- Populated dynamically -->
-                            </select>
+
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label" style="font-size: 11px;">Annual Leaves</label>
+                                <input type="number" id="add-emp-annual-quota" class="input-control" value="14" min="0" style="text-align: center; font-weight: 700;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" style="font-size: 11px;">Casual Leaves</label>
+                                <input type="number" id="add-emp-casual-quota" class="input-control" value="10" min="0" style="text-align: center; font-weight: 700;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" style="font-size: 11px;">Sick Leaves</label>
+                                <input type="number" id="add-emp-sick-quota" class="input-control" value="8" min="0" style="text-align: center; font-weight: 700;">
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline" onclick="closeModal('add-employee-modal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Employee Profile</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 9px 20px; font-weight: 700;">✨ Create Employee Profile</button>
                 </div>
             </form>
         </div>
@@ -343,65 +319,125 @@
 
     <!-- MODAL: EDIT EMPLOYEE -->
     <div id="edit-employee-modal" class="modal-overlay">
-        <div class="modal-card">
+        <div class="modal-card modal-card-lg">
             <div class="modal-header">
-                <h3>✏️ Edit Employee Details</h3>
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">✏️ Edit Employee Details</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Update staff role, department, shift policy, salary, and leave quotas.</p>
+                </div>
                 <button type="button" class="btn-modal-close" onclick="closeModal('edit-employee-modal')">✕</button>
             </div>
             <form id="edit-employee-form" onsubmit="handleEditEmployeeSubmit(event)">
                 <input type="hidden" id="edit-emp-id">
-                <div class="modal-body">
-                    <!-- Avatar Upload & Live Preview -->
-                    <div class="form-group">
-                        <label class="form-label">Employee Profile Picture (Image)</label>
-                        <div style="display: flex; align-items: center; gap: 14px;">
-                            <div id="edit-emp-avatar-preview" class="user-avatar" style="width: 52px; height: 52px; font-size: 22px; flex-shrink: 0; background-size: cover; background-position: center; border: 2px solid var(--border-color);">👤</div>
+                <div class="modal-body" style="gap: 16px;">
+                    <!-- Section 1: Identity & Credentials -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">👤 Account & Login Credentials</div>
+                        
+                        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 2px;">
+                            <div id="edit-emp-avatar-preview" class="user-avatar" style="width: 48px; height: 48px; font-size: 20px; flex-shrink: 0; background-size: cover; background-position: center; border: 2px solid var(--border-color); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">👤</div>
                             <div style="flex: 1;">
-                                <input type="file" id="edit-emp-avatar-file" class="input-control" accept="image/*" onchange="handleAvatarFileSelect(this, 'edit-emp-avatar-preview', 'edit-emp-avatar-base64')">
+                                <label class="form-label" style="margin-bottom: 3px;">Update Profile Photo</label>
+                                <input type="file" id="edit-emp-avatar-file" class="input-control" accept="image/*" style="padding: 5px 8px; font-size: 12px;" onchange="handleAvatarFileSelect(this, 'edit-emp-avatar-preview', 'edit-emp-avatar-base64')">
                                 <input type="hidden" id="edit-emp-avatar-base64">
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Full Name *</label>
+                                <input type="text" id="edit-emp-name" class="input-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Official Email Address *</label>
+                                <input type="email" id="edit-emp-email" class="input-control" required>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">System Role & Access</label>
+                                <select id="edit-emp-role" class="input-control" style="font-weight: 600;">
+                                    <option value="employee">👤 Staff Member</option>
+                                    <option value="super_admin">👑 Super Admin</option>
+                                    <option value="hr">👥 HR Manager</option>
+                                    <option value="hod">🏢 Head of Department (HOD)</option>
+                                    <option value="team_lead">⭐ Team Lead</option>
+                                    <option value="coordinator">🎯 Task Coordinator</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Designation / Title</label>
+                                <input type="text" id="edit-emp-designation" class="input-control">
                             </div>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Full Name *</label>
-                        <input type="text" id="edit-emp-name" class="input-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Official Email Address *</label>
-                        <input type="email" id="edit-emp-email" class="input-control" required>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <!-- Section 2: Department, Team & Shift -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">🏢 Department & Shift Schedule</div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Department</label>
+                                <select id="edit-emp-dept" class="input-control">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Assigned Team</label>
+                                <select id="edit-emp-team" class="input-control">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                        </div>
+
                         <div class="form-group">
-                            <label class="form-label">System Role</label>
-                            <select id="edit-emp-role" class="input-control">
-                                <option value="employee">Employee</option>
-                                <option value="admin">Admin</option>
+                            <label class="form-label">Expected Shift / Duty Hours</label>
+                            <select id="edit-emp-shift-hours" class="input-control" style="font-weight: 700; color: var(--primary);">
+                                <option value="8.0">⏱️ 8.0 Hours / Day (Standard Shift)</option>
+                                <option value="9.0">⏱️ 9.0 Hours / Day</option>
+                                <option value="7.0">⏱️ 7.0 Hours / Day</option>
+                                <option value="6.0">⏱️ 6.0 Hours / Day</option>
+                                <option value="10.0">⏱️ 10.0 Hours / Day</option>
+                                <option value="12.0">⏱️ 12.0 Hours / Day</option>
+                                <option value="0.0">🌐 Flexible / Open Shift (No fixed hours)</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Designation / Title</label>
-                            <input type="text" id="edit-emp-designation" class="input-control">
-                        </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                        <div class="form-group">
-                            <label class="form-label">Department</label>
-                            <select id="edit-emp-dept" class="input-control">
-                                <!-- Populated dynamically -->
-                            </select>
+
+                    <!-- Section 3: Salary & Leave Quotas -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">💵 Salary & Leave Entitlements</div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Basic Monthly Salary (PKR)</label>
+                                <input type="number" id="edit-emp-salary" class="input-control" placeholder="e.g. 75000" min="0" step="500" style="font-weight: 700;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Joining Date</label>
+                                <input type="date" id="edit-emp-joining-date" class="input-control">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Assigned Team</label>
-                            <select id="edit-emp-team" class="input-control">
-                                <!-- Populated dynamically -->
-                            </select>
+
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label" style="font-size: 11px;">Annual Leaves</label>
+                                <input type="number" id="edit-emp-annual-quota" class="input-control" value="14" min="0" style="text-align: center; font-weight: 700;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" style="font-size: 11px;">Casual Leaves</label>
+                                <input type="number" id="edit-emp-casual-quota" class="input-control" value="10" min="0" style="text-align: center; font-weight: 700;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" style="font-size: 11px;">Sick Leaves</label>
+                                <input type="number" id="edit-emp-sick-quota" class="input-control" value="8" min="0" style="text-align: center; font-weight: 700;">
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline" onclick="closeModal('edit-employee-modal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 9px 20px; font-weight: 700;">💾 Save Changes</button>
                 </div>
             </form>
         </div>
@@ -537,8 +573,9 @@
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="form-label" style="font-weight: 700; font-size: 12.5px; margin-bottom: 5px;">Assign Organizational Role Preset *</label>
                         <select id="perm-role-select" class="input-control" onchange="applyRolePreset(this.value)" style="font-weight: 600; font-size: 13px;">
-                            <option value="admin">👑 Super Admin (Full Company-Wide Control)</option>
-                            <option value="hod">🎖️ Head of Department / HOD (Manage Tasks, Sheets & Reports)</option>
+                            <option value="super_admin">👑 Super Admin (Full Company-Wide Control)</option>
+                            <option value="hr">👥 HR Manager (Manage HR, Staff Directory & Attendance)</option>
+                            <option value="hod">🏢 Head of Department / HOD (Manage Tasks, Sheets & Reports)</option>
                             <option value="team_lead">⭐ Team Lead / Supervisor (Assign Tasks & Unlock Team Sheets)</option>
                             <option value="coordinator">🎯 Task Coordinator (Create & Manage Tasks Across Teams)</option>
                             <option value="employee" selected>👤 Staff Member (Standard Creator / Daily Worksheet)</option>
@@ -676,13 +713,6 @@
                         </div>
                         <input type="text" id="admin-shift-out-time" class="input-control" placeholder="e.g. 06:00 PM (Leave empty if currently on duty)" autocomplete="off">
                         <small style="font-size: 11px; color: var(--text-dim);">Leave empty if employee is still currently on duty.</small>
-                    </div>
-
-                    <div class="form-group" style="margin-top: 14px;">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; color: var(--text-main);">
-                            <input type="checkbox" id="admin-shift-lock-checkbox" style="cursor: pointer; transform: scale(1.15);">
-                            <span><strong>Lock Sheet</strong> (Prevents further edits by employee after check-out)</span>
-                        </label>
                     </div>
                 </div>
                 <div class="modal-footer" style="padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
