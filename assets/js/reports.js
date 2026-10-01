@@ -408,7 +408,15 @@ async function loadAttendanceReport() {
 
     try {
         const res = await fetch(url);
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (parseErr) {
+            console.error("Server output:", text);
+            container.innerHTML = `<div style="text-align: center; padding: 30px; color: #ef4444;">Server error: ${escapeHtml(text.slice(0, 200))}</div>`;
+            return;
+        }
 
         if (!data.success) {
             container.innerHTML = `<div style="text-align: center; padding: 30px; color: #ef4444;">${escapeHtml(data.message || 'Failed to load report.')}</div>`;
@@ -426,7 +434,7 @@ async function loadAttendanceReport() {
 
     } catch (err) {
         console.error("Error generating attendance report:", err);
-        container.innerHTML = '<div style="text-align: center; padding: 30px; color: #ef4444;">Error generating attendance report. Please check server logs.</div>';
+        container.innerHTML = `<div style="text-align: center; padding: 30px; color: #ef4444;">Error generating attendance report: ${escapeHtml(err.message || 'Network error')}</div>`;
     }
 }
 

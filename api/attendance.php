@@ -387,294 +387,307 @@ switch ($action) {
         break;
 
     case 'attendance_report':
-        $month = $_GET['month'] ?? date('Y-m');
-        $startDate = $_GET['start_date'] ?? ($month . '-01');
-        $endDate = $_GET['end_date'] ?? date('Y-m-t', strtotime($startDate));
-        $empIdFilter = isset($_GET['employee_id']) && $_GET['employee_id'] !== '' && $_GET['employee_id'] !== 'all' ? (int)$_GET['employee_id'] : null;
-        $deptFilter = isset($_GET['department_id']) && $_GET['department_id'] !== '' && $_GET['department_id'] !== 'all' ? (int)$_GET['department_id'] : null;
-        $rawStandardParam = $_GET['standard_hours'] ?? 'auto';
+        try {
+            $month = $_GET['month'] ?? date('Y-m');
+            $startDate = $_GET['start_date'] ?? ($month . '-01');
+            $endDate = $_GET['end_date'] ?? date('Y-m-t', strtotime($startDate));
+            $empIdFilter = isset($_GET['employee_id']) && $_GET['employee_id'] !== '' && $_GET['employee_id'] !== 'all' ? (int)$_GET['employee_id'] : null;
+            $deptFilter = isset($_GET['department_id']) && $_GET['department_id'] !== '' && $_GET['department_id'] !== 'all' ? (int)$_GET['department_id'] : null;
+            $rawStandardParam = $_GET['standard_hours'] ?? 'auto';
 
-        $whereClauses = ["e.is_active = 1"];
-        $params = [];
+            $whereClauses = ["e.is_active = 1"];
+            $params = [];
 
-        if (!$hasGlobalAttendance && $userDeptId > 0) {
-            $whereClauses[] = "e.department_id = ?";
-            $params[] = $userDeptId;
-        } else if ($deptFilter) {
-            $whereClauses[] = "e.department_id = ?";
-            $params[] = $deptFilter;
-        }
+            if (!$hasGlobalAttendance && $userDeptId > 0) {
+                $whereClauses[] = "e.department_id = ?";
+                $params[] = $userDeptId;
+            } else if ($deptFilter) {
+                $whereClauses[] = "e.department_id = ?";
+                $params[] = $deptFilter;
+            }
 
-        if ($empIdFilter) {
-            $whereClauses[] = "e.id = ?";
-            $params[] = $empIdFilter;
-        }
+            if ($empIdFilter) {
+                $whereClauses[] = "e.id = ?";
+                $params[] = $empIdFilter;
+            }
 
-        $whereSql = "WHERE " . implode(' AND ', $whereClauses);
+            $whereSql = "WHERE " . implode(' AND ', $whereClauses);
 
-        $empStmt = $pdo->prepare("
-            SELECT e.id, e.name, e.email, e.designation, e.role, e.avatar, e.department_id,
-                   COALESCE(p.expected_hours, 8.0) as expected_hours,
-                   COALESCE(p.shift_policy, 'standard_8h') as shift_policy,
-                   d.name as department_name, t.name as team_name
-            FROM employees e
-            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
-            LEFT JOIN departments d ON e.department_id = d.id
-            LEFT JOIN teams t ON e.team_id = t.id
-            {$whereSql}
-            ORDER BY 
-                CASE e.role 
-                    WHEN 'super_admin' THEN 1 
-                    WHEN 'admin' THEN 1 
-                    WHEN 'hr' THEN 2 
-                    WHEN 'hod' THEN 3 
-                    WHEN 'team_lead' THEN 4 
-                    ELSE 5 
-                END,
-                d.id ASC, e.name ASC
-        ");
-        $empStmt->execute($params);
-        $employees = $empStmt->fetchAll();
+            $empStmt = $pdo->prepare("
+                SELECT e.id, e.name, e.email, e.designation, e.role, e.avatar, e.department_id,
+                       COALESCE(p.expected_hours, 8.0) as expected_hours,
+                       COALESCE(p.shift_policy, 'standard_8h') as shift_policy,
+                       d.name as department_name, t.name as team_name
+                FROM employees e
+                LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
+                LEFT JOIN departments d ON e.department_id = d.id
+                LEFT JOIN teams t ON e.team_id = t.id
+                {$whereSql}
+                ORDER BY 
+                    CASE e.role 
+                        WHEN 'super_admin' THEN 1 
+                        WHEN 'admin' THEN 1 
+                        WHEN 'hr' THEN 2 
+                        WHEN 'hod' THEN 3 
+                        WHEN 'team_lead' THEN 4 
+                        ELSE 5 
+                    END,
+                    d.id ASC, e.name ASC
+            ");
+            $empStmt->execute($params);
+            $employees = $empStmt->fetchAll();
 
-        // Fetch all daily sheets for this date range
-        $sheetStmt = $pdo->prepare("
-            SELECT ds.*, 
-                   (SELECT COUNT(*) FROM sheet_entries se WHERE se.sheet_id = ds.id) as total_entries
-            FROM daily_sheets ds
-            WHERE ds.sheet_date BETWEEN ? AND ?
-        ");
-        $sheetStmt->execute([$startDate, $endDate]);
-        $allSheets = $sheetStmt->fetchAll();
-        
-        // Group sheets by employee_id and date
-        $sheetsByEmp = [];
-        foreach ($allSheets as $sh) {
-            $sheetsByEmp[$sh['employee_id']][$sh['sheet_date']] = $sh;
-        }
+            // Fetch all daily sheets for this date range
+            $sheetStmt = $pdo->prepare("
+                SELECT ds.*, 
+                       (SELECT COUNT(*) FROM sheet_entries se WHERE se.sheet_id = ds.id) as total_entries
+                FROM daily_sheets ds
+                WHERE ds.sheet_date BETWEEN ? AND ?
+            ");
+            $sheetStmt->execute([$startDate, $endDate]);
+            $allSheets = $sheetStmt->fetchAll();
+            
+            // Group sheets by employee_id and date
+            $sheetsByEmp = [];
+            foreach ($allSheets as $sh) {
+                $sheetsByEmp[$sh['employee_id']][$sh['sheet_date']] = $sh;
+            }
 
-        // Fetch all approved leaves for this date range
-        $leaveStmt = $pdo->prepare("
-            SELECT * FROM hr_leaves 
-            WHERE status = 'approved' 
-              AND ((start_date BETWEEN ? AND ?) OR (end_date BETWEEN ? AND ?) OR (start_date <= ? AND end_date >= ?))
-        ");
-        $leaveStmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
-        $approvedLeaves = $leaveStmt->fetchAll();
+            // Fetch all approved leaves for this date range
+            $approvedLeaves = [];
+            try {
+                $leaveStmt = $pdo->prepare("
+                    SELECT * FROM hr_leaves 
+                    WHERE status = 'approved' 
+                      AND ((start_date BETWEEN ? AND ?) OR (end_date BETWEEN ? AND ?) OR (start_date <= ? AND end_date >= ?))
+                ");
+                $leaveStmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
+                $approvedLeaves = $leaveStmt->fetchAll();
+            } catch (Exception $e) {
+                $approvedLeaves = [];
+            }
 
-        // Generate list of days between startDate and endDate
-        $periodDates = [];
-        $currDate = $startDate;
-        $today = date('Y-m-d');
-        while (strtotime($currDate) <= strtotime($endDate)) {
-            $periodDates[] = [
-                'date' => $currDate,
-                'day' => date('D', strtotime($currDate)),
-                'day_num' => (int)date('d', strtotime($currDate)),
-                'is_weekend' => (date('N', strtotime($currDate)) >= 7),
-                'is_future' => ($currDate > $today)
-            ];
-            $currDate = date('Y-m-d', strtotime($currDate . ' +1 day'));
-        }
+            // Generate list of days between startDate and endDate
+            $periodDates = [];
+            $currDate = $startDate;
+            $today = date('Y-m-d');
+            while (strtotime($currDate) <= strtotime($endDate)) {
+                $periodDates[] = [
+                    'date' => $currDate,
+                    'day' => date('D', strtotime($currDate)),
+                    'day_num' => (int)date('d', strtotime($currDate)),
+                    'is_weekend' => (date('N', strtotime($currDate)) >= 7),
+                    'is_future' => ($currDate > $today)
+                ];
+                $currDate = date('Y-m-d', strtotime($currDate . ' +1 day'));
+            }
 
-        $reportData = [];
-        $grandTotals = [
-            'total_employees' => count($employees),
-            'total_days_evaluated' => count($periodDates),
-            'total_present_full' => 0,
-            'total_short_leaves' => 0,
-            'total_half_leaves' => 0,
-            'total_approved_leaves' => 0,
-            'total_absences' => 0,
-            'total_duty_seconds' => 0,
-            'total_duty_hours' => 0,
-            'total_expected_hours' => 0
-        ];
-
-        foreach ($employees as $emp) {
-            $empId = $emp['id'];
-            $empExpectedHours = isset($emp['expected_hours']) ? (float)$emp['expected_hours'] : 8.0;
-
-            // Determine effective daily shift hours
-            $isOpenFlexible = ($rawStandardParam === 'open' || ($rawStandardParam === 'auto' && $empExpectedHours <= 0.0));
-            $shiftHours = $isOpenFlexible ? 0.0 : (($rawStandardParam !== 'auto' && is_numeric($rawStandardParam)) ? (float)$rawStandardParam : $empExpectedHours);
-
-            $empRecords = [];
-            $empSummary = [
-                'full_days' => 0,
-                'short_leaves' => 0,
-                'half_leaves' => 0,
-                'incomplete' => 0,
-                'approved_leaves' => 0,
-                'absences' => 0,
+            $reportData = [];
+            $grandTotals = [
+                'total_employees' => count($employees),
+                'total_days_evaluated' => count($periodDates),
+                'total_present_full' => 0,
+                'total_short_leaves' => 0,
+                'total_half_leaves' => 0,
+                'total_approved_leaves' => 0,
+                'total_absences' => 0,
                 'total_duty_seconds' => 0,
                 'total_duty_hours' => 0,
-                'expected_duty_hours' => 0,
-                'working_days_count' => 0,
-                'is_flexible' => $isOpenFlexible,
-                'shift_hours' => $shiftHours,
-                'weekly_hours' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0]
+                'total_expected_hours' => 0
             ];
 
-            foreach ($periodDates as $d) {
-                $dt = $d['date'];
-                $sheet = $sheetsByEmp[$empId][$dt] ?? null;
-                
-                // Check if on approved leave
-                $isOnLeave = false;
-                $leaveType = '';
-                $leaveReason = '';
-                foreach ($approvedLeaves as $lv) {
-                    if ($lv['employee_id'] == $empId && $dt >= $lv['start_date'] && $dt <= $lv['end_date']) {
-                        $isOnLeave = true;
-                        $leaveType = $lv['leave_type'];
-                        $leaveReason = $lv['reason'] ?? '';
-                        break;
+            foreach ($employees as $emp) {
+                $empId = $emp['id'];
+                $empExpectedHours = isset($emp['expected_hours']) ? (float)$emp['expected_hours'] : 8.0;
+
+                // Determine effective daily shift hours
+                $isOpenFlexible = ($rawStandardParam === 'open' || ($rawStandardParam === 'auto' && $empExpectedHours <= 0.0));
+                $shiftHours = $isOpenFlexible ? 0.0 : (($rawStandardParam !== 'auto' && is_numeric($rawStandardParam)) ? (float)$rawStandardParam : $empExpectedHours);
+
+                $empRecords = [];
+                $empSummary = [
+                    'full_days' => 0,
+                    'short_leaves' => 0,
+                    'half_leaves' => 0,
+                    'incomplete' => 0,
+                    'approved_leaves' => 0,
+                    'absences' => 0,
+                    'total_duty_seconds' => 0,
+                    'total_duty_hours' => 0,
+                    'expected_duty_hours' => 0,
+                    'working_days_count' => 0,
+                    'is_flexible' => $isOpenFlexible,
+                    'shift_hours' => $shiftHours,
+                    'weekly_hours' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0]
+                ];
+
+                foreach ($periodDates as $d) {
+                    $dt = $d['date'];
+                    $sheet = $sheetsByEmp[$empId][$dt] ?? null;
+                    
+                    // Check if on approved leave
+                    $isOnLeave = false;
+                    $leaveType = '';
+                    $leaveReason = '';
+                    foreach ($approvedLeaves as $lv) {
+                        if ($lv['employee_id'] == $empId && $dt >= $lv['start_date'] && $dt <= $lv['end_date']) {
+                            $isOnLeave = true;
+                            $leaveType = $lv['leave_type'];
+                            $leaveReason = $lv['reason'] ?? '';
+                            break;
+                        }
                     }
-                }
 
-                $dutySeconds = $sheet ? (int)$sheet['total_duty_seconds'] : 0;
-                if ($sheet && empty($sheet['check_out_time']) && !empty($sheet['check_in_time']) && $dt === $today) {
-                    $inTs = strtotime($dt . ' ' . $sheet['check_in_time']);
-                    if ($inTs) $dutySeconds = max(0, time() - $inTs);
-                }
-
-                $dutyHours = round($dutySeconds / 3600, 2);
-                $weekNum = min(6, (int)ceil($d['day_num'] / 7));
-
-                if (!$d['is_future']) {
-                    $empSummary['working_days_count']++;
-                    $empSummary['total_duty_seconds'] += $dutySeconds;
-                    $empSummary['total_duty_hours'] += $dutyHours;
-                    $empSummary['weekly_hours'][$weekNum] += $dutyHours;
-                    if (!$isOpenFlexible && !$d['is_weekend']) {
-                        $empSummary['expected_duty_hours'] += $shiftHours;
+                    $dutySeconds = $sheet ? (int)$sheet['total_duty_seconds'] : 0;
+                    if ($sheet && empty($sheet['check_out_time']) && !empty($sheet['check_in_time']) && $dt === $today) {
+                        $inTs = strtotime($dt . ' ' . $sheet['check_in_time']);
+                        if ($inTs) $dutySeconds = max(0, time() - $inTs);
                     }
-                }
 
-                // Dynamic Classification Rules
-                if ($d['is_future']) {
-                    $status = 'upcoming';
-                    $statusLabel = 'Upcoming';
-                    $badgeClass = 'badge-upcoming';
-                } elseif ($isOnLeave) {
-                    $status = 'approved_leave';
-                    $statusLabel = '🌴 ' . ucfirst($leaveType) . ' Leave';
-                    $badgeClass = 'badge-leave';
-                    $empSummary['approved_leaves']++;
-                    $grandTotals['total_approved_leaves']++;
-                } elseif ($isOpenFlexible) {
-                    // Open / Flexible Shift (No fixed threshold)
-                    if ($dutyHours > 0) {
-                        $status = 'full_day';
-                        $statusLabel = '🟢 Shift Logged (' . formatDutyTime($dutySeconds) . ')';
-                        $badgeClass = 'badge-present';
-                        $empSummary['full_days']++;
-                        $grandTotals['total_present_full']++;
-                    } elseif ($d['is_weekend']) {
-                        $status = 'weekend';
-                        $statusLabel = 'Weekend';
-                        $badgeClass = 'badge-weekend';
+                    $dutyHours = round($dutySeconds / 3600, 2);
+                    $weekNum = min(6, (int)ceil($d['day_num'] / 7));
+
+                    if (!$d['is_future']) {
+                        $empSummary['working_days_count']++;
+                        $empSummary['total_duty_seconds'] += $dutySeconds;
+                        $empSummary['total_duty_hours'] += $dutyHours;
+                        $empSummary['weekly_hours'][$weekNum] += $dutyHours;
+                        if (!$isOpenFlexible && !$d['is_weekend']) {
+                            $empSummary['expected_duty_hours'] += $shiftHours;
+                        }
+                    }
+
+                    // Dynamic Classification Rules
+                    if ($d['is_future']) {
+                        $status = 'upcoming';
+                        $statusLabel = 'Upcoming';
+                        $badgeClass = 'badge-upcoming';
+                    } elseif ($isOnLeave) {
+                        $status = 'approved_leave';
+                        $statusLabel = '🌴 ' . ucfirst($leaveType) . ' Leave';
+                        $badgeClass = 'badge-leave';
+                        $empSummary['approved_leaves']++;
+                        $grandTotals['total_approved_leaves']++;
+                    } elseif ($isOpenFlexible) {
+                        // Open / Flexible Shift (No fixed threshold)
+                        if ($dutyHours > 0) {
+                            $status = 'full_day';
+                            $statusLabel = '🟢 Shift Logged (' . formatDutyTime($dutySeconds) . ')';
+                            $badgeClass = 'badge-present';
+                            $empSummary['full_days']++;
+                            $grandTotals['total_present_full']++;
+                        } elseif ($d['is_weekend']) {
+                            $status = 'weekend';
+                            $statusLabel = 'Weekend';
+                            $badgeClass = 'badge-weekend';
+                        } else {
+                            $status = 'absent';
+                            $statusLabel = '⚪ Off Duty';
+                            $badgeClass = 'badge-absent';
+                        }
                     } else {
-                        $status = 'absent';
-                        $statusLabel = '⚪ Off Duty';
-                        $badgeClass = 'badge-absent';
-                    }
-                } else {
-                    // Fixed Shift Evaluation
-                    $fullThreshold = max(1.0, $shiftHours - 0.5);
-                    $shortThreshold = max(1.0, round($shiftHours * 0.65, 1));
-                    $halfThreshold = max(0.5, round($shiftHours * 0.35, 1));
+                        // Fixed Shift Evaluation
+                        $fullThreshold = max(1.0, $shiftHours - 0.5);
+                        $shortThreshold = max(1.0, round($shiftHours * 0.65, 1));
+                        $halfThreshold = max(0.5, round($shiftHours * 0.35, 1));
 
-                    if ($dutyHours >= $fullThreshold) {
-                        $status = 'full_day';
-                        $statusLabel = '🟢 Full Day (' . formatDutyTime($dutySeconds) . ')';
-                        $badgeClass = 'badge-present';
-                        $empSummary['full_days']++;
-                        $grandTotals['total_present_full']++;
-                    } elseif ($dutyHours >= $shortThreshold) {
-                        $status = 'short_leave';
-                        $statusLabel = '🟡 Short Leave (~' . round($shiftHours * 0.75, 1) . 'h)';
-                        $badgeClass = 'badge-short-leave';
-                        $empSummary['short_leaves']++;
-                        $grandTotals['total_short_leaves']++;
-                    } elseif ($dutyHours >= $halfThreshold) {
-                        $status = 'half_leave';
-                        $statusLabel = '🟠 Half Day (~' . round($shiftHours * 0.5, 1) . 'h)';
-                        $badgeClass = 'badge-half-leave';
-                        $empSummary['half_leaves']++;
-                        $grandTotals['total_half_leaves']++;
-                    } elseif ($dutyHours > 0) {
-                        $status = 'incomplete';
-                        $statusLabel = '🔴 Incomplete';
-                        $badgeClass = 'badge-incomplete';
-                        $empSummary['incomplete']++;
-                        $grandTotals['total_absences']++;
-                    } elseif ($d['is_weekend']) {
-                        $status = 'weekend';
-                        $statusLabel = 'Weekend';
-                        $badgeClass = 'badge-weekend';
-                    } else {
-                        $status = 'absent';
-                        $statusLabel = '🔴 Absent';
-                        $badgeClass = 'badge-absent';
-                        $empSummary['absences']++;
-                        $grandTotals['total_absences']++;
+                        if ($dutyHours >= $fullThreshold) {
+                            $status = 'full_day';
+                            $statusLabel = '🟢 Full Day (' . formatDutyTime($dutySeconds) . ')';
+                            $badgeClass = 'badge-present';
+                            $empSummary['full_days']++;
+                            $grandTotals['total_present_full']++;
+                        } elseif ($dutyHours >= $shortThreshold) {
+                            $status = 'short_leave';
+                            $statusLabel = '🟡 Short Leave (~' . round($shiftHours * 0.75, 1) . 'h)';
+                            $badgeClass = 'badge-short-leave';
+                            $empSummary['short_leaves']++;
+                            $grandTotals['total_short_leaves']++;
+                        } elseif ($dutyHours >= $halfThreshold) {
+                            $status = 'half_leave';
+                            $statusLabel = '🟠 Half Day (~' . round($shiftHours * 0.5, 1) . 'h)';
+                            $badgeClass = 'badge-half-leave';
+                            $empSummary['half_leaves']++;
+                            $grandTotals['total_half_leaves']++;
+                        } elseif ($dutyHours > 0) {
+                            $status = 'incomplete';
+                            $statusLabel = '🔴 Incomplete';
+                            $badgeClass = 'badge-incomplete';
+                            $empSummary['incomplete']++;
+                            $grandTotals['total_absences']++;
+                        } elseif ($d['is_weekend']) {
+                            $status = 'weekend';
+                            $statusLabel = 'Weekend';
+                            $badgeClass = 'badge-weekend';
+                        } else {
+                            $status = 'absent';
+                            $statusLabel = '🔴 Absent';
+                            $badgeClass = 'badge-absent';
+                            $empSummary['absences']++;
+                            $grandTotals['total_absences']++;
+                        }
                     }
+
+                    $empRecords[] = [
+                        'date' => $dt,
+                        'day' => $d['day'],
+                        'day_num' => $d['day_num'],
+                        'is_weekend' => $d['is_weekend'],
+                        'is_future' => $d['is_future'],
+                        'check_in' => $sheet['check_in_time'] ?? null,
+                        'check_out' => $sheet['check_out_time'] ?? null,
+                        'duty_seconds' => $dutySeconds,
+                        'duty_hours' => $dutyHours,
+                        'duty_formatted' => $dutySeconds > 0 ? formatDutyTime($dutySeconds) : '-',
+                        'status' => $status,
+                        'status_label' => $statusLabel,
+                        'badge_class' => $badgeClass,
+                        'is_locked' => $sheet ? (int)$sheet['is_locked'] : 0,
+                        'entries_count' => $sheet ? (int)$sheet['total_entries'] : 0,
+                        'leave_type' => $leaveType,
+                        'leave_reason' => $leaveReason,
+                        'work_summary' => $sheet['work_summary'] ?? '',
+                        'remarks' => $sheet['remarks'] ?? ''
+                    ];
                 }
 
-                $empRecords[] = [
-                    'date' => $dt,
-                    'day' => $d['day'],
-                    'day_num' => $d['day_num'],
-                    'is_weekend' => $d['is_weekend'],
-                    'is_future' => $d['is_future'],
-                    'check_in' => $sheet['check_in_time'] ?? null,
-                    'check_out' => $sheet['check_out_time'] ?? null,
-                    'duty_seconds' => $dutySeconds,
-                    'duty_hours' => $dutyHours,
-                    'duty_formatted' => $dutySeconds > 0 ? formatDutyTime($dutySeconds) : '-',
-                    'status' => $status,
-                    'status_label' => $statusLabel,
-                    'badge_class' => $badgeClass,
-                    'is_locked' => $sheet ? (int)$sheet['is_locked'] : 0,
-                    'entries_count' => $sheet ? (int)$sheet['total_entries'] : 0,
-                    'leave_type' => $leaveType,
-                    'leave_reason' => $leaveReason,
-                    'work_summary' => $sheet['work_summary'] ?? '',
-                    'remarks' => $sheet['remarks'] ?? ''
+                // Summary calculations
+                $activeWeeks = array_filter($empSummary['weekly_hours']);
+                $empSummary['avg_weekly_hours'] = count($activeWeeks) > 0 
+                    ? round(array_sum($activeWeeks) / count($activeWeeks), 1) 
+                    : 0;
+                $empSummary['duty_formatted'] = formatDutyTime($empSummary['total_duty_seconds']);
+                $empSummary['hour_balance'] = round($empSummary['total_duty_hours'] - $empSummary['expected_duty_hours'], 1);
+
+                $grandTotals['total_duty_seconds'] += $empSummary['total_duty_seconds'];
+                $grandTotals['total_duty_hours'] += $empSummary['total_duty_hours'];
+                $grandTotals['total_expected_hours'] += $empSummary['expected_duty_hours'];
+
+                $reportData[] = [
+                    'employee' => $emp,
+                    'summary' => $empSummary,
+                    'daily_records' => $empRecords
                 ];
             }
 
-            // Summary calculations
-            $activeWeeks = array_filter($empSummary['weekly_hours']);
-            $empSummary['avg_weekly_hours'] = count($activeWeeks) > 0 
-                ? round(array_sum($activeWeeks) / count($activeWeeks), 1) 
-                : 0;
-            $empSummary['duty_formatted'] = formatDutyTime($empSummary['total_duty_seconds']);
-            $empSummary['hour_balance'] = round($empSummary['total_duty_hours'] - $empSummary['expected_duty_hours'], 1);
+            $grandTotals['total_duty_formatted'] = formatDutyTime($grandTotals['total_duty_seconds']);
 
-            $grandTotals['total_duty_seconds'] += $empSummary['total_duty_seconds'];
-            $grandTotals['total_duty_hours'] += $empSummary['total_duty_hours'];
-            $grandTotals['total_expected_hours'] += $empSummary['expected_duty_hours'];
-
-            $reportData[] = [
-                'employee' => $emp,
-                'summary' => $empSummary,
-                'daily_records' => $empRecords
-            ];
+            echo json_encode([
+                'success' => true,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'standard_hours' => $rawStandardParam,
+                'grand_totals' => $grandTotals,
+                'period_dates' => $periodDates,
+                'report_data' => $reportData
+            ]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Attendance calculation error: ' . $e->getMessage()
+            ]);
         }
-
-        $grandTotals['total_duty_formatted'] = formatDutyTime($grandTotals['total_duty_seconds']);
-
-        echo json_encode([
-            'success' => true,
-            'start_date' => $startDate,
-            'end_date' => $endDate,
-            'standard_hours' => $standardHours,
-            'grand_totals' => $grandTotals,
-            'period_dates' => $periodDates,
-            'report_data' => $reportData
-        ]);
         break;
 
     default:
