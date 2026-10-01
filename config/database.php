@@ -233,6 +233,14 @@ function migratePermissionsSchema($pdo) {
             FOREIGN KEY (target_department_id) REFERENCES departments(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        // Auto-seed default hr_employee_profiles for any existing employees missing a profile without altering data
+        $pdo->exec("
+            INSERT IGNORE INTO hr_employee_profiles (employee_id, joining_date, employment_type, basic_salary, expected_hours, shift_policy, annual_leave_quota, casual_leave_quota, sick_leave_quota)
+            SELECT id, CURDATE(), 'full_time', 0.00, 8.0, 'standard_8h', 14, 10, 8
+            FROM employees
+            WHERE id NOT IN (SELECT employee_id FROM hr_employee_profiles)
+        ");
+
     } catch (Exception $e) {
         // Ignore if already migrated
     }
