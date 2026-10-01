@@ -71,8 +71,9 @@ switch ($action) {
 
         // Determine destination landing dashboard
         $redirectUrl = 'index.php';
+        $userRole = strtolower($user['role'] ?? '');
         $deptLower = strtolower($user['department_name'] ?? '');
-        if ($deptLower === 'hr' || $deptLower === 'human resources') {
+        if ($userRole === 'hr' || $deptLower === 'hr' || $deptLower === 'human resources') {
             $redirectUrl = 'hr.php';
         }
 

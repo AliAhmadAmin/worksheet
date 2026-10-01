@@ -317,8 +317,9 @@ async function loadUserData() {
 
     const portalSwitcher = document.querySelector('.portal-switcher-wrapper');
     if (portalSwitcher) {
-        // Portal switcher only available for Super Admin
-        portalSwitcher.style.display = isSuperAdmin ? '' : 'none';
+        // Portal switcher available for Super Admin, Admin, and HR Managers
+        const canSwitchPortal = isSuperAdmin || AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'hr' || hasPermission('can_manage_hr');
+        portalSwitcher.style.display = canSwitchPortal ? '' : 'none';
     }
 
     await loadDailyWorksheet();
@@ -508,7 +509,9 @@ function renderUserBar() {
     }
 
     // Dynamic Tab & Section Labeling
+    const mainNavIcon = document.getElementById('main-nav-tab-icon');
     const navTabLabel = document.getElementById('main-nav-tab-label');
+    const tasksNavIcon = document.getElementById('tasks-nav-tab-icon');
     const tasksNavLabel = document.getElementById('tasks-nav-tab-label');
     const wsHeading = document.getElementById('worksheet-title-heading');
     const wsDesc = document.getElementById('worksheet-title-desc');
@@ -520,14 +523,16 @@ function renderUserBar() {
     const canInspect = hasPermission('can_inspect_sheets');
     const canAssign = user.role === 'admin' || hasPermission('can_assign_tasks');
 
-    if (user.role === 'admin' || canInspect) {
-        if (navTabLabel) navTabLabel.innerHTML = '🏠 Dashboard';
+    if (user.role === 'admin' || user.role === 'super_admin' || canInspect) {
+        if (mainNavIcon) mainNavIcon.textContent = '🏠';
+        if (navTabLabel) navTabLabel.textContent = 'Dashboard';
         if (wsHeading) wsHeading.textContent = 'Employee Worksheet Inspector & Live Editor';
         if (wsDesc) wsDesc.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
         if (sideHeading) sideHeading.textContent = '🎯 Team Tasks & Quick Actions';
         if (sideDesc) sideDesc.textContent = 'Monitor team tasks or assign new tasks to creators.';
     } else {
-        if (navTabLabel) navTabLabel.innerHTML = '📝 Hourly Sheet';
+        if (mainNavIcon) mainNavIcon.textContent = '📝';
+        if (navTabLabel) navTabLabel.textContent = 'Hourly Sheet';
         if (wsHeading) wsHeading.textContent = 'Hourly Work Log Sheet';
         if (wsDesc) wsDesc.textContent = 'Record your work batches, content types, departments, and links.';
         if (sideHeading) sideHeading.textContent = '🎯 My Assigned Tasks';
@@ -535,19 +540,15 @@ function renderUserBar() {
     }
 
     if (canAssign) {
-        if (tasksNavLabel) tasksNavLabel.innerHTML = '🎯 Task Assigner';
+        if (tasksNavIcon) tasksNavIcon.textContent = '🎯';
+        if (tasksNavLabel) tasksNavLabel.textContent = 'Task Assigner';
         if (tasksPageTitle) tasksPageTitle.textContent = '🎯 Task Assignment Command Center';
         if (tasksPageDesc) tasksPageDesc.textContent = 'Assign specific tasks to individual team members, filter by status, and monitor real-time completion.';
     } else {
-        if (tasksNavLabel) tasksNavLabel.innerHTML = '🎯 Tasks';
+        if (tasksNavIcon) tasksNavIcon.textContent = '🎯';
+        if (tasksNavLabel) tasksNavLabel.textContent = 'Assigned Tasks';
         if (tasksPageTitle) tasksPageTitle.textContent = '🎯 My Assigned Tasks';
         if (tasksPageDesc) tasksPageDesc.textContent = 'View your assigned tasks, access project paths/links, and track completion.';
-    }
-
-    const hrNavLabel = document.getElementById('hr-nav-tab-label');
-    const canManageHr = user.role === 'admin' || hasPermission('can_manage_hr');
-    if (hrNavLabel) {
-        hrNavLabel.innerHTML = canManageHr ? '💼 HR Management' : '🏖️ Leaves & HR';
     }
 
     // User Badge Interactivity: Opens My Profile & Settings for all users

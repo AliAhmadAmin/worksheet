@@ -18,8 +18,11 @@ if (!empty($_SESSION['user_id'])) {
     $user = $stmt->fetch();
 
     if ($user) {
+        $userRole = strtolower($user['role'] ?? '');
         $deptLower = strtolower($user['department_name'] ?? '');
-        if ($deptLower === 'hr' || $deptLower === 'human resources') {
+        $isHrUser = ($userRole === 'hr' || $userRole === 'super_admin' || $userRole === 'admin' || !empty($user['can_manage_hr']) || $deptLower === 'hr' || $deptLower === 'human resources');
+
+        if ($userRole === 'hr' || $deptLower === 'hr' || $deptLower === 'human resources') {
             header('Location: hr.php');
             exit;
         }

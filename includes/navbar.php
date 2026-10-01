@@ -107,11 +107,11 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">WORKSPACE</div>
             <button type="button" class="nav-btn active" data-tab="tab-worksheet" data-route="worksheet">
-                <span class="nav-icon">📝</span>
+                <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">Hourly Sheet</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
-                <span class="nav-icon">🎯</span>
+                <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
                 <span class="nav-label" id="tasks-nav-tab-label">Assigned Tasks</span>
                 <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
             </button>
