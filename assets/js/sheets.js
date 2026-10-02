@@ -66,14 +66,6 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
             return;
         }
 
-        // If viewing today with no check-in, check if employee has an active overnight shift from yesterday (e.g. 6PM to 2AM)
-        const isEmployee = !AppState.currentUser || AppState.currentUser.role !== 'admin';
-        if (allowOvernightRedirect && isEmployee && data.active_overnight_sheet && date === getLocalDateString()) {
-            AppState.selectedDate = data.active_overnight_sheet.sheet_date;
-            showToast(`🌙 Active Night Shift detected (Started: ${data.active_overnight_sheet.check_in_time}). Live duty timer is running!`, "info");
-            return loadDailyWorksheet(false);
-        }
-
         AppState.currentSheet = data.sheet;
         AppState.currentEntries = data.entries || [];
         AppState.isLocked = data.is_locked;
@@ -83,9 +75,8 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
         renderWorksheetSummary(data.sheet);
         updateLockBadge(data.is_locked, data.can_edit);
 
-        // Draft & Night Shift Recovery Banners
+        // Draft Recovery Banner
         const draftBanner = document.getElementById('worksheet-draft-banner');
-        const yesterdayNotice = document.getElementById('worksheet-yesterday-notice');
 
         if (!data.entries || data.entries.length === 0) {
             const draft = getLocalDraft(empId, date);
@@ -99,20 +90,8 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
             } else if (draftBanner) {
                 draftBanner.style.display = 'none';
             }
-
-            if (yesterdayNotice && date === getLocalDateString()) {
-                const yDate = new Date();
-                yDate.setDate(yDate.getDate() - 1);
-                const yStr = yDate.toISOString().split('T')[0];
-                const yLabel = document.getElementById('yesterday-notice-date');
-                if (yLabel) yLabel.textContent = yStr;
-                yesterdayNotice.style.display = 'flex';
-            } else if (yesterdayNotice) {
-                yesterdayNotice.style.display = 'none';
-            }
         } else {
             if (draftBanner) draftBanner.style.display = 'none';
-            if (yesterdayNotice) yesterdayNotice.style.display = 'none';
             // Sync current saved entries to local cache
             saveLocalDraft();
         }
