@@ -63,12 +63,20 @@ switch ($action) {
             $entries = $entriesStmt->fetchAll();
         }
 
-        // Check if there is an active unclosed overnight shift from yesterday (e.g. 6PM to 2AM)
+        // Check if there is an active unclosed overnight shift from recent dates (e.g. checked in last night)
         $activeOvernightSheet = null;
         if ($date === date('Y-m-d') && (!$sheet || empty($sheet['check_in_time']))) {
-            $yesterday = date('Y-m-d', strtotime('-1 day'));
-            $yStmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ? AND check_in_time IS NOT NULL AND (is_locked = 0 OR is_locked IS NULL)");
-            $yStmt->execute([$empId, $yesterday]);
+            $yStmt = $pdo->prepare("
+                SELECT * FROM daily_sheets 
+                WHERE employee_id = ? 
+                  AND check_in_time IS NOT NULL 
+                  AND (check_out_time IS NULL OR check_out_time = '')
+                  AND (is_locked = 0 OR is_locked IS NULL)
+                  AND sheet_date < ?
+                ORDER BY sheet_date DESC 
+                LIMIT 1
+            ");
+            $yStmt->execute([$empId, $date]);
             $ySheet = $yStmt->fetch();
             if ($ySheet) {
                 $inDateTime = strtotime($ySheet['sheet_date'] . ' ' . $ySheet['check_in_time']);

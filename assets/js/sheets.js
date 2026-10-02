@@ -680,7 +680,8 @@ function renderWorksheetSummary(sheet) {
 // Employee Check-In Action
 async function handleCheckIn() {
     const todayStr = getLocalDateString();
-    if (AppState.selectedDate !== todayStr && AppState.currentUser?.role !== 'admin') {
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin');
+    if (AppState.selectedDate !== todayStr && !isAdmin) {
         showToast(`Check-In is only permitted on Today's date (${todayStr}).`, "error");
         return;
     }
@@ -711,15 +712,19 @@ async function handleCheckIn() {
     }
 }
 
-// Employee Check-Out Action
+// Employee Check-Out Action (Supports Overnight / Cross-Midnight Shifts)
 async function handleCheckOut() {
     const todayStr = getLocalDateString();
-    if (AppState.selectedDate !== todayStr && AppState.currentUser?.role !== 'admin') {
-        showToast(`Check-Out is only permitted on Today's date (${todayStr}).`, "error");
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin');
+    const isOngoingShift = AppState.currentSheet && AppState.currentSheet.check_in_time && !AppState.currentSheet.check_out_time && (!AppState.currentSheet.is_locked);
+
+    // Allow check-out if it is an active ongoing shift (e.g. night shift started yesterday) or if viewing today
+    if (!isOngoingShift && AppState.selectedDate !== todayStr && !isAdmin) {
+        showToast(`Check-Out is only permitted for active ongoing shifts or today's date (${todayStr}).`, "error");
         return;
     }
 
-    if (!confirm("Are you sure you want to Check Out? Once you check out, your sheet will be LOCKED and only Admin can unlock or edit it.")) {
+    if (!confirm("Are you sure you want to Check Out? Once you check out, your duty hours will be finalized and sheet will be LOCKED.")) {
         return;
     }
 
