@@ -5,5 +5,7 @@
     <script src="assets/js/reports.js"></script>
     <script src="assets/js/hr.js"></script>
     <script src="assets/js/employees.js"></script>
+    <script src="assets/js/programming.js"></script>
+    <script src="assets/js/newsroom.js"></script>
 </body>
 </html>

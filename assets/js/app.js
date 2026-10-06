@@ -324,6 +324,7 @@ async function loadUserData() {
 
     await loadDailyWorksheet();
     await loadAssignedTasks();
+    await updateGlobalSidebarBadges();
     if (typeof loadHrDashboard === 'function') {
         loadHrDashboard();
     }
@@ -335,6 +336,40 @@ async function loadUserData() {
     }
     if (isAdmin || canManage) {
         loadEmployeeDirectory();
+    }
+}
+
+async function updateGlobalSidebarBadges() {
+    try {
+        // 1. News Room Handover Pending Badge
+        const newsBadges = [document.getElementById('pending-news-badge'), document.getElementById('pending-news-badge-nr')].filter(Boolean);
+        if (newsBadges.length > 0) {
+            const newsRes = await fetch('api/newsroom.php?action=list');
+            const newsData = await newsRes.json();
+            if (newsData.success && newsData.stats) {
+                const count = parseInt(newsData.stats.pending_queue) || 0;
+                newsBadges.forEach(badge => {
+                    badge.textContent = count;
+                    badge.style.display = count > 0 ? 'inline-block' : 'none';
+                });
+            }
+        }
+
+        // 2. Programming Handover Pending Badge
+        const progBadges = [document.getElementById('pending-programming-badge'), document.getElementById('pending-prog-badge-pg')].filter(Boolean);
+        if (progBadges.length > 0) {
+            const progRes = await fetch('api/programming.php?action=list');
+            const progData = await progRes.json();
+            if (progData.success && progData.stats) {
+                const count = parseInt(progData.stats.pending_queue) || 0;
+                progBadges.forEach(badge => {
+                    badge.textContent = count;
+                    badge.style.display = count > 0 ? 'inline-block' : 'none';
+                });
+            }
+        }
+    } catch (e) {
+        // Ignore background badge errors
     }
 }
 
@@ -635,6 +670,12 @@ function navigateToTab(tabId, updateHash = true) {
         loadEmployeeDirectory();
     } else if (tabId === 'tab-tasks') {
         loadAssignedTasks();
+    } else if (tabId === 'tab-newsroom') {
+        if (typeof initNewsroomModule === 'function') initNewsroomModule();
+        else if (typeof loadNewsroomDispatches === 'function') loadNewsroomDispatches();
+    } else if (tabId === 'tab-programming') {
+        if (typeof initProgrammingModule === 'function') initProgrammingModule();
+        else if (typeof loadProgrammingDispatches === 'function') loadProgrammingDispatches();
     }
 }
 
@@ -810,6 +851,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     initApp();
+    updateGlobalSidebarBadges();
 
     const dateInput = document.getElementById('worksheet-date-picker');
     if (dateInput) {
@@ -820,14 +862,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Keep session alive periodically while tab is open
+    // Keep session alive and refresh sidebar queue badges periodically (every 30s)
     setInterval(async () => {
         if (AppState.currentUser) {
             try {
                 await fetch('api/auth.php?action=current_user');
             } catch (e) {}
+            updateGlobalSidebarBadges();
         }
-    }, 300000);
+    }, 30000);
 
     // Save offline draft on window close / tab navigation
     window.addEventListener('beforeunload', () => {

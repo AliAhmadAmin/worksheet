@@ -52,10 +52,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- Department Workspace Portal Switcher Dropdown (Super Admin / Elevated Users) -->
         <div class="portal-switcher-wrapper admin-only" style="position: relative; display: none;">
             <button type="button" class="portal-switcher-btn" onclick="togglePortalMenu()" id="portal-switcher-btn" title="Switch Department Workspace Portal">
-                <span class="portal-icon"><?= $currentPortal === 'hr' ? '💼' : '🎬' ?></span>
+                <span class="portal-icon"><?= $currentPortal === 'hr' ? '💼' : ($currentPortal === 'newsroom' ? '📺' : ($currentPortal === 'programming' ? '📡' : '🎬')) ?></span>
                 <div class="portal-text-block">
                     <span class="portal-eyebrow">PORTAL</span>
-                    <span class="portal-name"><?= $currentPortal === 'hr' ? 'HR & People' : 'Digital Media' ?></span>
+                    <span class="portal-name"><?= $currentPortal === 'hr' ? 'HR & People' : ($currentPortal === 'newsroom' ? 'News Room' : ($currentPortal === 'programming' ? 'Programming' : 'Digital Media')) ?></span>
                 </div>
                 <span class="portal-chevron">▾</span>
             </button>
@@ -72,6 +72,22 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                     </div>
                     <?php if ($currentPortal === 'digital'): ?><span class="item-check">✓</span><?php endif; ?>
                 </a>
+                <a href="newsroom.php" class="portal-menu-item <?= $currentPortal === 'newsroom' ? 'active' : '' ?>">
+                    <span class="item-icon">📺</span>
+                    <div class="item-info">
+                        <div class="item-title">News Room Portal</div>
+                        <div class="item-desc">Bulletins, tickers & dispatch matrix</div>
+                    </div>
+                    <?php if ($currentPortal === 'newsroom'): ?><span class="item-check">✓</span><?php endif; ?>
+                </a>
+                <a href="programming.php" class="portal-menu-item <?= $currentPortal === 'programming' ? 'active' : '' ?>">
+                    <span class="item-icon">📡</span>
+                    <div class="item-info">
+                        <div class="item-title">Programming Portal</div>
+                        <div class="item-desc">Content handover & dispatch matrix</div>
+                    </div>
+                    <?php if ($currentPortal === 'programming'): ?><span class="item-check">✓</span><?php endif; ?>
+                </a>
                 <a href="hr.php" class="portal-menu-item <?= $currentPortal === 'hr' ? 'active' : '' ?>">
                     <span class="item-icon">💼</span>
                     <div class="item-info">
@@ -80,22 +96,6 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                     </div>
                     <?php if ($currentPortal === 'hr'): ?><span class="item-check">✓</span><?php endif; ?>
                 </a>
-                <div class="portal-menu-item upcoming" title="In development">
-                    <span class="item-icon">📺</span>
-                    <div class="item-info">
-                        <div class="item-title">News Room Portal</div>
-                        <div class="item-desc">Bulletin rundowns & tickers</div>
-                    </div>
-                    <span class="portal-badge-soon">Soon</span>
-                </div>
-                <div class="portal-menu-item upcoming" title="In development">
-                    <span class="item-icon">📡</span>
-                    <div class="item-info">
-                        <div class="item-title">Programming Portal</div>
-                        <div class="item-desc">Transmission grid & schedules</div>
-                    </div>
-                    <span class="portal-badge-soon">Soon</span>
-                </div>
             </div>
         </div>
     </div>
@@ -114,6 +114,16 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
                 <span class="nav-label" id="tasks-nav-tab-label">Assigned Tasks</span>
                 <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-newsroom" data-route="newsroom">
+                <span class="nav-icon">📺</span>
+                <span class="nav-label">News Handover</span>
+                <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-programming" data-route="programming">
+                <span class="nav-icon">📡</span>
+                <span class="nav-label">Program Handover</span>
+                <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </button>
         </div>
 
@@ -149,6 +159,78 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Manage Staff</span>
             </button>
+        </div>
+
+    <?php elseif ($currentPortal === 'newsroom'): ?>
+        <!-- News Room Operations Category -->
+        <div class="sidebar-nav-group">
+            <div class="sidebar-nav-title">NEWS PIPELINE</div>
+            <button type="button" class="nav-btn active" data-tab="tab-newsroom" data-route="newsroom">
+                <span class="nav-icon">📺</span>
+                <span class="nav-label">News Handover</span>
+                <span id="pending-news-badge-nr" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
+            </button>
+            <a href="index.php" class="nav-btn" style="text-decoration: none;">
+                <span class="nav-icon">📝</span>
+                <span class="nav-label">Digital Sheet</span>
+            </a>
+            <a href="index.php#tasks" class="nav-btn" style="text-decoration: none;">
+                <span class="nav-icon">🎯</span>
+                <span class="nav-label">My Tasks</span>
+            </a>
+        </div>
+
+        <!-- Operations & Staff Category -->
+        <div class="sidebar-nav-group">
+            <div class="sidebar-nav-title">STAFF & SERVICES</div>
+            <button type="button" class="nav-btn" data-tab="tab-attendance" data-route="attendance">
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">Live Attendance</span>
+            </button>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
+                <span class="nav-icon">📁</span>
+                <span class="nav-label">Staff Directory</span>
+            </button>
+            <a href="hr.php#leaves" class="nav-btn" style="text-decoration: none;">
+                <span class="nav-icon">🏖️</span>
+                <span class="nav-label">Leave Portal</span>
+            </a>
+        </div>
+
+    <?php elseif ($currentPortal === 'programming'): ?>
+        <!-- Programming Operations Category -->
+        <div class="sidebar-nav-group">
+            <div class="sidebar-nav-title">HANDOVER PIPELINE</div>
+            <button type="button" class="nav-btn active" data-tab="tab-programming" data-route="programming">
+                <span class="nav-icon">📡</span>
+                <span class="nav-label">Handover Board</span>
+                <span id="pending-prog-badge-pg" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
+            </button>
+            <a href="index.php" class="nav-btn" style="text-decoration: none;">
+                <span class="nav-icon">📝</span>
+                <span class="nav-label">Digital Sheet</span>
+            </a>
+            <a href="index.php#tasks" class="nav-btn" style="text-decoration: none;">
+                <span class="nav-icon">🎯</span>
+                <span class="nav-label">My Tasks</span>
+            </a>
+        </div>
+
+        <!-- Operations & Staff Category -->
+        <div class="sidebar-nav-group">
+            <div class="sidebar-nav-title">STAFF & SERVICES</div>
+            <button type="button" class="nav-btn" data-tab="tab-attendance" data-route="attendance">
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">Live Attendance</span>
+            </button>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
+                <span class="nav-icon">📁</span>
+                <span class="nav-label">Staff Directory</span>
+            </button>
+            <a href="hr.php#leaves" class="nav-btn" style="text-decoration: none;">
+                <span class="nav-icon">🏖️</span>
+                <span class="nav-label">Leave Portal</span>
+            </a>
         </div>
 
     <?php elseif ($currentPortal === 'hr'): ?>

@@ -233,6 +233,82 @@ function migratePermissionsSchema($pdo) {
             FOREIGN KEY (target_department_id) REFERENCES departments(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS programming_dispatches (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            dispatch_date DATE NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            path_whatsapp TEXT,
+            channel VARCHAR(100) DEFAULT 'Discover Pakistan',
+            sender_id INT NULL,
+            sender_name VARCHAR(150),
+            dispatch_time VARCHAR(50),
+            link TEXT,
+            dp_status VARCHAR(50) DEFAULT '',
+            dp_time VARCHAR(50),
+            pt_status VARCHAR(50) DEFAULT '',
+            pt_time VARCHAR(50),
+            publisher_id INT NULL,
+            publisher_name VARCHAR(150),
+            remarks TEXT,
+            rating VARCHAR(50),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (sender_id) REFERENCES employees(id) ON DELETE SET NULL,
+            FOREIGN KEY (publisher_id) REFERENCES employees(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS newsroom_dispatches (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            dispatch_date DATE NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            path_whatsapp TEXT,
+            channel VARCHAR(100) DEFAULT 'Discover Pakistan',
+            sender_id INT NULL,
+            sender_name VARCHAR(150),
+            dispatch_time VARCHAR(50),
+            link TEXT,
+            dp_status VARCHAR(50) DEFAULT '',
+            dp_time VARCHAR(50),
+            pt_status VARCHAR(50) DEFAULT '',
+            pt_time VARCHAR(50),
+            publisher_id INT NULL,
+            publisher_name VARCHAR(150),
+            remarks TEXT,
+            rating VARCHAR(50),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (sender_id) REFERENCES employees(id) ON DELETE SET NULL,
+            FOREIGN KEY (publisher_id) REFERENCES employees(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Seed Programming & News Room Departments & Teams if missing
+        $pdo->exec("INSERT IGNORE INTO departments (name) VALUES ('Programming')");
+        $pdo->exec("INSERT IGNORE INTO departments (name) VALUES ('Archive')");
+        $pdo->exec("INSERT IGNORE INTO departments (name) VALUES ('News Room')");
+        $pdo->exec("INSERT IGNORE INTO teams (name) VALUES ('Programming Team')");
+        $pdo->exec("INSERT IGNORE INTO teams (name) VALUES ('Archive Team')");
+        $pdo->exec("INSERT IGNORE INTO teams (name) VALUES ('News Team')");
+
+        // Auto-sync status for items published on PT where DP status was pending
+        $pdo->exec("
+            UPDATE programming_dispatches 
+            SET dp_status = 'Published on PT' 
+            WHERE (pt_status = 'Published' OR pt_status = 'Published on PT') 
+              AND (dp_status = '' OR dp_status IS NULL OR dp_status = 'Pending')
+        ");
+        $pdo->exec("
+            UPDATE newsroom_dispatches 
+            SET dp_status = 'Published on PT' 
+            WHERE (pt_status = 'Published' OR pt_status = 'Published on PT') 
+              AND (dp_status = '' OR dp_status IS NULL OR dp_status = 'Pending')
+        ");
+
+        // Seed Programming & Newsroom Staff Rosters non-destructively
+        seedProgrammingStaff($pdo);
+        seedNewsroomStaff($pdo);
+
         // Auto-seed default hr_employee_profiles for any existing employees missing a profile without altering data
         $pdo->exec("
             INSERT IGNORE INTO hr_employee_profiles (employee_id, joining_date, employment_type, basic_salary, expected_hours, shift_policy, annual_leave_quota, casual_leave_quota, sick_leave_quota)
@@ -243,6 +319,129 @@ function migratePermissionsSchema($pdo) {
 
     } catch (Exception $e) {
         // Ignore if already migrated
+    }
+}
+
+function seedNewsroomStaff($pdo) {
+    try {
+        $deptMap = $pdo->query("SELECT name, id FROM departments")->fetchAll(PDO::FETCH_KEY_PAIR);
+        $teamMap = $pdo->query("SELECT name, id FROM teams")->fetchAll(PDO::FETCH_KEY_PAIR);
+
+        $newsDeptId = $deptMap['News Room'] ?? ($deptMap['Digital'] ?? 1);
+        $newsTeamId = $teamMap['News Team'] ?? ($teamMap['Admin'] ?? 1);
+        $defaultPasswordHash = password_hash('DiscoverPakistan123', PASSWORD_DEFAULT);
+
+        $newsroomRoster = [
+            ['Naveed Qaiser', 'hnqrana@gmail.com', 'hod', 'Director News', 'News Room', 'News Team'],
+            ['Rashid Yazdani', 'rashid.yazdani@discoverpakistan.tv', 'employee', 'Content Writer', 'News Room', 'News Team'],
+            ['Kazim Jaffri', 'kazim.jaffari@gmail.com', 'employee', 'Content Writer', 'News Room', 'News Team'],
+            ['Sammad Khan', 'sammadk96@gmail.com', 'team_lead', 'Sr.Producer', 'News Room', 'News Team'],
+            ['Hafiz Shahzad Ahmed', 'Shahzadnazir470@gmail.com', 'team_lead', 'Assignment Editor', 'News Room', 'News Team'],
+            ['Khurram Khalid', 'kkizhere@gmail.com', 'team_lead', 'Assignment Editor', 'News Room', 'News Team'],
+            ['Hussain Naqvi', 'hussaintransmission@gmail.com', 'team_lead', 'Assignment Editor', 'News Room', 'News Team'],
+            ['Khurram Shahzad', 'Idealkhuram@gmail.com', 'employee', 'Content Producer', 'News Room', 'News Team'],
+            ['Sheraz Khalid', 'az9766599@gmail.com', 'employee', 'Content Producer', 'News Room', 'News Team'],
+            ['Asim Mumtaz', 'sherwani.asim@gmail.com', 'employee', 'Associate Producer', 'News Room', 'News Team'],
+            ['Ali Zain', 'alizainzafar4@gmail.com', 'employee', 'News Producer', 'News Room', 'News Team'],
+            ['Shehrbano', 'Shehrbano29@gmail.com', 'employee', 'News Producer', 'News Room', 'News Team'],
+            ['Warisha Abbas', 'warishahamza35@gmail.com', 'employee', 'Anchor', 'News Room', 'News Team'],
+            ['Eza Romail', 'ezaromail@gmail.com', 'employee', 'Anchor', 'News Room', 'News Team'],
+            ['Talha Amir', 'talhasulehri28@gmail.com', 'employee', 'Anchor', 'News Room', 'News Team'],
+            ['Ateeq Malik', 'Ateeqmajeed@gmail.com', 'employee', 'Reporter', 'News Room', 'News Team'],
+            ['Hafsa Ali', 'ranahafsa26@gmail.com', 'employee', 'Reporter', 'News Room', 'News Team'],
+            ['Shuja Butt', 'alib4711@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Talha Arif', 'talhaarif0@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Muhammad Abbas', 'muhammadabbasjaffery72@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Abdur Rehman', 'peaksrehman@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Faizan Joya', 'faizanjoyia05@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Hassan Raza', 'Hassanraza0032uon@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Umar Muzamil', 'umarmuzammil205@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Rashid Ali', 'Rashidhussain12349@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Rizwan Waseem Khan', 'zeerizwan2020@gmail.com', 'employee', 'Associate Producer', 'News Room', 'News Team'],
+            ['Muhammad Khaqan Blaggan', 'khaqan143jutt@gmail.com', 'employee', 'Associate Producer', 'News Room', 'News Team'],
+            ['Zulqanain Haider', 'syedzulqarnain05@gmail.com', 'employee', 'Audio Engineer', 'News Room', 'News Team'],
+            ['Sued Moeed Ali', 'immoeed7@gmail.com', 'employee', 'Audio Engineer', 'News Room', 'News Team'],
+            ['Jabeer Sajid', 'jabeershah14@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Kashif Ali', 'Kashiftahirtv@gmail.com', 'employee', 'NLE (Non-Linear Editor)', 'News Room', 'News Team'],
+            ['Maria Bukhari', 'maria4bukhari21@gmail.com', 'employee', 'Content Analyst', 'News Room', 'News Team']
+        ];
+
+        $stmtInsert = $pdo->prepare("
+            INSERT IGNORE INTO employees (name, email, password_hash, role, designation, department_id, team_id, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        ");
+
+        foreach ($newsroomRoster as $emp) {
+            $name = $emp[0];
+            $email = strtolower(trim($emp[1]));
+            $role = $emp[2];
+            $designation = $emp[3];
+            $deptId = $deptMap[$emp[4]] ?? $newsDeptId;
+            $teamId = $teamMap[$emp[5]] ?? $newsTeamId;
+
+            $stmtInsert->execute([$name, $email, $defaultPasswordHash, $role, $designation, $deptId, $teamId]);
+        }
+    } catch (Exception $e) {
+        // Ignore errors if already seeded
+    }
+}
+
+function seedProgrammingStaff($pdo) {
+    try {
+        $deptMap = $pdo->query("SELECT name, id FROM departments")->fetchAll(PDO::FETCH_KEY_PAIR);
+        $teamMap = $pdo->query("SELECT name, id FROM teams")->fetchAll(PDO::FETCH_KEY_PAIR);
+
+        $progDeptId = $deptMap['Programming'] ?? ($deptMap['Digital'] ?? 1);
+        $progTeamId = $teamMap['Programming Team'] ?? ($teamMap['Admin'] ?? 1);
+        $defaultPasswordHash = password_hash('DiscoverPakistan123', PASSWORD_DEFAULT);
+
+        $programmingRoster = [
+            ['Ghulam Abbas', 'hodshahdp@gmail.com', 'hod', 'HOD Programming', 'Programming', 'Programming Team'],
+            ['Zeeshan Butt', 'Meri.emailz@gmail.com', 'team_lead', 'Sr.Producer', 'Programming', 'Programming Team'],
+            ['Tabish Noor Khan', 'tabish.discoverpk@gmail.com', 'team_lead', 'Sr.Producer', 'Programming', 'Programming Team'],
+            ['Fakhar Zaman', 'fakhar.zaman@discoverpakistan.tv', 'team_lead', 'Sr.Producer', 'Programming', 'Programming Team'],
+            ['Iqra Maqsood', 'iqramaqsood009@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Umair Manzoor', 'umairmanzoor@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Usman Mehar', 'Ieospunch@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Khursand Hashim', 'Khursand.hashim62@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Maisha Aslam', 'Maishaaslam91@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Syed Fahad Kamran', 'Fahadkamran1999@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Mueez', 'Ra7361309@gmail.com', 'employee', 'Asst. Producer', 'Programming', 'Programming Team'],
+            ['Fahad feroz', 'fahad.ferose@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Waqas Chaudhary', 'waqas.chaudhary@discoverpakistan.tv', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Sameera Latif', 'sameera.latif@discoverpakistan.tv', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Zaheer Sheikh', 'Zhr.sheikh78@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Saba Pasha', 'Sabapasha851@gmail.com', 'employee', 'Program Anchor', 'Programming', 'Programming Team'],
+            ['Rameen Mehmood', 'Rameenmehmood5@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Khadija Bhalli', 'khadija.bhalli@discoverpakistan.tv', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Shehroz Anjum', 'Shehroz.anjum1994@gmail.com', 'employee', 'Anchor + Content Writer', 'Programming', 'Programming Team'],
+            ['Hafsa Ali', 'hafsa.ali@discoverpakistan.tv', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Warisha Abbass', 'warisha.abbass@discoverpakistan.tv', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Shahan Karachi', 'Shahan.shahid.k@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Naseer Abbasi', 'abbasinaseer056@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Adeel Mirza', 'mirza.adeel.45@gmail.com', 'employee', 'Producer', 'Programming', 'Programming Team'],
+            ['Ali Kashif', 'alikashifsultani@gmail.com', 'hod', 'HOD Archive', 'Programming', 'Archive Team'],
+            ['Rana Arslan', 'ranaarslan421@gmail.com', 'employee', 'Archive Officer', 'Programming', 'Archive Team'],
+            ['Babar Rasool', 'Babarwattoo777@gmail.com', 'employee', 'Archive Officer', 'Programming', 'Archive Team']
+        ];
+
+        $stmtInsert = $pdo->prepare("
+            INSERT IGNORE INTO employees (name, email, password_hash, role, designation, department_id, team_id, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+        ");
+
+        foreach ($programmingRoster as $emp) {
+            $name = $emp[0];
+            $email = strtolower(trim($emp[1]));
+            $role = $emp[2];
+            $designation = $emp[3];
+            $deptId = $deptMap[$emp[4]] ?? $progDeptId;
+            $teamId = $teamMap[$emp[5]] ?? $progTeamId;
+
+            $stmtInsert->execute([$name, $email, $defaultPasswordHash, $role, $designation, $deptId, $teamId]);
+        }
+    } catch (Exception $e) {
+        // Ignore errors if already seeded
     }
 }
 

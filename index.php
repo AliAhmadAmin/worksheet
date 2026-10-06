@@ -20,6 +20,8 @@ require_once __DIR__ . '/includes/navbar.php';
     // Modular Feature Views
     require_once __DIR__ . '/views/tab_worksheet.php';
     require_once __DIR__ . '/views/tab_tasks.php';
+    require_once __DIR__ . '/views/tab_newsroom.php';
+    require_once __DIR__ . '/views/tab_programming.php';
     require_once __DIR__ . '/views/tab_hr.php';
     require_once __DIR__ . '/views/tab_reports.php';
     require_once __DIR__ . '/views/tab_attendance.php';
