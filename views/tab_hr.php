@@ -308,10 +308,11 @@
             <!-- Filter Bar -->
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <select id="hr-leave-status-filter" class="input-control" style="font-size: 12.5px; padding: 6px 12px; min-width: 140px;" onchange="loadHrLeaves()">
+                    <select id="hr-leave-status-filter" class="input-control" style="font-size: 12.5px; padding: 6px 12px; min-width: 160px;" onchange="loadHrLeaves()">
                         <option value="all">All Statuses</option>
-                        <option value="pending" selected>⏳ Pending Approval</option>
-                        <option value="approved">✅ Approved</option>
+                        <option value="pending" selected>⏳ Pending HOD Approval</option>
+                        <option value="approved_by_hod">🟡 Approved by HOD (Pending HR)</option>
+                        <option value="approved">✅ Approved by HR</option>
                         <option value="rejected">❌ Rejected</option>
                     </select>
 

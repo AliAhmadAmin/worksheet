@@ -20,22 +20,45 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 }
 
 $currentUserId = $_SESSION['user_id'] ?? ($data['employee_id'] ?? 1);
-$stmtUserCheck = $pdo->prepare("SELECT * FROM employees WHERE id = ?");
+$stmtUserCheck = $pdo->prepare("
+    SELECT e.*, d.name as department_name, t.name as team_name 
+    FROM employees e 
+    LEFT JOIN departments d ON e.department_id = d.id
+    LEFT JOIN teams t ON e.team_id = t.id
+    WHERE e.id = ?
+");
 $stmtUserCheck->execute([$currentUserId]);
 $currentUserObj = $stmtUserCheck->fetch() ?: [];
 
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
 $isAdmin = ($currentUserRole === 'admin' || $currentUserRole === 'super_admin' || $currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr'));
 $canManageHr = $isAdmin || !empty($currentUserObj['can_manage_hr']);
+$isHod = ($currentUserRole === 'hod' || stripos($currentUserObj['designation'] ?? '', 'HOD') !== false || stripos($currentUserObj['designation'] ?? '', 'Director') !== false);
+$userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 
 switch ($action) {
     case 'get_overview':
         $selectedMonth = $_GET['month'] ?? date('Y-m');
         $todayDate = date('Y-m-d');
 
-        // Total Pending Leaves
-        $stmtPending = $pdo->query("SELECT COUNT(*) FROM hr_leaves WHERE status = 'pending'");
-        $pendingLeavesCount = (int)$stmtPending->fetchColumn();
+        // Total Pending Leaves (Awaiting HOD or HR review)
+        if ($canManageHr) {
+            $stmtPending = $pdo->query("SELECT COUNT(*) FROM hr_leaves WHERE status IN ('pending', 'approved_by_hod')");
+            $pendingLeavesCount = (int)$stmtPending->fetchColumn();
+        } elseif ($isHod) {
+            $stmtPending = $pdo->prepare("
+                SELECT COUNT(*) 
+                FROM hr_leaves l 
+                JOIN employees e ON l.employee_id = e.id 
+                WHERE l.status = 'pending' AND e.department_id = ?
+            ");
+            $stmtPending->execute([$userDeptId]);
+            $pendingLeavesCount = (int)$stmtPending->fetchColumn();
+        } else {
+            $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM hr_leaves WHERE status IN ('pending', 'approved_by_hod') AND employee_id = ?");
+            $stmtPending->execute([$currentUserId]);
+            $pendingLeavesCount = (int)$stmtPending->fetchColumn();
+        }
 
         // Approved Leaves this month
         $stmtApprovedMonth = $pdo->prepare("SELECT COUNT(*) FROM hr_leaves WHERE status = 'approved' AND (DATE_FORMAT(start_date, '%Y-%m') = ? OR DATE_FORMAT(end_date, '%Y-%m') = ?)");
@@ -64,16 +87,45 @@ switch ($action) {
         $todayOnLeaveStaff = $stmtOnLeave->fetchAll();
 
         // Pending Leave Applications Queue (Top 6)
-        $stmtPendingList = $pdo->query("
-            SELECT l.*, e.name as employee_name, e.designation, e.avatar, d.name as department_name
-            FROM hr_leaves l
-            JOIN employees e ON l.employee_id = e.id
-            LEFT JOIN departments d ON e.department_id = d.id
-            WHERE l.status = 'pending'
-            ORDER BY l.created_at ASC
-            LIMIT 6
-        ");
-        $pendingLeavesList = $stmtPendingList->fetchAll();
+        if ($canManageHr) {
+            $stmtPendingList = $pdo->query("
+                SELECT l.*, e.name as employee_name, e.designation, e.avatar, d.name as department_name, h.name as hod_name
+                FROM hr_leaves l
+                JOIN employees e ON l.employee_id = e.id
+                LEFT JOIN departments d ON e.department_id = d.id
+                LEFT JOIN employees h ON l.hod_id = h.id
+                WHERE l.status IN ('pending', 'approved_by_hod')
+                ORDER BY CASE l.status WHEN 'approved_by_hod' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END, l.created_at ASC
+                LIMIT 6
+            ");
+            $pendingLeavesList = $stmtPendingList->fetchAll();
+        } elseif ($isHod) {
+            $stmtPendingList = $pdo->prepare("
+                SELECT l.*, e.name as employee_name, e.designation, e.avatar, d.name as department_name, h.name as hod_name
+                FROM hr_leaves l
+                JOIN employees e ON l.employee_id = e.id
+                LEFT JOIN departments d ON e.department_id = d.id
+                LEFT JOIN employees h ON l.hod_id = h.id
+                WHERE l.status IN ('pending', 'approved_by_hod') AND e.department_id = ?
+                ORDER BY CASE l.status WHEN 'pending' THEN 1 WHEN 'approved_by_hod' THEN 2 ELSE 3 END, l.created_at ASC
+                LIMIT 6
+            ");
+            $stmtPendingList->execute([$userDeptId]);
+            $pendingLeavesList = $stmtPendingList->fetchAll();
+        } else {
+            $stmtPendingList = $pdo->prepare("
+                SELECT l.*, e.name as employee_name, e.designation, e.avatar, d.name as department_name, h.name as hod_name
+                FROM hr_leaves l
+                JOIN employees e ON l.employee_id = e.id
+                LEFT JOIN departments d ON e.department_id = d.id
+                LEFT JOIN employees h ON l.hod_id = h.id
+                WHERE l.status IN ('pending', 'approved_by_hod') AND l.employee_id = ?
+                ORDER BY l.created_at ASC
+                LIMIT 6
+            ");
+            $stmtPendingList->execute([$currentUserId]);
+            $pendingLeavesList = $stmtPendingList->fetchAll();
+        }
 
         // Department Headcount Breakdown
         $stmtDeptBreakdown = $pdo->query("
@@ -221,22 +273,38 @@ switch ($action) {
                    e.designation as employee_designation,
                    e.avatar as employee_avatar,
                    d.name as department_name,
-                   a.name as action_by_name
+                   d.id as department_id,
+                   a.name as action_by_name,
+                   h.name as hod_name
             FROM hr_leaves l
             JOIN employees e ON l.employee_id = e.id
             LEFT JOIN departments d ON e.department_id = d.id
             LEFT JOIN employees a ON l.action_by = a.id
+            LEFT JOIN employees h ON l.hod_id = h.id
             WHERE 1=1
         ";
         $params = [];
 
-        // If not HR admin and not inspecting someone else, employee can only see their own leaves
-        if (!$canManageHr) {
+        if ($canManageHr) {
+            // HR can see all or filter by specific employee
+            if ($empFilter) {
+                $sql .= " AND l.employee_id = ?";
+                $params[] = $empFilter;
+            }
+        } elseif ($isHod) {
+            // HOD can see leaves from their department OR their own leaves
+            if ($empFilter) {
+                $sql .= " AND l.employee_id = ?";
+                $params[] = $empFilter;
+            } else {
+                $sql .= " AND (e.department_id = ? OR l.employee_id = ?)";
+                $params[] = $userDeptId;
+                $params[] = $currentUserId;
+            }
+        } else {
+            // Regular employee can only see their own leaves
             $sql .= " AND l.employee_id = ?";
             $params[] = $currentUserId;
-        } elseif ($empFilter) {
-            $sql .= " AND l.employee_id = ?";
-            $params[] = $empFilter;
         }
 
         if ($statusFilter && $statusFilter !== 'all') {
@@ -249,13 +317,23 @@ switch ($action) {
             $params[] = $typeFilter;
         }
 
-        $sql .= " ORDER BY CASE l.status WHEN 'pending' THEN 1 WHEN 'approved' THEN 2 ELSE 3 END, l.start_date DESC";
+        $sql .= " ORDER BY CASE l.status WHEN 'pending' THEN 1 WHEN 'approved_by_hod' THEN 2 WHEN 'approved' THEN 3 ELSE 4 END, l.start_date DESC";
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $leaves = $stmt->fetchAll();
 
-        echo json_encode(['success' => true, 'leaves' => $leaves]);
+        echo json_encode([
+            'success' => true, 
+            'leaves' => $leaves,
+            'current_user' => [
+                'id' => $currentUserId,
+                'role' => $currentUserRole,
+                'is_hod' => $isHod,
+                'can_manage_hr' => $canManageHr,
+                'department_id' => $userDeptId
+            ]
+        ]);
         break;
 
     case 'apply_leave':
@@ -285,7 +363,7 @@ switch ($action) {
         $interval = $startDt->diff($endDt);
         $daysCount = (float)($interval->days + 1);
 
-        $initialStatus = $canManageHr && isset($data['auto_approve']) && $data['auto_approve'] ? 'approved' : 'pending';
+        $initialStatus = ($canManageHr && isset($data['auto_approve']) && $data['auto_approve']) ? 'approved' : 'pending';
         $actionBy = ($initialStatus === 'approved') ? $currentUserId : null;
         $actionAt = ($initialStatus === 'approved') ? date('Y-m-d H:i:s') : null;
 
@@ -297,33 +375,124 @@ switch ($action) {
 
         echo json_encode([
             'success' => true,
-            'message' => ($initialStatus === 'approved') ? 'Leave recorded and approved successfully.' : 'Leave application submitted successfully for approval.'
+            'message' => ($initialStatus === 'approved') ? 'Leave recorded and approved successfully.' : 'Leave application submitted successfully. Forwarded to HOD for initial approval.'
         ]);
         break;
 
     case 'update_leave_status':
-        if (!$canManageHr) {
-            echo json_encode(['success' => false, 'message' => 'Access denied: HR Manager / Admin permission required.']);
-            exit;
-        }
-
         $leaveId = (int)($data['leave_id'] ?? 0);
-        $status = $data['status'] ?? '';
-        $adminNotes = trim($data['admin_notes'] ?? '');
+        $targetStatus = $data['status'] ?? '';
+        $notes = trim($data['admin_notes'] ?? ($data['hod_notes'] ?? ''));
 
-        if (!in_array($status, ['approved', 'rejected', 'pending', 'cancelled'])) {
-            echo json_encode(['success' => false, 'message' => 'Invalid status provided.']);
+        if (!$leaveId) {
+            echo json_encode(['success' => false, 'message' => 'Leave application ID is required.']);
             exit;
         }
 
-        $stmt = $pdo->prepare("
-            UPDATE hr_leaves 
-            SET status = ?, admin_notes = ?, action_by = ?, action_at = NOW() 
-            WHERE id = ?
+        $stmtCheck = $pdo->prepare("
+            SELECT l.*, e.department_id, e.name as employee_name 
+            FROM hr_leaves l 
+            JOIN employees e ON l.employee_id = e.id 
+            WHERE l.id = ?
         ");
-        $stmt->execute([$status, $adminNotes, $currentUserId, $leaveId]);
+        $stmtCheck->execute([$leaveId]);
+        $leave = $stmtCheck->fetch();
 
-        echo json_encode(['success' => true, 'message' => "Leave application marked as {$status}."]);
+        if (!$leave) {
+            echo json_encode(['success' => false, 'message' => 'Leave record not found.']);
+            exit;
+        }
+
+        $isDeptHod = ($isHod && (int)$leave['department_id'] === $userDeptId);
+
+        if (!$canManageHr && !$isDeptHod) {
+            echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to approve/reject this leave.']);
+            exit;
+        }
+
+        // HOD Approval Workflow
+        if ($targetStatus === 'approved_by_hod') {
+            if (!$isDeptHod && !$canManageHr) {
+                echo json_encode(['success' => false, 'message' => 'Only Department HOD can endorse this initial approval.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare("
+                UPDATE hr_leaves 
+                SET status = 'approved_by_hod', hod_id = ?, hod_action_at = NOW(), hod_notes = ? 
+                WHERE id = ?
+            ");
+            $stmt->execute([$currentUserId, $notes, $leaveId]);
+
+            echo json_encode([
+                'success' => true, 
+                'message' => "Leave approved by HOD. Forwarded to HR for final approval.",
+                'status' => 'approved_by_hod'
+            ]);
+            break;
+        }
+
+        // HR Final Approval
+        if ($targetStatus === 'approved') {
+            if (!$canManageHr) {
+                echo json_encode(['success' => false, 'message' => 'Access Denied: Only HR Department can grant final leave approval.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare("
+                UPDATE hr_leaves 
+                SET status = 'approved', action_by = ?, action_at = NOW(), admin_notes = ? 
+                WHERE id = ?
+            ");
+            $stmt->execute([$currentUserId, $notes, $leaveId]);
+
+            echo json_encode([
+                'success' => true, 
+                'message' => "Leave application granted final approval by HR.",
+                'status' => 'approved'
+            ]);
+            break;
+        }
+
+        // Rejection by HOD or HR
+        if ($targetStatus === 'rejected') {
+            if ($isDeptHod && !$canManageHr) {
+                // HOD rejection
+                $stmt = $pdo->prepare("
+                    UPDATE hr_leaves 
+                    SET status = 'rejected', hod_id = ?, hod_action_at = NOW(), hod_notes = ? 
+                    WHERE id = ?
+                ");
+                $stmt->execute([$currentUserId, $notes, $leaveId]);
+                $msg = "Leave application rejected by HOD.";
+            } else {
+                // HR rejection
+                $stmt = $pdo->prepare("
+                    UPDATE hr_leaves 
+                    SET status = 'rejected', action_by = ?, action_at = NOW(), admin_notes = ? 
+                    WHERE id = ?
+                ");
+                $stmt->execute([$currentUserId, $notes, $leaveId]);
+                $msg = "Leave application rejected by HR.";
+            }
+
+            echo json_encode(['success' => true, 'message' => $msg, 'status' => 'rejected']);
+            break;
+        }
+
+        // Fallback for resetting / cancelling
+        if (in_array($targetStatus, ['pending', 'cancelled'])) {
+            if (!$canManageHr && $leave['employee_id'] != $currentUserId) {
+                echo json_encode(['success' => false, 'message' => 'Access denied.']);
+                exit;
+            }
+            $stmt = $pdo->prepare("UPDATE hr_leaves SET status = ?, admin_notes = ? WHERE id = ?");
+            $stmt->execute([$targetStatus, $notes, $leaveId]);
+            echo json_encode(['success' => true, 'message' => "Leave marked as {$targetStatus}."]);
+            break;
+        }
+
+        echo json_encode(['success' => false, 'message' => 'Invalid status provided.']);
         break;
 
     case 'delete_leave':
@@ -343,7 +512,7 @@ switch ($action) {
             exit;
         }
 
-        if (!$canManageHr && $leave['status'] !== 'pending') {
+        if (!$canManageHr && !in_array($leave['status'], ['pending', 'approved_by_hod'])) {
             echo json_encode(['success' => false, 'message' => 'Only pending leave applications can be cancelled.']);
             exit;
         }

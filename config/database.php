@@ -131,7 +131,10 @@ function migratePermissionsSchema($pdo) {
             end_date DATE NOT NULL,
             days_count DECIMAL(4,1) DEFAULT 1.0,
             reason TEXT NOT NULL,
-            status ENUM('pending', 'approved', 'rejected', 'cancelled') DEFAULT 'pending',
+            status VARCHAR(50) DEFAULT 'pending',
+            hod_id INT NULL,
+            hod_action_at DATETIME NULL,
+            hod_notes TEXT,
             admin_notes TEXT,
             action_by INT NULL,
             action_at DATETIME NULL,
@@ -139,6 +142,13 @@ function migratePermissionsSchema($pdo) {
             FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
             FOREIGN KEY (action_by) REFERENCES employees(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        try {
+            $pdo->exec("ALTER TABLE hr_leaves MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending'");
+            $pdo->exec("ALTER TABLE hr_leaves ADD COLUMN hod_id INT NULL");
+            $pdo->exec("ALTER TABLE hr_leaves ADD COLUMN hod_action_at DATETIME NULL");
+            $pdo->exec("ALTER TABLE hr_leaves ADD COLUMN hod_notes TEXT NULL");
+        } catch (Exception $e) {}
 
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS hr_employee_profiles (
