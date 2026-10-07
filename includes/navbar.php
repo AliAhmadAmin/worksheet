@@ -142,6 +142,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
             </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+                <span class="nav-icon">⚠️</span>
+                <span class="nav-label">Fines & Penalties</span>
+            </button>
         </div>
 
         <!-- Department Management Category -->
@@ -263,6 +267,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <button type="button" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+                <span class="nav-icon">⚠️</span>
+                <span class="nav-label">Fines & Penalties</span>
             </button>
         </div>
 

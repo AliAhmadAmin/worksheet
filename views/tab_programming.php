@@ -73,12 +73,12 @@
             <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
                 <div class="form-group" style="margin-bottom: 0; min-width: 140px;">
                     <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">📅 Date Filter</label>
-                    <input type="date" id="prog-filter-date" class="input-control" style="font-size: 12.5px; padding: 6px 10px;" onchange="handleProgFilterChange('date')">
+                    <input type="date" id="prog-filter-date" class="input-control" value="<?= date('Y-m-d') ?>" style="font-size: 12.5px; padding: 6px 10px;" onchange="handleProgFilterChange('date')">
                 </div>
 
                 <div class="form-group" style="margin-bottom: 0; min-width: 130px;">
                     <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">🗓️ Month</label>
-                    <input type="month" id="prog-filter-month" class="input-control" style="font-size: 12.5px; padding: 6px 10px;" onchange="handleProgFilterChange('month')">
+                    <input type="month" id="prog-filter-month" class="input-control" value="<?= date('Y-m') ?>" style="font-size: 12.5px; padding: 6px 10px;" onchange="handleProgFilterChange('month')">
                 </div>
 
                 <div class="form-group" style="margin-bottom: 0; min-width: 160px;">

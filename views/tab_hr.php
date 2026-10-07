@@ -25,6 +25,9 @@
                     <button type="button" class="btn btn-primary" onclick="openCreateNoticeModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
                         📢 Post Notice
                     </button>
+                    <button type="button" class="btn btn-outline" onclick="openIssueFineModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">
+                        ⚠️ Issue Fine
+                    </button>
                     <button type="button" class="btn btn-outline" onclick="navigateToTab('tab-hr-leaves')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
                         🏖️ Leave Approvals
                     </button>
@@ -258,6 +261,9 @@
                         <button type="button" class="btn btn-outline" style="justify-content: flex-start; text-align: left; padding: 8px 12px; font-size: 12.5px;" onclick="navigateToTab('tab-hr-notices')">
                             📢 Company Notice Board
                         </button>
+                        <button type="button" class="btn btn-outline" style="justify-content: flex-start; text-align: left; padding: 8px 12px; font-size: 12.5px; color: #ef4444;" onclick="navigateToTab('tab-hr-fines')">
+                            ⚠️ Disciplinary Fines & Penalties
+                        </button>
                         <button type="button" class="btn btn-outline" style="justify-content: flex-start; text-align: left; padding: 8px 12px; font-size: 12.5px;" onclick="navigateToTab('tab-attendance')">
                             👥 Real-Time Staff Attendance
                         </button>
@@ -485,7 +491,130 @@
 </section>
 
 
-<!-- ================= 5. DEDICATED MONTHLY PAYROLL & SALARIES ================= -->
+<!-- ================= 5. DEDICATED DISCIPLINARY FINES & PENALTIES ================= -->
+<section id="tab-hr-fines" class="tab-section">
+    <div class="worksheet-container">
+
+        <!-- Fines Header Card -->
+        <div class="worksheet-card" style="margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <h2 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 2px; display: flex; align-items: center; gap: 8px;">
+                        ⚠️ Disciplinary Fines & Penalties Center
+                    </h2>
+                    <p style="color: var(--text-muted); font-size: 12.5px; margin: 0;">
+                        Track policy violations, late arrivals, negligence, and manage deductions applied to monthly payroll.
+                    </p>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-primary" onclick="openIssueFineModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                        ➕ Issue Fine
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="loadHrFines()" title="Refresh Fines">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Fines Filter Toolbar -->
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; border-top: 1px solid var(--border-color); padding-top: 14px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label for="hr-fines-month-filter" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Salary Month:</label>
+                    <input type="month" id="hr-fines-month-filter" class="input-control" style="padding: 5px 10px; font-size: 12px; font-weight: 600;" onchange="loadHrFines()">
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label for="hr-fines-status-filter" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Status:</label>
+                    <select id="hr-fines-status-filter" class="input-control" style="padding: 5px 10px; font-size: 12px; font-weight: 600;" onchange="loadHrFines()">
+                        <option value="all">All Statuses</option>
+                        <option value="applied" selected>Applied (Active)</option>
+                        <option value="waived">Waived (Forgiven)</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <label for="hr-fines-cat-filter" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Violation:</label>
+                    <select id="hr-fines-cat-filter" class="input-control" style="padding: 5px 10px; font-size: 12px; font-weight: 600;" onchange="loadHrFines()">
+                        <option value="all">All Violations</option>
+                        <option value="late_arrival">⏱️ Late Arrival</option>
+                        <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
+                        <option value="sop_violation">⚠️ SOP / Policy Violation</option>
+                        <option value="negligence">⚠️ Negligence / Damage</option>
+                        <option value="misconduct">🛑 Misconduct</option>
+                        <option value="other">📝 Other Reason</option>
+                    </select>
+                </div>
+
+                <div class="admin-only" style="display: flex; align-items: center; gap: 6px;">
+                    <label for="hr-fines-emp-filter" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Staff:</label>
+                    <select id="hr-fines-emp-filter" class="input-control" style="padding: 5px 10px; font-size: 12px; min-width: 150px;" onchange="loadHrFines()">
+                        <option value="">All Employees</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Fines Summary Metrics -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px;">
+                <div style="padding: 12px 16px; background: rgba(239, 68, 68, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(239, 68, 68, 0.2);">
+                    <div style="font-size: 11px; font-weight: 800; color: #ef4444; text-transform: uppercase;">🔴 Total Active Fines</div>
+                    <div id="hr-fines-total-applied-amount" style="font-size: 19px; font-weight: 800; color: #ef4444; margin-top: 2px;">PKR 0</div>
+                    <div id="hr-fines-total-applied-count" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">0 penalties applied to payroll</div>
+                </div>
+
+                <div style="padding: 12px 16px; background: rgba(16, 185, 129, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.2);">
+                    <div style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase;">🟢 Total Waived / Forgiven</div>
+                    <div id="hr-fines-total-waived-amount" style="font-size: 19px; font-weight: 800; color: #10b981; margin-top: 2px;">PKR 0</div>
+                    <div id="hr-fines-total-waived-count" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">0 forgiven penalties</div>
+                </div>
+
+                <div style="padding: 12px 16px; background: rgba(59, 130, 246, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(59, 130, 246, 0.2);">
+                    <div style="font-size: 11px; font-weight: 800; color: #3b82f6; text-transform: uppercase;">📋 Total Records</div>
+                    <div id="hr-fines-total-count" style="font-size: 19px; font-weight: 800; color: #3b82f6; margin-top: 2px;">0 Records</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Recorded disciplinary incidents</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fines Records Interactive Table -->
+        <div class="worksheet-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="font-size: 15px; font-weight: 800; color: var(--text-main); margin: 0;">
+                    📋 Disciplinary Actions & Fines Ledger
+                </h3>
+                <span id="hr-fines-count-label" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Showing 0 record(s)</span>
+            </div>
+
+            <div class="table-responsive">
+                <table class="interactive-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%; min-width: 170px;">Employee</th>
+                            <th style="width: 10%; min-width: 95px;">Incident Date</th>
+                            <th style="width: 14%; min-width: 130px;">Violation Category</th>
+                            <th style="width: 22%; min-width: 180px;">Reason & Incident Details</th>
+                            <th style="width: 10%; min-width: 90px;">Salary Month</th>
+                            <th style="width: 10%; min-width: 95px;">Fine Amount</th>
+                            <th style="width: 8%; min-width: 85px; text-align: center;">Status</th>
+                            <th style="width: 6%; min-width: 75px; text-align: center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hr-fines-table-body">
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                                Loading disciplinary fine records...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+
+<!-- ================= 6. DEDICATED MONTHLY PAYROLL & SALARIES ================= -->
 <section id="tab-hr-payroll" class="tab-section">
     <div class="worksheet-container">
 
@@ -496,7 +625,7 @@
                         💰 Monthly Payroll & Compensation Command Center
                     </h2>
                     <p style="color: var(--text-muted); font-size: 12.5px; margin: 0;">
-                        Auto-calculated based on daily attendance records, duty hours, approved leaves, and active loan deductions.
+                        Auto-calculated based on daily attendance records, duty hours, approved leaves, active loan deductions, and disciplinary fines.
                     </p>
                 </div>
 
@@ -515,21 +644,22 @@
                 <table class="interactive-table">
                     <thead>
                         <tr>
-                            <th style="width: 18%; min-width: 160px;">Employee</th>
-                            <th style="width: 8%; min-width: 70px; text-align: center;" title="Attended working days">Present</th>
-                            <th style="width: 8%; min-width: 70px; text-align: center;" title="Approved paid leaves">Leaves</th>
-                            <th style="width: 9%; min-width: 80px; text-align: center;" title="Total recorded duty hours">Hours</th>
-                            <th style="width: 12%; min-width: 100px;">Basic Pay</th>
-                            <th style="width: 10%; min-width: 90px;">Bonus</th>
+                            <th style="width: 17%; min-width: 155px;">Employee</th>
+                            <th style="width: 7%; min-width: 65px; text-align: center;" title="Attended working days">Present</th>
+                            <th style="width: 7%; min-width: 65px; text-align: center;" title="Approved paid leaves">Leaves</th>
+                            <th style="width: 8%; min-width: 75px; text-align: center;" title="Total recorded duty hours">Hours</th>
+                            <th style="width: 11%; min-width: 95px;">Basic Pay</th>
+                            <th style="width: 9%; min-width: 85px;">Bonus</th>
                             <th style="width: 12%; min-width: 100px;">Deductions (Loans)</th>
+                            <th style="width: 10%; min-width: 95px; color: #ef4444;">Fines</th>
                             <th style="width: 12%; min-width: 110px; font-weight: 800;">Net Salary</th>
-                            <th style="width: 6%; min-width: 80px; text-align: center;">Status</th>
-                            <th style="width: 5%; min-width: 75px; text-align: center;">Slip</th>
+                            <th style="width: 6%; min-width: 75px; text-align: center;">Status</th>
+                            <th style="width: 5%; min-width: 70px; text-align: center;">Slip</th>
                         </tr>
                     </thead>
                     <tbody id="hr-payroll-table-body">
                         <tr>
-                            <td colspan="10" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                            <td colspan="11" style="text-align: center; padding: 30px; color: var(--text-muted);">
                                 Select month to calculate payroll...
                             </td>
                         </tr>
@@ -725,7 +855,7 @@
 
 <!-- 4. Edit Payroll Item Modal (Admin Only) -->
 <div id="hr-edit-payroll-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 500px;">
+    <div class="modal-card" style="max-width: 520px;">
         <div class="modal-header">
             <h3 class="modal-title">💰 Edit Payroll Adjustments</h3>
             <button type="button" class="modal-close" onclick="closeModal('hr-edit-payroll-modal')">&times;</button>
@@ -750,19 +880,30 @@
                         <input type="number" step="0.01" id="hr-pay-bonus" class="input-control" value="0.00" style="width: 100%; color: #10b981; font-weight: 700;" oninput="calculateModalNetSalary()">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Deductions (PKR)</label>
-                        <input type="number" step="0.01" id="hr-pay-deductions" class="input-control" value="0.00" style="width: 100%; color: #ef4444; font-weight: 700;" oninput="calculateModalNetSalary()">
+                        <label class="form-label" style="font-size: 11px;">Bonus Reason</label>
+                        <input type="text" id="hr-pay-bonus-reason" class="input-control" placeholder="e.g. Performance / Overtime" style="width: 100%;">
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div class="form-group">
-                        <label class="form-label" style="font-size: 11px;">Bonus Reason</label>
-                        <input type="text" id="hr-pay-bonus-reason" class="input-control" placeholder="e.g. Performance / Overtime" style="width: 100%;">
+                        <label class="form-label">Deductions / Loans (PKR)</label>
+                        <input type="number" step="0.01" id="hr-pay-deductions" class="input-control" value="0.00" style="width: 100%; color: #ef4444; font-weight: 700;" oninput="calculateModalNetSalary()">
                     </div>
                     <div class="form-group">
                         <label class="form-label" style="font-size: 11px;">Deduction Reason</label>
-                        <input type="text" id="hr-pay-deduction-reason" class="input-control" placeholder="e.g. Loan repayment / Late" style="width: 100%;">
+                        <input type="text" id="hr-pay-deduction-reason" class="input-control" placeholder="e.g. Loan repayment" style="width: 100%;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label class="form-label" style="color: #ef4444;">⚠️ Disciplinary Fines (PKR)</label>
+                        <input type="number" step="0.01" id="hr-pay-fines" class="input-control" value="0.00" style="width: 100%; color: #ef4444; font-weight: 700; border-color: rgba(239, 68, 68, 0.4);" oninput="calculateModalNetSalary()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 11px; color: #ef4444;">Fine Reason / Notes</label>
+                        <input type="text" id="hr-pay-fine-reason" class="input-control" placeholder="e.g. Late Arrival / Violation" style="width: 100%;">
                     </div>
                 </div>
 
@@ -794,7 +935,65 @@
     </div>
 </div>
 
-<!-- 5. Printable Pay Slip Modal -->
+<!-- 5. Issue Disciplinary Fine Modal -->
+<div id="hr-issue-fine-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3 class="modal-title">⚠️ Issue Disciplinary Fine / Penalty</h3>
+            <button type="button" class="modal-close" onclick="closeModal('hr-issue-fine-modal')">&times;</button>
+        </div>
+        <form id="hr-issue-fine-form" onsubmit="handleIssueFineSubmit(event)">
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Employee</label>
+                    <select id="hr-fine-form-emp-id" class="input-control" style="width: 100%;" required>
+                        <!-- Dynamic Staff List -->
+                    </select>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label">Incident Date</label>
+                        <input type="date" id="hr-fine-form-date" class="input-control" style="width: 100%;" required onchange="updateFineFormSalaryMonth()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Salary Deduction Month</label>
+                        <input type="month" id="hr-fine-form-month" class="input-control" style="width: 100%; font-weight: 600;" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label">Violation Category</label>
+                        <select id="hr-fine-form-category" class="input-control" style="width: 100%; font-weight: 600;" required>
+                            <option value="late_arrival">⏱️ Late Arrival</option>
+                            <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
+                            <option value="sop_violation" selected>⚠️ SOP / Policy Violation</option>
+                            <option value="negligence">⚠️ Negligence / Damage</option>
+                            <option value="misconduct">🛑 Misconduct</option>
+                            <option value="other">📝 Other Reason</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fine Amount (PKR)</label>
+                        <input type="number" step="50" min="50" id="hr-fine-form-amount" class="input-control" placeholder="e.g. 1000" style="width: 100%; font-weight: 700; color: #ef4444;" required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Reason & Violation Incident Details</label>
+                    <textarea id="hr-fine-form-reason" class="input-control" rows="3" placeholder="Explain the exact incident, policy breach, or disciplinary notice..." style="width: 100%; resize: vertical;" required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('hr-issue-fine-modal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background: #dc2626; border-color: #dc2626;">⚠️ Issue Disciplinary Fine</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 6. Printable Pay Slip Modal -->
 <div id="hr-payslip-modal" class="modal-overlay">
     <div class="modal-card" style="max-width: 650px;">
         <div class="modal-header">

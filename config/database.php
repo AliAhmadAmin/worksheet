@@ -32,54 +32,57 @@ function getDbConnection() {
         return $pdo;
     }
 
-    $passwordsToTry = [DB_PASS, '', 'root'];
-    // Deduplicate passwords to avoid redundant attempts
-    $passwordsToTry = array_unique($passwordsToTry);
+    $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+    $options = [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+        PDO::ATTR_PERSISTENT => true
+    ];
+
+    $passwordsToTry = array_unique([DB_PASS, '', 'root']);
     $lastException = null;
 
+    // Fast path: Try connecting directly to existing database
     foreach ($passwordsToTry as $pass) {
         try {
-            $pdo = new PDO("mysql:host=" . DB_HOST . ";charset=utf8mb4", DB_USER, $pass, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false
-            ]);
+            $pdo = new PDO($dsn, DB_USER, $pass, $options);
             if ($pdo) {
-                break;
+                return $pdo;
             }
         } catch (PDOException $e) {
             $lastException = $e;
         }
     }
 
-    if (!$pdo) {
-        http_response_code(500);
-        header('Content-Type: application/json');
-        echo json_encode(['error' => 'MySQL Database connection failed: ' . ($lastException ? $lastException->getMessage() : 'Unknown error')]);
-        exit;
-    }
-
-    try {
-        // Ensure database exists
-        $pdo->exec("CREATE DATABASE IF NOT EXISTS `" . DB_NAME . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-        $pdo->exec("USE `" . DB_NAME . "`");
-
-        // Check if tables exist
-        $check = $pdo->query("SHOW TABLES LIKE 'employees'")->fetch();
-        if (!$check) {
-            initDatabaseSchema($pdo);
-            seedInitialData($pdo);
-        } else {
-            migratePermissionsSchema($pdo);
+    // Fallback path: Database might not exist yet or needs bootstrap
+    foreach ($passwordsToTry as $pass) {
+        try {
+            $pdo = new PDO("mysql:host=" . DB_HOST . ";charset=utf8mb4", DB_USER, $pass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ]);
+            if ($pdo) {
+                $pdo->exec("CREATE DATABASE IF NOT EXISTS `" . DB_NAME . "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                $pdo->exec("USE `" . DB_NAME . "`");
+                $check = $pdo->query("SHOW TABLES LIKE 'employees'")->fetch();
+                if (!$check) {
+                    initDatabaseSchema($pdo);
+                    seedInitialData($pdo);
+                } else {
+                    migratePermissionsSchema($pdo);
+                }
+                return $pdo;
+            }
+        } catch (PDOException $e) {
+            $lastException = $e;
         }
-
-        return $pdo;
-    } catch (PDOException $e) {
-        http_response_code(500);
-        header('Content-Type: application/json');
-        echo json_encode(['error' => 'MySQL Database initialization failed: ' . $e->getMessage()]);
-        exit;
     }
+
+    http_response_code(500);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'MySQL Database connection failed: ' . ($lastException ? $lastException->getMessage() : 'Unknown error')]);
+    exit;
 }
 
 function migratePermissionsSchema($pdo) {
@@ -242,6 +245,32 @@ function migratePermissionsSchema($pdo) {
             FOREIGN KEY (posted_by) REFERENCES employees(id) ON DELETE CASCADE,
             FOREIGN KEY (target_department_id) REFERENCES departments(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS hr_fines (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            fine_date DATE NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            fine_category ENUM('late_arrival', 'unauthorized_absence', 'sop_violation', 'negligence', 'misconduct', 'other') DEFAULT 'sop_violation',
+            reason TEXT NOT NULL,
+            salary_month VARCHAR(7) NOT NULL,
+            status ENUM('applied', 'waived') DEFAULT 'applied',
+            waived_reason TEXT NULL,
+            issued_by INT NULL,
+            action_by INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+            FOREIGN KEY (issued_by) REFERENCES employees(id) ON DELETE SET NULL,
+            FOREIGN KEY (action_by) REFERENCES employees(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        try {
+            $pdo->exec("ALTER TABLE hr_payroll ADD COLUMN fines DECIMAL(10,2) DEFAULT 0.00");
+        } catch (Exception $e) {}
+        try {
+            $pdo->exec("ALTER TABLE hr_payroll ADD COLUMN fine_reason TEXT NULL");
+        } catch (Exception $e) {}
 
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS programming_dispatches (

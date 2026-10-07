@@ -100,29 +100,46 @@ function escapeHtml(str) {
 // Initialize Application
 async function initApp() {
     try {
-        // 1. Fetch Master Data first (to populate email dropdowns)
-        const masterRes = await fetch('api/employees.php?action=list');
-        const masterData = await masterRes.json();
-        if (masterData.success) {
-            AppState.employees = masterData.employees;
-            AppState.departments = masterData.departments;
-            AppState.teams = masterData.teams;
-            AppState.contentTypes = masterData.content_types;
-            populateEmailSelectors();
+        // Fast path: Immediately apply server-bootstrapped user state
+        if (window.__INITIAL_USER__) {
+            AppState.currentUser = window.__INITIAL_USER__;
+            renderUserBar();
         }
 
-        // 2. Check Authentication Status
-        const userRes = await fetch('api/auth.php?action=current_user');
-        const userData = await userRes.json();
+        // Parallel fetch of master data and fallback auth check
+        const masterPromise = fetch('api/employees.php?action=list')
+            .then(res => res.json())
+            .then(masterData => {
+                if (masterData.success) {
+                    AppState.employees = masterData.employees;
+                    AppState.departments = masterData.departments;
+                    AppState.teams = masterData.teams;
+                    AppState.contentTypes = masterData.content_types;
+                    populateEmailSelectors();
+                }
+            })
+            .catch(err => console.error("Master data fetch error:", err));
 
-        if (userData.success && userData.user) {
-            AppState.currentUser = userData.user;
-            renderUserBar();
-            loadUserData();
+        let userPromise;
+        if (!AppState.currentUser) {
+            userPromise = fetch('api/auth.php?action=current_user')
+                .then(res => res.json())
+                .then(userData => {
+                    if (userData.success && userData.user) {
+                        AppState.currentUser = userData.user;
+                        renderUserBar();
+                    } else {
+                        window.location.href = 'login.php';
+                    }
+                });
         } else {
-            // Redirect to dedicated login page
-            window.location.href = 'login.php';
-            return;
+            userPromise = Promise.resolve();
+        }
+
+        await Promise.all([masterPromise, userPromise]);
+
+        if (AppState.currentUser) {
+            await loadUserData();
         }
 
         setupTabNavigation();
@@ -322,21 +339,14 @@ async function loadUserData() {
         portalSwitcher.style.display = canSwitchPortal ? '' : 'none';
     }
 
-    await loadDailyWorksheet();
-    await loadAssignedTasks();
-    await updateGlobalSidebarBadges();
-    if (typeof loadHrDashboard === 'function') {
-        loadHrDashboard();
-    }
-    if (isAdmin || canAttendance) {
-        loadLiveAttendance();
-    }
-    if (isAdmin || canReports) {
-        loadReports();
-    }
-    if (isAdmin || canManage) {
-        loadEmployeeDirectory();
-    }
+    // Load active daily worksheet and tasks concurrently
+    await Promise.all([
+        loadDailyWorksheet(),
+        loadAssignedTasks()
+    ]);
+
+    // Asynchronously update badges without blocking UI rendering
+    updateGlobalSidebarBadges();
 }
 
 async function updateGlobalSidebarBadges() {
@@ -664,6 +674,8 @@ function navigateToTab(tabId, updateHash = true) {
         if (typeof loadHrLoans === 'function') loadHrLoans();
     } else if (tabId === 'tab-hr-notices') {
         if (typeof loadHrNotices === 'function') loadHrNotices();
+    } else if (tabId === 'tab-hr-fines') {
+        if (typeof loadHrFines === 'function') loadHrFines();
     } else if (tabId === 'tab-hr-payroll') {
         if (typeof loadHrPayroll === 'function') loadHrPayroll();
     } else if (tabId === 'tab-employees') {

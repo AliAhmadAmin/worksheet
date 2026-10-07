@@ -749,8 +749,28 @@ switch ($action) {
                 $deductionReason = "Loan Deduction: " . implode(', ', $loanNotes);
             }
 
-            // Auto Net Salary calculation
-            $netSalary = max(0, $basicSalary + $bonus - $deductions);
+            // Auto Fines calculation for the month
+            $stmtActiveFines = $pdo->prepare("
+                SELECT amount, reason, fine_category 
+                FROM hr_fines 
+                WHERE employee_id = ? 
+                  AND salary_month = ? 
+                  AND status = 'applied'
+            ");
+            $stmtActiveFines->execute([$eId, $salaryMonth]);
+            $activeFines = $stmtActiveFines->fetchAll();
+            $autoFines = 0.00;
+            $fineNotes = [];
+            foreach ($activeFines as $af) {
+                $autoFines += (float)$af['amount'];
+                $fineNotes[] = ucfirst(str_replace('_', ' ', $af['fine_category'])) . " (PKR " . number_format($af['amount']) . ")";
+            }
+
+            $fines = $record && isset($record['fines']) ? (float)$record['fines'] : $autoFines;
+            $fineReason = $record && !empty($record['fine_reason']) ? $record['fine_reason'] : ($autoFines > 0 ? implode(', ', $fineNotes) : '');
+
+            // Auto Net Salary calculation (Basic + Bonus - Deductions - Fines)
+            $netSalary = max(0, $basicSalary + $bonus - $deductions - $fines);
 
             $payrollItems[] = [
                 'employee_id' => $eId,
@@ -769,6 +789,9 @@ switch ($action) {
                 'bonus_reason' => $bonusReason,
                 'deductions' => $deductions,
                 'deduction_reason' => $deductionReason,
+                'fines' => $fines,
+                'fine_reason' => $fineReason,
+                'auto_fines' => $autoFines,
                 'net_salary' => $netSalary,
                 'active_loans_count' => count($activeLoans),
                 'auto_loan_deduction' => $autoLoanDeduction,
@@ -801,20 +824,22 @@ switch ($action) {
         $totalDutyHours = (float)($data['total_duty_hours'] ?? 0.00);
         $bonus = (float)($data['bonus'] ?? 0.00);
         $deductions = (float)($data['deductions'] ?? 0.00);
+        $fines = (float)($data['fines'] ?? 0.00);
         $bonusReason = trim($data['bonus_reason'] ?? '');
         $deductionReason = trim($data['deduction_reason'] ?? '');
+        $fineReason = trim($data['fine_reason'] ?? '');
         $paymentStatus = $data['payment_status'] ?? 'draft';
         $paymentDate = !empty($data['payment_date']) ? $data['payment_date'] : null;
         $paymentMethod = $data['payment_method'] ?? 'Bank Transfer';
 
-        $netSalary = max(0, $basicSalary + $bonus - $deductions);
+        $netSalary = max(0, $basicSalary + $bonus - $deductions - $fines);
 
         $stmt = $pdo->prepare("
             INSERT INTO hr_payroll 
                 (employee_id, salary_month, basic_salary, working_days, present_days, approved_leaves, unpaid_leaves, 
-                 total_duty_hours, bonus, deductions, bonus_reason, deduction_reason, net_salary, payment_status, payment_date, payment_method, generated_by)
+                 total_duty_hours, bonus, deductions, fines, bonus_reason, deduction_reason, fine_reason, net_salary, payment_status, payment_date, payment_method, generated_by)
             VALUES 
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 basic_salary = VALUES(basic_salary),
                 working_days = VALUES(working_days),
@@ -824,8 +849,10 @@ switch ($action) {
                 total_duty_hours = VALUES(total_duty_hours),
                 bonus = VALUES(bonus),
                 deductions = VALUES(deductions),
+                fines = VALUES(fines),
                 bonus_reason = VALUES(bonus_reason),
                 deduction_reason = VALUES(deduction_reason),
+                fine_reason = VALUES(fine_reason),
                 net_salary = VALUES(net_salary),
                 payment_status = VALUES(payment_status),
                 payment_date = VALUES(payment_date),
@@ -835,7 +862,7 @@ switch ($action) {
 
         $stmt->execute([
             $empId, $salaryMonth, $basicSalary, $workingDays, $presentDays, $approvedLeaves, $unpaidLeaves,
-            $totalDutyHours, $bonus, $deductions, $bonusReason, $deductionReason, $netSalary, $paymentStatus, $paymentDate, $paymentMethod, $currentUserId
+            $totalDutyHours, $bonus, $deductions, $fines, $bonusReason, $deductionReason, $fineReason, $netSalary, $paymentStatus, $paymentDate, $paymentMethod, $currentUserId
         ]);
 
         echo json_encode(['success' => true, 'message' => 'Payroll record updated successfully.']);
@@ -1040,6 +1067,188 @@ switch ($action) {
         $stmt->execute([$noticeId]);
 
         echo json_encode(['success' => true, 'message' => 'Notice archived successfully.']);
+        break;
+
+    case 'get_fines':
+        $monthFilter = $_GET['month'] ?? '';
+        $empFilter = $_GET['employee_id'] ?? null;
+        $statusFilter = $_GET['status'] ?? 'all';
+        $catFilter = $_GET['fine_category'] ?? 'all';
+
+        $sql = "
+            SELECT f.*, 
+                   e.name as employee_name, 
+                   e.designation as employee_designation,
+                   e.avatar as employee_avatar,
+                   d.name as department_name,
+                   i.name as issued_by_name,
+                   a.name as action_by_name
+            FROM hr_fines f
+            JOIN employees e ON f.employee_id = e.id
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN employees i ON f.issued_by = i.id
+            LEFT JOIN employees a ON f.action_by = a.id
+            WHERE 1=1
+        ";
+        $params = [];
+
+        if (!$canManageHr && !$isHod) {
+            $sql .= " AND f.employee_id = ?";
+            $params[] = $currentUserId;
+        } elseif ($isHod && !$canManageHr) {
+            if ($empFilter) {
+                $sql .= " AND f.employee_id = ?";
+                $params[] = $empFilter;
+            } else {
+                $sql .= " AND (e.department_id = ? OR f.employee_id = ?)";
+                $params[] = $userDeptId;
+                $params[] = $currentUserId;
+            }
+        } elseif ($empFilter) {
+            $sql .= " AND f.employee_id = ?";
+            $params[] = $empFilter;
+        }
+
+        if (!empty($monthFilter)) {
+            $sql .= " AND f.salary_month = ?";
+            $params[] = $monthFilter;
+        }
+
+        if (!empty($statusFilter) && $statusFilter !== 'all') {
+            $sql .= " AND f.status = ?";
+            $params[] = $statusFilter;
+        }
+
+        if (!empty($catFilter) && $catFilter !== 'all') {
+            $sql .= " AND f.fine_category = ?";
+            $params[] = $catFilter;
+        }
+
+        $sql .= " ORDER BY f.fine_date DESC, f.created_at DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $fines = $stmt->fetchAll();
+
+        // Calculate summary stats
+        $totalApplied = 0.00;
+        $totalWaived = 0.00;
+        $appliedCount = 0;
+        $waivedCount = 0;
+
+        foreach ($fines as $f) {
+            if ($f['status'] === 'applied') {
+                $totalApplied += (float)$f['amount'];
+                $appliedCount++;
+            } elseif ($f['status'] === 'waived') {
+                $totalWaived += (float)$f['amount'];
+                $waivedCount++;
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'fines' => $fines,
+            'stats' => [
+                'total_fines' => count($fines),
+                'applied_count' => $appliedCount,
+                'waived_count' => $waivedCount,
+                'total_applied_amount' => $totalApplied,
+                'total_waived_amount' => $totalWaived
+            ]
+        ]);
+        break;
+
+    case 'add_fine':
+        if (!$canManageHr && !$isHod) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: Only Admins, HR and HODs can issue fines.']);
+            exit;
+        }
+
+        $empId = (int)($data['employee_id'] ?? 0);
+        $amount = (float)($data['amount'] ?? 0);
+        $fineDate = !empty($data['fine_date']) ? $data['fine_date'] : date('Y-m-d');
+        $salaryMonth = !empty($data['salary_month']) ? $data['salary_month'] : date('Y-m', strtotime($fineDate));
+        $fineCategory = $data['fine_category'] ?? 'sop_violation';
+        $reason = trim($data['reason'] ?? '');
+
+        if ($empId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Please select an employee.']);
+            exit;
+        }
+        if ($amount <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Fine amount must be greater than zero.']);
+            exit;
+        }
+        if (!$reason) {
+            echo json_encode(['success' => false, 'message' => 'Please describe the reason/incident for this penalty.']);
+            exit;
+        }
+
+        // HOD validation: can only fine departmental staff
+        if ($isHod && !$canManageHr) {
+            $stmtEmpCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $stmtEmpCheck->execute([$empId]);
+            $targetDeptId = (int)$stmtEmpCheck->fetchColumn();
+            if ($targetDeptId !== $userDeptId) {
+                echo json_encode(['success' => false, 'message' => 'HODs can only issue disciplinary fines for staff in their own department.']);
+                exit;
+            }
+        }
+
+        $validCategories = ['late_arrival', 'unauthorized_absence', 'sop_violation', 'negligence', 'misconduct', 'other'];
+        if (!in_array($fineCategory, $validCategories)) {
+            $fineCategory = 'sop_violation';
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO hr_fines 
+                (employee_id, fine_date, amount, fine_category, reason, salary_month, status, issued_by)
+            VALUES 
+                (?, ?, ?, ?, ?, ?, 'applied', ?)
+        ");
+        $stmt->execute([$empId, $fineDate, $amount, $fineCategory, $reason, $salaryMonth, $currentUserId]);
+
+        echo json_encode(['success' => true, 'message' => 'Disciplinary fine issued successfully.']);
+        break;
+
+    case 'update_fine_status':
+        if (!$canManageHr) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: Admin/HR permission required.']);
+            exit;
+        }
+
+        $fineId = (int)($data['fine_id'] ?? 0);
+        $status = $data['status'] ?? 'applied';
+        $waivedReason = trim($data['waived_reason'] ?? '');
+
+        if (!in_array($status, ['applied', 'waived'])) {
+            echo json_encode(['success' => false, 'message' => 'Invalid fine status.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("
+            UPDATE hr_fines 
+            SET status = ?, waived_reason = ?, action_by = ?
+            WHERE id = ?
+        ");
+        $stmt->execute([$status, $waivedReason, $currentUserId, $fineId]);
+
+        $actionWord = ($status === 'waived') ? 'waived (forgiven)' : 're-applied';
+        echo json_encode(['success' => true, 'message' => "Fine successfully {$actionWord}."]);
+        break;
+
+    case 'delete_fine':
+        if (!$canManageHr) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: Admin/HR permission required.']);
+            exit;
+        }
+
+        $fineId = (int)($data['fine_id'] ?? 0);
+        $stmt = $pdo->prepare("DELETE FROM hr_fines WHERE id = ?");
+        $stmt->execute([$fineId]);
+
+        echo json_encode(['success' => true, 'message' => 'Fine record removed successfully.']);
         break;
 
     default:

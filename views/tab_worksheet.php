@@ -4,14 +4,18 @@
             <div id="hero-employee-container" class="shift-hero-card employee-only">
                 <div class="shift-left-meta">
                     <div id="hero-profile-avatar" class="meta-profile-circle" onclick="openMyProfileModal()" style="cursor: pointer; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;" title="Click to edit profile & photo">
-                        <span id="hero-profile-avatar-char">👤</span>
+                        <?php if (!empty($authUser['avatar'])): ?>
+                            <img src="<?= htmlspecialchars($authUser['avatar']) ?>" style="width: 100%; height: 100%; object-fit: cover;" alt="<?= htmlspecialchars($authUser['name']) ?>" onerror="this.outerHTML='<span id=\'hero-profile-avatar-char\'>👤</span>';">
+                        <?php else: ?>
+                            <span id="hero-profile-avatar-char"><?= htmlspecialchars(strtoupper(substr($authUser['name'] ?? 'U', 0, 1))) ?></span>
+                        <?php endif; ?>
                     </div>
                     <div class="shift-details">
                         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                            <h2 id="hero-emp-name" style="margin: 0;">Employee Name</h2>
+                            <h2 id="hero-emp-name" style="margin: 0;"><?= htmlspecialchars($authUser['name'] ?? 'Employee Name') ?></h2>
                             <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; border-radius: 12px; font-weight: 700;" onclick="openMyProfileModal()" title="Edit My Profile & Photo">✏️ Edit Profile</button>
                         </div>
-                        <p id="hero-emp-meta">Designation • Department • Team</p>
+                        <p id="hero-emp-meta"><?= htmlspecialchars(($authUser['designation'] ?? 'Staff') . ' • ' . ($authUser['department_name'] ?? 'Digital') . ' • ' . ($authUser['team_name'] ?? 'Team')) ?></p>
                         <div style="display: flex; gap: 14px; margin-top: 6px; font-size: 12.5px;">
                             <span>In: <strong id="hero-checkin-time" style="color: #38bdf8;">--:--</strong></span>
                             <span>Out: <strong id="hero-checkout-time" style="color: #fbbf24;">--:--</strong></span>
@@ -101,7 +105,7 @@
                             <!-- Group 2: Date Navigation -->
                             <div class="admin-ctrl-group admin-ctrl-date">
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="goToPrevDay()" title="Previous Day">◀</button>
-                                <input type="date" id="worksheet-date-picker" class="input-control worksheet-date-input" style="padding: 6px 10px; font-weight: 600;" onchange="changeWorksheetDate(this.value)">
+                                <input type="date" id="worksheet-date-picker" class="input-control worksheet-date-input" value="<?= date('Y-m-d') ?>" style="padding: 6px 10px; font-weight: 600;" onchange="changeWorksheetDate(this.value)">
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="goToNextDay()" title="Next Day">▶</button>
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 11.5px;" onclick="goToToday()" title="Jump to Today">Today</button>
                             </div>
@@ -151,7 +155,7 @@
                         <div class="controls-group">
                             <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="goToPrevDay()" title="Previous Day">◀</button>
-                                <input type="date" class="input-control worksheet-date-input" style="padding: 6px 10px;" onchange="changeWorksheetDate(this.value)">
+                                <input type="date" class="input-control worksheet-date-input" value="<?= date('Y-m-d') ?>" style="padding: 6px 10px;" onchange="changeWorksheetDate(this.value)">
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="goToNextDay()" title="Next Day">▶</button>
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 11.5px;" onclick="goToToday()" title="Jump to Today">Today</button>
                             </div>

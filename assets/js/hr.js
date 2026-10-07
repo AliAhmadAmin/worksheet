@@ -7,6 +7,7 @@ let HrState = {
     leaves: [],
     loans: [],
     notices: [],
+    fines: [],
     profiles: [],
     payroll: [],
     currentSubTab: 'leaves',
@@ -17,6 +18,10 @@ async function loadHrDashboard() {
     const monthInput = document.getElementById('hr-payroll-month');
     if (monthInput && !monthInput.value) {
         monthInput.value = HrState.selectedMonth;
+    }
+    const finesMonthInput = document.getElementById('hr-fines-month-filter');
+    if (finesMonthInput && !finesMonthInput.value) {
+        finesMonthInput.value = HrState.selectedMonth;
     }
 
     populateHrEmployeeDropdowns();
@@ -29,6 +34,8 @@ async function loadHrDashboard() {
         await loadHrLoans();
     } else if (document.getElementById('tab-hr-notices')?.classList.contains('active')) {
         await loadHrNotices();
+    } else if (document.getElementById('tab-hr-fines')?.classList.contains('active')) {
+        await loadHrFines();
     } else if (document.getElementById('tab-hr-payroll')?.classList.contains('active')) {
         await loadHrPayroll();
     }
@@ -476,6 +483,32 @@ function populateHrEmployeeDropdowns() {
             opt.value = dept.id;
             opt.textContent = dept.name;
             noticeDeptSelect.appendChild(opt);
+        });
+    }
+
+    // Filter dropdown in Fines table
+    const finesFilter = document.getElementById('hr-fines-emp-filter');
+    if (finesFilter) {
+        const currentVal = finesFilter.value;
+        finesFilter.innerHTML = '<option value="">All Employees</option>';
+        employees.forEach(emp => {
+            const opt = document.createElement('option');
+            opt.value = emp.id;
+            opt.textContent = emp.name;
+            finesFilter.appendChild(opt);
+        });
+        finesFilter.value = currentVal;
+    }
+
+    // Modal employee select for Fines
+    const modalFineEmpSelect = document.getElementById('hr-fine-form-emp-id');
+    if (modalFineEmpSelect) {
+        modalFineEmpSelect.innerHTML = '';
+        employees.forEach(emp => {
+            const opt = document.createElement('option');
+            opt.value = emp.id;
+            opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
+            modalFineEmpSelect.appendChild(opt);
         });
     }
 }
@@ -1250,7 +1283,307 @@ async function handleDeleteNotice(noticeId) {
 }
 
 
-// ================= 4. MONTHLY PAYROLL & SALARIES =================
+// ================= 4. DISCIPLINARY FINES & PENALTIES =================
+
+async function loadHrFines() {
+    const tbody = document.getElementById('hr-fines-table-body');
+    if (!tbody) return;
+
+    const monthFilter = document.getElementById('hr-fines-month-filter')?.value || '';
+    const statusFilter = document.getElementById('hr-fines-status-filter')?.value || 'all';
+    const catFilter = document.getElementById('hr-fines-cat-filter')?.value || 'all';
+    const empFilter = document.getElementById('hr-fines-emp-filter')?.value || '';
+
+    let url = `api/hr.php?action=get_fines&status=${encodeURIComponent(statusFilter)}&fine_category=${encodeURIComponent(catFilter)}`;
+    if (monthFilter) url += `&month=${encodeURIComponent(monthFilter)}`;
+    if (empFilter) url += `&employee_id=${encodeURIComponent(empFilter)}`;
+
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.success) {
+            HrState.fines = data.fines || [];
+            
+            // Update stats
+            const stats = data.stats || {};
+            const appliedAmtEl = document.getElementById('hr-fines-total-applied-amount');
+            const appliedCntEl = document.getElementById('hr-fines-total-applied-count');
+            const waivedAmtEl = document.getElementById('hr-fines-total-waived-amount');
+            const waivedCntEl = document.getElementById('hr-fines-total-waived-count');
+            const totalCntEl = document.getElementById('hr-fines-total-count');
+
+            if (appliedAmtEl) appliedAmtEl.textContent = `PKR ${parseFloat(stats.total_applied_amount || 0).toLocaleString()}`;
+            if (appliedCntEl) appliedCntEl.textContent = `${stats.applied_count || 0} penalties applied to payroll`;
+            if (waivedAmtEl) waivedAmtEl.textContent = `PKR ${parseFloat(stats.total_waived_amount || 0).toLocaleString()}`;
+            if (waivedCntEl) waivedCntEl.textContent = `${stats.waived_count || 0} forgiven penalties`;
+            if (totalCntEl) totalCntEl.textContent = `${stats.total_fines || 0} Records`;
+
+            renderFinesTable(HrState.fines);
+        } else {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading fines')}</td></tr>`;
+        }
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading fines.</td></tr>`;
+    }
+}
+
+function renderFinesTable(fines) {
+    const tbody = document.getElementById('hr-fines-table-body');
+    const countLabel = document.getElementById('hr-fines-count-label');
+    if (!tbody) return;
+
+    if (countLabel) {
+        countLabel.textContent = `Showing ${fines.length} fine record(s)`;
+    }
+
+    if (!fines || fines.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+                    <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
+                    <div style="font-weight: 700; font-size: 14px;">No Disciplinary Fines Recorded</div>
+                    <div style="font-size: 12px; margin-top: 4px;">Click "+ Issue Fine" above to log a penalty or violation.</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.can_manage_hr);
+
+    const categoryBadges = {
+        late_arrival: { label: '⏱️ Late Arrival', bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706' },
+        unauthorized_absence: { label: '🚫 Unauthorized Absence', bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' },
+        sop_violation: { label: '⚠️ Policy / SOP Breach', bg: 'rgba(139, 92, 246, 0.12)', color: '#8b5cf6' },
+        negligence: { label: '⚠️ Negligence / Damage', bg: 'rgba(249, 115, 22, 0.12)', color: '#ea580c' },
+        misconduct: { label: '🛑 Misconduct', bg: 'rgba(220, 38, 38, 0.12)', color: '#dc2626' },
+        other: { label: '📝 Disciplinary Note', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280' }
+    };
+
+    let html = '';
+    fines.forEach(f => {
+        const catBadge = categoryBadges[f.fine_category] || categoryBadges.sop_violation;
+        const isWaived = f.status === 'waived';
+
+        const avatarInitial = f.employee_name ? f.employee_name.charAt(0).toUpperCase() : '👤';
+        const avatarHtml = f.employee_avatar
+            ? `<img src="${escapeHtml(f.employee_avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" alt="${escapeHtml(f.employee_name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width:28px;height:28px;font-size:12px;\\'>${escapeHtml(avatarInitial)}</div>';">`
+            : `<div class="user-avatar" style="width: 28px; height: 28px; font-size: 12px;">${escapeHtml(avatarInitial)}</div>`;
+
+        let actionHtml = '';
+        if (isAdmin) {
+            if (isWaived) {
+                actionHtml = `
+                    <div style="display: flex; gap: 4px; justify-content: center;">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 6px; font-size: 11px; color: #ef4444;" onclick="handleFineAction(${f.id}, 'applied')" title="Re-apply Fine to Payroll">
+                            Re-Apply
+                        </button>
+                        <button type="button" class="btn-icon-del" style="padding: 3px 6px;" onclick="handleDeleteFine(${f.id})" title="Delete fine record">🗑️</button>
+                    </div>
+                `;
+            } else {
+                actionHtml = `
+                    <div style="display: flex; gap: 4px; justify-content: center;">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 6px; font-size: 11px; color: #10b981;" onclick="handleFineAction(${f.id}, 'waived')" title="Waive / Forgive Fine">
+                            Waive
+                        </button>
+                        <button type="button" class="btn-icon-del" style="padding: 3px 6px;" onclick="handleDeleteFine(${f.id})" title="Delete fine record">🗑️</button>
+                    </div>
+                `;
+            }
+        } else {
+            actionHtml = `<span style="color: var(--text-muted); font-size: 11px;">View Only</span>`;
+        }
+
+        html += `
+            <tr style="${isWaived ? 'opacity: 0.65; background: rgba(107, 114, 128, 0.03);' : ''}">
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${avatarHtml}
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">${escapeHtml(f.employee_name)}</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(f.employee_designation || 'Staff')} • ${escapeHtml(f.department_name || 'General')}</div>
+                        </div>
+                    </div>
+                </td>
+                <td style="font-size: 12px; font-weight: 600; color: var(--text-main);">
+                    ${escapeHtml(f.fine_date)}
+                </td>
+                <td>
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: ${catBadge.bg}; color: ${catBadge.color};">
+                        ${catBadge.label}
+                    </span>
+                </td>
+                <td>
+                    <div style="font-size: 12.5px; color: var(--text-main); font-weight: 500; line-height: 1.4;">${escapeHtml(f.reason)}</div>
+                    ${f.waived_reason ? `<div style="font-size: 11px; color: #10b981; margin-top: 2px;"><b>Waived Note:</b> ${escapeHtml(f.waived_reason)}</div>` : ''}
+                    <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">Issued by ${escapeHtml(f.issued_by_name || 'HR')}</div>
+                </td>
+                <td style="font-weight: 700; font-size: 12px; color: var(--primary);">
+                    ${escapeHtml(f.salary_month)}
+                </td>
+                <td style="font-weight: 800; font-size: 13.5px; color: ${isWaived ? '#6b7280; text-decoration: line-through;' : '#ef4444;'}">
+                    PKR ${parseFloat(f.amount).toLocaleString()}
+                </td>
+                <td style="text-align: center;">
+                    ${isWaived 
+                        ? `<span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: rgba(16, 185, 129, 0.12); color: #10b981;">Waived</span>`
+                        : `<span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: rgba(239, 68, 68, 0.12); color: #ef4444;">Applied</span>`
+                    }
+                </td>
+                <td style="text-align: center;">
+                    ${actionHtml}
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function openIssueFineModal() {
+    populateHrEmployeeDropdowns();
+    const today = new Date().toISOString().slice(0, 10);
+    const currentMonth = today.slice(0, 7);
+
+    const dateInput = document.getElementById('hr-fine-form-date');
+    const monthInput = document.getElementById('hr-fine-form-month');
+    const amountInput = document.getElementById('hr-fine-form-amount');
+    const reasonInput = document.getElementById('hr-fine-form-reason');
+    const catInput = document.getElementById('hr-fine-form-category');
+
+    if (dateInput) dateInput.value = today;
+    if (monthInput) monthInput.value = currentMonth;
+    if (amountInput) amountInput.value = '';
+    if (reasonInput) reasonInput.value = '';
+    if (catInput) catInput.value = 'sop_violation';
+
+    openModal('hr-issue-fine-modal');
+}
+
+function updateFineFormSalaryMonth() {
+    const dateVal = document.getElementById('hr-fine-form-date')?.value;
+    const monthInput = document.getElementById('hr-fine-form-month');
+    if (dateVal && monthInput) {
+        monthInput.value = dateVal.slice(0, 7);
+    }
+}
+
+async function handleIssueFineSubmit(e) {
+    if (e) e.preventDefault();
+
+    const empId = document.getElementById('hr-fine-form-emp-id')?.value;
+    const fineDate = document.getElementById('hr-fine-form-date')?.value;
+    const salaryMonth = document.getElementById('hr-fine-form-month')?.value;
+    const fineCategory = document.getElementById('hr-fine-form-category')?.value;
+    const amount = document.getElementById('hr-fine-form-amount')?.value;
+    const reason = document.getElementById('hr-fine-form-reason')?.value.trim();
+
+    if (!empId) {
+        showToast("Please select an employee.", "error");
+        return;
+    }
+    if (!amount || parseFloat(amount) <= 0) {
+        showToast("Please enter a valid fine amount.", "error");
+        return;
+    }
+    if (!reason) {
+        showToast("Please provide incident details / violation reason.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'add_fine',
+                employee_id: empId,
+                fine_date: fineDate,
+                salary_month: salaryMonth,
+                fine_category: fineCategory,
+                amount: amount,
+                reason: reason
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast("Disciplinary fine issued successfully.", "success");
+            closeModal('hr-issue-fine-modal');
+            await loadHrFines();
+            if (document.getElementById('tab-hr-payroll')?.classList.contains('active')) {
+                await loadHrPayroll();
+            }
+        } else {
+            showToast(data.message || "Failed to issue fine.", "error");
+        }
+    } catch (err) {
+        showToast("Network error issuing fine.", "error");
+    }
+}
+
+async function handleFineAction(fineId, status) {
+    let waivedReason = '';
+    if (status === 'waived') {
+        waivedReason = prompt("Enter reason for waiving / forgiving this fine (optional):", "Waived upon managerial review") || '';
+    }
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'update_fine_status',
+                fine_id: fineId,
+                status: status,
+                waived_reason: waivedReason
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message || "Fine status updated.", "success");
+            await loadHrFines();
+            if (document.getElementById('tab-hr-payroll')?.classList.contains('active')) {
+                await loadHrPayroll();
+            }
+        } else {
+            showToast(data.message || "Failed to update fine.", "error");
+        }
+    } catch (err) {
+        showToast("Network error updating fine status.", "error");
+    }
+}
+
+async function handleDeleteFine(fineId) {
+    if (!confirm("Are you sure you want to delete this fine record?")) return;
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete_fine', fine_id: fineId })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast("Fine record removed.", "info");
+            await loadHrFines();
+            if (document.getElementById('tab-hr-payroll')?.classList.contains('active')) {
+                await loadHrPayroll();
+            }
+        } else {
+            showToast(data.message || "Failed to delete fine record.", "error");
+        }
+    } catch (err) {
+        showToast("Network error deleting fine.", "error");
+    }
+}
+
+
+// ================= 5. MONTHLY PAYROLL & SALARIES =================
 
 async function loadHrPayroll() {
     const tbody = document.getElementById('hr-payroll-table-body');
@@ -1266,10 +1599,10 @@ async function loadHrPayroll() {
             HrState.payroll = data.payroll || [];
             renderHrPayrollTable(HrState.payroll);
         } else {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading payroll')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading payroll')}</td></tr>`;
         }
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading payroll records.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading payroll records.</td></tr>`;
     }
 }
 
@@ -1278,7 +1611,7 @@ function renderHrPayrollTable(payroll) {
     if (!tbody) return;
 
     if (!payroll || payroll.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--text-muted);">No staff records found for selected month.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: var(--text-muted);">No staff records found for selected month.</td></tr>`;
         return;
     }
 
@@ -1328,6 +1661,10 @@ function renderHrPayrollTable(payroll) {
                     ${p.deductions > 0 ? `-${parseFloat(p.deductions).toLocaleString()}` : '0'}
                     ${p.auto_loan_deduction > 0 ? `<div style="font-size: 10px; color: #8b5cf6;">💳 Loan: ${parseFloat(p.auto_loan_deduction).toLocaleString()}</div>` : ''}
                 </td>
+                <td style="font-size: 12.5px; color: #ef4444; font-weight: 600;">
+                    ${p.fines > 0 ? `-${parseFloat(p.fines).toLocaleString()}` : '0'}
+                    ${p.fine_reason ? `<div style="font-size: 10px; color: #ef4444; white-space: normal; max-width: 140px;">⚠️ ${escapeHtml(p.fine_reason)}</div>` : ''}
+                </td>
                 <td style="font-size: 13.5px; font-weight: 800; color: #10b981;">
                     PKR ${parseFloat(p.net_salary).toLocaleString()}
                 </td>
@@ -1358,8 +1695,10 @@ function openEditPayrollModal(item) {
     document.getElementById('hr-pay-basic-salary').value = item.basic_salary;
     document.getElementById('hr-pay-bonus').value = item.bonus || 0;
     document.getElementById('hr-pay-deductions').value = item.deductions || 0;
+    document.getElementById('hr-pay-fines').value = item.fines || 0;
     document.getElementById('hr-pay-bonus-reason').value = item.bonus_reason || '';
     document.getElementById('hr-pay-deduction-reason').value = item.deduction_reason || '';
+    document.getElementById('hr-pay-fine-reason').value = item.fine_reason || '';
     document.getElementById('hr-pay-status').value = item.payment_status || 'draft';
     document.getElementById('hr-pay-method').value = item.payment_method || 'Bank Transfer';
 
@@ -1371,7 +1710,8 @@ function calculateModalNetSalary() {
     const basic = parseFloat(document.getElementById('hr-pay-basic-salary')?.value) || 0;
     const bonus = parseFloat(document.getElementById('hr-pay-bonus')?.value) || 0;
     const deductions = parseFloat(document.getElementById('hr-pay-deductions')?.value) || 0;
-    const net = Math.max(0, basic + bonus - deductions);
+    const fines = parseFloat(document.getElementById('hr-pay-fines')?.value) || 0;
+    const net = Math.max(0, basic + bonus - deductions - fines);
 
     const netDisplay = document.getElementById('hr-pay-net-salary-display');
     if (netDisplay) {
@@ -1387,8 +1727,10 @@ async function handleSavePayrollItemSubmit(e) {
     const basic = document.getElementById('hr-pay-basic-salary')?.value;
     const bonus = document.getElementById('hr-pay-bonus')?.value;
     const deductions = document.getElementById('hr-pay-deductions')?.value;
+    const fines = document.getElementById('hr-pay-fines')?.value;
     const bonusReason = document.getElementById('hr-pay-bonus-reason')?.value.trim();
     const deductionReason = document.getElementById('hr-pay-deduction-reason')?.value.trim();
+    const fineReason = document.getElementById('hr-pay-fine-reason')?.value.trim();
     const status = document.getElementById('hr-pay-status')?.value;
     const method = document.getElementById('hr-pay-method')?.value.trim();
 
@@ -1403,8 +1745,10 @@ async function handleSavePayrollItemSubmit(e) {
                 basic_salary: basic,
                 bonus: bonus,
                 deductions: deductions,
+                fines: fines,
                 bonus_reason: bonusReason,
                 deduction_reason: deductionReason,
+                fine_reason: fineReason,
                 payment_status: status,
                 payment_method: method
             })
@@ -1491,7 +1835,7 @@ function printSalarySlip(item) {
             <table class="table-box">
                 <thead>
                     <tr>
-                        <th>Earnings & Allowances</th>
+                        <th>Earnings & Deductions Summary</th>
                         <th style="width: 30%; text-align: right;">Amount (PKR)</th>
                     </tr>
                 </thead>
@@ -1507,8 +1851,13 @@ function printSalarySlip(item) {
                     </tr>` : ''}
                     ${item.deductions > 0 ? `
                     <tr>
-                        <td>Deductions ${item.deduction_reason ? `(${escapeHtml(item.deduction_reason)})` : ''}</td>
+                        <td>Loan / Advance Deductions ${item.deduction_reason ? `(${escapeHtml(item.deduction_reason)})` : ''}</td>
                         <td class="amount" style="color: #dc2626;">- PKR ${parseFloat(item.deductions).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    </tr>` : ''}
+                    ${item.fines > 0 ? `
+                    <tr>
+                        <td>Disciplinary Fines & Penalties ${item.fine_reason ? `(${escapeHtml(item.fine_reason)})` : ''}</td>
+                        <td class="amount" style="color: #dc2626;">- PKR ${parseFloat(item.fines).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                     </tr>` : ''}
                 </tbody>
             </table>
