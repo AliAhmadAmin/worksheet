@@ -198,11 +198,11 @@
             </div>
             <form id="add-employee-form" onsubmit="handleAddEmployeeSubmit(event)">
                 <div class="modal-body" style="gap: 16px;">
-                    <!-- Section 1: Identity & Credentials -->
+                    <!-- Section 1: Identity & Legal Master Data -->
                     <div class="modal-section">
-                        <div class="modal-section-title">👤 Account & Login Credentials</div>
+                        <div class="modal-section-title">📋 Identity & Legal Information</div>
                         
-                        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 2px;">
+                        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 12px;">
                             <div id="add-emp-avatar-preview" class="user-avatar" style="width: 48px; height: 48px; font-size: 20px; flex-shrink: 0; background-size: cover; background-position: center; border: 2px solid var(--border-color); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">👤</div>
                             <div style="flex: 1;">
                                 <label class="form-label" style="margin-bottom: 3px;">Profile Photo (Optional)</label>
@@ -217,16 +217,47 @@
                                 <input type="text" id="add-emp-name" class="input-control" placeholder="e.g. Ali Raza" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Official Email Address *</label>
-                                <input type="email" id="add-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv" required>
+                                <label class="form-label">Father / Husband Name</label>
+                                <input type="text" id="add-emp-father-name" class="input-control" placeholder="e.g. Muhammad Raza">
                             </div>
                         </div>
 
                         <div class="form-grid-2">
                             <div class="form-group">
-                                <label class="form-label">Initial Password *</label>
-                                <input type="text" id="add-emp-password" class="input-control" value="DiscoverPakistan123" required>
+                                <label class="form-label">Employee Code</label>
+                                <input type="text" id="add-emp-code" class="input-control" placeholder="e.g. DP-104 (Auto if empty)">
                             </div>
+                            <div class="form-group">
+                                <label class="form-label">CNIC No.</label>
+                                <input type="text" id="add-emp-cnic" class="input-control" placeholder="e.g. 35202-1234567-1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Portal Login Access (Optional) -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">👤 System Login Access</div>
+                        
+                        <!-- Toggle for Portal Login Access -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 12px;">
+                            <label for="add-emp-can-login" style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0;">
+                                🔑 Enable System Login Access
+                            </label>
+                            <input type="checkbox" id="add-emp-can-login" style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);" onchange="toggleLoginCredentialsSection('add', this.checked)">
+                        </div>
+
+                        <div id="add-emp-login-fields" style="display: none;">
+                            <div class="form-grid-2">
+                                <div class="form-group">
+                                    <label class="form-label">Official Email Address <span id="add-emp-email-required-mark" style="color: #ef4444;">*</span></label>
+                                    <input type="email" id="add-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Initial Password *</label>
+                                    <input type="text" id="add-emp-password" class="input-control" value="DiscoverPakistan123">
+                                </div>
+                            </div>
+
                             <div class="form-group">
                                 <label class="form-label">System Role & Access</label>
                                 <select id="add-emp-role" class="input-control" style="font-weight: 600;">
@@ -241,18 +272,18 @@
                         </div>
                     </div>
 
-                    <!-- Section 2: Department, Team & Shift -->
+                    <!-- Section 3: Department, Team & Shift -->
                     <div class="modal-section">
                         <div class="modal-section-title">🏢 Department & Shift Schedule</div>
                         <div class="form-grid-2">
                             <div class="form-group">
                                 <label class="form-label">Designation / Title</label>
-                                <input type="text" id="add-emp-designation" class="input-control" placeholder="e.g. Content Creator, Video Editor" value="Content Creator">
+                                <input type="text" id="add-emp-designation" class="input-control" placeholder="e.g. Content Creator, Video Editor">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Department</label>
                                 <select id="add-emp-dept" class="input-control">
-                                    <!-- Populated dynamically -->
+                                    <option value="">-- Select Department --</option>
                                 </select>
                             </div>
                         </div>
@@ -261,8 +292,10 @@
                             <div class="form-group">
                                 <label class="form-label">Assigned Team</label>
                                 <select id="add-emp-team" class="input-control">
-                                    <!-- Populated dynamically -->
+                                    <option value="">-- Unassigned (To be assigned by HOD) --</option>
+                                    <!-- Populated dynamically based on selected department -->
                                 </select>
+                                <small style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; display: block;">Optional: HOD will assign team.</small>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Expected Shift / Duty Hours</label>
@@ -279,13 +312,17 @@
                         </div>
                     </div>
 
-                    <!-- Section 3: Salary & Leave Quotas -->
+                    <!-- Section 4: Salary, Bank & Entitlements -->
                     <div class="modal-section">
-                        <div class="modal-section-title">💵 Salary & Leave Entitlements</div>
-                        <div class="form-grid-2">
+                        <div class="modal-section-title">💵 Salary, Allowances & Bank Disbursal</div>
+                        <div class="form-grid-3">
                             <div class="form-group">
-                                <label class="form-label">Basic Monthly Salary (PKR)</label>
+                                <label class="form-label">Gross / Base Salary (PKR)</label>
                                 <input type="number" id="add-emp-salary" class="input-control" placeholder="e.g. 75000" min="0" step="500" style="font-weight: 700;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Fixed Fuel / Mobile Allow.</label>
+                                <input type="number" id="add-emp-fixed-allowance" class="input-control" placeholder="e.g. 5000" min="0" step="100">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Joining Date</label>
@@ -293,7 +330,28 @@
                             </div>
                         </div>
 
-                        <div class="form-grid-3">
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Bank Name</label>
+                                <select id="add-emp-bank-name" class="input-control">
+                                    <option value="UBL" selected>🏦 UBL (United Bank Limited)</option>
+                                    <option value="Meezan Bank">🏦 Meezan Bank</option>
+                                    <option value="HBL">🏦 HBL (Habib Bank Limited)</option>
+                                    <option value="MCB">🏦 MCB Bank</option>
+                                    <option value="Allied Bank">🏦 Allied Bank</option>
+                                    <option value="Bank Alfalah">🏦 Bank Alfalah</option>
+                                    <option value="Faysal Bank">🏦 Faysal Bank</option>
+                                    <option value="Other Bank">🏛️ Other Commercial Bank</option>
+                                    <option value="Cash">💵 Cash / Direct Counter</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Bank Account / IBAN No.</label>
+                                <input type="text" id="add-emp-bank-account" class="input-control" placeholder="e.g. 0123456789012 or PK00UNIL...">
+                            </div>
+                        </div>
+
+                        <div class="form-grid-3" style="margin-top: 6px;">
                             <div class="form-group">
                                 <label class="form-label" style="font-size: 11px;">Annual Leaves</label>
                                 <input type="number" id="add-emp-annual-quota" class="input-control" value="14" min="0" style="text-align: center; font-weight: 700;">
@@ -323,18 +381,18 @@
             <div class="modal-header">
                 <div>
                     <h3 style="display: flex; align-items: center; gap: 8px;">✏️ Edit Employee Details</h3>
-                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Update staff role, department, shift policy, salary, and leave quotas.</p>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Update staff master profile, bank info, role, department, salary, and leave quotas.</p>
                 </div>
                 <button type="button" class="btn-modal-close" onclick="closeModal('edit-employee-modal')">✕</button>
             </div>
             <form id="edit-employee-form" onsubmit="handleEditEmployeeSubmit(event)">
                 <input type="hidden" id="edit-emp-id">
                 <div class="modal-body" style="gap: 16px;">
-                    <!-- Section 1: Identity & Credentials -->
+                    <!-- Section 1: Identity & Legal Master Data -->
                     <div class="modal-section">
-                        <div class="modal-section-title">👤 Account & Login Credentials</div>
+                        <div class="modal-section-title">📋 Identity & Legal Information</div>
                         
-                        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 2px;">
+                        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 12px;">
                             <div id="edit-emp-avatar-preview" class="user-avatar" style="width: 48px; height: 48px; font-size: 20px; flex-shrink: 0; background-size: cover; background-position: center; border: 2px solid var(--border-color); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">👤</div>
                             <div style="flex: 1;">
                                 <label class="form-label" style="margin-bottom: 3px;">Update Profile Photo</label>
@@ -349,69 +407,115 @@
                                 <input type="text" id="edit-emp-name" class="input-control" required>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Official Email Address *</label>
-                                <input type="email" id="edit-emp-email" class="input-control" required>
+                                <label class="form-label">Father / Husband Name</label>
+                                <input type="text" id="edit-emp-father-name" class="input-control" placeholder="e.g. Muhammad Raza">
                             </div>
                         </div>
 
                         <div class="form-grid-2">
                             <div class="form-group">
-                                <label class="form-label">System Role & Access</label>
-                                <select id="edit-emp-role" class="input-control" style="font-weight: 600;">
-                                    <option value="employee">👤 Staff Member</option>
-                                    <option value="super_admin">👑 Super Admin</option>
-                                    <option value="hr">👥 HR Manager</option>
-                                    <option value="hod">🏢 Head of Department (HOD)</option>
-                                    <option value="team_lead">⭐ Team Lead</option>
-                                    <option value="coordinator">🎯 Task Coordinator</option>
-                                </select>
+                                <label class="form-label">Employee Code</label>
+                                <input type="text" id="edit-emp-code" class="input-control" placeholder="e.g. DP-104">
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Designation / Title</label>
-                                <input type="text" id="edit-emp-designation" class="input-control">
+                                <label class="form-label">CNIC No.</label>
+                                <input type="text" id="edit-emp-cnic" class="input-control" placeholder="e.g. 35202-1234567-1">
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 8px;">
+                            <label class="form-label">Account Status</label>
+                            <select id="edit-emp-status" class="input-control" style="font-weight: 600;">
+                                <option value="1">🟢 Active (Normal Working Staff)</option>
+                                <option value="0">⛔ Deactivated (Suspended / Retained in History)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Portal Login Access (Optional) -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">👤 System Login Access</div>
+                        
+                        <!-- Toggle for Portal Login Access -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 12px;">
+                            <label for="edit-emp-can-login" style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0;">
+                                🔑 Enable System Login Access
+                            </label>
+                            <input type="checkbox" id="edit-emp-can-login" checked style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);" onchange="toggleLoginCredentialsSection('edit', this.checked)">
+                        </div>
+
+                        <div id="edit-emp-login-fields" style="display: block;">
+                            <div class="form-grid-2">
+                                <div class="form-group">
+                                    <label class="form-label">Official Email Address <span id="edit-emp-email-required-mark" style="color: #ef4444;">*</span></label>
+                                    <input type="email" id="edit-emp-email" class="input-control">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">System Role & Access</label>
+                                    <select id="edit-emp-role" class="input-control" style="font-weight: 600;">
+                                        <option value="employee">👤 Staff Member</option>
+                                        <option value="super_admin">👑 Super Admin</option>
+                                        <option value="hr">👥 HR Manager</option>
+                                        <option value="hod">🏢 Head of Department (HOD)</option>
+                                        <option value="team_lead">⭐ Team Lead</option>
+                                        <option value="coordinator">🎯 Task Coordinator</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Section 2: Department, Team & Shift -->
+                    <!-- Section 3: Department, Team & Shift -->
                     <div class="modal-section">
                         <div class="modal-section-title">🏢 Department & Shift Schedule</div>
                         <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Designation / Title</label>
+                                <input type="text" id="edit-emp-designation" class="input-control" placeholder="e.g. Content Creator, Video Editor">
+                            </div>
                             <div class="form-group">
                                 <label class="form-label">Department</label>
                                 <select id="edit-emp-dept" class="input-control">
                                     <!-- Populated dynamically -->
                                 </select>
                             </div>
+                        </div>
+
+                        <div class="form-grid-2">
                             <div class="form-group">
                                 <label class="form-label">Assigned Team</label>
                                 <select id="edit-emp-team" class="input-control">
+                                    <option value="">-- Unassigned (To be assigned by HOD) --</option>
                                     <!-- Populated dynamically -->
+                                </select>
+                                <small style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; display: block;">Optional: HOD can assign staff into teams.</small>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Expected Shift / Duty Hours</label>
+                                <select id="edit-emp-shift-hours" class="input-control" style="font-weight: 700; color: var(--primary);">
+                                    <option value="8.0">⏱️ 8.0 Hours / Day (Standard Shift)</option>
+                                    <option value="9.0">⏱️ 9.0 Hours / Day</option>
+                                    <option value="7.0">⏱️ 7.0 Hours / Day</option>
+                                    <option value="6.0">⏱️ 6.0 Hours / Day</option>
+                                    <option value="10.0">⏱️ 10.0 Hours / Day</option>
+                                    <option value="12.0">⏱️ 12.0 Hours / Day</option>
+                                    <option value="0.0">🌐 Flexible / Open Shift (No fixed hours)</option>
                                 </select>
                             </div>
                         </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Expected Shift / Duty Hours</label>
-                            <select id="edit-emp-shift-hours" class="input-control" style="font-weight: 700; color: var(--primary);">
-                                <option value="8.0">⏱️ 8.0 Hours / Day (Standard Shift)</option>
-                                <option value="9.0">⏱️ 9.0 Hours / Day</option>
-                                <option value="7.0">⏱️ 7.0 Hours / Day</option>
-                                <option value="6.0">⏱️ 6.0 Hours / Day</option>
-                                <option value="10.0">⏱️ 10.0 Hours / Day</option>
-                                <option value="12.0">⏱️ 12.0 Hours / Day</option>
-                                <option value="0.0">🌐 Flexible / Open Shift (No fixed hours)</option>
-                            </select>
-                        </div>
                     </div>
 
-                    <!-- Section 3: Salary & Leave Quotas -->
+                    <!-- Section 4: Salary, Bank & Entitlements -->
                     <div class="modal-section">
-                        <div class="modal-section-title">💵 Salary & Leave Entitlements</div>
-                        <div class="form-grid-2">
+                        <div class="modal-section-title">💵 Salary, Allowances & Bank Disbursal</div>
+                        <div class="form-grid-3">
                             <div class="form-group">
-                                <label class="form-label">Basic Monthly Salary (PKR)</label>
+                                <label class="form-label">Gross / Base Salary (PKR)</label>
                                 <input type="number" id="edit-emp-salary" class="input-control" placeholder="e.g. 75000" min="0" step="500" style="font-weight: 700;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Fixed Fuel / Mobile Allow.</label>
+                                <input type="number" id="edit-emp-fixed-allowance" class="input-control" placeholder="e.g. 5000" min="0" step="100">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Joining Date</label>
@@ -419,7 +523,28 @@
                             </div>
                         </div>
 
-                        <div class="form-grid-3">
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Bank Name</label>
+                                <select id="edit-emp-bank-name" class="input-control">
+                                    <option value="UBL">🏦 UBL (United Bank Limited)</option>
+                                    <option value="Meezan Bank">🏦 Meezan Bank</option>
+                                    <option value="HBL">🏦 HBL (Habib Bank Limited)</option>
+                                    <option value="MCB">🏦 MCB Bank</option>
+                                    <option value="Allied Bank">🏦 Allied Bank</option>
+                                    <option value="Bank Alfalah">🏦 Bank Alfalah</option>
+                                    <option value="Faysal Bank">🏦 Faysal Bank</option>
+                                    <option value="Other Bank">🏛️ Other Commercial Bank</option>
+                                    <option value="Cash">💵 Cash / Direct Counter</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Bank Account / IBAN No.</label>
+                                <input type="text" id="edit-emp-bank-account" class="input-control" placeholder="e.g. 0123456789012 or PK00UNIL...">
+                            </div>
+                        </div>
+
+                        <div class="form-grid-3" style="margin-top: 6px;">
                             <div class="form-group">
                                 <label class="form-label" style="font-size: 11px;">Annual Leaves</label>
                                 <input type="number" id="edit-emp-annual-quota" class="input-control" value="14" min="0" style="text-align: center; font-weight: 700;">
@@ -438,6 +563,197 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline" onclick="closeModal('edit-employee-modal')">Cancel</button>
                     <button type="submit" class="btn btn-primary" style="padding: 9px 20px; font-weight: 700;">💾 Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT MONTHLY PAYROLL ITEM -->
+    <div id="edit-payroll-modal" class="modal-overlay">
+        <div class="modal-card modal-card-lg">
+            <div class="modal-header">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">💵 Adjust Monthly Payroll & Deductions</h3>
+                    <p id="edit-payroll-subtitle" style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Update salary additions, advances, loan deductions, fines, taxes, and payment status.</p>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="closeModal('edit-payroll-modal')">✕</button>
+            </div>
+            <form id="edit-payroll-form" onsubmit="handleSavePayrollItem(event)">
+                <input type="hidden" id="edit-pr-employee-id">
+                <input type="hidden" id="edit-pr-salary-month">
+                <input type="hidden" id="edit-pr-working-days">
+                <input type="hidden" id="edit-pr-present-days">
+                <input type="hidden" id="edit-pr-approved-leaves">
+                <input type="hidden" id="edit-pr-unpaid-leaves">
+                <input type="hidden" id="edit-pr-duty-hours">
+
+                <div class="modal-body" style="gap: 16px;">
+                    <!-- Employee Summary Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-elevated); padding: 12px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                        <div>
+                            <div id="edit-pr-emp-display" style="font-size: 14px; font-weight: 700; color: var(--text-main);">Ali Raza (DP-101)</div>
+                            <div id="edit-pr-meta-display" style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">News Room | Bank: UBL (0123456789) | CNIC: 35202-1234567-1</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div id="edit-pr-month-display" class="badge" style="background: var(--primary-light); color: var(--primary); font-size: 12px; font-weight: 700;">Month: 2026-10</div>
+                            <div id="edit-pr-days-display" style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">30 Days (26 Present, 2 Leaves)</div>
+                        </div>
+                    </div>
+
+                    <!-- Row 1: Base Salary & Form # -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">💼 Earnings & Additions</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Gross / Base Salary (PKR) *</label>
+                                <input type="number" id="edit-pr-basic-salary" class="input-control" step="100" min="0" required oninput="calculatePayrollModalTotals()" style="font-weight: 700;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Fuel / Travel / Mobile (PKR)</label>
+                                <input type="number" id="edit-pr-fuel" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Incentive / Performance (PKR)</label>
+                                <input type="number" id="edit-pr-incentive" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                        </div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Food Bills / Reimbursement (PKR)</label>
+                                <input type="number" id="edit-pr-food-bills" class="input-control" step="50" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Other Bonus (PKR)</label>
+                                <input type="number" id="edit-pr-bonus" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Bonus / Incentive Remarks</label>
+                            <input type="text" id="edit-pr-bonus-reason" class="input-control" placeholder="e.g. Eid Bonus, Performance target achieved">
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Deductions -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">📉 Deductions & Taxes</div>
+                        
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label" id="edit-pr-unpaid-label">Unpaid Leaves (PKR)</label>
+                                <input type="number" id="edit-pr-unpaid-deduction" class="input-control" step="0.01" min="0" oninput="handleUnpaidDeductionManualInput()" style="color: #dc2626; font-weight: 700;">
+                                <div style="margin-top: 6px;">
+                                    <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 600; color: #059669; user-select: none;">
+                                        <input type="checkbox" id="edit-pr-waive-unpaid" onchange="toggleWaiveUnpaidDeduction()" style="width: 15px; height: 15px; accent-color: #10b981; cursor: pointer;">
+                                        <span>Waive off deduction</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Advance Salary (PKR)</label>
+                                <input type="number" id="edit-pr-advance" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Loan Deduction (PKR)</label>
+                                <input type="number" id="edit-pr-loan" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                        </div>
+
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">WHT / Income Tax (PKR)</label>
+                                <input type="number" id="edit-pr-wht" class="input-control" step="50" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Fines / Penalties (PKR)</label>
+                                <input type="number" id="edit-pr-fines" class="input-control" step="50" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Other Deductions (PKR)</label>
+                                <input type="number" id="edit-pr-deductions" class="input-control" step="50" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Fine Reason</label>
+                                <input type="text" id="edit-pr-fine-reason" class="input-control" placeholder="e.g. Late Arrival Penalty">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Deduction Reason</label>
+                                <input type="text" id="edit-pr-deduction-reason" class="input-control" placeholder="e.g. Special adjustment">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Summary Calculation Banner -->
+                    <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 18px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; text-align: center;">
+                            <div>
+                                <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL ADDITIONS</div>
+                                <div id="modal-calc-additions" style="font-size: 15px; font-weight: 700; color: #059669;">PKR 0</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">TOTAL DEDUCTIONS</div>
+                                <div id="modal-calc-deductions" style="font-size: 15px; font-weight: 700; color: #dc2626;">PKR 0</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">NET SALARY</div>
+                                <div id="modal-calc-net" style="font-size: 17px; font-weight: 800; color: var(--primary);">PKR 0</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">SALARY PAYABLE</div>
+                                <div id="modal-calc-payable" style="font-size: 17px; font-weight: 800; color: #d97706;">PKR 0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Disbursal, Form # & Increment Remarks -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">🏛️ Disbursal, Form # & Audit Remarks</div>
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Form # / Voucher Ref</label>
+                                <input type="text" id="edit-pr-form-no" class="input-control" placeholder="e.g. VCH-2026-104">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Salary Paid Amount (PKR)</label>
+                                <input type="number" id="edit-pr-paid-amount" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Payment Method</label>
+                                <select id="edit-pr-payment-method" class="input-control">
+                                    <option value="Bank Transfer">🏦 Bank Transfer / UBL</option>
+                                    <option value="Cheque">📜 Cheque</option>
+                                    <option value="Cash">💵 Cash</option>
+                                    <option value="Other">🏛️ Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Payment Status</label>
+                                <select id="edit-pr-payment-status" class="input-control" style="font-weight: 700;">
+                                    <option value="draft">🟡 Draft (Pending Approval)</option>
+                                    <option value="approved">🔵 Approved</option>
+                                    <option value="paid">🟢 Disbursed / Paid</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Payment Date</label>
+                                <input type="date" id="edit-pr-payment-date" class="input-control">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Salary Increment Remarks / Audit Notes</label>
+                            <textarea id="edit-pr-remarks" class="input-control" rows="2" placeholder="e.g. Annual increment of 10% effective this month..."></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('edit-payroll-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 9px 24px; font-weight: 700;">💾 Save Payroll Adjustment</button>
                 </div>
             </form>
         </div>
@@ -725,6 +1041,206 @@
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD DEPARTMENT (HR & ADMIN) -->
+    <div id="add-department-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">🏢 Add New Department</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Create an organizational department and assign a Head of Department (HOD).</p>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="closeModal('add-department-modal')">✕</button>
+            </div>
+            <form id="add-department-form" onsubmit="handleSaveDepartmentSubmit(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Department Name *</label>
+                        <input type="text" id="add-dept-name" class="input-control" placeholder="e.g. Creative Media, Digital, News Room" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Head of Department (HOD)</label>
+                        <select id="add-dept-hod" class="input-control">
+                            <option value="">-- No HOD Appointed Yet --</option>
+                            <!-- Populated dynamically with employees -->
+                        </select>
+                        <small style="font-size: 11px; color: var(--text-muted);">The assigned HOD will manage teams and staff assignments within this department.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Department Description / Scope</label>
+                        <textarea id="add-dept-description" class="input-control" rows="2" placeholder="Brief outline of operations, goals, or duties..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('add-department-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="font-weight: 700;">✨ Create Department</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT DEPARTMENT -->
+    <div id="edit-department-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">✏️ Edit Department</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Update department details and leadership assignments.</p>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="closeModal('edit-department-modal')">✕</button>
+            </div>
+            <form id="edit-department-form" onsubmit="handleEditDepartmentSubmit(event)">
+                <input type="hidden" id="edit-dept-id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Department Name *</label>
+                        <input type="text" id="edit-dept-name" class="input-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Head of Department (HOD)</label>
+                        <select id="edit-dept-hod" class="input-control">
+                            <option value="">-- No HOD Appointed Yet --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Department Description / Scope</label>
+                        <textarea id="edit-dept-description" class="input-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('edit-department-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="font-weight: 700;">💾 Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD TEAM (HOD & ADMIN) -->
+    <div id="add-team-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">👥 Create New Team</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Form a specialized operational unit under your department.</p>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="closeModal('add-team-modal')">✕</button>
+            </div>
+            <form id="add-team-form" onsubmit="handleSaveTeamSubmit(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Parent Department *</label>
+                        <select id="add-team-dept" class="input-control" required>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Team Name *</label>
+                        <input type="text" id="add-team-name" class="input-control" placeholder="e.g. Facebook Team, YouTube Lead, NLE Unit" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Team Focus / Scope</label>
+                        <textarea id="add-team-description" class="input-control" rows="2" placeholder="Tasks, platform responsibilities, or workflow goals..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('add-team-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="font-weight: 700;">✨ Create Team</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT TEAM -->
+    <div id="edit-team-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">✏️ Edit Team Details</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Update team title, parent department, or description.</p>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="closeModal('edit-team-modal')">✕</button>
+            </div>
+            <form id="edit-team-form" onsubmit="handleEditTeamSubmit(event)">
+                <input type="hidden" id="edit-team-id">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label class="form-label">Parent Department *</label>
+                        <select id="edit-team-dept" class="input-control" required>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Team Name *</label>
+                        <input type="text" id="edit-team-name" class="input-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Team Focus / Scope</label>
+                        <textarea id="edit-team-description" class="input-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('edit-team-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="font-weight: 700;">💾 Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: DEPARTMENT DRILLDOWN (VIEW TEAMS & ROSTER) -->
+    <div id="department-drilldown-modal" class="modal-overlay">
+        <div class="modal-card modal-card-lg" style="max-width: 860px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%); border-bottom: 1px solid var(--border-color);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div id="drilldown-dept-icon" style="width: 44px; height: 44px; border-radius: 12px; background: var(--primary); color: #fff; font-size: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(37,99,235,0.25);">🏢</div>
+                    <div>
+                        <h3 id="drilldown-dept-name" style="margin: 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">Department Name</h3>
+                        <p id="drilldown-dept-meta" style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">HOD • Staff Members • Teams</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="closeModal('department-drilldown-modal')">✕</button>
+            </div>
+
+            <div class="modal-body" style="padding: 16px 20px; gap: 18px;">
+                <!-- Header Stats Bar & Actions -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 16px; background: var(--bg-card-elevated); border-radius: 10px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; gap: 18px; flex-wrap: wrap;" id="drilldown-dept-stats">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <div id="drilldown-actions-bar" style="display: flex; gap: 8px;">
+                        <!-- "+ Add Team to Dept" button populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Unassigned Staff Box in this Department -->
+                <div id="drilldown-unassigned-container" style="display: none;">
+                    <!-- Populated dynamically if there are unassigned staff in this department -->
+                </div>
+
+                <!-- Department Teams & Roster List -->
+                <div>
+                    <h4 style="font-size: 14px; margin: 0 0 10px 0; color: var(--text-main); display: flex; align-items: center; justify-content: space-between;">
+                        <span>📋 Operational Teams & Staff Roster</span>
+                        <span id="drilldown-team-count-badge" class="badge" style="font-size: 11px; background: var(--primary-light); color: var(--primary);">0 Teams</span>
+                    </h4>
+                    <div id="drilldown-teams-list" style="display: flex; flex-direction: column; gap: 14px;">
+                        <!-- Populated dynamically with teams & their assigned staff -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="padding: 12px 20px;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('department-drilldown-modal')">Close</button>
+            </div>
         </div>
     </div>
 

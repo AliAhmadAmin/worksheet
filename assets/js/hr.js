@@ -413,7 +413,21 @@ function renderDashboardDeptAttendance(deptList) {
     container.innerHTML = html;
 }
 
-function populateHrEmployeeDropdowns() {
+async function populateHrEmployeeDropdowns() {
+    if (!AppState.employees || AppState.employees.length === 0) {
+        try {
+            const res = await fetch('api/employees.php?action=list');
+            const data = await res.json();
+            if (data && data.success && data.employees) {
+                AppState.employees = data.employees;
+                AppState.departments = data.departments || [];
+                AppState.teams = data.teams || [];
+            }
+        } catch (e) {
+            console.error("Error fetching employees for dropdowns:", e);
+        }
+    }
+
     const employees = AppState.employees || [];
 
     // Filter dropdown in Leaves table
@@ -424,7 +438,7 @@ function populateHrEmployeeDropdowns() {
         employees.forEach(emp => {
             const opt = document.createElement('option');
             opt.value = emp.id;
-            opt.textContent = emp.name;
+            opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
             leaveFilter.appendChild(opt);
         });
         leaveFilter.value = currentVal;
@@ -438,7 +452,7 @@ function populateHrEmployeeDropdowns() {
         employees.forEach(emp => {
             const opt = document.createElement('option');
             opt.value = emp.id;
-            opt.textContent = emp.name;
+            opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
             loanFilter.appendChild(opt);
         });
         loanFilter.value = currentVal;
@@ -447,12 +461,13 @@ function populateHrEmployeeDropdowns() {
     // Modal employee select for Leaves
     const modalLeaveEmpSelect = document.getElementById('hr-leave-form-emp-id');
     if (modalLeaveEmpSelect) {
+        const currentVal = modalLeaveEmpSelect.value;
         modalLeaveEmpSelect.innerHTML = '';
         employees.forEach(emp => {
             const opt = document.createElement('option');
             opt.value = emp.id;
             opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
-            if (AppState.currentUser && emp.id == AppState.currentUser.id) {
+            if (currentVal ? emp.id == currentVal : (AppState.currentUser && emp.id == AppState.currentUser.id)) {
                 opt.selected = true;
             }
             modalLeaveEmpSelect.appendChild(opt);
@@ -462,12 +477,13 @@ function populateHrEmployeeDropdowns() {
     // Modal employee select for Loans
     const modalLoanEmpSelect = document.getElementById('hr-loan-form-emp-id');
     if (modalLoanEmpSelect) {
+        const currentVal = modalLoanEmpSelect.value;
         modalLoanEmpSelect.innerHTML = '';
         employees.forEach(emp => {
             const opt = document.createElement('option');
             opt.value = emp.id;
             opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
-            if (AppState.currentUser && emp.id == AppState.currentUser.id) {
+            if (currentVal ? emp.id == currentVal : (AppState.currentUser && emp.id == AppState.currentUser.id)) {
                 opt.selected = true;
             }
             modalLoanEmpSelect.appendChild(opt);
@@ -494,7 +510,7 @@ function populateHrEmployeeDropdowns() {
         employees.forEach(emp => {
             const opt = document.createElement('option');
             opt.value = emp.id;
-            opt.textContent = emp.name;
+            opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
             finesFilter.appendChild(opt);
         });
         finesFilter.value = currentVal;
@@ -503,14 +519,71 @@ function populateHrEmployeeDropdowns() {
     // Modal employee select for Fines
     const modalFineEmpSelect = document.getElementById('hr-fine-form-emp-id');
     if (modalFineEmpSelect) {
+        const currentVal = modalFineEmpSelect.value;
         modalFineEmpSelect.innerHTML = '';
         employees.forEach(emp => {
             const opt = document.createElement('option');
             opt.value = emp.id;
             opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
+            if (currentVal ? emp.id == currentVal : (AppState.currentUser && emp.id == AppState.currentUser.id)) {
+                opt.selected = true;
+            }
             modalFineEmpSelect.appendChild(opt);
         });
     }
+
+    // Filter dropdown in Claims table
+    const claimsFilter = document.getElementById('hr-claims-emp-filter');
+    if (claimsFilter) {
+        const currentVal = claimsFilter.value;
+        claimsFilter.innerHTML = '<option value="">All Employees</option>';
+        employees.forEach(emp => {
+            const opt = document.createElement('option');
+            opt.value = emp.id;
+            opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
+            claimsFilter.appendChild(opt);
+        });
+        claimsFilter.value = currentVal;
+    }
+
+    // Modal employee select for Claims
+    const modalClaimEmpSelect = document.getElementById('hr-claim-form-emp-id');
+    if (modalClaimEmpSelect) {
+        const currentVal = modalClaimEmpSelect.value;
+        modalClaimEmpSelect.innerHTML = '';
+        employees.forEach(emp => {
+            const opt = document.createElement('option');
+            opt.value = emp.id;
+            opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
+            if (currentVal ? emp.id == currentVal : (AppState.currentUser && emp.id == AppState.currentUser.id)) {
+                opt.selected = true;
+            }
+            modalClaimEmpSelect.appendChild(opt);
+        });
+    }
+
+    // Populate Department filters across all HR subtabs
+    const deptDropdownIds = [
+        'hr-leave-dept-filter',
+        'hr-loan-dept-filter',
+        'hr-claims-dept-filter',
+        'hr-notice-dept-filter',
+        'hr-fines-dept-filter'
+    ];
+    deptDropdownIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && AppState.departments) {
+            const currentVal = el.value;
+            el.innerHTML = '<option value="">🏢 All Departments</option>';
+            AppState.departments.forEach(dept => {
+                const opt = document.createElement('option');
+                opt.value = dept.name;
+                opt.textContent = `🏢 ${dept.name}`;
+                el.appendChild(opt);
+            });
+            if (currentVal) el.value = currentVal;
+        }
+    });
 }
 
 // ================= 1. LEAVE MANAGEMENT =================
@@ -533,13 +606,58 @@ async function loadHrLeaves() {
         if (data.success) {
             HrState.leaves = data.leaves || [];
             HrState.currentUser = data.current_user || {};
-            renderLeavesTable(HrState.leaves);
+            applyLeavesClientFilters();
         } else {
             tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading leaves')}</td></tr>`;
         }
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading leave records.</td></tr>`;
     }
+}
+
+function applyLeavesClientFilters() {
+    const search = (document.getElementById('hr-leave-search')?.value || '').toLowerCase().trim();
+    const dept = (document.getElementById('hr-leave-dept-filter')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('hr-leave-status-filter')?.value || 'all';
+    const type = document.getElementById('hr-leave-type-filter')?.value || 'all';
+    const empId = document.getElementById('hr-leave-emp-filter')?.value || '';
+
+    // Show/hide reset button
+    const resetBtn = document.getElementById('hr-leave-reset-filters-btn');
+    if (resetBtn) {
+        const isFiltered = !!(search || dept || empId || status !== 'pending' || type !== 'all');
+        resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
+    }
+
+    let list = HrState.leaves || [];
+
+    if (dept) {
+        list = list.filter(l => {
+            const dName = (l.department_name || '').toLowerCase();
+            return dName === dept || (l.department_id && String(l.department_id) === dept);
+        });
+    }
+
+    if (search) {
+        list = list.filter(l => {
+            return (l.employee_name && l.employee_name.toLowerCase().includes(search)) ||
+                   (l.leave_type && l.leave_type.toLowerCase().includes(search)) ||
+                   (l.reason && l.reason.toLowerCase().includes(search)) ||
+                   (l.department_name && l.department_name.toLowerCase().includes(search)) ||
+                   (l.status && l.status.toLowerCase().includes(search));
+        });
+    }
+
+    renderLeavesTable(list);
+}
+
+function resetLeavesFilters() {
+    if (document.getElementById('hr-leave-search')) document.getElementById('hr-leave-search').value = '';
+    if (document.getElementById('hr-leave-dept-filter')) document.getElementById('hr-leave-dept-filter').value = '';
+    if (document.getElementById('hr-leave-status-filter')) document.getElementById('hr-leave-status-filter').value = 'pending';
+    if (document.getElementById('hr-leave-type-filter')) document.getElementById('hr-leave-type-filter').value = 'all';
+    if (document.getElementById('hr-leave-emp-filter')) document.getElementById('hr-leave-emp-filter').value = '';
+    loadHrLeaves();
 }
 
 function renderLeavesTable(leaves) {
@@ -703,7 +821,8 @@ function renderLeavesTable(leaves) {
     tbody.innerHTML = html;
 }
 
-function openApplyLeaveModal() {
+async function openApplyLeaveModal() {
+    await populateHrEmployeeDropdowns();
     const today = getLocalDateString();
     const startInput = document.getElementById('hr-leave-form-start-date');
     const endInput = document.getElementById('hr-leave-form-end-date');
@@ -859,13 +978,58 @@ async function loadHrLoans() {
 
         if (data.success) {
             HrState.loans = data.loans || [];
-            renderLoansTable(HrState.loans);
+            applyLoansClientFilters();
         } else {
             tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading loan records')}</td></tr>`;
         }
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading loan records.</td></tr>`;
     }
+}
+
+function applyLoansClientFilters() {
+    const search = (document.getElementById('hr-loan-search')?.value || '').toLowerCase().trim();
+    const dept = (document.getElementById('hr-loan-dept-filter')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('hr-loan-status-filter')?.value || 'all';
+    const type = document.getElementById('hr-loan-type-filter')?.value || 'all';
+    const empId = document.getElementById('hr-loan-emp-filter')?.value || '';
+
+    const resetBtn = document.getElementById('hr-loan-reset-filters-btn');
+    if (resetBtn) {
+        const isFiltered = !!(search || dept || empId || status !== 'pending' || type !== 'all');
+        resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
+    }
+
+    let list = HrState.loans || [];
+
+    if (dept) {
+        list = list.filter(l => {
+            const dName = (l.department_name || '').toLowerCase();
+            return dName === dept || (l.department_id && String(l.department_id) === dept);
+        });
+    }
+
+    if (search) {
+        list = list.filter(l => {
+            return (l.employee_name && l.employee_name.toLowerCase().includes(search)) ||
+                   (l.request_type && l.request_type.toLowerCase().includes(search)) ||
+                   (l.reason && l.reason.toLowerCase().includes(search)) ||
+                   (l.department_name && l.department_name.toLowerCase().includes(search)) ||
+                   (l.status && l.status.toLowerCase().includes(search)) ||
+                   (l.amount && String(l.amount).includes(search));
+        });
+    }
+
+    renderLoansTable(list);
+}
+
+function resetLoansFilters() {
+    if (document.getElementById('hr-loan-search')) document.getElementById('hr-loan-search').value = '';
+    if (document.getElementById('hr-loan-dept-filter')) document.getElementById('hr-loan-dept-filter').value = '';
+    if (document.getElementById('hr-loan-status-filter')) document.getElementById('hr-loan-status-filter').value = 'pending';
+    if (document.getElementById('hr-loan-type-filter')) document.getElementById('hr-loan-type-filter').value = 'all';
+    if (document.getElementById('hr-loan-emp-filter')) document.getElementById('hr-loan-emp-filter').value = '';
+    loadHrLoans();
 }
 
 function renderLoansTable(loans) {
@@ -998,7 +1162,8 @@ function renderLoansTable(loans) {
     tbody.innerHTML = html;
 }
 
-function openApplyLoanModal() {
+async function openApplyLoanModal() {
+    await populateHrEmployeeDropdowns();
     const currentMonth = new Date().toISOString().slice(0, 7);
     const startMonthInput = document.getElementById('hr-loan-form-start-month');
     const amountInput = document.getElementById('hr-loan-form-amount');
@@ -1129,6 +1294,353 @@ async function handleDeleteLoan(loanId) {
 }
 
 
+// ================= 3. FUEL, TRAVEL, FOOD & INCENTIVE CLAIMS =================
+
+async function loadHrClaims() {
+    const tbody = document.getElementById('hr-claims-table-body');
+    if (!tbody) return;
+
+    const typeFilter = document.getElementById('hr-claims-type-filter')?.value || 'all';
+    const monthFilter = document.getElementById('hr-claims-month-filter')?.value || '';
+    const statusFilter = document.getElementById('hr-claims-status-filter')?.value || 'all';
+    const empFilter = document.getElementById('hr-claims-emp-filter')?.value || '';
+
+    let url = `api/hr.php?action=get_claims&claim_type=${encodeURIComponent(typeFilter)}&status=${encodeURIComponent(statusFilter)}`;
+    if (monthFilter) url += `&month=${encodeURIComponent(monthFilter)}`;
+    if (empFilter) url += `&employee_id=${encodeURIComponent(empFilter)}`;
+
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.success) {
+            HrState.claims = data.claims || [];
+            
+            // Update stats
+            const stats = data.stats || {};
+            const fuelEl = document.getElementById('hr-claims-total-fuel');
+            const foodEl = document.getElementById('hr-claims-total-food');
+            const incEl = document.getElementById('hr-claims-total-incentive');
+            const pendEl = document.getElementById('hr-claims-total-pending');
+
+            if (fuelEl) fuelEl.textContent = `PKR ${(stats.total_fuel_amount || 0).toLocaleString()}`;
+            if (foodEl) foodEl.textContent = `PKR ${(stats.total_food_amount || 0).toLocaleString()}`;
+            if (incEl) incEl.textContent = `PKR ${(stats.total_incentive_amount || 0).toLocaleString()}`;
+            if (pendEl) pendEl.textContent = `${stats.pending_count || 0} Claim(s)`;
+
+            applyClaimsClientFilters();
+        } else {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading claims')}</td></tr>`;
+        }
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading claims.</td></tr>`;
+    }
+}
+
+function applyClaimsClientFilters() {
+    const search = (document.getElementById('hr-claims-search')?.value || '').toLowerCase().trim();
+    const dept = (document.getElementById('hr-claims-dept-filter')?.value || '').toLowerCase().trim();
+    const type = document.getElementById('hr-claims-type-filter')?.value || 'all';
+    const status = document.getElementById('hr-claims-status-filter')?.value || 'all';
+    const month = document.getElementById('hr-claims-month-filter')?.value || '';
+    const empId = document.getElementById('hr-claims-emp-filter')?.value || '';
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const resetBtn = document.getElementById('hr-claims-reset-filters-btn');
+    if (resetBtn) {
+        const isFiltered = !!(search || dept || empId || type !== 'all' || status !== 'approved' || (month && month !== currentMonth));
+        resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
+    }
+
+    let list = HrState.claims || [];
+
+    if (dept) {
+        list = list.filter(c => {
+            const dName = (c.department_name || '').toLowerCase();
+            return dName === dept || (c.department_id && String(c.department_id) === dept);
+        });
+    }
+
+    if (search) {
+        list = list.filter(c => {
+            return (c.employee_name && c.employee_name.toLowerCase().includes(search)) ||
+                   (c.claim_type && c.claim_type.toLowerCase().includes(search)) ||
+                   (c.description && c.description.toLowerCase().includes(search)) ||
+                   (c.route_details && c.route_details.toLowerCase().includes(search)) ||
+                   (c.receipt_number && c.receipt_number.toLowerCase().includes(search)) ||
+                   (c.department_name && c.department_name.toLowerCase().includes(search)) ||
+                   (c.status && c.status.toLowerCase().includes(search)) ||
+                   (c.amount && String(c.amount).includes(search));
+        });
+    }
+
+    renderHrClaimsTable(list);
+}
+
+function resetClaimsFilters() {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    if (document.getElementById('hr-claims-search')) document.getElementById('hr-claims-search').value = '';
+    if (document.getElementById('hr-claims-dept-filter')) document.getElementById('hr-claims-dept-filter').value = '';
+    if (document.getElementById('hr-claims-type-filter')) document.getElementById('hr-claims-type-filter').value = 'all';
+    if (document.getElementById('hr-claims-status-filter')) document.getElementById('hr-claims-status-filter').value = 'approved';
+    if (document.getElementById('hr-claims-month-filter')) document.getElementById('hr-claims-month-filter').value = currentMonth;
+    if (document.getElementById('hr-claims-emp-filter')) document.getElementById('hr-claims-emp-filter').value = '';
+    loadHrClaims();
+}
+
+function renderHrClaimsTable(claims) {
+    const tbody = document.getElementById('hr-claims-table-body');
+    const countLabel = document.getElementById('hr-claims-count-label');
+    if (!tbody) return;
+
+    if (countLabel) {
+        countLabel.textContent = `Showing ${claims.length} claim(s)`;
+    }
+
+    if (!claims || claims.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+                    <div style="font-size: 32px; margin-bottom: 8px;">⛽</div>
+                    <div style="font-weight: 700; font-size: 14px;">No claims or allowances found</div>
+                    <div style="font-size: 12px; margin-top: 4px;">Click "+ Add Allowance / Claim" above to record a new entry.</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || AppState.currentUser.can_manage_hr);
+
+    const typeBadges = {
+        fuel: { label: '⛽ Fuel / Mileage', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7' },
+        travel: { label: '✈️ Travel / Trip', bg: 'rgba(59, 130, 246, 0.12)', color: '#2563eb' },
+        mobile: { label: '📱 Mobile / Net', bg: 'rgba(107, 114, 128, 0.12)', color: '#4b5563' },
+        food_bills: { label: '🍲 Food & Meals', bg: 'rgba(16, 185, 129, 0.12)', color: '#059669' },
+        incentive: { label: '🏆 Incentive', bg: 'rgba(139, 92, 246, 0.12)', color: '#7c3aed' },
+        bonus: { label: '🎁 Special Bonus', bg: 'rgba(236, 72, 153, 0.12)', color: '#db2777' },
+        other: { label: '📝 Other', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280' }
+    };
+
+    const statusBadges = {
+        pending: { label: '⏳ Pending', bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706' },
+        approved: { label: '✅ Approved', bg: 'rgba(16, 185, 129, 0.12)', color: '#059669' },
+        paid: { label: '💵 Paid', bg: 'rgba(59, 130, 246, 0.12)', color: '#2563eb' },
+        rejected: { label: '❌ Rejected', bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' }
+    };
+
+    let html = '';
+    claims.forEach(c => {
+        const typeBadge = typeBadges[c.claim_type] || typeBadges.other;
+        const statBadge = statusBadges[c.status] || statusBadges.pending;
+
+        const avatarInitial = c.employee_name ? c.employee_name.charAt(0).toUpperCase() : '👤';
+        const avatarHtml = c.avatar
+            ? `<img src="${escapeHtml(c.avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" alt="${escapeHtml(c.employee_name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width:28px;height:28px;font-size:12px;\\'>${escapeHtml(avatarInitial)}</div>';">`
+            : `<div class="user-avatar" style="width: 28px; height: 28px; font-size: 12px;">${escapeHtml(avatarInitial)}</div>`;
+
+        let actionHtml = '';
+        if (isAdmin || (AppState.currentUser && AppState.currentUser.role === 'hod')) {
+            if (c.status === 'pending') {
+                actionHtml = `
+                    <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; color: #059669; border-color: rgba(16, 185, 129, 0.4);" onclick="handleUpdateClaimStatus(${c.id}, 'approved')" title="Approve & Apply to Payroll">✅ Approve</button>
+                    <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; color: #dc2626; border-color: rgba(220, 38, 38, 0.4);" onclick="handleUpdateClaimStatus(${c.id}, 'rejected')" title="Reject Claim">❌</button>
+                `;
+            } else if (c.status === 'approved') {
+                actionHtml = `
+                    <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; color: #2563eb;" onclick="handleUpdateClaimStatus(${c.id}, 'paid')" title="Mark as Paid">💵 Mark Paid</button>
+                    <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; color: #ef4444;" onclick="handleDeleteClaim(${c.id})" title="Delete Claim">🗑️</button>
+                `;
+            } else {
+                actionHtml = `
+                    <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; color: #ef4444;" onclick="handleDeleteClaim(${c.id})" title="Delete Claim">🗑️</button>
+                `;
+            }
+        } else {
+            actionHtml = `<span style="font-size: 11px; color: var(--text-muted);">${statBadge.label}</span>`;
+        }
+
+        html += `
+            <tr>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${avatarHtml}
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: var(--text-main); display: flex; align-items: center; gap: 5px;">
+                                ${escapeHtml(c.employee_name)}
+                                <span style="font-size: 10px; background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 1px 4px; border-radius: 4px; font-family: monospace;">${escapeHtml(c.emp_code || '')}</span>
+                            </div>
+                            <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(c.designation || 'Staff')} • ${escapeHtml(c.department_name || 'General')}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11.5px; font-weight: 700; background: ${typeBadge.bg}; color: ${typeBadge.color};">
+                        ${typeBadge.label}
+                    </span>
+                    ${c.receipt_no ? `<div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">📄 ${escapeHtml(c.receipt_no)}</div>` : ''}
+                </td>
+                <td style="font-weight: 800; font-size: 13.5px; color: #059669;">
+                    PKR ${parseFloat(c.amount).toLocaleString()}
+                </td>
+                <td>
+                    <div style="font-size: 12px; font-weight: 600; color: var(--text-main);">${escapeHtml(c.claim_date)}</div>
+                    <div style="font-size: 11px; color: var(--primary); font-weight: 600;">Salary: ${escapeHtml(c.salary_month)}</div>
+                </td>
+                <td>
+                    <div style="font-size: 12px; color: var(--text-main); line-height: 1.4;">${escapeHtml(c.reason)}</div>
+                    ${c.action_by_name ? `<div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Action: ${escapeHtml(c.action_by_name)}</div>` : ''}
+                </td>
+                <td style="text-align: center;">
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: ${statBadge.bg}; color: ${statBadge.color};">
+                        ${statBadge.label}
+                    </span>
+                </td>
+                <td style="text-align: center;">
+                    <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+                        ${actionHtml}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+async function openAddClaimModal() {
+    await populateHrEmployeeDropdowns();
+    const today = new Date().toISOString().slice(0, 10);
+    const month = today.slice(0, 7);
+
+    const dateInput = document.getElementById('hr-claim-form-date');
+    const monthInput = document.getElementById('hr-claim-form-month');
+    const amountInput = document.getElementById('hr-claim-form-amount');
+    const receiptInput = document.getElementById('hr-claim-form-receipt');
+    const reasonInput = document.getElementById('hr-claim-form-reason');
+
+    if (dateInput) dateInput.value = today;
+    if (monthInput) monthInput.value = month;
+    if (amountInput) amountInput.value = '';
+    if (receiptInput) receiptInput.value = '';
+    if (reasonInput) reasonInput.value = '';
+
+    openModal('hr-add-claim-modal');
+}
+
+function updateClaimFormSalaryMonth() {
+    const dateVal = document.getElementById('hr-claim-form-date')?.value;
+    if (dateVal) {
+        const monthInput = document.getElementById('hr-claim-form-month');
+        if (monthInput) monthInput.value = dateVal.slice(0, 7);
+    }
+}
+
+async function handleSaveClaimSubmit(e) {
+    if (e) e.preventDefault();
+
+    const empId = document.getElementById('hr-claim-form-emp-id')?.value;
+    const claimType = document.getElementById('hr-claim-form-type')?.value || 'fuel';
+    const amount = parseFloat(document.getElementById('hr-claim-form-amount')?.value) || 0;
+    const claimDate = document.getElementById('hr-claim-form-date')?.value;
+    const salaryMonth = document.getElementById('hr-claim-form-month')?.value;
+    const receiptNo = document.getElementById('hr-claim-form-receipt')?.value.trim();
+    const reason = document.getElementById('hr-claim-form-reason')?.value.trim();
+    const autoApprove = document.getElementById('hr-claim-form-auto-approve')?.checked ? 1 : 0;
+
+    if (!empId || amount <= 0 || !reason) {
+        showToast("Please enter employee, valid amount, and purpose description.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'add_claim',
+                employee_id: empId,
+                claim_type: claimType,
+                amount: amount,
+                claim_date: claimDate,
+                salary_month: salaryMonth,
+                receipt_no: receiptNo,
+                reason: reason,
+                auto_approve: autoApprove
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message || "Allowance / Claim recorded successfully.", "success");
+            closeModal('hr-add-claim-modal');
+            await loadHrClaims();
+            // If payroll tab is active, refresh payroll too
+            if (typeof loadHrPayroll === 'function') loadHrPayroll();
+        } else {
+            showToast(data.message || "Failed to record claim.", "error");
+        }
+    } catch (err) {
+        showToast("Network error submitting claim.", "error");
+    }
+}
+
+async function handleUpdateClaimStatus(claimId, status) {
+    let adminNotes = '';
+    if (status === 'rejected') {
+        adminNotes = prompt("Enter reason for rejection (optional):") || '';
+    }
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'update_claim_status',
+                claim_id: claimId,
+                status: status,
+                admin_notes: adminNotes
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message || `Claim status updated to ${status}.`, "success");
+            await loadHrClaims();
+            if (typeof loadHrPayroll === 'function') loadHrPayroll();
+        } else {
+            showToast(data.message || "Failed to update claim status.", "error");
+        }
+    } catch (err) {
+        showToast("Network error updating claim status.", "error");
+    }
+}
+
+async function handleDeleteClaim(claimId) {
+    if (!confirm("Are you sure you want to delete this allowance / claim entry?")) return;
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete_claim', claim_id: claimId })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message || "Claim entry deleted.", "info");
+            await loadHrClaims();
+            if (typeof loadHrPayroll === 'function') loadHrPayroll();
+        } else {
+            showToast(data.message || "Failed to delete claim.", "error");
+        }
+    } catch (err) {
+        showToast("Network error deleting claim.", "error");
+    }
+}
+
+
+
 // ================= 3. COMPANY NOTICE BOARD =================
 
 async function loadHrNotices() {
@@ -1141,13 +1653,60 @@ async function loadHrNotices() {
 
         if (data.success) {
             HrState.notices = data.notices || [];
-            renderNoticesFeed(HrState.notices);
+            applyNoticesClientFilters();
         } else {
             feed.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 30px; grid-column: 1 / -1;">${escapeHtml(data.message || 'Error loading notices')}</div>`;
         }
     } catch (err) {
         feed.innerHTML = `<div style="text-align: center; color: #ef4444; padding: 30px; grid-column: 1 / -1;">Network error loading notices.</div>`;
     }
+}
+
+function applyNoticesClientFilters() {
+    const search = (document.getElementById('hr-notice-search')?.value || '').toLowerCase().trim();
+    const dept = (document.getElementById('hr-notice-dept-filter')?.value || '').toLowerCase().trim();
+    const priority = document.getElementById('hr-notice-priority-filter')?.value || 'all';
+
+    const resetBtn = document.getElementById('hr-notice-reset-filters-btn');
+    if (resetBtn) {
+        const isFiltered = !!(search || dept || priority !== 'all');
+        resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
+    }
+
+    let list = HrState.notices || [];
+
+    if (priority && priority !== 'all') {
+        list = list.filter(n => (n.priority || '').toLowerCase() === priority.toLowerCase());
+    }
+
+    if (dept) {
+        list = list.filter(n => {
+            const dName = (n.target_department_name || '').toLowerCase();
+            return !n.target_department_id || dName === dept || String(n.target_department_id) === dept;
+        });
+    }
+
+    if (search) {
+        list = list.filter(n => {
+            return (n.title && n.title.toLowerCase().includes(search)) ||
+                   (n.message && n.message.toLowerCase().includes(search)) ||
+                   (n.posted_by_name && n.posted_by_name.toLowerCase().includes(search));
+        });
+    }
+
+    const countLabel = document.getElementById('hr-notices-count-label');
+    if (countLabel) {
+        countLabel.textContent = `Showing ${list.length} notice(s)`;
+    }
+
+    renderNoticesFeed(list);
+}
+
+function resetNoticesFilters() {
+    if (document.getElementById('hr-notice-search')) document.getElementById('hr-notice-search').value = '';
+    if (document.getElementById('hr-notice-dept-filter')) document.getElementById('hr-notice-dept-filter').value = '';
+    if (document.getElementById('hr-notice-priority-filter')) document.getElementById('hr-notice-priority-filter').value = 'all';
+    applyNoticesClientFilters();
 }
 
 function renderNoticesFeed(notices) {
@@ -1319,13 +1878,62 @@ async function loadHrFines() {
             if (waivedCntEl) waivedCntEl.textContent = `${stats.waived_count || 0} forgiven penalties`;
             if (totalCntEl) totalCntEl.textContent = `${stats.total_fines || 0} Records`;
 
-            renderFinesTable(HrState.fines);
+            applyFinesClientFilters();
         } else {
             tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading fines')}</td></tr>`;
         }
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading fines.</td></tr>`;
     }
+}
+
+function applyFinesClientFilters() {
+    const search = (document.getElementById('hr-fines-search')?.value || '').toLowerCase().trim();
+    const dept = (document.getElementById('hr-fines-dept-filter')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('hr-fines-status-filter')?.value || 'all';
+    const cat = document.getElementById('hr-fines-cat-filter')?.value || 'all';
+    const month = document.getElementById('hr-fines-month-filter')?.value || '';
+    const empId = document.getElementById('hr-fines-emp-filter')?.value || '';
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const resetBtn = document.getElementById('hr-fines-reset-filters-btn');
+    if (resetBtn) {
+        const isFiltered = !!(search || dept || empId || status !== 'applied' || cat !== 'all' || (month && month !== currentMonth));
+        resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
+    }
+
+    let list = HrState.fines || [];
+
+    if (dept) {
+        list = list.filter(f => {
+            const dName = (f.department_name || '').toLowerCase();
+            return dName === dept || (f.department_id && String(f.department_id) === dept);
+        });
+    }
+
+    if (search) {
+        list = list.filter(f => {
+            return (f.employee_name && f.employee_name.toLowerCase().includes(search)) ||
+                   (f.reason && f.reason.toLowerCase().includes(search)) ||
+                   (f.fine_category && f.fine_category.toLowerCase().includes(search)) ||
+                   (f.department_name && f.department_name.toLowerCase().includes(search)) ||
+                   (f.status && f.status.toLowerCase().includes(search)) ||
+                   (f.amount && String(f.amount).includes(search));
+        });
+    }
+
+    renderFinesTable(list);
+}
+
+function resetFinesFilters() {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    if (document.getElementById('hr-fines-search')) document.getElementById('hr-fines-search').value = '';
+    if (document.getElementById('hr-fines-dept-filter')) document.getElementById('hr-fines-dept-filter').value = '';
+    if (document.getElementById('hr-fines-status-filter')) document.getElementById('hr-fines-status-filter').value = 'applied';
+    if (document.getElementById('hr-fines-cat-filter')) document.getElementById('hr-fines-cat-filter').value = 'all';
+    if (document.getElementById('hr-fines-month-filter')) document.getElementById('hr-fines-month-filter').value = currentMonth;
+    if (document.getElementById('hr-fines-emp-filter')) document.getElementById('hr-fines-emp-filter').value = '';
+    loadHrFines();
 }
 
 function renderFinesTable(fines) {
@@ -1442,8 +2050,8 @@ function renderFinesTable(fines) {
     tbody.innerHTML = html;
 }
 
-function openIssueFineModal() {
-    populateHrEmployeeDropdowns();
+async function openIssueFineModal() {
+    await populateHrEmployeeDropdowns();
     const today = new Date().toISOString().slice(0, 10);
     const currentMonth = today.slice(0, 7);
 
@@ -1589,7 +2197,12 @@ async function loadHrPayroll() {
     const tbody = document.getElementById('hr-payroll-table-body');
     if (!tbody) return;
 
-    const month = document.getElementById('hr-payroll-month')?.value || HrState.selectedMonth;
+    const currentYearMonth = new Date().toISOString().slice(0, 7);
+    const monthInput = document.getElementById('hr-payroll-month');
+    if (monthInput && !monthInput.value) {
+        monthInput.value = HrState.selectedMonth || currentYearMonth;
+    }
+    const month = monthInput?.value || HrState.selectedMonth || currentYearMonth;
 
     try {
         const res = await fetch(`api/hr.php?action=get_payroll&month=${encodeURIComponent(month)}`);
@@ -1597,13 +2210,128 @@ async function loadHrPayroll() {
 
         if (data.success) {
             HrState.payroll = data.payroll || [];
-            renderHrPayrollTable(HrState.payroll);
+            populatePayrollDeptFilter();
+            applyPayrollFilters();
         } else {
-            tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading payroll')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="14" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading payroll')}</td></tr>`;
+            updatePayrollSummaryStats([]);
         }
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading payroll records.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="14" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading payroll records.</td></tr>`;
+        updatePayrollSummaryStats([]);
     }
+}
+
+function populatePayrollDeptFilter() {
+    const filterDept = document.getElementById('hr-payroll-filter-dept');
+    if (!filterDept) return;
+
+    const currentVal = filterDept.value;
+    filterDept.innerHTML = '<option value="">🏢 All Departments</option>';
+
+    // Collect distinct departments from HrState.payroll
+    const depts = new Map();
+    (HrState.payroll || []).forEach(p => {
+        if (p.department_name) {
+            depts.set(p.department_name, (depts.get(p.department_name) || 0) + 1);
+        }
+    });
+
+    depts.forEach((count, name) => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = `🏢 ${name} (${count})`;
+        filterDept.appendChild(opt);
+    });
+
+    if (currentVal) filterDept.value = currentVal;
+}
+
+function resetPayrollFilters() {
+    if (document.getElementById('hr-payroll-search')) document.getElementById('hr-payroll-search').value = '';
+    if (document.getElementById('hr-payroll-filter-dept')) document.getElementById('hr-payroll-filter-dept').value = '';
+    if (document.getElementById('hr-payroll-filter-status')) document.getElementById('hr-payroll-filter-status').value = '';
+    if (document.getElementById('hr-payroll-filter-bank')) document.getElementById('hr-payroll-filter-bank').value = '';
+    applyPayrollFilters();
+}
+
+function updatePayrollSummaryStats(list) {
+    let totalGross = 0;
+    let totalDeductions = 0;
+    let totalNet = 0;
+
+    (list || []).forEach(p => {
+        const gross = parseFloat(p.basic_salary || 0) + parseFloat(p.fuel_allowance || 0) + parseFloat(p.incentive || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.bonus || 0);
+        const deductions = parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0) + parseFloat(p.fines || 0) + parseFloat(p.wht_amount || 0) + parseFloat(p.unpaid_leave_deduction || 0);
+        const net = parseFloat(p.net_salary || 0);
+
+        totalGross += gross;
+        totalDeductions += deductions;
+        totalNet += net;
+    });
+
+    const empCountEl = document.getElementById('payroll-stat-total-emp');
+    const grossEl = document.getElementById('payroll-stat-total-gross');
+    const dedEl = document.getElementById('payroll-stat-total-deductions');
+    const netEl = document.getElementById('payroll-stat-total-net');
+
+    if (empCountEl) empCountEl.textContent = (list || []).length;
+    if (grossEl) grossEl.textContent = `PKR ${totalGross.toLocaleString()}`;
+    if (dedEl) dedEl.textContent = `PKR ${totalDeductions.toLocaleString()}`;
+    if (netEl) netEl.textContent = `PKR ${totalNet.toLocaleString()}`;
+}
+
+function applyPayrollFilters() {
+    const search = (document.getElementById('hr-payroll-search')?.value || '').toLowerCase().trim();
+    const deptName = document.getElementById('hr-payroll-filter-dept')?.value;
+    const paymentStatus = document.getElementById('hr-payroll-filter-status')?.value;
+    const bankFilter = document.getElementById('hr-payroll-filter-bank')?.value;
+
+    // Toggle reset button visibility
+    const resetBtn = document.getElementById('hr-payroll-reset-filters-btn');
+    if (resetBtn) {
+        const isFiltered = !!(search || deptName || paymentStatus || bankFilter);
+        resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
+    }
+
+    let list = HrState.payroll || [];
+
+    if (deptName) {
+        list = list.filter(p => (p.department_name || '').toLowerCase() === deptName.toLowerCase());
+    }
+
+    if (paymentStatus) {
+        list = list.filter(p => (p.payment_status || 'draft') === paymentStatus);
+    }
+
+    if (bankFilter) {
+        if (bankFilter === 'Cash') {
+            list = list.filter(p => {
+                const b = (p.bank_name || '').toLowerCase();
+                const acc = (p.bank_account_no || '').toLowerCase();
+                return b === 'cash' || acc.includes('cash');
+            });
+        } else {
+            list = list.filter(p => (p.bank_name || '').toLowerCase().includes(bankFilter.toLowerCase()));
+        }
+    }
+
+    if (search) {
+        list = list.filter(p => 
+            (p.employee_name || '').toLowerCase().includes(search) ||
+            (p.emp_code || '').toLowerCase().includes(search) ||
+            (p.cnic_no || '').toLowerCase().includes(search) ||
+            (p.father_husband_name || '').toLowerCase().includes(search) ||
+            (p.designation || '').toLowerCase().includes(search) ||
+            (p.department_name || '').toLowerCase().includes(search) ||
+            (p.bank_name || '').toLowerCase().includes(search) ||
+            (p.bank_account_no || '').toLowerCase().includes(search) ||
+            (p.form_no || '').toLowerCase().includes(search)
+        );
+    }
+
+    updatePayrollSummaryStats(list);
+    renderHrPayrollTable(list);
 }
 
 function renderHrPayrollTable(payroll) {
@@ -1611,16 +2339,16 @@ function renderHrPayrollTable(payroll) {
     if (!tbody) return;
 
     if (!payroll || payroll.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 30px; color: var(--text-muted);">No staff records found for selected month.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="14" style="text-align: center; padding: 30px; color: var(--text-muted);">No staff records found for selected month.</td></tr>`;
         return;
     }
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.can_manage_hr);
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || AppState.currentUser.can_manage_hr);
 
     const statusBadges = {
-        draft: { label: 'Draft', bg: 'rgba(107, 114, 128, 0.1)', color: '#6b7280' },
-        approved: { label: 'Approved', bg: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' },
-        paid: { label: 'Paid ✅', bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981' }
+        draft: { label: 'Draft', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280' },
+        approved: { label: 'Approved', bg: 'rgba(59, 130, 246, 0.12)', color: '#2563eb' },
+        paid: { label: 'Paid ✅', bg: 'rgba(16, 185, 129, 0.15)', color: '#059669' }
     };
 
     let html = '';
@@ -1628,55 +2356,91 @@ function renderHrPayrollTable(payroll) {
         const stBadge = statusBadges[p.payment_status] || statusBadges.draft;
         const avatarInitial = p.employee_name ? p.employee_name.charAt(0).toUpperCase() : '👤';
         const avatarHtml = p.avatar
-            ? `<img src="${escapeHtml(p.avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" alt="${escapeHtml(p.employee_name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width:28px;height:28px;font-size:12px;\\'>${escapeHtml(avatarInitial)}</div>';">`
-            : `<div class="user-avatar" style="width: 28px; height: 28px; font-size: 12px;">${escapeHtml(avatarInitial)}</div>`;
+            ? `<img src="${escapeHtml(p.avatar)}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(p.employee_name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width:30px;height:30px;font-size:12px;\\'>${escapeHtml(avatarInitial)}</div>';">`
+            : `<div class="user-avatar" style="width: 30px; height: 30px; font-size: 12px; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
+
+        const empCode = p.emp_code || `DP-${String(p.employee_id).padStart(3, '0')}`;
+
+        const paidLeaves = parseFloat(p.approved_leaves || 0);
+        const unpaidLeaves = parseFloat(p.unpaid_leaves || 0);
+        const unpaidDeduction = parseFloat(p.unpaid_leave_deduction || 0);
+
+        let leavesHtml = '<span style="color: var(--text-muted); font-size: 11.5px;">0 Leaves</span>';
+        if (paidLeaves > 0 || unpaidLeaves > 0) {
+            let unpaidLabel = '';
+            if (unpaidLeaves > 0) {
+                if (unpaidDeduction > 0) {
+                    unpaidLabel = `<div style="font-weight: 700; color: #dc2626; font-size: 11px;" title="Unpaid Leave Deducted: PKR ${unpaidDeduction.toLocaleString()}">⚠️ ${unpaidLeaves} Unpaid (-${unpaidDeduction.toLocaleString()})</div>`;
+                } else {
+                    unpaidLabel = `<div style="font-weight: 700; color: #059669; font-size: 11px;" title="Unpaid Leave Waived / Excused by HR (0 PKR deduction)">⚠️ ${unpaidLeaves} Unpaid (Excused)</div>`;
+                }
+            }
+            leavesHtml = `
+                ${paidLeaves > 0 ? `<div style="font-weight: 700; color: #059669; font-size: 11.5px;">🌴 ${paidLeaves} Paid</div>` : ''}
+                ${unpaidLabel}
+            `;
+        }
 
         html += `
-            <tr>
+            <tr ${isAdmin ? `onclick="openEditPayrollModalById(${p.employee_id})"` : ''} style="${isAdmin ? 'cursor: pointer;' : ''}" title="${isAdmin ? 'Click row to adjust payroll & deductions' : ''}">
                 <td>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         ${avatarHtml}
                         <div>
                             <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">${escapeHtml(p.employee_name)}</div>
-                            <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.designation || 'Staff')} • ${escapeHtml(p.department_name || 'General')}</div>
+                            <div style="font-size: 10.5px; color: var(--text-muted); font-family: monospace; font-weight: 600;">${escapeHtml(empCode)}</div>
                         </div>
                     </div>
                 </td>
-                <td style="text-align: center; font-weight: 700; color: #10b981;">
-                    ${p.present_days} / ${p.working_days}
+                <td>
+                    <div style="font-size: 12.5px; font-weight: 600; color: var(--text-main);">${escapeHtml(p.designation || 'Staff')}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.department_name || 'General')}</div>
                 </td>
-                <td style="text-align: center; font-weight: 600;">
-                    ${p.approved_leaves > 0 ? `<span style="color: #3b82f6;">${p.approved_leaves}d</span>` : '0'}
+                <td>
+                    <div style="font-size: 12px; font-weight: 600; color: var(--text-main);">${escapeHtml(p.father_husband_name || '--')}</div>
+                    <div style="font-size: 10.5px; color: var(--text-muted); font-family: monospace;">${escapeHtml(p.cnic_no || 'No CNIC')}</div>
                 </td>
-                <td style="text-align: center; font-weight: 600; font-size: 12px;">
-                    ${p.total_duty_hours} hrs
+                <td style="text-align: center;">
+                    ${leavesHtml}
                 </td>
-                <td style="font-size: 12.5px; font-weight: 600;">
+                <td style="font-size: 12.5px; font-weight: 700; color: var(--text-main);">
                     PKR ${parseFloat(p.basic_salary).toLocaleString()}
                 </td>
-                <td style="font-size: 12.5px; color: #10b981; font-weight: 600;">
-                    ${p.bonus > 0 ? `+${parseFloat(p.bonus).toLocaleString()}` : '0'}
+                <td style="font-size: 12px; font-weight: 600; color: #0284c7;">
+                    ${parseFloat(p.fuel_allowance || 0) > 0 ? `+${parseFloat(p.fuel_allowance).toLocaleString()}` : '--'}
                 </td>
-                <td style="font-size: 12.5px; color: #ef4444; font-weight: 600;">
-                    ${p.deductions > 0 ? `-${parseFloat(p.deductions).toLocaleString()}` : '0'}
-                    ${p.auto_loan_deduction > 0 ? `<div style="font-size: 10px; color: #8b5cf6;">💳 Loan: ${parseFloat(p.auto_loan_deduction).toLocaleString()}</div>` : ''}
+                <td style="font-size: 12px; font-weight: 600; color: #059669;">
+                    ${(parseFloat(p.incentive || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.bonus || 0)) > 0 ? `+${(parseFloat(p.incentive || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.bonus || 0)).toLocaleString()}` : '--'}
+                    ${parseFloat(p.food_bills || 0) > 0 ? `<div style="font-size: 10px; color: #16a34a;">🍲 Food: ${parseFloat(p.food_bills).toLocaleString()}</div>` : ''}
                 </td>
-                <td style="font-size: 12.5px; color: #ef4444; font-weight: 600;">
-                    ${p.fines > 0 ? `-${parseFloat(p.fines).toLocaleString()}` : '0'}
-                    ${p.fine_reason ? `<div style="font-size: 10px; color: #ef4444; white-space: normal; max-width: 140px;">⚠️ ${escapeHtml(p.fine_reason)}</div>` : ''}
+                <td style="font-size: 12px; font-weight: 600; color: #dc2626;">
+                    ${(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0)) > 0 ? `-${(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0)).toLocaleString()}` : '--'}
+                    ${parseFloat(p.advance_salary || 0) > 0 ? `<div style="font-size: 10px; color: #b91c1c;">Adv: ${parseFloat(p.advance_salary).toLocaleString()}</div>` : ''}
+                    ${parseFloat(p.loan_deduction || 0) > 0 ? `<div style="font-size: 10px; color: #7c3aed;">Loan: ${parseFloat(p.loan_deduction).toLocaleString()}</div>` : ''}
                 </td>
-                <td style="font-size: 13.5px; font-weight: 800; color: #10b981;">
+                <td style="font-size: 12px; color: #dc2626; font-weight: 600;" title="${p.fine_reason ? escapeHtml(p.fine_reason) : ''}">
+                    ${parseFloat(p.fines || 0) > 0 ? `-${parseFloat(p.fines).toLocaleString()}` : '--'}
+                </td>
+                <td style="font-size: 12px; color: #d97706; font-weight: 600;">
+                    ${parseFloat(p.wht_amount || 0) > 0 ? `-${parseFloat(p.wht_amount).toLocaleString()}` : '--'}
+                </td>
+                <td style="font-size: 13.5px; font-weight: 800; color: #059669;">
                     PKR ${parseFloat(p.net_salary).toLocaleString()}
+                    ${parseFloat(p.paid_amount || 0) > 0 ? `<div style="font-size: 10.5px; color: #2563eb; font-weight: 600;">Paid: PKR ${parseFloat(p.paid_amount).toLocaleString()}</div>` : ''}
+                </td>
+                <td>
+                    <div style="font-size: 11.5px; font-weight: 700; color: var(--text-main);">🏦 ${escapeHtml(p.bank_name || 'UBL')}</div>
+                    <div style="font-size: 10.5px; color: var(--text-muted); font-family: monospace;">${escapeHtml(p.bank_account_no || 'Cash')}</div>
+                    ${p.form_no ? `<div style="font-size: 10.5px; color: var(--primary); font-weight: 600;">📄 Form #${escapeHtml(p.form_no)}</div>` : ''}
                 </td>
                 <td style="text-align: center;">
                     <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: ${stBadge.bg}; color: ${stBadge.color};">
                         ${stBadge.label}
                     </span>
                 </td>
-                <td style="text-align: center;">
-                    <div style="display: flex; gap: 4px; justify-content: center;">
-                        ${isAdmin ? `<button type="button" class="btn btn-outline" style="padding: 3px 6px; font-size: 11px;" onclick='openEditPayrollModal(${JSON.stringify(p)})' title="Edit Adjustments">✏️</button>` : ''}
-                        <button type="button" class="btn btn-outline" style="padding: 3px 6px; font-size: 11px;" onclick='printSalarySlip(${JSON.stringify(p)})' title="Print Pay Slip">🖨️ Slip</button>
+                <td style="text-align: right;">
+                    <div style="display: flex; gap: 4px; justify-content: flex-end;">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px;" onclick='event.stopPropagation(); printSalarySlip(HrState.payroll.find(x => x.employee_id == ${p.employee_id}))' title="Print Detailed Pay Slip">🖨️</button>
                     </div>
                 </td>
             </tr>
@@ -1686,53 +2450,181 @@ function renderHrPayrollTable(payroll) {
     tbody.innerHTML = html;
 }
 
-function openEditPayrollModal(item) {
-    document.getElementById('hr-pay-emp-id').value = item.employee_id;
-    document.getElementById('hr-pay-month').value = item.salary_month;
-    document.getElementById('hr-pay-emp-name-display').textContent = item.employee_name;
-    document.getElementById('hr-pay-month-display').textContent = `Month: ${item.salary_month} (${item.present_days} days present, ${item.total_duty_hours} hrs duty)`;
-
-    document.getElementById('hr-pay-basic-salary').value = item.basic_salary;
-    document.getElementById('hr-pay-bonus').value = item.bonus || 0;
-    document.getElementById('hr-pay-deductions').value = item.deductions || 0;
-    document.getElementById('hr-pay-fines').value = item.fines || 0;
-    document.getElementById('hr-pay-bonus-reason').value = item.bonus_reason || '';
-    document.getElementById('hr-pay-deduction-reason').value = item.deduction_reason || '';
-    document.getElementById('hr-pay-fine-reason').value = item.fine_reason || '';
-    document.getElementById('hr-pay-status').value = item.payment_status || 'draft';
-    document.getElementById('hr-pay-method').value = item.payment_method || 'Bank Transfer';
-
-    calculateModalNetSalary();
-    openModal('hr-edit-payroll-modal');
-}
-
-function calculateModalNetSalary() {
-    const basic = parseFloat(document.getElementById('hr-pay-basic-salary')?.value) || 0;
-    const bonus = parseFloat(document.getElementById('hr-pay-bonus')?.value) || 0;
-    const deductions = parseFloat(document.getElementById('hr-pay-deductions')?.value) || 0;
-    const fines = parseFloat(document.getElementById('hr-pay-fines')?.value) || 0;
-    const net = Math.max(0, basic + bonus - deductions - fines);
-
-    const netDisplay = document.getElementById('hr-pay-net-salary-display');
-    if (netDisplay) {
-        netDisplay.textContent = `PKR ${net.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function openEditPayrollModalById(empId) {
+    const item = (HrState.payroll || []).find(p => p.employee_id == empId);
+    if (item) {
+        openEditPayrollModal(item);
     }
 }
 
-async function handleSavePayrollItemSubmit(e) {
+function openEditPayrollModal(item) {
+    document.getElementById('edit-pr-employee-id').value = item.employee_id;
+    document.getElementById('edit-pr-salary-month').value = item.salary_month;
+    document.getElementById('edit-pr-working-days').value = item.working_days || 30;
+    document.getElementById('edit-pr-present-days').value = item.present_days || 0;
+    document.getElementById('edit-pr-approved-leaves').value = item.approved_leaves || 0;
+    document.getElementById('edit-pr-unpaid-leaves').value = item.unpaid_leaves || 0;
+    document.getElementById('edit-pr-duty-hours').value = item.total_duty_hours || 0;
+
+    const empCode = item.emp_code || `DP-${String(item.employee_id).padStart(3, '0')}`;
+    document.getElementById('edit-pr-emp-display').textContent = `${item.employee_name} (${empCode})`;
+    document.getElementById('edit-pr-meta-display').textContent = `${item.designation || 'Staff'} • ${item.department_name || 'General'} | Bank: ${item.bank_name || 'UBL'} (${item.bank_account_no || 'Cash'}) | CNIC: ${item.cnic_no || 'N/A'}`;
+    document.getElementById('edit-pr-month-display').textContent = `Month: ${item.salary_month}`;
+    document.getElementById('edit-pr-days-display').textContent = `${item.working_days || 30} Days (${item.present_days || 0} Present, ${item.approved_leaves || 0} Paid Leaves, ${item.unpaid_leaves || 0} Unpaid Leaves, ${item.total_duty_hours || 0}h Duty)`;
+
+    document.getElementById('edit-pr-basic-salary').value = item.basic_salary || 0;
+    document.getElementById('edit-pr-fuel').value = item.fuel_allowance || 0;
+    document.getElementById('edit-pr-incentive').value = item.incentive || 0;
+    document.getElementById('edit-pr-food-bills').value = item.food_bills || 0;
+    document.getElementById('edit-pr-bonus').value = item.bonus || 0;
+    document.getElementById('edit-pr-bonus-reason').value = item.bonus_reason || '';
+
+    // Calculate / populate unpaid leave deduction
+    const basic = parseFloat(item.basic_salary || 0);
+    const unpaidLeaves = parseFloat(item.unpaid_leaves || 0);
+    const dailyRate = basic > 0 ? (basic / 30.0) : 0;
+    const autoUnpaidDed = unpaidLeaves > 0 ? (Math.round((unpaidLeaves * dailyRate) * 100) / 100) : 0;
+
+    let unpaidDedVal = autoUnpaidDed;
+    let isWaived = false;
+    if (item.unpaid_leave_deduction !== null && item.unpaid_leave_deduction !== undefined && item.unpaid_leave_deduction !== '') {
+        unpaidDedVal = parseFloat(item.unpaid_leave_deduction);
+        if (unpaidDedVal === 0 && unpaidLeaves > 0) {
+            isWaived = true;
+        }
+    }
+    const unpaidInput = document.getElementById('edit-pr-unpaid-deduction');
+    if (unpaidInput) {
+        unpaidInput.value = unpaidDedVal.toFixed(2);
+        unpaidInput.dataset.autoAmount = autoUnpaidDed.toFixed(2);
+    }
+
+    const waiveCheckbox = document.getElementById('edit-pr-waive-unpaid');
+    if (waiveCheckbox) {
+        waiveCheckbox.checked = isWaived;
+    }
+
+    const labelEl = document.getElementById('edit-pr-unpaid-label');
+    if (labelEl) {
+        labelEl.textContent = unpaidLeaves > 0 ? `Unpaid Leaves (${unpaidLeaves})` : 'Unpaid Leaves (0)';
+    }
+
+    document.getElementById('edit-pr-advance').value = item.advance_salary || 0;
+    document.getElementById('edit-pr-loan').value = item.loan_deduction || 0;
+    document.getElementById('edit-pr-wht').value = item.wht_amount || 0;
+    document.getElementById('edit-pr-fines').value = item.fines || 0;
+    document.getElementById('edit-pr-fine-reason').value = item.fine_reason || '';
+    document.getElementById('edit-pr-deductions').value = item.deductions || 0;
+    document.getElementById('edit-pr-deduction-reason').value = item.deduction_reason || '';
+
+    document.getElementById('edit-pr-form-no').value = item.form_no || '';
+    document.getElementById('edit-pr-paid-amount').value = item.paid_amount || 0;
+    document.getElementById('edit-pr-payment-method').value = item.payment_method || 'Bank Transfer';
+    document.getElementById('edit-pr-payment-status').value = item.payment_status || 'draft';
+    document.getElementById('edit-pr-payment-date').value = item.payment_date || '';
+    document.getElementById('edit-pr-remarks').value = item.increment_remarks || '';
+
+    calculatePayrollModalTotals();
+    openModal('edit-payroll-modal');
+}
+
+function toggleWaiveUnpaidDeduction() {
+    const waiveCheckbox = document.getElementById('edit-pr-waive-unpaid');
+    const input = document.getElementById('edit-pr-unpaid-deduction');
+    if (!input || !waiveCheckbox) return;
+
+    if (waiveCheckbox.checked) {
+        input.value = '0.00';
+    } else {
+        const autoAmt = parseFloat(input.dataset.autoAmount || 0);
+        input.value = autoAmt.toFixed(2);
+    }
+    calculatePayrollModalTotals();
+}
+
+function handleUnpaidDeductionManualInput() {
+    const input = document.getElementById('edit-pr-unpaid-deduction');
+    const waiveCheckbox = document.getElementById('edit-pr-waive-unpaid');
+    if (!input || !waiveCheckbox) return;
+
+    const val = parseFloat(input.value) || 0;
+    const unpaidLeaves = parseFloat(document.getElementById('edit-pr-unpaid-leaves')?.value) || 0;
+
+    if (val === 0 && unpaidLeaves > 0) {
+        waiveCheckbox.checked = true;
+    } else {
+        waiveCheckbox.checked = false;
+    }
+    calculatePayrollModalTotals();
+}
+
+function calculatePayrollModalTotals() {
+    const basic = parseFloat(document.getElementById('edit-pr-basic-salary')?.value) || 0;
+    const fuel = parseFloat(document.getElementById('edit-pr-fuel')?.value) || 0;
+    const incentive = parseFloat(document.getElementById('edit-pr-incentive')?.value) || 0;
+    const food = parseFloat(document.getElementById('edit-pr-food-bills')?.value) || 0;
+    const bonus = parseFloat(document.getElementById('edit-pr-bonus')?.value) || 0;
+
+    const unpaidDed = parseFloat(document.getElementById('edit-pr-unpaid-deduction')?.value) || 0;
+    const advance = parseFloat(document.getElementById('edit-pr-advance')?.value) || 0;
+    const loan = parseFloat(document.getElementById('edit-pr-loan')?.value) || 0;
+    const wht = parseFloat(document.getElementById('edit-pr-wht')?.value) || 0;
+    const fines = parseFloat(document.getElementById('edit-pr-fines')?.value) || 0;
+    const otherDed = parseFloat(document.getElementById('edit-pr-deductions')?.value) || 0;
+
+    const paid = parseFloat(document.getElementById('edit-pr-paid-amount')?.value) || 0;
+
+    const totalAdditions = fuel + incentive + food + bonus;
+    const totalDeductions = advance + loan + wht + fines + unpaidDed + otherDed;
+    const netSalary = Math.max(0, basic + totalAdditions - totalDeductions);
+    const payable = Math.max(0, netSalary - paid);
+
+    const addEl = document.getElementById('modal-calc-additions');
+    if (addEl) addEl.textContent = `PKR ${totalAdditions.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+    const dedEl = document.getElementById('modal-calc-deductions');
+    if (dedEl) dedEl.textContent = `PKR ${totalDeductions.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+    const netEl = document.getElementById('modal-calc-net');
+    if (netEl) netEl.textContent = `PKR ${netSalary.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+    const payEl = document.getElementById('modal-calc-payable');
+    if (payEl) payEl.textContent = `PKR ${payable.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+async function handleSavePayrollItem(e) {
     if (e) e.preventDefault();
 
-    const empId = document.getElementById('hr-pay-emp-id')?.value;
-    const month = document.getElementById('hr-pay-month')?.value;
-    const basic = document.getElementById('hr-pay-basic-salary')?.value;
-    const bonus = document.getElementById('hr-pay-bonus')?.value;
-    const deductions = document.getElementById('hr-pay-deductions')?.value;
-    const fines = document.getElementById('hr-pay-fines')?.value;
-    const bonusReason = document.getElementById('hr-pay-bonus-reason')?.value.trim();
-    const deductionReason = document.getElementById('hr-pay-deduction-reason')?.value.trim();
-    const fineReason = document.getElementById('hr-pay-fine-reason')?.value.trim();
-    const status = document.getElementById('hr-pay-status')?.value;
-    const method = document.getElementById('hr-pay-method')?.value.trim();
+    const empId = document.getElementById('edit-pr-employee-id')?.value;
+    const month = document.getElementById('edit-pr-salary-month')?.value;
+    const workingDays = document.getElementById('edit-pr-working-days')?.value;
+    const presentDays = document.getElementById('edit-pr-present-days')?.value;
+    const approvedLeaves = document.getElementById('edit-pr-approved-leaves')?.value;
+    const unpaidLeaves = document.getElementById('edit-pr-unpaid-leaves')?.value;
+    const dutyHours = document.getElementById('edit-pr-duty-hours')?.value;
+
+    const basicSalary = document.getElementById('edit-pr-basic-salary')?.value;
+    const fuelAllowance = document.getElementById('edit-pr-fuel')?.value;
+    const incentive = document.getElementById('edit-pr-incentive')?.value;
+    const foodBills = document.getElementById('edit-pr-food-bills')?.value;
+    const bonus = document.getElementById('edit-pr-bonus')?.value;
+    const bonusReason = document.getElementById('edit-pr-bonus-reason')?.value.trim();
+
+    const unpaidLeaveDeduction = document.getElementById('edit-pr-unpaid-deduction')?.value;
+    const advanceSalary = document.getElementById('edit-pr-advance')?.value;
+    const loanDeduction = document.getElementById('edit-pr-loan')?.value;
+    const whtAmount = document.getElementById('edit-pr-wht')?.value;
+    const fines = document.getElementById('edit-pr-fines')?.value;
+    const fineReason = document.getElementById('edit-pr-fine-reason')?.value.trim();
+    const deductions = document.getElementById('edit-pr-deductions')?.value;
+    const deductionReason = document.getElementById('edit-pr-deduction-reason')?.value.trim();
+
+    const formNo = document.getElementById('edit-pr-form-no')?.value.trim();
+    const paidAmount = document.getElementById('edit-pr-paid-amount')?.value;
+    const paymentMethod = document.getElementById('edit-pr-payment-method')?.value;
+    const paymentStatus = document.getElementById('edit-pr-payment-status')?.value;
+    const paymentDate = document.getElementById('edit-pr-payment-date')?.value;
+    const incrementRemarks = document.getElementById('edit-pr-remarks')?.value.trim();
 
     try {
         const res = await fetch('api/hr.php', {
@@ -1742,68 +2634,113 @@ async function handleSavePayrollItemSubmit(e) {
                 action: 'save_payroll_item',
                 employee_id: empId,
                 salary_month: month,
-                basic_salary: basic,
+                working_days: workingDays,
+                present_days: presentDays,
+                approved_leaves: approvedLeaves,
+                unpaid_leaves: unpaidLeaves,
+                unpaid_leave_deduction: unpaidLeaveDeduction,
+                total_duty_hours: dutyHours,
+                basic_salary: basicSalary,
+                fuel_allowance: fuelAllowance,
+                incentive: incentive,
+                food_bills: foodBills,
                 bonus: bonus,
-                deductions: deductions,
-                fines: fines,
                 bonus_reason: bonusReason,
-                deduction_reason: deductionReason,
+                advance_salary: advanceSalary,
+                loan_deduction: loanDeduction,
+                fines: fines,
                 fine_reason: fineReason,
-                payment_status: status,
-                payment_method: method
+                wht_amount: whtAmount,
+                deductions: deductions,
+                deduction_reason: deductionReason,
+                form_no: formNo,
+                paid_amount: paidAmount,
+                payment_method: paymentMethod,
+                payment_status: paymentStatus,
+                payment_date: paymentDate,
+                increment_remarks: incrementRemarks
             })
         });
         const data = await res.json();
 
         if (data.success) {
-            showToast("Payroll adjustment saved successfully.", "success");
-            closeModal('hr-edit-payroll-modal');
+            showToast("Payroll record & breakdown saved successfully!", "success");
+            closeModal('edit-payroll-modal');
             await loadHrPayroll();
         } else {
-            showToast(data.message || "Failed to save adjustments.", "error");
+            showToast(data.message || "Failed to save payroll record.", "error");
         }
     } catch (err) {
-        showToast("Network error saving payroll.", "error");
+        showToast("Network error saving payroll adjustments.", "error");
     }
 }
 
 function printSalarySlip(item) {
-    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    const printWindow = window.open('', '_blank', 'width=840,height=960');
     if (!printWindow) {
         showToast("Please allow popups to view and print salary slips.", "error");
         return;
     }
 
     const monthName = new Date(item.salary_month + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const empCode = item.emp_code || `DP-${String(item.employee_id).padStart(3, '0')}`;
+
+    const basicSalary = parseFloat(item.basic_salary || 0);
+    const fuel = parseFloat(item.fuel_allowance || 0);
+    const incentive = parseFloat(item.incentive || 0);
+    const foodBills = parseFloat(item.food_bills || 0);
+    const bonus = parseFloat(item.bonus || 0);
+
+    const unpaidDed = parseFloat(item.unpaid_leave_deduction || 0);
+    const unpaidLeaves = parseFloat(item.unpaid_leaves || 0);
+    const advance = parseFloat(item.advance_salary || 0);
+    const loan = parseFloat(item.loan_deduction || 0);
+    const fines = parseFloat(item.fines || 0);
+    const wht = parseFloat(item.wht_amount || 0);
+    const deductions = parseFloat(item.deductions || 0);
+
+    const totalAdditions = fuel + incentive + foodBills + bonus;
+    const totalDeductions = advance + loan + fines + wht + unpaidDed + deductions;
+    const netSalary = Math.max(0, basicSalary + totalAdditions - totalDeductions);
+    const paidAmount = parseFloat(item.paid_amount || 0);
+    const payableAmount = Math.max(0, netSalary - paidAmount);
 
     const slipHtml = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Salary Pay Slip - ${escapeHtml(item.employee_name)} - ${monthName}</title>
+        <title>Salary Pay Slip - ${escapeHtml(item.employee_name)} (${escapeHtml(empCode)}) - ${monthName}</title>
         <style>
             * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
-            body { padding: 40px; color: #1e293b; background: #fff; }
-            .slip-card { max-width: 720px; margin: 0 auto; border: 2px solid #0f172a; padding: 30px; border-radius: 8px; }
-            .header { text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 20px; }
-            .header h1 { font-size: 22px; text-transform: uppercase; letter-spacing: 1px; color: #0284c7; }
-            .header p { font-size: 13px; color: #64748b; margin-top: 4px; }
-            .badge-month { display: inline-block; background: #f1f5f9; padding: 4px 14px; border-radius: 20px; font-weight: 700; font-size: 13px; margin-top: 8px; border: 1px solid #cbd5e1; }
-            .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-            .meta-box { background: #f8fafc; padding: 12px 16px; border-radius: 6px; border: 1px solid #e2e8f0; }
-            .meta-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+            body { padding: 30px; color: #0f172a; background: #fff; }
+            .slip-card { max-width: 760px; margin: 0 auto; border: 2px solid #0f172a; padding: 25px 30px; border-radius: 8px; }
+            .header { text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 18px; }
+            .header h1 { font-size: 24px; text-transform: uppercase; letter-spacing: 1px; color: #0284c7; font-weight: 800; }
+            .header p { font-size: 13px; color: #64748b; margin-top: 3px; font-weight: 600; }
+            .badge-month { display: inline-block; background: #f1f5f9; padding: 4px 16px; border-radius: 20px; font-weight: 700; font-size: 13px; margin-top: 8px; border: 1px solid #cbd5e1; color: #0369a1; }
+            
+            .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+            .meta-box { background: #f8fafc; padding: 12px 14px; border-radius: 6px; border: 1px solid #e2e8f0; }
+            .meta-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12.5px; }
             .meta-label { color: #64748b; font-weight: 600; }
             .meta-val { font-weight: 700; color: #0f172a; }
-            .table-box { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
-            .table-box th, .table-box td { border: 1px solid #cbd5e1; padding: 10px 14px; font-size: 13px; }
+
+            .table-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+            .table-box { width: 100%; border-collapse: collapse; }
+            .table-box th, .table-box td { border: 1px solid #cbd5e1; padding: 8px 12px; font-size: 12.5px; }
             .table-box th { background: #f1f5f9; font-weight: 700; text-align: left; }
             .table-box td.amount { text-align: right; font-weight: 700; }
-            .net-box { background: #ecfdf5; border: 2px solid #10b981; padding: 14px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 35px; }
+            
+            .net-box { background: #ecfdf5; border: 2px solid #10b981; padding: 14px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
             .net-title { font-size: 15px; font-weight: 800; color: #065f46; }
-            .net-amount { font-size: 20px; font-weight: 800; color: #047857; }
-            .sig-row { display: flex; justify-content: space-between; margin-top: 60px; padding: 0 20px; }
-            .sig-line { width: 200px; border-top: 1.5px solid #475569; text-align: center; padding-top: 6px; font-size: 12px; font-weight: 700; color: #475569; }
+            .net-amount { font-size: 22px; font-weight: 800; color: #047857; }
+
+            .remarks-box { background: #fefce8; border: 1px dashed #ca8a04; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #854d0e; margin-bottom: 24px; }
+            
+            .sig-row { display: flex; justify-content: space-between; margin-top: 45px; padding: 0 15px; }
+            .sig-line { width: 190px; border-top: 1.5px solid #475569; text-align: center; padding-top: 6px; font-size: 11.5px; font-weight: 700; color: #475569; }
+            
             @media print {
                 body { padding: 0; }
                 .slip-card { border: none; padding: 0; }
@@ -1815,61 +2752,144 @@ function printSalarySlip(item) {
         <div class="slip-card">
             <div class="header">
                 <h1>Discover Pakistan HD TV</h1>
-                <p>Digital Media & Operations Department • Official Salary Pay Slip</p>
-                <div class="badge-month">Salary Month: ${monthName}</div>
+                <p>Digital Media & Satellite Operations • Official Monthly Salary Slip</p>
+                <div class="badge-month">Salary Month: ${monthName} ${item.form_no ? `• Form #${escapeHtml(item.form_no)}` : ''}</div>
             </div>
 
-            <div class="grid-2">
+            <div class="meta-grid">
                 <div class="meta-box">
+                    <div class="meta-row"><span class="meta-label">Employee Code:</span><span class="meta-val">${escapeHtml(empCode)}</span></div>
                     <div class="meta-row"><span class="meta-label">Employee Name:</span><span class="meta-val">${escapeHtml(item.employee_name)}</span></div>
+                    <div class="meta-row"><span class="meta-label">Father / Husband:</span><span class="meta-val">${escapeHtml(item.father_husband_name || '--')}</span></div>
+                    <div class="meta-row"><span class="meta-label">CNIC Number:</span><span class="meta-val">${escapeHtml(item.cnic_no || '--')}</span></div>
                     <div class="meta-row"><span class="meta-label">Designation:</span><span class="meta-val">${escapeHtml(item.designation || 'Staff Member')}</span></div>
                     <div class="meta-row"><span class="meta-label">Department:</span><span class="meta-val">${escapeHtml(item.department_name || 'General')}</span></div>
                 </div>
                 <div class="meta-box">
-                    <div class="meta-row"><span class="meta-label">Present Days:</span><span class="meta-val">${item.present_days} / ${item.working_days} Days</span></div>
-                    <div class="meta-row"><span class="meta-label">Approved Leaves:</span><span class="meta-val">${item.approved_leaves} Day(s)</span></div>
-                    <div class="meta-row"><span class="meta-label">Duty Hours:</span><span class="meta-val">${item.total_duty_hours} Hours</span></div>
+                    <div class="meta-row"><span class="meta-label">Joining Date:</span><span class="meta-val">${escapeHtml(item.joining_date || '--')}</span></div>
+                    <div class="meta-row"><span class="meta-label">Working / Present:</span><span class="meta-val">${item.present_days} / ${item.working_days} Days</span></div>
+                    <div class="meta-row"><span class="meta-label">Leaves:</span><span class="meta-val">${item.approved_leaves || 0} Paid, ${item.unpaid_leaves || 0} Unpaid</span></div>
+                    <div class="meta-row"><span class="meta-label">Duty Hours:</span><span class="meta-val">${item.total_duty_hours || 0} Hours</span></div>
+                    <div class="meta-row"><span class="meta-label">Bank Name:</span><span class="meta-val">${escapeHtml(item.bank_name || 'UBL')}</span></div>
+                    <div class="meta-row"><span class="meta-label">Account / IBAN:</span><span class="meta-val">${escapeHtml(item.bank_account_no || 'Cash / Direct')}</span></div>
                 </div>
             </div>
 
-            <table class="table-box">
-                <thead>
-                    <tr>
-                        <th>Earnings & Deductions Summary</th>
-                        <th style="width: 30%; text-align: right;">Amount (PKR)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Basic Salary</td>
-                        <td class="amount">PKR ${parseFloat(item.basic_salary).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    </tr>
-                    ${item.bonus > 0 ? `
-                    <tr>
-                        <td>Bonus / Performance Incentive ${item.bonus_reason ? `(${escapeHtml(item.bonus_reason)})` : ''}</td>
-                        <td class="amount" style="color: #059669;">+ PKR ${parseFloat(item.bonus).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    </tr>` : ''}
-                    ${item.deductions > 0 ? `
-                    <tr>
-                        <td>Loan / Advance Deductions ${item.deduction_reason ? `(${escapeHtml(item.deduction_reason)})` : ''}</td>
-                        <td class="amount" style="color: #dc2626;">- PKR ${parseFloat(item.deductions).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    </tr>` : ''}
-                    ${item.fines > 0 ? `
-                    <tr>
-                        <td>Disciplinary Fines & Penalties ${item.fine_reason ? `(${escapeHtml(item.fine_reason)})` : ''}</td>
-                        <td class="amount" style="color: #dc2626;">- PKR ${parseFloat(item.fines).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    </tr>` : ''}
-                </tbody>
-            </table>
+            <div class="table-split">
+                <!-- Earnings -->
+                <table class="table-box">
+                    <thead>
+                        <tr>
+                            <th>➕ Earnings & Allowances</th>
+                            <th style="width: 35%; text-align: right;">Amount (PKR)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Basic / Gross Salary</td>
+                            <td class="amount">${basicSalary.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                        ${fuel > 0 ? `
+                        <tr>
+                            <td>Fuel / Travel / Mobile Allowance</td>
+                            <td class="amount" style="color: #0284c7;">+${fuel.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        ${incentive > 0 ? `
+                        <tr>
+                            <td>Incentive / Performance</td>
+                            <td class="amount" style="color: #059669;">+${incentive.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        ${foodBills > 0 ? `
+                        <tr>
+                            <td>Food Bills Reimbursement</td>
+                            <td class="amount" style="color: #059669;">+${foodBills.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        ${bonus > 0 ? `
+                        <tr>
+                            <td>Bonus ${item.bonus_reason ? `(${escapeHtml(item.bonus_reason)})` : ''}</td>
+                            <td class="amount" style="color: #059669;">+${bonus.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        <tr style="background: #f8fafc; font-weight: 800;">
+                            <td>Total Gross Earnings</td>
+                            <td class="amount" style="color: #059669;">PKR ${(basicSalary + totalAdditions).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- Deductions -->
+                <table class="table-box">
+                    <thead>
+                        <tr>
+                            <th>➖ Deductions & Taxes</th>
+                            <th style="width: 35%; text-align: right;">Amount (PKR)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${unpaidDed > 0 ? `
+                        <tr>
+                            <td>Unpaid Leave Deduction (${unpaidLeaves} day${unpaidLeaves > 1 ? 's' : ''})</td>
+                            <td class="amount" style="color: #dc2626;">-${unpaidDed.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : (unpaidLeaves > 0 ? `
+                        <tr>
+                            <td>Unpaid Leaves (${unpaidLeaves} day${unpaidLeaves > 1 ? 's' : ''})</td>
+                            <td class="amount" style="color: #059669;">Excused / 0.00</td>
+                        </tr>` : '')}
+                        ${advance > 0 ? `
+                        <tr>
+                            <td>Advance Salary Deduction</td>
+                            <td class="amount" style="color: #dc2626;">-${advance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        ${loan > 0 ? `
+                        <tr>
+                            <td>Loan Installment</td>
+                            <td class="amount" style="color: #dc2626;">-${loan.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        ${fines > 0 ? `
+                        <tr>
+                            <td>Disciplinary Fines ${item.fine_reason ? `(${escapeHtml(item.fine_reason)})` : ''}</td>
+                            <td class="amount" style="color: #dc2626;">-${fines.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        ${wht > 0 ? `
+                        <tr>
+                            <td>WHT / Income Tax</td>
+                            <td class="amount" style="color: #dc2626;">-${wht.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        ${deductions > 0 ? `
+                        <tr>
+                            <td>Other Deductions ${item.deduction_reason ? `(${escapeHtml(item.deduction_reason)})` : ''}</td>
+                            <td class="amount" style="color: #dc2626;">-${deductions.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        ${totalDeductions === 0 ? `
+                        <tr>
+                            <td colspan="2" style="text-align: center; color: #64748b; font-style: italic;">No deductions applied</td>
+                        </tr>` : ''}
+                        <tr style="background: #f8fafc; font-weight: 800;">
+                            <td>Total Deductions</td>
+                            <td class="amount" style="color: #dc2626;">PKR ${totalDeductions.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
 
             <div class="net-box">
-                <span class="net-title">TOTAL NET SALARY PAYABLE:</span>
-                <span class="net-amount">PKR ${parseFloat(item.net_salary).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                <div>
+                    <div class="net-title">TOTAL NET SALARY:</div>
+                    <div style="font-size: 12px; color: #065f46; margin-top: 2px;">
+                        Payment Mode: ${escapeHtml(item.payment_method || 'Bank Transfer')} ${paidAmount > 0 ? `• Disbursed: PKR ${paidAmount.toLocaleString()}` : ''}
+                    </div>
+                </div>
+                <div class="net-amount">PKR ${netSalary.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
             </div>
+
+            ${item.increment_remarks ? `
+            <div class="remarks-box">
+                <strong>📝 Salary Remarks / Audit Note:</strong> ${escapeHtml(item.increment_remarks)}
+            </div>` : ''}
 
             <div class="sig-row">
                 <div class="sig-line">Employee Signature</div>
-                <div class="sig-line">HR & Accounts Manager</div>
+                <div class="sig-line">HR Manager</div>
+                <div class="sig-line">Accounts & Finance Director</div>
             </div>
         </div>
 
@@ -1886,3 +2906,165 @@ function printSalarySlip(item) {
     printWindow.document.write(slipHtml);
     printWindow.document.close();
 }
+
+/**
+ * Export full monthly payroll sheet to CSV / Excel
+ */
+function exportPayrollCSV() {
+    let payroll = HrState.payroll || [];
+    if (!payroll || payroll.length === 0) {
+        showToast("No payroll records available for the selected month to export.", "warning");
+        return;
+    }
+
+    const search = (document.getElementById('hr-payroll-search')?.value || '').toLowerCase().trim();
+    const deptName = document.getElementById('hr-payroll-filter-dept')?.value;
+    const paymentStatus = document.getElementById('hr-payroll-filter-status')?.value;
+    const bankFilter = document.getElementById('hr-payroll-filter-bank')?.value;
+
+    if (search || deptName || paymentStatus || bankFilter) {
+        if (deptName) {
+            payroll = payroll.filter(p => (p.department_name || '').toLowerCase() === deptName.toLowerCase());
+        }
+        if (paymentStatus) {
+            payroll = payroll.filter(p => (p.payment_status || 'draft') === paymentStatus);
+        }
+        if (bankFilter) {
+            if (bankFilter === 'Cash') {
+                payroll = payroll.filter(p => {
+                    const b = (p.bank_name || '').toLowerCase();
+                    const acc = (p.bank_account_no || '').toLowerCase();
+                    return b === 'cash' || acc.includes('cash');
+                });
+            } else {
+                payroll = payroll.filter(p => (p.bank_name || '').toLowerCase().includes(bankFilter.toLowerCase()));
+            }
+        }
+        if (search) {
+            payroll = payroll.filter(p => 
+                (p.employee_name || '').toLowerCase().includes(search) ||
+                (p.emp_code || '').toLowerCase().includes(search) ||
+                (p.cnic_no || '').toLowerCase().includes(search) ||
+                (p.father_husband_name || '').toLowerCase().includes(search) ||
+                (p.designation || '').toLowerCase().includes(search) ||
+                (p.department_name || '').toLowerCase().includes(search) ||
+                (p.bank_name || '').toLowerCase().includes(search) ||
+                (p.bank_account_no || '').toLowerCase().includes(search) ||
+                (p.form_no || '').toLowerCase().includes(search)
+            );
+        }
+    }
+
+    const month = document.getElementById('hr-payroll-month')?.value || HrState.selectedMonth || 'current';
+
+    const headers = [
+        "EMPLOYEE CODE",
+        "NAME",
+        "DESIGNATION",
+        "DEPARTMENT",
+        "FATHER / HUSBAND NAME",
+        "CNIC NO.",
+        "DATE OF JOINING",
+        "GROSS SALARY",
+        "PAID LEAVES",
+        "UNPAID LEAVES",
+        "UNPAID LEAVE DEDUCTION",
+        "FUEL / TRAV. / MOBILE",
+        "INCENTIVE",
+        "FOOD BILLS",
+        "BONUS",
+        "TOTAL ADDITIONS",
+        "ADVANCE SALARY",
+        "LOAN DEDUCTION",
+        "FINES",
+        "WHT TAX",
+        "OTHER DEDUCTIONS",
+        "TOTAL DEDUCTIONS",
+        "NET SALARY",
+        "SALARY PAID",
+        "SALARY PAYABLE",
+        "FORM #",
+        "BANK NAME",
+        "BANK ACCOUNT / IBAN",
+        "PAYMENT STATUS",
+        "SALARY INCREMENT / AUDIT REMARKS"
+    ];
+
+    const escapeCsvValue = (val) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+    };
+
+    const rows = [headers.join(',')];
+
+    payroll.forEach(p => {
+        const empCode = p.emp_code || `DP-${String(p.employee_id).padStart(3, '0')}`;
+        const basic = parseFloat(p.basic_salary || 0);
+        const fuel = parseFloat(p.fuel_allowance || 0);
+        const incentive = parseFloat(p.incentive || 0);
+        const foodBills = parseFloat(p.food_bills || 0);
+        const bonus = parseFloat(p.bonus || 0);
+        const totalAdditions = fuel + incentive + foodBills + bonus;
+
+        const unpaidDed = parseFloat(p.unpaid_leave_deduction || 0);
+        const advance = parseFloat(p.advance_salary || 0);
+        const loan = parseFloat(p.loan_deduction || 0);
+        const fines = parseFloat(p.fines || 0);
+        const wht = parseFloat(p.wht_amount || 0);
+        const deductions = parseFloat(p.deductions || 0);
+        const totalDeductions = advance + loan + fines + wht + unpaidDed + deductions;
+
+        const netSalary = parseFloat(p.net_salary || (basic + totalAdditions - totalDeductions));
+        const paidAmount = parseFloat(p.paid_amount || 0);
+        const payableAmount = parseFloat(p.payable_amount || Math.max(0, netSalary - paidAmount));
+
+        const row = [
+            escapeCsvValue(empCode),
+            escapeCsvValue(p.employee_name || ''),
+            escapeCsvValue(p.designation || ''),
+            escapeCsvValue(p.department_name || ''),
+            escapeCsvValue(p.father_husband_name || ''),
+            escapeCsvValue(p.cnic_no || ''),
+            escapeCsvValue(p.joining_date || ''),
+            escapeCsvValue(basic.toFixed(2)),
+            escapeCsvValue(p.approved_leaves || 0),
+            escapeCsvValue(p.unpaid_leaves || 0),
+            escapeCsvValue(unpaidDed.toFixed(2)),
+            escapeCsvValue(fuel.toFixed(2)),
+            escapeCsvValue(incentive.toFixed(2)),
+            escapeCsvValue(foodBills.toFixed(2)),
+            escapeCsvValue(bonus.toFixed(2)),
+            escapeCsvValue(totalAdditions.toFixed(2)),
+            escapeCsvValue(advance.toFixed(2)),
+            escapeCsvValue(loan.toFixed(2)),
+            escapeCsvValue(fines.toFixed(2)),
+            escapeCsvValue(wht.toFixed(2)),
+            escapeCsvValue(deductions.toFixed(2)),
+            escapeCsvValue(totalDeductions.toFixed(2)),
+            escapeCsvValue(netSalary.toFixed(2)),
+            escapeCsvValue(paidAmount.toFixed(2)),
+            escapeCsvValue(payableAmount.toFixed(2)),
+            escapeCsvValue(p.form_no || ''),
+            escapeCsvValue(p.bank_name || ''),
+            escapeCsvValue(p.bank_account_no || ''),
+            escapeCsvValue((p.payment_status || 'draft').toUpperCase()),
+            escapeCsvValue(p.increment_remarks || '')
+        ];
+
+        rows.push(row.join(','));
+    });
+
+    const csvContent = "\uFEFF" + rows.join("\r\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `payroll_sheet_${month}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Payroll sheet exported successfully for ${month}!`, "success");
+}
+

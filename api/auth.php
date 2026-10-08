@@ -51,6 +51,18 @@ switch ($action) {
             exit;
         }
 
+        if (isset($user['can_login']) && (int)$user['can_login'] === 0) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Portal login access is disabled for this staff profile.']);
+            exit;
+        }
+
+        if (empty($user['password_hash'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'No login password configured for this employee profile.']);
+            exit;
+        }
+
         // Validate password
         $isValid = false;
         if (password_verify($password, $user['password_hash']) || $password === 'DiscoverPakistan123') {

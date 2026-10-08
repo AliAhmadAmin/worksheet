@@ -272,6 +272,9 @@ function migratePermissionsSchema($pdo) {
             $pdo->exec("ALTER TABLE hr_payroll ADD COLUMN fine_reason TEXT NULL");
         } catch (Exception $e) {}
 
+        ensureDepartmentAndTeamsSchema($pdo);
+        ensureDetailedPayrollSchema($pdo);
+
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS programming_dispatches (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -358,6 +361,109 @@ function migratePermissionsSchema($pdo) {
 
     } catch (Exception $e) {
         // Ignore if already migrated
+    }
+}
+
+function ensureDepartmentAndTeamsSchema($pdo) {
+    try {
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS departments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) UNIQUE NOT NULL,
+            description TEXT NULL,
+            hod_id INT NULL,
+            is_active TINYINT DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        try { $pdo->exec("ALTER TABLE departments ADD COLUMN description TEXT NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE departments ADD COLUMN hod_id INT NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE departments ADD COLUMN is_active TINYINT DEFAULT 1"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE departments ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (Exception $e) {}
+
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS teams (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            department_id INT NULL,
+            description TEXT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        try { $pdo->exec("ALTER TABLE teams ADD COLUMN department_id INT NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE teams ADD COLUMN description TEXT NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE teams ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (Exception $e) {}
+
+        // Allow staff without login accounts
+        try { $pdo->exec("ALTER TABLE employees ADD COLUMN can_login TINYINT DEFAULT 1"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees MODIFY COLUMN email VARCHAR(191) NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees MODIFY COLUMN password_hash VARCHAR(255) NULL"); } catch (Exception $e) {}
+
+        // Link default teams to departments if not linked yet
+        $deptMap = $pdo->query("SELECT name, id FROM departments")->fetchAll(PDO::FETCH_KEY_PAIR);
+        if (!empty($deptMap)) {
+            $digitalId = $deptMap['Digital'] ?? null;
+            $newsId = $deptMap['News Room'] ?? null;
+            $progId = $deptMap['Programming'] ?? null;
+            $othersId = $deptMap['Others'] ?? null;
+
+            if ($digitalId) {
+                $pdo->exec("UPDATE teams SET department_id = $digitalId WHERE department_id IS NULL AND name IN ('Admin', 'Facebook Team', 'Image Posting Team', 'YouTube Team', 'Digital NLEs', 'Team YouTube Shorts', 'Internees')");
+            }
+            if ($newsId) {
+                $pdo->exec("UPDATE teams SET department_id = $newsId WHERE department_id IS NULL AND name IN ('Pakistan Today News', 'News Team')");
+            }
+            if ($progId) {
+                $pdo->exec("UPDATE teams SET department_id = $progId WHERE department_id IS NULL AND name IN ('Programming Team', 'Archive Team')");
+            }
+            if ($othersId) {
+                $pdo->exec("UPDATE teams SET department_id = $othersId WHERE department_id IS NULL AND name IN ('Web Developer')");
+            }
+
+            // Sync HODs into departments if hod_id is currently NULL
+            $hods = $pdo->query("SELECT id, name, department_id FROM employees WHERE role = 'hod' AND department_id IS NOT NULL")->fetchAll();
+            foreach ($hods as $h) {
+                $pdo->prepare("UPDATE departments SET hod_id = ? WHERE id = ? AND hod_id IS NULL")->execute([$h['id'], $h['department_id']]);
+            }
+        }
+    } catch (Exception $e) {
+        // Ignore
+    }
+}
+
+function ensureDetailedPayrollSchema($pdo) {
+    try {
+        // 1. Extend hr_employee_profiles with legal/bank master columns
+        $profileCols = [
+            "emp_code VARCHAR(50) NULL",
+            "father_husband_name VARCHAR(191) NULL",
+            "cnic_no VARCHAR(50) NULL",
+            "bank_name VARCHAR(100) DEFAULT 'UBL'",
+            "bank_account_no VARCHAR(100) NULL",
+            "fixed_allowance DECIMAL(10,2) DEFAULT 0.00"
+        ];
+        foreach ($profileCols as $col) {
+            try { $pdo->exec("ALTER TABLE hr_employee_profiles ADD COLUMN {$col}"); } catch (Exception $e) {}
+        }
+
+        // 2. Extend hr_payroll with comprehensive calculation & disbursement columns
+        $payrollCols = [
+            "fuel_allowance DECIMAL(10,2) DEFAULT 0.00",
+            "incentive DECIMAL(10,2) DEFAULT 0.00",
+            "food_bills DECIMAL(10,2) DEFAULT 0.00",
+            "advance_salary DECIMAL(10,2) DEFAULT 0.00",
+            "loan_deduction DECIMAL(10,2) DEFAULT 0.00",
+            "wht_amount DECIMAL(10,2) DEFAULT 0.00",
+            "form_no VARCHAR(50) NULL",
+            "increment_remarks TEXT NULL",
+            "paid_amount DECIMAL(10,2) DEFAULT 0.00",
+            "payable_amount DECIMAL(10,2) DEFAULT 0.00"
+        ];
+        foreach ($payrollCols as $col) {
+            try { $pdo->exec("ALTER TABLE hr_payroll ADD COLUMN {$col}"); } catch (Exception $e) {}
+        }
+    } catch (Exception $e) {
+        // Ignore
     }
 }
 

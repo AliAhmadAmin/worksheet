@@ -629,244 +629,7 @@ switch ($action) {
         echo json_encode(['success' => true, 'message' => 'HR profile saved successfully.']);
         break;
 
-    case 'get_payroll':
-        $salaryMonth = $_GET['month'] ?? date('Y-m');
-        $empFilter = $_GET['employee_id'] ?? null;
 
-        // Parse month
-        $parts = explode('-', $salaryMonth);
-        $year = (int)($parts[0] ?? date('Y'));
-        $month = (int)($parts[1] ?? date('m'));
-        $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-
-        // Fetch active employees
-        $empSql = "
-            SELECT e.id, e.name, e.designation, e.role, e.avatar,
-                   d.name as department_name, t.name as team_name,
-                   COALESCE(p.basic_salary, 0.00) as default_basic_salary,
-                   COALESCE(p.employment_type, 'full_time') as employment_type,
-                   p.joining_date
-            FROM employees e
-            LEFT JOIN departments d ON e.department_id = d.id
-            LEFT JOIN teams t ON e.team_id = t.id
-            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
-            WHERE e.is_active = 1
-        ";
-        $empParams = [];
-        if (!$canManageHr) {
-            $empSql .= " AND e.id = ?";
-            $empParams[] = $currentUserId;
-        } elseif ($empFilter) {
-            $empSql .= " AND e.id = ?";
-            $empParams[] = $empFilter;
-        }
-        $empSql .= " ORDER BY e.name ASC";
-
-        $stmtEmp = $pdo->prepare($empSql);
-        $stmtEmp->execute($empParams);
-        $employees = $stmtEmp->fetchAll();
-
-        // Fetch existing payroll records for month
-        $stmtPayroll = $pdo->prepare("SELECT * FROM hr_payroll WHERE salary_month = ?");
-        $stmtPayroll->execute([$salaryMonth]);
-        $existingPayroll = [];
-        foreach ($stmtPayroll->fetchAll() as $pr) {
-            $existingPayroll[$pr['employee_id']] = $pr;
-        }
-
-        $payrollItems = [];
-
-        foreach ($employees as $emp) {
-            $eId = $emp['id'];
-
-            // 1. Calculate attended days and duty seconds from daily_sheets
-            $stmtAtt = $pdo->prepare("
-                SELECT COUNT(*) as present_count, 
-                       COALESCE(SUM(total_duty_seconds), 0) as total_seconds
-                FROM daily_sheets 
-                WHERE employee_id = ? 
-                  AND DATE_FORMAT(sheet_date, '%Y-%m') = ?
-                  AND (check_in_time IS NOT NULL OR total_duty_seconds > 0)
-            ");
-            $stmtAtt->execute([$eId, $salaryMonth]);
-            $attRow = $stmtAtt->fetch();
-            $presentDays = (int)($attRow['present_count'] ?? 0);
-            $totalDutyHours = round(((int)$attRow['total_seconds']) / 3600, 1);
-
-            // 2. Calculate approved leaves in this month
-            $stmtLeaves = $pdo->prepare("
-                SELECT leave_type, SUM(days_count) as days
-                FROM hr_leaves
-                WHERE employee_id = ? 
-                  AND status = 'approved'
-                  AND (DATE_FORMAT(start_date, '%Y-%m') = ? OR DATE_FORMAT(end_date, '%Y-%m') = ?)
-                GROUP BY leave_type
-            ");
-            $stmtLeaves->execute([$eId, $salaryMonth, $salaryMonth]);
-            $leavesRows = $stmtLeaves->fetchAll();
-            $approvedLeaves = 0;
-            $unpaidLeaves = 0;
-            foreach ($leavesRows as $lr) {
-                if ($lr['leave_type'] === 'unpaid') {
-                    $unpaidLeaves += (float)$lr['days'];
-                } else {
-                    $approvedLeaves += (float)$lr['days'];
-                }
-            }
-
-            // Existing or Computed Record
-            $record = $existingPayroll[$eId] ?? null;
-            $basicSalary = $record ? (float)$record['basic_salary'] : (float)$emp['default_basic_salary'];
-            $bonus = $record ? (float)$record['bonus'] : 0.00;
-            $deductions = $record ? (float)$record['deductions'] : 0.00;
-            $deductionReason = $record ? ($record['deduction_reason'] ?? '') : '';
-            $bonusReason = $record ? ($record['bonus_reason'] ?? '') : '';
-            $paymentStatus = $record ? ($record['payment_status'] ?? 'draft') : 'draft';
-            $paymentDate = $record ? ($record['payment_date'] ?? null) : null;
-            $paymentMethod = $record ? ($record['payment_method'] ?? 'Bank Transfer') : 'Bank Transfer';
-
-            // Auto Loan / Advance Installment calculation if no manual deduction already set
-            $stmtActiveLoans = $pdo->prepare("
-                SELECT * FROM hr_loans 
-                WHERE employee_id = ? 
-                  AND status = 'approved' 
-                  AND deduction_start_month <= ? 
-                  AND paid_amount < amount
-            ");
-            $stmtActiveLoans->execute([$eId, $salaryMonth]);
-            $activeLoans = $stmtActiveLoans->fetchAll();
-            $autoLoanDeduction = 0;
-            $loanNotes = [];
-            foreach ($activeLoans as $al) {
-                $rem = (float)$al['amount'] - (float)$al['paid_amount'];
-                $monthly = min($rem, (float)$al['monthly_deduction']);
-                $autoLoanDeduction += $monthly;
-                $loanNotes[] = ucfirst(str_replace('_', ' ', $al['request_type'])) . " (" . number_format($monthly) . ")";
-            }
-
-            if (!$record && $autoLoanDeduction > 0) {
-                $deductions = $autoLoanDeduction;
-                $deductionReason = "Loan Deduction: " . implode(', ', $loanNotes);
-            }
-
-            // Auto Fines calculation for the month
-            $stmtActiveFines = $pdo->prepare("
-                SELECT amount, reason, fine_category 
-                FROM hr_fines 
-                WHERE employee_id = ? 
-                  AND salary_month = ? 
-                  AND status = 'applied'
-            ");
-            $stmtActiveFines->execute([$eId, $salaryMonth]);
-            $activeFines = $stmtActiveFines->fetchAll();
-            $autoFines = 0.00;
-            $fineNotes = [];
-            foreach ($activeFines as $af) {
-                $autoFines += (float)$af['amount'];
-                $fineNotes[] = ucfirst(str_replace('_', ' ', $af['fine_category'])) . " (PKR " . number_format($af['amount']) . ")";
-            }
-
-            $fines = $record && isset($record['fines']) ? (float)$record['fines'] : $autoFines;
-            $fineReason = $record && !empty($record['fine_reason']) ? $record['fine_reason'] : ($autoFines > 0 ? implode(', ', $fineNotes) : '');
-
-            // Auto Net Salary calculation (Basic + Bonus - Deductions - Fines)
-            $netSalary = max(0, $basicSalary + $bonus - $deductions - $fines);
-
-            $payrollItems[] = [
-                'employee_id' => $eId,
-                'employee_name' => $emp['name'],
-                'designation' => $emp['designation'],
-                'department_name' => $emp['department_name'],
-                'avatar' => $emp['avatar'],
-                'salary_month' => $salaryMonth,
-                'working_days' => $daysInMonth,
-                'present_days' => $presentDays,
-                'approved_leaves' => $approvedLeaves,
-                'unpaid_leaves' => $unpaidLeaves,
-                'total_duty_hours' => $totalDutyHours,
-                'basic_salary' => $basicSalary,
-                'bonus' => $bonus,
-                'bonus_reason' => $bonusReason,
-                'deductions' => $deductions,
-                'deduction_reason' => $deductionReason,
-                'fines' => $fines,
-                'fine_reason' => $fineReason,
-                'auto_fines' => $autoFines,
-                'net_salary' => $netSalary,
-                'active_loans_count' => count($activeLoans),
-                'auto_loan_deduction' => $autoLoanDeduction,
-                'payment_status' => $paymentStatus,
-                'payment_date' => $paymentDate,
-                'payment_method' => $paymentMethod
-            ];
-        }
-
-        echo json_encode([
-            'success' => true,
-            'salary_month' => $salaryMonth,
-            'payroll' => $payrollItems
-        ]);
-        break;
-
-    case 'save_payroll_item':
-        if (!$canManageHr) {
-            echo json_encode(['success' => false, 'message' => 'Access denied: Admin/HR permission required.']);
-            exit;
-        }
-
-        $empId = (int)($data['employee_id'] ?? 0);
-        $salaryMonth = $data['salary_month'] ?? date('Y-m');
-        $basicSalary = (float)($data['basic_salary'] ?? 0.00);
-        $workingDays = (int)($data['working_days'] ?? 30);
-        $presentDays = (int)($data['present_days'] ?? 0);
-        $approvedLeaves = (int)($data['approved_leaves'] ?? 0);
-        $unpaidLeaves = (int)($data['unpaid_leaves'] ?? 0);
-        $totalDutyHours = (float)($data['total_duty_hours'] ?? 0.00);
-        $bonus = (float)($data['bonus'] ?? 0.00);
-        $deductions = (float)($data['deductions'] ?? 0.00);
-        $fines = (float)($data['fines'] ?? 0.00);
-        $bonusReason = trim($data['bonus_reason'] ?? '');
-        $deductionReason = trim($data['deduction_reason'] ?? '');
-        $fineReason = trim($data['fine_reason'] ?? '');
-        $paymentStatus = $data['payment_status'] ?? 'draft';
-        $paymentDate = !empty($data['payment_date']) ? $data['payment_date'] : null;
-        $paymentMethod = $data['payment_method'] ?? 'Bank Transfer';
-
-        $netSalary = max(0, $basicSalary + $bonus - $deductions - $fines);
-
-        $stmt = $pdo->prepare("
-            INSERT INTO hr_payroll 
-                (employee_id, salary_month, basic_salary, working_days, present_days, approved_leaves, unpaid_leaves, 
-                 total_duty_hours, bonus, deductions, fines, bonus_reason, deduction_reason, fine_reason, net_salary, payment_status, payment_date, payment_method, generated_by)
-            VALUES 
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                basic_salary = VALUES(basic_salary),
-                working_days = VALUES(working_days),
-                present_days = VALUES(present_days),
-                approved_leaves = VALUES(approved_leaves),
-                unpaid_leaves = VALUES(unpaid_leaves),
-                total_duty_hours = VALUES(total_duty_hours),
-                bonus = VALUES(bonus),
-                deductions = VALUES(deductions),
-                fines = VALUES(fines),
-                bonus_reason = VALUES(bonus_reason),
-                deduction_reason = VALUES(deduction_reason),
-                fine_reason = VALUES(fine_reason),
-                net_salary = VALUES(net_salary),
-                payment_status = VALUES(payment_status),
-                payment_date = VALUES(payment_date),
-                payment_method = VALUES(payment_method),
-                generated_by = VALUES(generated_by)
-        ");
-
-        $stmt->execute([
-            $empId, $salaryMonth, $basicSalary, $workingDays, $presentDays, $approvedLeaves, $unpaidLeaves,
-            $totalDutyHours, $bonus, $deductions, $fines, $bonusReason, $deductionReason, $fineReason, $netSalary, $paymentStatus, $paymentDate, $paymentMethod, $currentUserId
-        ]);
-
-        echo json_encode(['success' => true, 'message' => 'Payroll record updated successfully.']);
-        break;
 
     case 'get_loans':
         $empFilter = $_GET['employee_id'] ?? null;
@@ -1251,7 +1014,491 @@ switch ($action) {
         echo json_encode(['success' => true, 'message' => 'Fine record removed successfully.']);
         break;
 
+    case 'get_payroll':
+        $month = $_GET['month'] ?? date('Y-m');
+        $firstDay = $month . '-01';
+        $lastDay = date('Y-m-t', strtotime($firstDay));
+
+        $whereClauses = ["e.is_active = 1"];
+        $params = [
+            'month' => $month,
+            'firstDay1' => $firstDay,
+            'lastDay1' => $lastDay,
+            'firstDay2' => $firstDay,
+            'lastDay2' => $lastDay,
+            'fineMonth' => $month,
+            'claimsMonth' => $month
+        ];
+
+        if (!$canManageHr && !$isHod) {
+            $whereClauses[] = "e.id = :curUser";
+            $params['curUser'] = $currentUserId;
+        } elseif ($isHod && !$canManageHr && $userDeptId > 0) {
+            $whereClauses[] = "e.department_id = :deptId";
+            $params['deptId'] = $userDeptId;
+        }
+
+        $whereSql = implode(' AND ', $whereClauses);
+
+        $sql = "
+            SELECT 
+                e.id as employee_id,
+                e.name as employee_name,
+                e.department_id,
+                e.designation,
+                e.avatar,
+                d.name as department_name,
+                COALESCE(p.emp_code, CONCAT('DP-', LPAD(e.id, 3, '0'))) as emp_code,
+                p.father_husband_name,
+                p.cnic_no,
+                p.bank_name,
+                p.bank_account_no,
+                p.fixed_allowance,
+                p.joining_date,
+                p.basic_salary as profile_salary,
+                COALESCE(pay.basic_salary, p.basic_salary, 0.00) as basic_salary,
+                COALESCE(pay.fuel_allowance, clm.fuel_claims, p.fixed_allowance, 0.00) as fuel_allowance,
+                COALESCE(pay.incentive, clm.incentive_claims, 0.00) as incentive,
+                COALESCE(pay.food_bills, clm.food_claims, 0.00) as food_bills,
+                COALESCE(pay.bonus, clm.bonus_claims, 0.00) as bonus,
+                pay.bonus_reason,
+                COALESCE(pay.advance_salary, 0.00) as advance_salary,
+                COALESCE(pay.loan_deduction, l_ded.loan_deduction, 0.00) as loan_deduction,
+                COALESCE(pay.fines, f_ded.fines, 0.00) as fines,
+                COALESCE(pay.fine_reason, f_ded.fine_reason) as fine_reason,
+                COALESCE(pay.wht_amount, 0.00) as wht_amount,
+                COALESCE(pay.deductions, 0.00) as deductions,
+                pay.deduction_reason,
+                COALESCE(pay.paid_amount, 0.00) as paid_amount,
+                COALESCE(pay.payable_amount, 0.00) as payable_amount,
+                pay.form_no,
+                pay.increment_remarks,
+                COALESCE(pay.payment_status, 'draft') as payment_status,
+                pay.payment_method,
+                pay.payment_date,
+                COALESCE(pay.working_days, 30) as working_days,
+                COALESCE(att.present_days, pay.present_days, 0) as present_days,
+                COALESCE(lv.paid_leaves, pay.approved_leaves, 0) as approved_leaves,
+                COALESCE(lv.unpaid_leaves, pay.unpaid_leaves, 0) as unpaid_leaves,
+                COALESCE(lv.total_leaves, (COALESCE(lv.paid_leaves, pay.approved_leaves, 0) + COALESCE(lv.unpaid_leaves, pay.unpaid_leaves, 0))) as total_leaves,
+                pay.unpaid_leave_deduction,
+                COALESCE(pay.total_duty_hours, ROUND(att.total_duty_hours, 1), 0.0) as total_duty_hours
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
+            LEFT JOIN hr_payroll pay ON e.id = pay.employee_id AND pay.salary_month = :month
+            LEFT JOIN (
+                SELECT 
+                    employee_id,
+                    SUM(CASE WHEN claim_type IN ('fuel', 'travel', 'mobile') THEN amount ELSE 0 END) as fuel_claims,
+                    SUM(CASE WHEN claim_type = 'incentive' THEN amount ELSE 0 END) as incentive_claims,
+                    SUM(CASE WHEN claim_type = 'food_bills' THEN amount ELSE 0 END) as food_claims,
+                    SUM(CASE WHEN claim_type = 'bonus' THEN amount ELSE 0 END) as bonus_claims
+                FROM hr_claims
+                WHERE status IN ('approved', 'paid') AND salary_month = :claimsMonth
+                GROUP BY employee_id
+            ) clm ON e.id = clm.employee_id
+            LEFT JOIN (
+                SELECT employee_id, COUNT(DISTINCT sheet_date) as present_days, SUM(COALESCE(total_duty_seconds, 0) / 3600.0) as total_duty_hours
+                FROM daily_sheets
+                WHERE sheet_date >= :firstDay1 AND sheet_date <= :lastDay1 AND (check_in_time IS NOT NULL OR total_duty_seconds > 0)
+                GROUP BY employee_id
+            ) att ON e.id = att.employee_id
+            LEFT JOIN (
+                SELECT 
+                    employee_id,
+                    SUM(CASE WHEN leave_type IN ('annual', 'casual', 'sick') THEN days_count ELSE 0 END) as paid_leaves,
+                    SUM(CASE WHEN leave_type = 'unpaid' THEN days_count ELSE 0 END) as unpaid_leaves,
+                    SUM(days_count) as total_leaves
+                FROM hr_leaves
+                WHERE status = 'approved' AND start_date <= :lastDay2 AND end_date >= :firstDay2
+                GROUP BY employee_id
+            ) lv ON e.id = lv.employee_id
+            LEFT JOIN (
+                SELECT employee_id, SUM(monthly_deduction) as loan_deduction
+                FROM hr_loans
+                WHERE status IN ('approved', 'active')
+                GROUP BY employee_id
+            ) l_ded ON e.id = l_ded.employee_id
+            LEFT JOIN (
+                SELECT employee_id, SUM(amount) as fines, GROUP_CONCAT(reason SEPARATOR '; ') as fine_reason
+                FROM hr_fines
+                WHERE status = 'applied' AND salary_month = :fineMonth
+                GROUP BY employee_id
+            ) f_ded ON e.id = f_ded.employee_id
+            WHERE {$whereSql}
+            ORDER BY e.name ASC
+        ";
+
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $payroll = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($payroll as &$p) {
+                $basic = (float)$p['basic_salary'];
+                $fuel = (float)$p['fuel_allowance'];
+                $incentive = (float)$p['incentive'];
+                $foodBills = (float)$p['food_bills'];
+                $bonus = (float)$p['bonus'];
+                $grossAdditions = $fuel + $incentive + $foodBills + $bonus;
+
+                $advance = (float)$p['advance_salary'];
+                $loan = (float)$p['loan_deduction'];
+                $fines = (float)$p['fines'];
+                $wht = (float)$p['wht_amount'];
+                $deductions = (float)$p['deductions'];
+
+                // Unpaid leave deduction computation
+                $unpaidLeavesCount = (float)($p['unpaid_leaves'] ?? 0);
+                if ($p['unpaid_leave_deduction'] !== null && $p['unpaid_leave_deduction'] !== '') {
+                    $unpaidLeaveDeduction = (float)$p['unpaid_leave_deduction'];
+                } else if ($unpaidLeavesCount > 0 && $basic > 0) {
+                    $dailyRate = $basic / 30.0;
+                    $unpaidLeaveDeduction = round($unpaidLeavesCount * $dailyRate, 2);
+                } else {
+                    $unpaidLeaveDeduction = 0.00;
+                }
+                $p['unpaid_leave_deduction'] = number_format($unpaidLeaveDeduction, 2, '.', '');
+
+                $grossDeductions = $advance + $loan + $fines + $wht + $deductions + $unpaidLeaveDeduction;
+
+                $netSalary = max(0, $basic + $grossAdditions - $grossDeductions);
+                $p['net_salary'] = number_format($netSalary, 2, '.', '');
+                
+                $paidAmount = (float)$p['paid_amount'];
+                $p['payable_amount'] = number_format(max(0, $netSalary - $paidAmount), 2, '.', '');
+                $p['salary_month'] = $month;
+            }
+
+            echo json_encode(['success' => true, 'payroll' => $payroll, 'month' => $month]);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'message' => 'Database error loading payroll: ' . $e->getMessage()]);
+        }
+        break;
+
+    case 'save_payroll_item':
+        if (!$canManageHr) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: HR/Admin permission required.']);
+            exit;
+        }
+
+        $empId = (int)($data['employee_id'] ?? 0);
+        $salaryMonth = $data['salary_month'] ?? date('Y-m');
+        $workingDays = (int)($data['working_days'] ?? 30);
+        $presentDays = (int)($data['present_days'] ?? 0);
+        $approvedLeaves = (int)($data['approved_leaves'] ?? 0);
+        $unpaidLeaves = (int)($data['unpaid_leaves'] ?? 0);
+        $dutyHours = (float)($data['total_duty_hours'] ?? 0.0);
+
+        $basicSalary = (float)($data['basic_salary'] ?? 0.0);
+        $fuelAllowance = (float)($data['fuel_allowance'] ?? 0.0);
+        $incentive = (float)($data['incentive'] ?? 0.0);
+        $foodBills = (float)($data['food_bills'] ?? 0.0);
+        $bonus = (float)($data['bonus'] ?? 0.0);
+        $bonusReason = trim($data['bonus_reason'] ?? '');
+
+        $advanceSalary = (float)($data['advance_salary'] ?? 0.0);
+        $loanDeduction = (float)($data['loan_deduction'] ?? 0.0);
+        $fines = (float)($data['fines'] ?? 0.0);
+        $fineReason = trim($data['fine_reason'] ?? '');
+        $whtAmount = (float)($data['wht_amount'] ?? 0.0);
+        $deductions = (float)($data['deductions'] ?? 0.0);
+        $deductionReason = trim($data['deduction_reason'] ?? '');
+
+        $unpaidLeaveDeduction = (isset($data['unpaid_leave_deduction']) && $data['unpaid_leave_deduction'] !== '') ? (float)$data['unpaid_leave_deduction'] : 0.00;
+
+        $grossAdditions = $fuelAllowance + $incentive + $foodBills + $bonus;
+        $grossDeductions = $advanceSalary + $loanDeduction + $fines + $whtAmount + $deductions + $unpaidLeaveDeduction;
+        $netSalary = max(0, $basicSalary + $grossAdditions - $grossDeductions);
+
+        $paidAmount = (float)($data['paid_amount'] ?? 0.0);
+        $payableAmount = max(0, $netSalary - $paidAmount);
+        $formNo = trim($data['form_no'] ?? '');
+        $incrementRemarks = trim($data['increment_remarks'] ?? '');
+        $paymentStatus = in_array($data['payment_status'] ?? '', ['draft', 'approved', 'paid']) ? $data['payment_status'] : 'draft';
+        $paymentMethod = trim($data['payment_method'] ?? 'Bank Transfer');
+        $paymentDate = !empty($data['payment_date']) ? $data['payment_date'] : null;
+
+        if ($empId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid employee ID.']);
+            exit;
+        }
+
+        try {
+            // Check if record exists
+            $stmtCheck = $pdo->prepare("SELECT id FROM hr_payroll WHERE employee_id = ? AND salary_month = ?");
+            $stmtCheck->execute([$empId, $salaryMonth]);
+            $existingId = $stmtCheck->fetchColumn();
+
+            if ($existingId) {
+                $stmtUpdate = $pdo->prepare("
+                    UPDATE hr_payroll SET
+                        basic_salary = ?,
+                        working_days = ?,
+                        present_days = ?,
+                        approved_leaves = ?,
+                        unpaid_leaves = ?,
+                        unpaid_leave_deduction = ?,
+                        total_duty_hours = ?,
+                        fuel_allowance = ?,
+                        incentive = ?,
+                        food_bills = ?,
+                        bonus = ?,
+                        bonus_reason = ?,
+                        advance_salary = ?,
+                        loan_deduction = ?,
+                        fines = ?,
+                        fine_reason = ?,
+                        wht_amount = ?,
+                        deductions = ?,
+                        deduction_reason = ?,
+                        net_salary = ?,
+                        paid_amount = ?,
+                        payable_amount = ?,
+                        form_no = ?,
+                        increment_remarks = ?,
+                        payment_status = ?,
+                        payment_method = ?,
+                        payment_date = ?,
+                        updated_at = NOW()
+                    WHERE id = ?
+                ");
+                $stmtUpdate->execute([
+                    $basicSalary, $workingDays, $presentDays, $approvedLeaves, $unpaidLeaves, $unpaidLeaveDeduction, $dutyHours,
+                    $fuelAllowance, $incentive, $foodBills, $bonus, $bonusReason,
+                    $advanceSalary, $loanDeduction, $fines, $fineReason, $whtAmount, $deductions, $deductionReason,
+                    $netSalary, $paidAmount, $payableAmount, $formNo, $incrementRemarks,
+                    $paymentStatus, $paymentMethod, $paymentDate, $existingId
+                ]);
+            } else {
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO hr_payroll (
+                        employee_id, salary_month, basic_salary, working_days, present_days,
+                        approved_leaves, unpaid_leaves, unpaid_leave_deduction, total_duty_hours,
+                        fuel_allowance, incentive, food_bills, bonus, bonus_reason,
+                        advance_salary, loan_deduction, fines, fine_reason, wht_amount,
+                        deductions, deduction_reason, net_salary, paid_amount, payable_amount,
+                        form_no, increment_remarks, payment_status, payment_method, payment_date,
+                        generated_by, created_at, updated_at
+                    ) VALUES (
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, NOW(), NOW()
+                    )
+                ");
+                $stmtInsert->execute([
+                    $empId, $salaryMonth, $basicSalary, $workingDays, $presentDays,
+                    $approvedLeaves, $unpaidLeaves, $unpaidLeaveDeduction, $dutyHours,
+                    $fuelAllowance, $incentive, $foodBills, $bonus, $bonusReason,
+                    $advanceSalary, $loanDeduction, $fines, $fineReason, $whtAmount,
+                    $deductions, $deductionReason, $netSalary, $paidAmount, $payableAmount,
+                    $formNo, $incrementRemarks, $paymentStatus, $paymentMethod, $paymentDate,
+                    $currentUserId
+                ]);
+            }
+
+            echo json_encode(['success' => true, 'message' => 'Payroll adjustments saved successfully.']);
+        } catch (PDOException $e) {
+            echo json_encode(['success' => false, 'message' => 'Database error saving payroll: ' . $e->getMessage()]);
+        }
+        break;
+
+    // ================= 7. FUEL, TRAVEL, FOOD & INCENTIVE CLAIMS =================
+    case 'get_claims':
+        $statusFilter = $_GET['status'] ?? 'all';
+        $typeFilter = $_GET['claim_type'] ?? 'all';
+        $monthFilter = $_GET['month'] ?? '';
+        $empFilter = (int)($_GET['employee_id'] ?? 0);
+
+        $whereClauses = ["1=1"];
+        $params = [];
+
+        if (!$canManageHr && !$isHod) {
+            $whereClauses[] = "c.employee_id = ?";
+            $params[] = $currentUserId;
+        } elseif ($isHod && !$canManageHr) {
+            $whereClauses[] = "(c.employee_id = ? OR e.department_id = ?)";
+            $params[] = $currentUserId;
+            $params[] = $userDeptId;
+        }
+
+        if ($statusFilter !== 'all') {
+            $whereClauses[] = "c.status = ?";
+            $params[] = $statusFilter;
+        }
+
+        if ($typeFilter !== 'all') {
+            $whereClauses[] = "c.claim_type = ?";
+            $params[] = $typeFilter;
+        }
+
+        if ($monthFilter) {
+            $whereClauses[] = "c.salary_month = ?";
+            $params[] = $monthFilter;
+        }
+
+        if ($empFilter > 0 && ($canManageHr || $isHod)) {
+            $whereClauses[] = "c.employee_id = ?";
+            $params[] = $empFilter;
+        }
+
+        $whereSql = implode(' AND ', $whereClauses);
+
+        $sql = "
+            SELECT 
+                c.*,
+                e.name as employee_name,
+                e.designation,
+                e.avatar,
+                d.name as department_name,
+                COALESCE(p.emp_code, CONCAT('DP-', LPAD(e.id, 3, '0'))) as emp_code,
+                act.name as action_by_name
+            FROM hr_claims c
+            JOIN employees e ON c.employee_id = e.id
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
+            LEFT JOIN employees act ON c.action_by = act.id
+            WHERE {$whereSql}
+            ORDER BY c.claim_date DESC, c.id DESC
+        ";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $claims = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Summary calculations
+        $totalFuel = 0.00;
+        $totalFood = 0.00;
+        $totalIncentive = 0.00;
+        $pendingCount = 0;
+
+        foreach ($claims as $clm) {
+            $amt = (float)$clm['amount'];
+            if ($clm['status'] === 'pending') {
+                $pendingCount++;
+            }
+            if ($clm['status'] === 'approved' || $clm['status'] === 'paid') {
+                if (in_array($clm['claim_type'], ['fuel', 'travel', 'mobile'])) {
+                    $totalFuel += $amt;
+                } elseif ($clm['claim_type'] === 'food_bills') {
+                    $totalFood += $amt;
+                } elseif (in_array($clm['claim_type'], ['incentive', 'bonus'])) {
+                    $totalIncentive += $amt;
+                }
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'claims' => $claims,
+            'stats' => [
+                'total_claims' => count($claims),
+                'pending_count' => $pendingCount,
+                'total_fuel_amount' => $totalFuel,
+                'total_food_amount' => $totalFood,
+                'total_incentive_amount' => $totalIncentive
+            ]
+        ]);
+        break;
+
+    case 'add_claim':
+        $empId = (int)($data['employee_id'] ?? $currentUserId);
+        $claimType = $data['claim_type'] ?? 'fuel';
+        $amount = (float)($data['amount'] ?? 0);
+        $claimDate = !empty($data['claim_date']) ? $data['claim_date'] : date('Y-m-d');
+        $salaryMonth = !empty($data['salary_month']) ? $data['salary_month'] : date('Y-m', strtotime($claimDate));
+        $receiptNo = trim($data['receipt_no'] ?? '');
+        $reason = trim($data['reason'] ?? '');
+        $autoApprove = !empty($data['auto_approve']);
+
+        if ($empId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Please select an employee.']);
+            exit;
+        }
+        if ($amount <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Amount must be greater than zero.']);
+            exit;
+        }
+        if (!$reason) {
+            echo json_encode(['success' => false, 'message' => 'Please provide the purpose, route, or reason for this claim.']);
+            exit;
+        }
+
+        $validTypes = ['fuel', 'travel', 'mobile', 'incentive', 'food_bills', 'bonus', 'other'];
+        if (!in_array($claimType, $validTypes)) {
+            $claimType = 'fuel';
+        }
+
+        // Determine status
+        $status = 'pending';
+        $actionBy = null;
+        $actionAt = null;
+
+        if ($canManageHr || ($isHod && $autoApprove)) {
+            $status = 'approved';
+            $actionBy = $currentUserId;
+            $actionAt = date('Y-m-d H:i:s');
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO hr_claims 
+                (employee_id, claim_type, amount, claim_date, salary_month, receipt_no, reason, status, action_by, action_at)
+            VALUES 
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([
+            $empId, $claimType, $amount, $claimDate, $salaryMonth, $receiptNo, $reason, $status, $actionBy, $actionAt
+        ]);
+
+        $statusMsg = ($status === 'approved') ? 'approved & recorded' : 'submitted for review';
+        echo json_encode(['success' => true, 'message' => "Claim successfully {$statusMsg}."]);
+        break;
+
+    case 'update_claim_status':
+        if (!$canManageHr && !$isHod) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: Admin/HR permission required.']);
+            exit;
+        }
+
+        $claimId = (int)($data['claim_id'] ?? 0);
+        $status = $data['status'] ?? 'approved';
+        $adminNotes = trim($data['admin_notes'] ?? '');
+
+        if (!in_array($status, ['pending', 'approved', 'rejected', 'paid'])) {
+            echo json_encode(['success' => false, 'message' => 'Invalid claim status.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("
+            UPDATE hr_claims 
+            SET status = ?, admin_notes = ?, action_by = ?, action_at = NOW()
+            WHERE id = ?
+        ");
+        $stmt->execute([$status, $adminNotes, $currentUserId, $claimId]);
+
+        echo json_encode(['success' => true, 'message' => "Claim status updated to {$status}."]);
+        break;
+
+    case 'delete_claim':
+        if (!$canManageHr) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: Admin/HR permission required.']);
+            exit;
+        }
+
+        $claimId = (int)($data['claim_id'] ?? 0);
+        $stmt = $pdo->prepare("DELETE FROM hr_claims WHERE id = ?");
+        $stmt->execute([$claimId]);
+
+        echo json_encode(['success' => true, 'message' => 'Claim record deleted successfully.']);
+        break;
+
     default:
         echo json_encode(['error' => 'Invalid or missing action in HR API']);
         break;
 }
+

@@ -22,7 +22,10 @@
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-primary" onclick="openCreateNoticeModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                    <button type="button" class="btn btn-primary" onclick="openAddClaimModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                        ⛽ + Add Fuel / Food Claim
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="openCreateNoticeModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
                         📢 Post Notice
                     </button>
                     <button type="button" class="btn btn-outline" onclick="openIssueFineModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #ef4444; border-color: rgba(239, 68, 68, 0.4);">
@@ -311,19 +314,30 @@
         </div>
 
         <div class="worksheet-card">
-            <!-- Filter Bar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <select id="hr-leave-status-filter" class="input-control" style="font-size: 12.5px; padding: 6px 12px; min-width: 160px;" onchange="loadHrLeaves()">
-                        <option value="all">All Statuses</option>
-                        <option value="pending" selected>⏳ Pending HOD Approval</option>
-                        <option value="approved_by_hod">🟡 Approved by HOD (Pending HR)</option>
-                        <option value="approved">✅ Approved by HR</option>
-                        <option value="rejected">❌ Rejected</option>
+            <!-- Unified Filter Toolbar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <!-- Search Box -->
+                <div style="position: relative; flex: 1; min-width: 200px; max-width: 300px;">
+                    <input type="text" id="hr-leave-search" class="input-control" placeholder="🔍 Search employee, reason, notes..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyLeavesClientFilters()">
+                </div>
+
+                <!-- Dropdown Filter Pills -->
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                    <select id="hr-leave-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyLeavesClientFilters()">
+                        <option value="">🏢 All Departments</option>
                     </select>
 
-                    <select id="hr-leave-type-filter" class="input-control" style="font-size: 12.5px; padding: 6px 12px; min-width: 140px;" onchange="loadHrLeaves()">
-                        <option value="all">All Leave Types</option>
+                    <select id="hr-leave-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLeaves()">
+                        <option value="all">All Statuses</option>
+                        <option value="pending" selected>⏳ Pending HOD Approval</option>
+                        <option value="approved_by_hod">🟡 Approved by HOD</option>
+                        <option value="approved">✅ Approved by HR</option>
+                        <option value="rejected">❌ Rejected</option>
+                        <option value="cancelled">🚫 Cancelled</option>
+                    </select>
+
+                    <select id="hr-leave-type-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLeaves()">
+                        <option value="all">🌴 All Leave Types</option>
                         <option value="casual">🌴 Casual Leave</option>
                         <option value="sick">🩺 Sick Leave</option>
                         <option value="annual">🏖️ Annual Leave</option>
@@ -331,13 +345,17 @@
                         <option value="other">📝 Other</option>
                     </select>
 
-                    <select id="hr-leave-emp-filter" class="input-control admin-only" style="font-size: 12.5px; padding: 6px 12px; min-width: 160px;" onchange="loadHrLeaves()">
-                        <option value="">All Employees</option>
+                    <select id="hr-leave-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLeaves()">
+                        <option value="">👤 All Employees</option>
                     </select>
-                </div>
 
-                <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;" id="hr-leaves-count-label">
-                    Showing 0 requests
+                    <button type="button" id="hr-leave-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetLeavesFilters()" title="Reset all filters">
+                        ↺ Reset
+                    </button>
+                    
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-leaves-count-label">
+                        Showing 0 requests
+                    </span>
                 </div>
             </div>
 
@@ -397,10 +415,20 @@
         </div>
 
         <div class="worksheet-card">
-            <!-- Filter Bar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <select id="hr-loan-status-filter" class="input-control" style="font-size: 12.5px; padding: 6px 12px; min-width: 140px;" onchange="loadHrLoans()">
+            <!-- Unified Filter Toolbar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <!-- Search Box -->
+                <div style="position: relative; flex: 1; min-width: 200px; max-width: 300px;">
+                    <input type="text" id="hr-loan-search" class="input-control" placeholder="🔍 Search employee, reason, amount..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyLoansClientFilters()">
+                </div>
+
+                <!-- Dropdown Filter Pills -->
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                    <select id="hr-loan-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyLoansClientFilters()">
+                        <option value="">🏢 All Departments</option>
+                    </select>
+
+                    <select id="hr-loan-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLoans()">
                         <option value="all">All Statuses</option>
                         <option value="pending" selected>⏳ Pending Review</option>
                         <option value="approved">✅ Active / Approved</option>
@@ -408,20 +436,24 @@
                         <option value="rejected">❌ Rejected</option>
                     </select>
 
-                    <select id="hr-loan-type-filter" class="input-control" style="font-size: 12.5px; padding: 6px 12px; min-width: 150px;" onchange="loadHrLoans()">
-                        <option value="all">All Loan Types</option>
+                    <select id="hr-loan-type-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLoans()">
+                        <option value="all">💳 All Request Types</option>
                         <option value="advance_salary">💵 Advance Salary</option>
                         <option value="emergency_loan">🚨 Emergency Loan</option>
                         <option value="medical_aid">🩺 Medical Aid</option>
                     </select>
 
-                    <select id="hr-loan-emp-filter" class="input-control admin-only" style="font-size: 12.5px; padding: 6px 12px; min-width: 160px;" onchange="loadHrLoans()">
-                        <option value="">All Employees</option>
+                    <select id="hr-loan-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLoans()">
+                        <option value="">👤 All Employees</option>
                     </select>
-                </div>
 
-                <div style="font-size: 12px; color: var(--text-muted); font-weight: 600;" id="hr-loans-count-label">
-                    Showing 0 loan records
+                    <button type="button" id="hr-loan-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetLoansFilters()" title="Reset all filters">
+                        ↺ Reset
+                    </button>
+                    
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-loans-count-label">
+                        Showing 0 loan records
+                    </span>
                 </div>
             </div>
 
@@ -444,6 +476,136 @@
                         <tr>
                             <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
                                 Loading loan records...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</section>
+
+
+<!-- ================= 3. FUEL, TRAVEL, FOOD & INCENTIVE CLAIMS ================= -->
+<section id="tab-hr-claims" class="tab-section">
+    <div class="worksheet-container">
+        
+        <div class="worksheet-card" style="margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <h2 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 2px;">
+                        ⛽ Fuel, Travel, Food & Incentive Allowances
+                    </h2>
+                    <p style="color: var(--text-muted); font-size: 12.5px; margin: 0;">
+                        Manage employee fuel allowances, travel expenses, food bills reimbursement, overtime meals, and performance incentives.
+                    </p>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button type="button" class="btn btn-primary" onclick="openAddClaimModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                        + Add Allowance / Claim
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="loadHrClaims()" title="Reload claims">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Summary KPI metrics -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px;">
+                <div style="padding: 12px 16px; background: rgba(14, 165, 233, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(14, 165, 233, 0.2);">
+                    <div style="font-size: 11px; font-weight: 800; color: #0284c7; text-transform: uppercase;">⛽ Fuel / Travel Approved</div>
+                    <div id="hr-claims-total-fuel" style="font-size: 19px; font-weight: 800; color: #0284c7; margin-top: 2px;">PKR 0</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Fuel & travel allowances</div>
+                </div>
+
+                <div style="padding: 12px 16px; background: rgba(16, 185, 129, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.2);">
+                    <div style="font-size: 11px; font-weight: 800; color: #059669; text-transform: uppercase;">🍲 Food Bills Approved</div>
+                    <div id="hr-claims-total-food" style="font-size: 19px; font-weight: 800; color: #059669; margin-top: 2px;">PKR 0</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Meal reimbursements</div>
+                </div>
+
+                <div style="padding: 12px 16px; background: rgba(139, 92, 246, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(139, 92, 246, 0.2);">
+                    <div style="font-size: 11px; font-weight: 800; color: #7c3aed; text-transform: uppercase;">🏆 Incentives & Bonus</div>
+                    <div id="hr-claims-total-incentive" style="font-size: 19px; font-weight: 800; color: #7c3aed; margin-top: 2px;">PKR 0</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Performance rewards</div>
+                </div>
+
+                <div style="padding: 12px 16px; background: rgba(245, 158, 11, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(245, 158, 11, 0.2);">
+                    <div style="font-size: 11px; font-weight: 800; color: #d97706; text-transform: uppercase;">⏳ Pending Review</div>
+                    <div id="hr-claims-total-pending" style="font-size: 19px; font-weight: 800; color: #d97706; margin-top: 2px;">0 Claims</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Awaiting HR approval</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="worksheet-card">
+            <!-- Unified Filter Toolbar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <!-- Search Box -->
+                <div style="position: relative; flex: 1; min-width: 200px; max-width: 280px;">
+                    <input type="text" id="hr-claims-search" class="input-control" placeholder="🔍 Search employee, route, receipt..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyClaimsClientFilters()">
+                </div>
+
+                <!-- Dropdown Filter Pills -->
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                    <input type="month" id="hr-claims-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrClaims()">
+
+                    <select id="hr-claims-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyClaimsClientFilters()">
+                        <option value="">🏢 All Departments</option>
+                    </select>
+
+                    <select id="hr-claims-type-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrClaims()">
+                        <option value="all">⛽ All Claim Types</option>
+                        <option value="fuel">⛽ Fuel & Mileage</option>
+                        <option value="travel">✈️ Travel / Official Trip</option>
+                        <option value="mobile">📱 Mobile / Internet</option>
+                        <option value="food_bills">🍲 Food Bills & Meals</option>
+                        <option value="incentive">🏆 Incentive / Reward</option>
+                        <option value="bonus">🎁 Bonus & Others</option>
+                    </select>
+
+                    <select id="hr-claims-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrClaims()">
+                        <option value="all">All Statuses</option>
+                        <option value="pending">⏳ Pending Review</option>
+                        <option value="approved" selected>✅ Approved</option>
+                        <option value="paid">💵 Paid</option>
+                        <option value="rejected">❌ Rejected</option>
+                    </select>
+
+                    <select id="hr-claims-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrClaims()">
+                        <option value="">👤 All Employees</option>
+                    </select>
+
+                    <button type="button" id="hr-claims-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetClaimsFilters()" title="Reset all filters">
+                        ↺ Reset
+                    </button>
+                    
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-claims-count-label">
+                        Showing 0 claim(s)
+                    </span>
+                </div>
+            </div>
+
+            <!-- Claims Table -->
+            <div class="table-responsive">
+                <table class="interactive-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 22%; min-width: 180px;">Employee</th>
+                            <th style="width: 14%; min-width: 130px;">Category</th>
+                            <th style="width: 12%; min-width: 100px; font-weight: 800;">Amount (PKR)</th>
+                            <th style="width: 12%; min-width: 110px;">Date & Month</th>
+                            <th style="width: 22%; min-width: 180px;">Details / Route / Receipt</th>
+                            <th style="width: 8%; min-width: 90px; text-align: center;">Status</th>
+                            <th style="width: 10%; min-width: 95px; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hr-claims-table-body">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                                Loading allowance and claim records...
                             </td>
                         </tr>
                     </tbody>
@@ -478,6 +640,34 @@
                         🔄 Refresh
                     </button>
                 </div>
+        <!-- Unified Filter Toolbar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <!-- Search Box -->
+            <div style="position: relative; flex: 1; min-width: 220px; max-width: 320px;">
+                <input type="text" id="hr-notice-search" class="input-control" placeholder="🔍 Search notices, announcements..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyNoticesClientFilters()">
+            </div>
+
+            <!-- Dropdown Filter Pills -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                <select id="hr-notice-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyNoticesClientFilters()">
+                    <option value="">🏢 All Departments</option>
+                </select>
+
+                <select id="hr-notice-priority-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyNoticesClientFilters()">
+                    <option value="all">📢 All Priorities</option>
+                    <option value="urgent">🚨 Urgent / Important</option>
+                    <option value="holiday">🎉 Holiday Schedule</option>
+                    <option value="event">🏆 Company Event</option>
+                    <option value="normal">📢 General Notice</option>
+                </select>
+
+                <button type="button" id="hr-notice-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetNoticesFilters()" title="Reset all filters">
+                    ↺ Reset
+                </button>
+                
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-notices-count-label">
+                    Showing 0 notices
+                </span>
             </div>
         </div>
 
@@ -517,43 +707,6 @@
                 </div>
             </div>
 
-            <!-- Fines Filter Toolbar -->
-            <div style="display: flex; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; border-top: 1px solid var(--border-color); padding-top: 14px;">
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <label for="hr-fines-month-filter" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Salary Month:</label>
-                    <input type="month" id="hr-fines-month-filter" class="input-control" style="padding: 5px 10px; font-size: 12px; font-weight: 600;" onchange="loadHrFines()">
-                </div>
-
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <label for="hr-fines-status-filter" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Status:</label>
-                    <select id="hr-fines-status-filter" class="input-control" style="padding: 5px 10px; font-size: 12px; font-weight: 600;" onchange="loadHrFines()">
-                        <option value="all">All Statuses</option>
-                        <option value="applied" selected>Applied (Active)</option>
-                        <option value="waived">Waived (Forgiven)</option>
-                    </select>
-                </div>
-
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <label for="hr-fines-cat-filter" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Violation:</label>
-                    <select id="hr-fines-cat-filter" class="input-control" style="padding: 5px 10px; font-size: 12px; font-weight: 600;" onchange="loadHrFines()">
-                        <option value="all">All Violations</option>
-                        <option value="late_arrival">⏱️ Late Arrival</option>
-                        <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
-                        <option value="sop_violation">⚠️ SOP / Policy Violation</option>
-                        <option value="negligence">⚠️ Negligence / Damage</option>
-                        <option value="misconduct">🛑 Misconduct</option>
-                        <option value="other">📝 Other Reason</option>
-                    </select>
-                </div>
-
-                <div class="admin-only" style="display: flex; align-items: center; gap: 6px;">
-                    <label for="hr-fines-emp-filter" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Staff:</label>
-                    <select id="hr-fines-emp-filter" class="input-control" style="padding: 5px 10px; font-size: 12px; min-width: 150px;" onchange="loadHrFines()">
-                        <option value="">All Employees</option>
-                    </select>
-                </div>
-            </div>
-
             <!-- Fines Summary Metrics -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px;">
                 <div style="padding: 12px 16px; background: rgba(239, 68, 68, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(239, 68, 68, 0.2);">
@@ -578,11 +731,49 @@
 
         <!-- Fines Records Interactive Table -->
         <div class="worksheet-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <h3 style="font-size: 15px; font-weight: 800; color: var(--text-main); margin: 0;">
-                    📋 Disciplinary Actions & Fines Ledger
-                </h3>
-                <span id="hr-fines-count-label" style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Showing 0 record(s)</span>
+            <!-- Unified Filter Toolbar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <!-- Search Box -->
+                <div style="position: relative; flex: 1; min-width: 200px; max-width: 280px;">
+                    <input type="text" id="hr-fines-search" class="input-control" placeholder="🔍 Search employee, violation, reason..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyFinesClientFilters()">
+                </div>
+
+                <!-- Dropdown Filter Pills -->
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                    <input type="month" id="hr-fines-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrFines()">
+
+                    <select id="hr-fines-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyFinesClientFilters()">
+                        <option value="">🏢 All Departments</option>
+                    </select>
+
+                    <select id="hr-fines-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
+                        <option value="all">All Statuses</option>
+                        <option value="applied" selected>🔴 Applied</option>
+                        <option value="waived">🟢 Waived</option>
+                    </select>
+
+                    <select id="hr-fines-cat-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
+                        <option value="all">⚠️ All Violations</option>
+                        <option value="late_arrival">⏱️ Late Arrival</option>
+                        <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
+                        <option value="sop_violation">⚠️ SOP / Policy Violation</option>
+                        <option value="negligence">⚠️ Negligence / Damage</option>
+                        <option value="misconduct">🛑 Misconduct</option>
+                        <option value="other">📝 Other Reason</option>
+                    </select>
+
+                    <select id="hr-fines-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
+                        <option value="">👤 All Employees</option>
+                    </select>
+
+                    <button type="button" id="hr-fines-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetFinesFilters()" title="Reset all filters">
+                        ↺ Reset
+                    </button>
+                    
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-fines-count-label">
+                        Showing 0 record(s)
+                    </span>
+                </div>
             </div>
 
             <div class="table-responsive">
@@ -619,7 +810,7 @@
     <div class="worksheet-container">
 
         <div class="worksheet-card" style="margin-bottom: 18px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
                 <div>
                     <h2 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 2px;">
                         💰 Monthly Payroll & Compensation Command Center
@@ -629,11 +820,72 @@
                     </p>
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <label for="hr-payroll-month" style="font-size: 12.5px; font-weight: 700; color: var(--text-muted);">Salary Month:</label>
-                    <input type="month" id="hr-payroll-month" class="input-control" style="font-size: 13px; font-weight: 700; padding: 6px 12px;" onchange="loadHrPayroll()">
-                    <button type="button" class="btn btn-outline" onclick="loadHrPayroll()" title="Recalculate stats">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <label for="hr-payroll-month" style="font-size: 12px; font-weight: 700; color: var(--text-muted);">Salary Month:</label>
+                    <input type="month" id="hr-payroll-month" class="input-control" value="<?php echo date('Y-m'); ?>" style="font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: var(--radius-md);" onchange="loadHrPayroll()">
+                    <button type="button" class="btn btn-outline" onclick="loadHrPayroll()" title="Recalculate stats" style="padding: 6px 12px; font-size: 12.5px; font-weight: 600;">
                         🔄 Recalculate
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="exportPayrollCSV()" style="padding: 6px 12px; font-size: 12.5px; font-weight: 700; color: #10b981; border-color: rgba(16, 185, 129, 0.4);" title="Export complete monthly payroll sheet to CSV / Excel">
+                        📊 Export CSV / Excel
+                    </button>
+                </div>
+            </div>
+
+            <!-- Payroll Quick Summary Stats Row -->
+            <div id="payroll-summary-bar" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px;">
+                <div style="background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Staff</div>
+                    <div id="payroll-stat-total-emp" style="font-size: 17px; font-weight: 800; color: var(--text-main); margin-top: 2px;">0</div>
+                </div>
+                <div style="background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Gross Pay</div>
+                    <div id="payroll-stat-total-gross" style="font-size: 17px; font-weight: 800; color: var(--text-main); margin-top: 2px;">PKR 0</div>
+                </div>
+                <div style="background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Deductions</div>
+                    <div id="payroll-stat-total-deductions" style="font-size: 17px; font-weight: 800; color: #ef4444; margin-top: 2px;">PKR 0</div>
+                </div>
+                <div style="background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Net Payout</div>
+                    <div id="payroll-stat-total-net" style="font-size: 17px; font-weight: 800; color: #059669; margin-top: 2px;">PKR 0</div>
+                </div>
+            </div>
+
+            <!-- Single-Row Unified Filter Toolbar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <!-- Search Box -->
+                <div style="position: relative; flex: 1; min-width: 220px; max-width: 320px;">
+                    <input type="text" id="hr-payroll-search" class="input-control" placeholder="🔍 Search staff, code, CNIC, designation..." style="width: 100%; padding: 7px 12px; font-size: 12.5px; border-radius: var(--radius-md);" oninput="applyPayrollFilters()">
+                </div>
+
+                <!-- Dropdown Filter Pills -->
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                    <select id="hr-payroll-filter-dept" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyPayrollFilters()">
+                        <option value="">🏢 All Departments</option>
+                    </select>
+
+                    <select id="hr-payroll-filter-status" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyPayrollFilters()">
+                        <option value="">💳 All Payment Status</option>
+                        <option value="draft">⏳ Draft</option>
+                        <option value="approved">🔵 Approved</option>
+                        <option value="paid">✅ Paid</option>
+                    </select>
+
+                    <select id="hr-payroll-filter-bank" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyPayrollFilters()">
+                        <option value="">🏦 All Banks / Cash</option>
+                        <option value="UBL">🏦 UBL</option>
+                        <option value="Meezan Bank">🏦 Meezan</option>
+                        <option value="HBL">🏦 HBL</option>
+                        <option value="MCB">🏦 MCB</option>
+                        <option value="Allied Bank">🏦 Allied</option>
+                        <option value="Bank Alfalah">🏦 Alfalah</option>
+                        <option value="Faysal Bank">🏦 Faysal</option>
+                        <option value="Cash">💵 Cash</option>
+                    </select>
+
+                    <button type="button" id="hr-payroll-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetPayrollFilters()" title="Reset all filters">
+                        ↺ Reset
                     </button>
                 </div>
             </div>
@@ -644,22 +896,25 @@
                 <table class="interactive-table">
                     <thead>
                         <tr>
-                            <th style="width: 17%; min-width: 155px;">Employee</th>
-                            <th style="width: 7%; min-width: 65px; text-align: center;" title="Attended working days">Present</th>
-                            <th style="width: 7%; min-width: 65px; text-align: center;" title="Approved paid leaves">Leaves</th>
-                            <th style="width: 8%; min-width: 75px; text-align: center;" title="Total recorded duty hours">Hours</th>
-                            <th style="width: 11%; min-width: 95px;">Basic Pay</th>
-                            <th style="width: 9%; min-width: 85px;">Bonus</th>
-                            <th style="width: 12%; min-width: 100px;">Deductions (Loans)</th>
-                            <th style="width: 10%; min-width: 95px; color: #ef4444;">Fines</th>
-                            <th style="width: 12%; min-width: 110px; font-weight: 800;">Net Salary</th>
-                            <th style="width: 6%; min-width: 75px; text-align: center;">Status</th>
-                            <th style="width: 5%; min-width: 70px; text-align: center;">Slip</th>
+                            <th style="min-width: 150px;">Staff & Code</th>
+                            <th style="min-width: 140px;">Designation</th>
+                            <th style="min-width: 130px;">Father / CNIC</th>
+                            <th style="text-align: center; min-width: 110px;" title="Approved Paid & Unpaid Leaves">Leaves / P. Leaves</th>
+                            <th style="min-width: 100px;">Gross Salary</th>
+                            <th style="min-width: 90px;">Fuel / Travel</th>
+                            <th style="min-width: 95px;">Incentive / Food</th>
+                            <th style="min-width: 100px;">Advance / Loan</th>
+                            <th style="min-width: 85px; color: #ef4444;">Fines</th>
+                            <th style="min-width: 80px;">WHT</th>
+                            <th style="min-width: 110px; font-weight: 800;">Net Salary</th>
+                            <th style="min-width: 130px;">Bank / Form #</th>
+                            <th style="text-align: center; min-width: 85px;">Status</th>
+                            <th style="text-align: right; min-width: 85px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="hr-payroll-table-body">
                         <tr>
-                            <td colspan="11" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                            <td colspan="14" style="text-align: center; padding: 30px; color: var(--text-muted);">
                                 Select month to calculate payroll...
                             </td>
                         </tr>
@@ -988,6 +1243,77 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('hr-issue-fine-modal')">Cancel</button>
                 <button type="submit" class="btn btn-primary" style="background: #dc2626; border-color: #dc2626;">⚠️ Issue Disciplinary Fine</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 6. Add Fuel, Travel, Food & Incentive Claim Modal -->
+<div id="hr-add-claim-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3 class="modal-title">⛽ Add Allowance / Expense Claim</h3>
+            <button type="button" class="modal-close" onclick="closeModal('hr-add-claim-modal')">&times;</button>
+        </div>
+        <form id="hr-add-claim-form" onsubmit="handleSaveClaimSubmit(event)">
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Employee</label>
+                    <select id="hr-claim-form-emp-id" class="input-control" style="width: 100%;" required>
+                        <!-- Dynamic Staff List -->
+                    </select>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label">Claim / Allowance Category</label>
+                        <select id="hr-claim-form-type" class="input-control" style="width: 100%; font-weight: 600;" required>
+                            <option value="fuel" selected>⛽ Fuel / Mileage</option>
+                            <option value="travel">✈️ Travel / Official Trip</option>
+                            <option value="mobile">📱 Mobile / Internet</option>
+                            <option value="food_bills">🍲 Food Bills / Meals</option>
+                            <option value="incentive">🏆 Performance Incentive</option>
+                            <option value="bonus">🎁 Special Bonus</option>
+                            <option value="other">📝 Other Allowance</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Amount (PKR)</label>
+                        <input type="number" step="0.01" min="1" id="hr-claim-form-amount" class="input-control" placeholder="e.g. 5000" style="width: 100%; font-weight: 700; color: #059669;" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label">Expense / Claim Date</label>
+                        <input type="date" id="hr-claim-form-date" class="input-control" style="width: 100%;" required onchange="updateClaimFormSalaryMonth()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Salary Month to Apply</label>
+                        <input type="month" id="hr-claim-form-month" class="input-control" style="width: 100%; font-weight: 600;" required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Receipt / Bill # / Route Details</label>
+                    <input type="text" id="hr-claim-form-receipt" class="input-control" placeholder="e.g. Slip #9821 / Lahore to Isb route" style="width: 100%;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Purpose / Description & Remarks</label>
+                    <textarea id="hr-claim-form-reason" class="input-control" rows="3" placeholder="Provide full details, client visit, night shift meal, performance target..." style="width: 100%; resize: vertical;" required></textarea>
+                </div>
+
+                <div class="admin-only" style="margin-bottom: 10px;">
+                    <label style="font-size: 12.5px; display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-main);">
+                        <input type="checkbox" id="hr-claim-form-auto-approve" value="1" checked>
+                        <b>Directly approve and apply this allowance to payroll</b>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('hr-add-claim-modal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">💾 Save & Record Allowance</button>
             </div>
         </form>
     </div>

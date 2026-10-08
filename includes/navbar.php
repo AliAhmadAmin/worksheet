@@ -138,6 +138,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance & Loans</span>
             </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+                <span class="nav-icon">⛽</span>
+                <span class="nav-label">Fuel, Travel & Food</span>
+            </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
@@ -263,6 +267,11 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance & Loans</span>
                 <span id="pending-loans-badge" class="nav-badge badge-info" style="display: none;">0</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+                <span class="nav-icon">⛽</span>
+                <span class="nav-label">Fuel, Travel & Food</span>
+                <span id="pending-claims-badge" class="nav-badge badge-info" style="display: none;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>

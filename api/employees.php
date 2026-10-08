@@ -26,15 +26,25 @@ $currentUserObj = $stmtUserCheck->fetch() ?: [];
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
 $isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
 $isHod = ($currentUserRole === 'hod');
-$isHr = ($currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr'));
+$isHr = ($currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr') || !empty($currentUserObj['can_manage_hr']));
 $canManageEmp = $isSuperAdmin || $isHr || !empty($currentUserObj['can_manage_employees']);
 
 switch ($action) {
     case 'list':
         $requestedDeptId = isset($_GET['department_id']) ? (int)$_GET['department_id'] : null;
+        $statusFilter = $_GET['status'] ?? null;
+        $includeInactive = isset($_GET['include_inactive']) && ($_GET['include_inactive'] === '1' || $_GET['include_inactive'] === 'true');
 
-        $whereClauses = ["e.is_active = 1"];
+        $whereClauses = [];
         $params = [];
+
+        if (!$includeInactive && $statusFilter !== 'all') {
+            if ($statusFilter === 'inactive') {
+                $whereClauses[] = "e.is_active = 0";
+            } else {
+                $whereClauses[] = "e.is_active = 1";
+            }
+        }
 
         if (!$isSuperAdmin && !$isHr) {
             // HOD and employees are restricted to their own department
@@ -48,10 +58,11 @@ switch ($action) {
             $params[] = $requestedDeptId;
         }
 
-        $whereSql = implode(' AND ', $whereClauses);
+        $whereSql = !empty($whereClauses) ? implode(' AND ', $whereClauses) : '1=1';
 
         $stmt = $pdo->prepare("
             SELECT e.*,
+                   p.emp_code, p.father_husband_name, p.cnic_no, p.bank_name, p.bank_account_no, p.fixed_allowance,
                    p.basic_salary, p.hourly_rate, p.expected_hours, p.shift_policy, p.joining_date,
                    p.annual_leave_quota, p.casual_leave_quota, p.sick_leave_quota,
                    d.name as department_name, t.name as team_name 
@@ -80,8 +91,27 @@ switch ($action) {
             unset($emp['password_hash']);
         }
 
-        $departments = $pdo->query("SELECT * FROM departments WHERE is_active = 1 ORDER BY id ASC")->fetchAll();
-        $teams = $pdo->query("SELECT * FROM teams ORDER BY id ASC")->fetchAll();
+        $departments = $pdo->query("
+            SELECT d.*, 
+                   h.name as hod_name, h.email as hod_email, h.avatar as hod_avatar,
+                   (SELECT COUNT(*) FROM teams t WHERE t.department_id = d.id) as team_count,
+                   (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id AND e.is_active = 1) as member_count,
+                   (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id AND (e.team_id IS NULL OR e.team_id = 0) AND e.is_active = 1) as unassigned_count
+            FROM departments d
+            LEFT JOIN employees h ON d.hod_id = h.id
+            WHERE d.is_active = 1
+            ORDER BY d.id ASC
+        ")->fetchAll();
+
+        $teams = $pdo->query("
+            SELECT t.*,
+                   d.name as department_name,
+                   (SELECT COUNT(*) FROM employees e WHERE e.team_id = t.id AND e.is_active = 1) as member_count
+            FROM teams t
+            LEFT JOIN departments d ON t.department_id = d.id
+            ORDER BY t.department_id ASC, t.name ASC
+        ")->fetchAll();
+
         $contentTypes = $pdo->query("SELECT * FROM content_types ORDER BY id ASC")->fetchAll();
 
         echo json_encode([
@@ -167,13 +197,21 @@ switch ($action) {
         }
 
         $name = trim($data['name'] ?? '');
-        $email = trim($data['email'] ?? '');
+        $canLogin = !empty($data['can_login']) ? 1 : 0;
+        $email = !empty(trim($data['email'] ?? '')) ? trim($data['email']) : null;
         $password = trim($data['password'] ?? 'DiscoverPakistan123');
-        $role = $data['role'] ?? 'employee';
-        $designation = trim($data['designation'] ?? 'Content Creator');
-        $deptId = (int)($data['department_id'] ?? 2);
-        $teamId = (int)($data['team_id'] ?? 2);
+        $role = $canLogin ? ($data['role'] ?? 'employee') : 'employee';
+        $designation = trim($data['designation'] ?? '');
+        $deptId = (!empty($data['department_id']) && (int)$data['department_id'] > 0) ? (int)$data['department_id'] : null;
+        $teamId = (!empty($data['team_id']) && (int)$data['team_id'] > 0) ? (int)$data['team_id'] : null;
         $avatar = trim($data['avatar'] ?? '');
+
+        $empCode = trim($data['emp_code'] ?? '');
+        $fatherHusbandName = trim($data['father_husband_name'] ?? '');
+        $cnicNo = trim($data['cnic_no'] ?? '');
+        $bankName = trim($data['bank_name'] ?? 'UBL');
+        $bankAccountNo = trim($data['bank_account_no'] ?? '');
+        $fixedAllowance = isset($data['fixed_allowance']) ? (float)$data['fixed_allowance'] : 0.0;
 
         $expectedHours = isset($data['expected_hours']) ? (float)$data['expected_hours'] : 8.0;
         $shiftPolicy = trim($data['shift_policy'] ?? ($expectedHours == 0.0 ? 'open_flexible' : 'standard_' . intval($expectedHours) . 'h'));
@@ -183,9 +221,15 @@ switch ($action) {
         $casualQuota = isset($data['casual_leave_quota']) ? (int)$data['casual_leave_quota'] : 10;
         $sickQuota = isset($data['sick_leave_quota']) ? (int)$data['sick_leave_quota'] : 8;
 
-        if (empty($name) || empty($email)) {
+        if (empty($name)) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Employee name and email are required.']);
+            echo json_encode(['success' => false, 'message' => 'Employee name is required.']);
+            exit;
+        }
+
+        if ($canLogin && empty($email)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Official email address is required when portal login access is enabled.']);
             exit;
         }
 
@@ -206,27 +250,35 @@ switch ($action) {
         }
 
         // Check if email already exists
-        $check = $pdo->prepare("SELECT id FROM employees WHERE LOWER(email) = LOWER(?)");
-        $check->execute([$email]);
-        if ($check->fetch()) {
-            http_response_code(409);
-            echo json_encode(['success' => false, 'message' => 'An employee with this email address already exists.']);
-            exit;
+        if (!empty($email)) {
+            $check = $pdo->prepare("SELECT id FROM employees WHERE LOWER(email) = LOWER(?)");
+            $check->execute([$email]);
+            if ($check->fetch()) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'message' => 'An employee with this email address already exists.']);
+                exit;
+            }
         }
 
-        $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)");
-        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar]);
+        $passwordHash = $canLogin ? password_hash($password, PASSWORD_DEFAULT) : null;
+        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, can_login, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
+        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar, $canLogin]);
         $newEmpId = $pdo->lastInsertId();
+
+        // Default employee code if empty
+        if (empty($empCode)) {
+            $empCode = 'DP-' . str_pad($newEmpId, 3, '0', STR_PAD_LEFT);
+        }
 
         // Create initial HR profile
         $stmtProf = $pdo->prepare("
-            INSERT INTO hr_employee_profiles (employee_id, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hr_employee_profiles (employee_id, emp_code, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmtProf->execute([$newEmpId, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
+        $stmtProf->execute([$newEmpId, $empCode, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
 
-        echo json_encode(['success' => true, 'message' => "Employee {$name} added successfully with shift and salary settings!", 'id' => $newEmpId]);
+        $loginMsg = $canLogin ? "with portal login enabled" : "as profile/roster only (no login)";
+        echo json_encode(['success' => true, 'message' => "Employee {$name} ({$empCode}) added successfully {$loginMsg}!", 'id' => $newEmpId]);
         break;
 
     case 'update_profile':
@@ -339,12 +391,20 @@ switch ($action) {
 
         $id = (int)($data['id'] ?? 0);
         $name = trim($data['name'] ?? '');
-        $email = trim($data['email'] ?? '');
-        $role = $data['role'] ?? 'employee';
-        $designation = trim($data['designation'] ?? 'Content Creator');
-        $deptId = (int)($data['department_id'] ?? 2);
-        $teamId = (int)($data['team_id'] ?? 2);
+        $canLogin = !empty($data['can_login']) ? 1 : 0;
+        $email = !empty(trim($data['email'] ?? '')) ? trim($data['email']) : null;
+        $role = $canLogin ? ($data['role'] ?? 'employee') : 'employee';
+        $designation = trim($data['designation'] ?? '');
+        $deptId = (!empty($data['department_id']) && (int)$data['department_id'] > 0) ? (int)$data['department_id'] : null;
+        $teamId = (!empty($data['team_id']) && (int)$data['team_id'] > 0) ? (int)$data['team_id'] : null;
         $avatar = trim($data['avatar'] ?? '');
+
+        $empCode = trim($data['emp_code'] ?? '');
+        $fatherHusbandName = trim($data['father_husband_name'] ?? '');
+        $cnicNo = trim($data['cnic_no'] ?? '');
+        $bankName = trim($data['bank_name'] ?? 'UBL');
+        $bankAccountNo = trim($data['bank_account_no'] ?? '');
+        $fixedAllowance = isset($data['fixed_allowance']) ? (float)$data['fixed_allowance'] : 0.0;
 
         $expectedHours = isset($data['expected_hours']) ? (float)$data['expected_hours'] : 8.0;
         $shiftPolicy = trim($data['shift_policy'] ?? ($expectedHours == 0.0 ? 'open_flexible' : 'standard_' . intval($expectedHours) . 'h'));
@@ -354,9 +414,15 @@ switch ($action) {
         $casualQuota = isset($data['casual_leave_quota']) ? (int)$data['casual_leave_quota'] : 10;
         $sickQuota = isset($data['sick_leave_quota']) ? (int)$data['sick_leave_quota'] : 8;
 
-        if (!$id || empty($name) || empty($email)) {
+        if (!$id || empty($name)) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Employee ID, name, and email are required.']);
+            echo json_encode(['success' => false, 'message' => 'Employee ID and name are required.']);
+            exit;
+        }
+
+        if ($canLogin && empty($email)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Official email address is required when portal login access is enabled.']);
             exit;
         }
 
@@ -377,27 +443,40 @@ switch ($action) {
         }
 
         // Check email uniqueness for other users
-        $check = $pdo->prepare("SELECT id FROM employees WHERE LOWER(email) = LOWER(?) AND id != ?");
-        $check->execute([$email, $id]);
-        if ($check->fetch()) {
-            http_response_code(409);
-            echo json_encode(['success' => false, 'message' => 'This email is already in use by another employee.']);
-            exit;
+        if (!empty($email)) {
+            $check = $pdo->prepare("SELECT id FROM employees WHERE LOWER(email) = LOWER(?) AND id != ?");
+            $check->execute([$email, $id]);
+            if ($check->fetch()) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'message' => 'This email is already in use by another employee.']);
+                exit;
+            }
+        }
+
+        $isActive = isset($data['is_active']) ? (int)$data['is_active'] : 1;
+        if (($_SESSION['user_id'] ?? 0) === $id && $isActive === 0) {
+            $isActive = 1;
         }
 
         if (!empty($avatar)) {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $id]);
         }
 
         // Update / Insert into hr_employee_profiles
         $stmtProf = $pdo->prepare("
-            INSERT INTO hr_employee_profiles (employee_id, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hr_employee_profiles (employee_id, emp_code, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
+                emp_code = VALUES(emp_code),
+                father_husband_name = VALUES(father_husband_name),
+                cnic_no = VALUES(cnic_no),
+                bank_name = VALUES(bank_name),
+                bank_account_no = VALUES(bank_account_no),
+                fixed_allowance = VALUES(fixed_allowance),
                 basic_salary = VALUES(basic_salary),
                 expected_hours = VALUES(expected_hours),
                 shift_policy = VALUES(shift_policy),
@@ -406,7 +485,7 @@ switch ($action) {
                 casual_leave_quota = VALUES(casual_leave_quota),
                 sick_leave_quota = VALUES(sick_leave_quota)
         ");
-        $stmtProf->execute([$id, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
+        $stmtProf->execute([$id, $empCode, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
 
         // If updated user is current session user, update session name/role
         if (($_SESSION['user_id'] ?? 0) === $id) {
@@ -416,6 +495,293 @@ switch ($action) {
         }
 
         echo json_encode(['success' => true, 'message' => "Employee {$name} details & shift settings updated successfully!"]);
+        break;
+
+    case 'create_department':
+        if (!$canManageEmp && !$isHr && !$isSuperAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
+            exit;
+        }
+
+        $name = trim($data['name'] ?? '');
+        $description = trim($data['description'] ?? '');
+        $hodId = (!empty($data['hod_id']) && (int)$data['hod_id'] > 0) ? (int)$data['hod_id'] : null;
+
+        if (empty($name)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Department name is required.']);
+            exit;
+        }
+
+        // Check duplicate name
+        $stmtCheck = $pdo->prepare("SELECT id FROM departments WHERE LOWER(name) = LOWER(?) AND is_active = 1");
+        $stmtCheck->execute([$name]);
+        if ($stmtCheck->fetch()) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => "A department named '{$name}' already exists."]);
+            exit;
+        }
+
+        $stmtInsert = $pdo->prepare("INSERT INTO departments (name, description, hod_id, is_active) VALUES (?, ?, ?, 1)");
+        $stmtInsert->execute([$name, $description, $hodId]);
+        $newDeptId = (int)$pdo->lastInsertId();
+
+        if ($hodId) {
+            $stmtUpdateHod = $pdo->prepare("UPDATE employees SET role = 'hod', department_id = ? WHERE id = ?");
+            $stmtUpdateHod->execute([$newDeptId, $hodId]);
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Department '{$name}' created successfully!",
+            'id' => $newDeptId
+        ]);
+        break;
+
+    case 'update_department':
+        if (!$canManageEmp && !$isHr && !$isSuperAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
+            exit;
+        }
+
+        $id = (int)($data['id'] ?? 0);
+        $name = trim($data['name'] ?? '');
+        $description = trim($data['description'] ?? '');
+        $hodId = (!empty($data['hod_id']) && (int)$data['hod_id'] > 0) ? (int)$data['hod_id'] : null;
+
+        if (!$id || empty($name)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Department ID and name are required.']);
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM departments WHERE LOWER(name) = LOWER(?) AND id != ? AND is_active = 1");
+        $stmtCheck->execute([$name, $id]);
+        if ($stmtCheck->fetch()) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => "Another department is already using the name '{$name}'."]);
+            exit;
+        }
+
+        $stmtUpdate = $pdo->prepare("UPDATE departments SET name = ?, description = ?, hod_id = ? WHERE id = ?");
+        $stmtUpdate->execute([$name, $description, $hodId, $id]);
+
+        if ($hodId) {
+            $stmtUpdateHod = $pdo->prepare("UPDATE employees SET role = 'hod', department_id = ? WHERE id = ?");
+            $stmtUpdateHod->execute([$id, $hodId]);
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Department '{$name}' updated successfully!"
+        ]);
+        break;
+
+    case 'delete_department':
+        if (!$isSuperAdmin && !$isHr) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
+            exit;
+        }
+
+        $id = (int)($data['id'] ?? 0);
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Department ID is required.']);
+            exit;
+        }
+
+        // Soft delete department
+        $stmt = $pdo->prepare("UPDATE departments SET is_active = 0 WHERE id = ?");
+        $stmt->execute([$id]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Department removed successfully.'
+        ]);
+        break;
+
+    case 'create_team':
+        $deptId = (int)($data['department_id'] ?? 0);
+        $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+
+        // HOD can create teams for their own department; Super Admin/HR can create for any department
+        if (!$isSuperAdmin && !$isHr && !$canManageEmp) {
+            if (!$isHod || $deptId !== $userDeptId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: HODs can only create teams within their own department.']);
+                exit;
+            }
+        }
+
+        $name = trim($data['name'] ?? '');
+        $description = trim($data['description'] ?? '');
+
+        if (empty($name) || !$deptId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Team name and department are required.']);
+            exit;
+        }
+
+        // Check duplicate team name in this department
+        $stmtCheck = $pdo->prepare("SELECT id FROM teams WHERE LOWER(name) = LOWER(?) AND department_id = ?");
+        $stmtCheck->execute([$name, $deptId]);
+        if ($stmtCheck->fetch()) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => "A team named '{$name}' already exists in this department."]);
+            exit;
+        }
+
+        $stmtInsert = $pdo->prepare("INSERT INTO teams (name, department_id, description) VALUES (?, ?, ?)");
+        $stmtInsert->execute([$name, $deptId, $description]);
+        $newTeamId = (int)$pdo->lastInsertId();
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Team '{$name}' created successfully!",
+            'id' => $newTeamId
+        ]);
+        break;
+
+    case 'update_team':
+        $teamId = (int)($data['id'] ?? 0);
+        $deptId = (int)($data['department_id'] ?? 0);
+        $name = trim($data['name'] ?? '');
+        $description = trim($data['description'] ?? '');
+        $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+
+        if (!$teamId || empty($name)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Team ID and name are required.']);
+            exit;
+        }
+
+        // Fetch existing team
+        $stmtFetch = $pdo->prepare("SELECT * FROM teams WHERE id = ?");
+        $stmtFetch->execute([$teamId]);
+        $existingTeam = $stmtFetch->fetch();
+        if (!$existingTeam) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Team not found.']);
+            exit;
+        }
+
+        if (!$isSuperAdmin && !$isHr && !$canManageEmp) {
+            if (!$isHod || (int)$existingTeam['department_id'] !== $userDeptId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: You can only edit teams in your assigned department.']);
+                exit;
+            }
+        }
+
+        $targetDeptId = $deptId > 0 ? $deptId : (int)$existingTeam['department_id'];
+
+        $stmtUpdate = $pdo->prepare("UPDATE teams SET name = ?, department_id = ?, description = ? WHERE id = ?");
+        $stmtUpdate->execute([$name, $targetDeptId, $description, $teamId]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Team '{$name}' updated successfully!"
+        ]);
+        break;
+
+    case 'delete_team':
+        $teamId = (int)($data['id'] ?? 0);
+        $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+
+        if (!$teamId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Team ID is required.']);
+            exit;
+        }
+
+        $stmtFetch = $pdo->prepare("SELECT * FROM teams WHERE id = ?");
+        $stmtFetch->execute([$teamId]);
+        $existingTeam = $stmtFetch->fetch();
+        if (!$existingTeam) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Team not found.']);
+            exit;
+        }
+
+        if (!$isSuperAdmin && !$isHr && !$canManageEmp) {
+            if (!$isHod || (int)$existingTeam['department_id'] !== $userDeptId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: You can only delete teams in your assigned department.']);
+                exit;
+            }
+        }
+
+        // Set team_id to NULL for all employees in this team
+        $pdo->prepare("UPDATE employees SET team_id = NULL WHERE team_id = ?")->execute([$teamId]);
+
+        // Delete team
+        $pdo->prepare("DELETE FROM teams WHERE id = ?")->execute([$teamId]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Team deleted successfully. Member assignments have been reset to unassigned."
+        ]);
+        break;
+
+    case 'assign_team':
+        $empId = (int)($data['employee_id'] ?? 0);
+        $teamId = (!empty($data['team_id']) && (int)$data['team_id'] > 0) ? (int)$data['team_id'] : null;
+        $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+
+        if (!$empId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Employee ID is required.']);
+            exit;
+        }
+
+        // Fetch target employee
+        $stmtTarget = $pdo->prepare("SELECT id, name, department_id, team_id FROM employees WHERE id = ?");
+        $stmtTarget->execute([$empId]);
+        $targetEmp = $stmtTarget->fetch();
+        if (!$targetEmp) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Employee not found.']);
+            exit;
+        }
+
+        // Check HOD department boundary
+        if (!$isSuperAdmin && !$isHr && !$canManageEmp) {
+            if (!$isHod || (int)$targetEmp['department_id'] !== $userDeptId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: HOD can only assign team members within their own department.']);
+                exit;
+            }
+        }
+
+        // If assigning to a team, verify team exists and matches department
+        if ($teamId) {
+            $stmtTeam = $pdo->prepare("SELECT id, name, department_id FROM teams WHERE id = ?");
+            $stmtTeam->execute([$teamId]);
+            $targetTeam = $stmtTeam->fetch();
+            if (!$targetTeam) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Team not found.']);
+                exit;
+            }
+            // If HOD, team must belong to their dept
+            if ($isHod && !$isSuperAdmin && !$isHr && (int)$targetTeam['department_id'] !== $userDeptId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Cannot assign employee to a team outside your department.']);
+                exit;
+            }
+        }
+
+        $stmtAssign = $pdo->prepare("UPDATE employees SET team_id = ? WHERE id = ?");
+        $stmtAssign->execute([$teamId, $empId]);
+
+        $teamLabel = $teamId ? "assigned to team successfully!" : "marked as Unassigned (General).";
+        echo json_encode([
+            'success' => true,
+            'message' => "{$targetEmp['name']} {$teamLabel}"
+        ]);
         break;
 
     case 'update_password':
@@ -441,14 +807,17 @@ switch ($action) {
         echo json_encode(['success' => true, 'message' => 'Password updated successfully!']);
         break;
 
+    case 'toggle_status':
+    case 'deactivate_employee':
     case 'delete_employee':
-        if (!$isSuperAdmin) {
+        if (!$canManageEmp && !$isSuperAdmin) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Super Admin authorization required.']);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
             exit;
         }
 
         $id = (int)($data['id'] ?? 0);
+        $newStatus = isset($data['is_active']) ? (int)$data['is_active'] : 0;
 
         if (!$id) {
             http_response_code(400);
@@ -456,18 +825,19 @@ switch ($action) {
             exit;
         }
 
-        // Prevent admin from deleting themselves
-        if (($_SESSION['user_id'] ?? 0) === $id) {
+        // Prevent admin from deactivating themselves
+        if (($_SESSION['user_id'] ?? 0) === $id && $newStatus === 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'You cannot delete your own admin account.']);
+            echo json_encode(['success' => false, 'message' => 'You cannot deactivate your own account.']);
             exit;
         }
 
-        // Soft delete or remove
-        $stmt = $pdo->prepare("DELETE FROM employees WHERE id = ?");
-        $stmt->execute([$id]);
+        // Soft deactivate/reactivate - Never hard delete employees so all payroll, attendance, fines, tasks and audit logs are preserved!
+        $stmt = $pdo->prepare("UPDATE employees SET is_active = ? WHERE id = ?");
+        $stmt->execute([$newStatus, $id]);
 
-        echo json_encode(['success' => true, 'message' => 'Employee removed successfully.']);
+        $msg = $newStatus === 1 ? 'Employee account reactivated successfully.' : 'Employee account deactivated successfully.';
+        echo json_encode(['success' => true, 'message' => $msg]);
         break;
 
     default:

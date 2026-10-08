@@ -291,10 +291,11 @@ async function loadUserData() {
 
     const isSuperAdmin = AppState.currentUser.role === 'super_admin';
     const isHod = AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'admin';
-    const canInspect = isSuperAdmin || isHod || hasPermission('can_inspect_sheets');
-    const canManage = isSuperAdmin || isHod || hasPermission('can_manage_employees');
-    const canAttendance = isSuperAdmin || isHod || hasPermission('can_view_attendance');
-    const canReports = isSuperAdmin || isHod || hasPermission('can_view_reports');
+    const isHr = AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || hasPermission('can_manage_hr');
+    const canInspect = isSuperAdmin || isHod || isHr || hasPermission('can_inspect_sheets');
+    const canManage = isSuperAdmin || isHod || isHr || hasPermission('can_manage_employees');
+    const canAttendance = isSuperAdmin || isHod || isHr || hasPermission('can_view_attendance');
+    const canReports = isSuperAdmin || isHod || isHr || hasPermission('can_view_reports');
 
     if (canInspect) {
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
@@ -672,6 +673,8 @@ function navigateToTab(tabId, updateHash = true) {
         if (typeof loadHrLeaves === 'function') loadHrLeaves();
     } else if (tabId === 'tab-hr-loans') {
         if (typeof loadHrLoans === 'function') loadHrLoans();
+    } else if (tabId === 'tab-hr-claims') {
+        if (typeof loadHrClaims === 'function') loadHrClaims();
     } else if (tabId === 'tab-hr-notices') {
         if (typeof loadHrNotices === 'function') loadHrNotices();
     } else if (tabId === 'tab-hr-fines') {
