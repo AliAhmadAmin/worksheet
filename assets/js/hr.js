@@ -266,7 +266,7 @@ function renderDashboardPendingLoansQueue(loanList) {
 
                 <div style="flex: 1; min-width: 150px;">
                     <div style="font-size: 12.5px; font-weight: 800; color: #8b5cf6;">
-                        PKR ${parseFloat(l.amount).toLocaleString()} <span style="font-size: 11px; font-weight: 600; color: var(--text-muted);">(${l.repayment_months} mo @ PKR ${parseFloat(l.monthly_deduction).toLocaleString()}/mo)</span>
+                        PKR ${Math.round(parseFloat(l.amount || 0)).toLocaleString('en-US')} <span style="font-size: 11px; font-weight: 600; color: var(--text-muted);">(${l.repayment_months} mo @ PKR ${Math.round(parseFloat(l.monthly_deduction || 0)).toLocaleString('en-US')}/mo)</span>
                     </div>
                     <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         ${typeTitle} • "${escapeHtml(l.reason)}"
@@ -1133,15 +1133,15 @@ function renderLoansTable(loans) {
                     </span>
                 </td>
                 <td style="font-weight: 800; font-size: 13.5px; color: var(--text-main);">
-                    PKR ${parseFloat(l.amount).toLocaleString()}
+                    PKR ${Math.round(parseFloat(l.amount || 0)).toLocaleString('en-US')}
                 </td>
                 <td>
-                    <div style="font-weight: 600; font-size: 12px;">${l.repayment_months} Mo @ PKR ${parseFloat(l.monthly_deduction).toLocaleString()}/mo</div>
+                    <div style="font-weight: 600; font-size: 12px;">${l.repayment_months} Mo @ PKR ${Math.round(parseFloat(l.monthly_deduction || 0)).toLocaleString('en-US')}/mo</div>
                     <div style="font-size: 10.5px; color: var(--primary);">Starts: ${escapeHtml(l.deduction_start_month)}</div>
                 </td>
                 <td>
-                    <div style="font-size: 12px; font-weight: 700; color: #10b981;">Paid: PKR ${parseFloat(l.paid_amount || 0).toLocaleString()}</div>
-                    <div style="font-size: 11px; font-weight: 700; color: #ef4444;">Rem: PKR ${parseFloat(l.remaining_amount || 0).toLocaleString()}</div>
+                    <div style="font-size: 12px; font-weight: 700; color: #10b981;">Paid: PKR ${Math.round(parseFloat(l.paid_amount || 0)).toLocaleString('en-US')}</div>
+                    <div style="font-size: 11px; font-weight: 700; color: #ef4444;">Rem: PKR ${Math.round(parseFloat(l.remaining_amount || 0)).toLocaleString('en-US')}</div>
                 </td>
                 <td>
                     <div style="font-size: 12px; color: var(--text-main);">${escapeHtml(l.reason)}</div>
@@ -1323,9 +1323,9 @@ async function loadHrClaims() {
             const incEl = document.getElementById('hr-claims-total-incentive');
             const pendEl = document.getElementById('hr-claims-total-pending');
 
-            if (fuelEl) fuelEl.textContent = `PKR ${(stats.total_fuel_amount || 0).toLocaleString()}`;
-            if (foodEl) foodEl.textContent = `PKR ${(stats.total_food_amount || 0).toLocaleString()}`;
-            if (incEl) incEl.textContent = `PKR ${(stats.total_incentive_amount || 0).toLocaleString()}`;
+            if (fuelEl) fuelEl.textContent = `PKR ${Math.round(stats.total_fuel_amount || 0).toLocaleString('en-US')}`;
+            if (foodEl) foodEl.textContent = `PKR ${Math.round(stats.total_food_amount || 0).toLocaleString('en-US')}`;
+            if (incEl) incEl.textContent = `PKR ${Math.round(stats.total_incentive_amount || 0).toLocaleString('en-US')}`;
             if (pendEl) pendEl.textContent = `${stats.pending_count || 0} Claim(s)`;
 
             applyClaimsClientFilters();
@@ -1481,7 +1481,7 @@ function renderHrClaimsTable(claims) {
                     ${c.receipt_no ? `<div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">📄 ${escapeHtml(c.receipt_no)}</div>` : ''}
                 </td>
                 <td style="font-weight: 800; font-size: 13.5px; color: #059669;">
-                    PKR ${parseFloat(c.amount).toLocaleString()}
+                    PKR ${Math.round(parseFloat(c.amount || 0)).toLocaleString('en-US')}
                 </td>
                 <td>
                     <div style="font-size: 12px; font-weight: 600; color: var(--text-main);">${escapeHtml(c.claim_date)}</div>
@@ -1872,9 +1872,9 @@ async function loadHrFines() {
             const waivedCntEl = document.getElementById('hr-fines-total-waived-count');
             const totalCntEl = document.getElementById('hr-fines-total-count');
 
-            if (appliedAmtEl) appliedAmtEl.textContent = `PKR ${parseFloat(stats.total_applied_amount || 0).toLocaleString()}`;
+            if (appliedAmtEl) appliedAmtEl.textContent = `PKR ${Math.round(parseFloat(stats.total_applied_amount || 0)).toLocaleString('en-US')}`;
             if (appliedCntEl) appliedCntEl.textContent = `${stats.applied_count || 0} penalties applied to payroll`;
-            if (waivedAmtEl) waivedAmtEl.textContent = `PKR ${parseFloat(stats.total_waived_amount || 0).toLocaleString()}`;
+            if (waivedAmtEl) waivedAmtEl.textContent = `PKR ${Math.round(parseFloat(stats.total_waived_amount || 0)).toLocaleString('en-US')}`;
             if (waivedCntEl) waivedCntEl.textContent = `${stats.waived_count || 0} forgiven penalties`;
             if (totalCntEl) totalCntEl.textContent = `${stats.total_fines || 0} Records`;
 
@@ -2032,7 +2032,7 @@ function renderFinesTable(fines) {
                     ${escapeHtml(f.salary_month)}
                 </td>
                 <td style="font-weight: 800; font-size: 13.5px; color: ${isWaived ? '#6b7280; text-decoration: line-through;' : '#ef4444;'}">
-                    PKR ${parseFloat(f.amount).toLocaleString()}
+                    PKR ${Math.round(parseFloat(f.amount || 0)).toLocaleString('en-US')}
                 </td>
                 <td style="text-align: center;">
                     ${isWaived 
@@ -2276,9 +2276,9 @@ function updatePayrollSummaryStats(list) {
     const netEl = document.getElementById('payroll-stat-total-net');
 
     if (empCountEl) empCountEl.textContent = (list || []).length;
-    if (grossEl) grossEl.textContent = `PKR ${totalGross.toLocaleString()}`;
-    if (dedEl) dedEl.textContent = `PKR ${totalDeductions.toLocaleString()}`;
-    if (netEl) netEl.textContent = `PKR ${totalNet.toLocaleString()}`;
+    if (grossEl) grossEl.textContent = `PKR ${Math.round(totalGross).toLocaleString('en-US')}`;
+    if (dedEl) dedEl.textContent = `PKR ${Math.round(totalDeductions).toLocaleString('en-US')}`;
+    if (netEl) netEl.textContent = `PKR ${Math.round(totalNet).toLocaleString('en-US')}`;
 }
 
 function applyPayrollFilters() {
@@ -2370,7 +2370,7 @@ function renderHrPayrollTable(payroll) {
             let unpaidLabel = '';
             if (unpaidLeaves > 0) {
                 if (unpaidDeduction > 0) {
-                    unpaidLabel = `<div style="font-weight: 700; color: #dc2626; font-size: 11px;" title="Unpaid Leave Deducted: PKR ${unpaidDeduction.toLocaleString()}">⚠️ ${unpaidLeaves} Unpaid (-${unpaidDeduction.toLocaleString()})</div>`;
+                    unpaidLabel = `<div style="font-weight: 700; color: #dc2626; font-size: 11px;" title="Unpaid Leave Deducted: PKR ${Math.round(unpaidDeduction).toLocaleString('en-US')}">⚠️ ${unpaidLeaves} Unpaid (-${Math.round(unpaidDeduction).toLocaleString('en-US')})</div>`;
                 } else {
                     unpaidLabel = `<div style="font-weight: 700; color: #059669; font-size: 11px;" title="Unpaid Leave Waived / Excused by HR (0 PKR deduction)">⚠️ ${unpaidLeaves} Unpaid (Excused)</div>`;
                 }
@@ -2404,31 +2404,31 @@ function renderHrPayrollTable(payroll) {
                     ${leavesHtml}
                 </td>
                 <td style="font-size: 12.5px; font-weight: 700; color: var(--text-main);">
-                    PKR ${parseFloat(p.basic_salary).toLocaleString()}
+                    PKR ${Math.round(parseFloat(p.basic_salary || 0)).toLocaleString('en-US')}
                 </td>
                 <td style="font-size: 12px; font-weight: 600; color: #0284c7;">
-                    ${parseFloat(p.fuel_allowance || 0) > 0 ? `+${parseFloat(p.fuel_allowance).toLocaleString()}` : '--'}
+                    ${parseFloat(p.fuel_allowance || 0) > 0 ? `+${Math.round(parseFloat(p.fuel_allowance)).toLocaleString('en-US')}` : '--'}
                 </td>
                 <td style="font-size: 12px; font-weight: 600; color: #059669;">
-                    ${(parseFloat(p.incentive || 0) + parseFloat(p.bonus || 0)) > 0 ? `+${(parseFloat(p.incentive || 0) + parseFloat(p.bonus || 0)).toLocaleString()}` : '--'}
-                    ${parseFloat(p.bonus || 0) > 0 ? `<div style="font-size: 10px; color: #10b981;">Bonus: +${parseFloat(p.bonus).toLocaleString()}</div>` : ''}
+                    ${(parseFloat(p.incentive || 0) + parseFloat(p.bonus || 0)) > 0 ? `+${Math.round(parseFloat(p.incentive || 0) + parseFloat(p.bonus || 0)).toLocaleString('en-US')}` : '--'}
+                    ${parseFloat(p.bonus || 0) > 0 ? `<div style="font-size: 10px; color: #10b981;">Bonus: +${Math.round(parseFloat(p.bonus)).toLocaleString('en-US')}</div>` : ''}
                 </td>
                 <td style="font-size: 12px; font-weight: 600; color: #dc2626;">
-                    ${(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.deductions || 0)) > 0 ? `-${(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.deductions || 0)).toLocaleString()}` : '--'}
-                    ${parseFloat(p.advance_salary || 0) > 0 ? `<div style="font-size: 10px; color: #b91c1c;">Adv: -${parseFloat(p.advance_salary).toLocaleString()}</div>` : ''}
-                    ${parseFloat(p.loan_deduction || 0) > 0 ? `<div style="font-size: 10px; color: #7c3aed;">Loan: -${parseFloat(p.loan_deduction).toLocaleString()}</div>` : ''}
-                    ${parseFloat(p.food_bills || 0) > 0 ? `<div style="font-size: 10px; color: #dc2626;">🍲 Food: -${parseFloat(p.food_bills).toLocaleString()}</div>` : ''}
-                    ${parseFloat(p.deductions || 0) > 0 ? `<div style="font-size: 10px; color: #dc2626;">Other: -${parseFloat(p.deductions).toLocaleString()}</div>` : ''}
+                    ${(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.deductions || 0)) > 0 ? `-${Math.round(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.deductions || 0)).toLocaleString('en-US')}` : '--'}
+                    ${parseFloat(p.advance_salary || 0) > 0 ? `<div style="font-size: 10px; color: #b91c1c;">Adv: -${Math.round(parseFloat(p.advance_salary)).toLocaleString('en-US')}</div>` : ''}
+                    ${parseFloat(p.loan_deduction || 0) > 0 ? `<div style="font-size: 10px; color: #7c3aed;">Loan: -${Math.round(parseFloat(p.loan_deduction)).toLocaleString('en-US')}</div>` : ''}
+                    ${parseFloat(p.food_bills || 0) > 0 ? `<div style="font-size: 10px; color: #dc2626;">🍲 Food: -${Math.round(parseFloat(p.food_bills)).toLocaleString('en-US')}</div>` : ''}
+                    ${parseFloat(p.deductions || 0) > 0 ? `<div style="font-size: 10px; color: #dc2626;">Other: -${Math.round(parseFloat(p.deductions)).toLocaleString('en-US')}</div>` : ''}
                 </td>
                 <td style="font-size: 12px; color: #dc2626; font-weight: 600;" title="${p.fine_reason ? escapeHtml(p.fine_reason) : ''}">
-                    ${parseFloat(p.fines || 0) > 0 ? `-${parseFloat(p.fines).toLocaleString()}` : '--'}
+                    ${parseFloat(p.fines || 0) > 0 ? `-${Math.round(parseFloat(p.fines)).toLocaleString('en-US')}` : '--'}
                 </td>
                 <td style="font-size: 12px; color: #d97706; font-weight: 600;">
-                    ${parseFloat(p.wht_amount || 0) > 0 ? `-${parseFloat(p.wht_amount).toLocaleString()}` : '--'}
+                    ${parseFloat(p.wht_amount || 0) > 0 ? `-${Math.round(parseFloat(p.wht_amount)).toLocaleString('en-US')}` : '--'}
                 </td>
                 <td style="font-size: 13.5px; font-weight: 800; color: #059669;">
-                    PKR ${parseFloat(p.net_salary).toLocaleString()}
-                    ${parseFloat(p.paid_amount || 0) > 0 ? `<div style="font-size: 10.5px; color: #2563eb; font-weight: 600;">Paid: PKR ${parseFloat(p.paid_amount).toLocaleString()}</div>` : ''}
+                    PKR ${Math.round(parseFloat(p.net_salary || 0)).toLocaleString('en-US')}
+                    ${parseFloat(p.paid_amount || 0) > 0 ? `<div style="font-size: 10.5px; color: #2563eb; font-weight: 600;">Paid: PKR ${Math.round(parseFloat(p.paid_amount)).toLocaleString('en-US')}</div>` : ''}
                 </td>
                 <td>
                     <div style="font-size: 11.5px; font-weight: 700; color: var(--text-main);">🏦 ${escapeHtml(p.bank_name || 'UBL')}</div>
@@ -2789,26 +2789,26 @@ function printSalarySlip(item) {
                     <tbody>
                         <tr>
                             <td>Basic / Gross Salary</td>
-                            <td class="amount">${basicSalary.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount">${Math.round(basicSalary).toLocaleString('en-US')}</td>
                         </tr>
                         ${fuel > 0 ? `
                         <tr>
                             <td>Fuel / Travel / Mobile Allowance</td>
-                            <td class="amount" style="color: #0284c7;">+${fuel.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #0284c7;">+${Math.round(fuel).toLocaleString('en-US')}</td>
                         </tr>` : ''}
                         ${incentive > 0 ? `
                         <tr>
                             <td>Incentive / Performance</td>
-                            <td class="amount" style="color: #059669;">+${incentive.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #059669;">+${Math.round(incentive).toLocaleString('en-US')}</td>
                         </tr>` : ''}
                         ${bonus > 0 ? `
                         <tr>
                             <td>Bonus ${item.bonus_reason ? `(${escapeHtml(item.bonus_reason)})` : ''}</td>
-                            <td class="amount" style="color: #059669;">+${bonus.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #059669;">+${Math.round(bonus).toLocaleString('en-US')}</td>
                         </tr>` : ''}
                         <tr style="background: #f8fafc; font-weight: 800;">
                             <td>Total Gross Earnings</td>
-                            <td class="amount" style="color: #059669;">PKR ${(basicSalary + totalAdditions).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #059669;">PKR ${Math.round(basicSalary + totalAdditions).toLocaleString('en-US')}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2825,41 +2825,41 @@ function printSalarySlip(item) {
                         ${unpaidDed > 0 ? `
                         <tr>
                             <td>Unpaid Leave Deduction (${unpaidLeaves} day${unpaidLeaves > 1 ? 's' : ''})</td>
-                            <td class="amount" style="color: #dc2626;">-${unpaidDed.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #dc2626;">-${Math.round(unpaidDed).toLocaleString('en-US')}</td>
                         </tr>` : (unpaidLeaves > 0 ? `
                         <tr>
                             <td>Unpaid Leaves (${unpaidLeaves} day${unpaidLeaves > 1 ? 's' : ''})</td>
-                            <td class="amount" style="color: #059669;">Excused / 0.00</td>
+                            <td class="amount" style="color: #059669;">Excused / 0</td>
                         </tr>` : '')}
                         ${advance > 0 ? `
                         <tr>
                             <td>Advance Salary Deduction</td>
-                            <td class="amount" style="color: #dc2626;">-${advance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #dc2626;">-${Math.round(advance).toLocaleString('en-US')}</td>
                         </tr>` : ''}
                         ${loan > 0 ? `
                         <tr>
                             <td>Loan Installment</td>
-                            <td class="amount" style="color: #dc2626;">-${loan.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #dc2626;">-${Math.round(loan).toLocaleString('en-US')}</td>
                         </tr>` : ''}
                         ${foodBills > 0 ? `
                         <tr>
                             <td>Canteen Food Bills / Mess</td>
-                            <td class="amount" style="color: #dc2626;">-${foodBills.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #dc2626;">-${Math.round(foodBills).toLocaleString('en-US')}</td>
                         </tr>` : ''}
                         ${fines > 0 ? `
                         <tr>
                             <td>Disciplinary Fines ${item.fine_reason ? `(${escapeHtml(item.fine_reason)})` : ''}</td>
-                            <td class="amount" style="color: #dc2626;">-${fines.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #dc2626;">-${Math.round(fines).toLocaleString('en-US')}</td>
                         </tr>` : ''}
                         ${wht > 0 ? `
                         <tr>
                             <td>WHT / Income Tax</td>
-                            <td class="amount" style="color: #dc2626;">-${wht.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #dc2626;">-${Math.round(wht).toLocaleString('en-US')}</td>
                         </tr>` : ''}
                         ${deductions > 0 ? `
                         <tr>
                             <td>Other Deductions ${item.deduction_reason ? `(${escapeHtml(item.deduction_reason)})` : ''}</td>
-                            <td class="amount" style="color: #dc2626;">-${deductions.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #dc2626;">-${Math.round(deductions).toLocaleString('en-US')}</td>
                         </tr>` : ''}
                         ${totalDeductions === 0 ? `
                         <tr>
@@ -2867,7 +2867,7 @@ function printSalarySlip(item) {
                         </tr>` : ''}
                         <tr style="background: #f8fafc; font-weight: 800;">
                             <td>Total Deductions</td>
-                            <td class="amount" style="color: #dc2626;">PKR ${totalDeductions.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td class="amount" style="color: #dc2626;">PKR ${Math.round(totalDeductions).toLocaleString('en-US')}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -2877,10 +2877,10 @@ function printSalarySlip(item) {
                 <div>
                     <div class="net-title">TOTAL NET SALARY:</div>
                     <div style="font-size: 12px; color: #065f46; margin-top: 2px;">
-                        Payment Mode: ${escapeHtml(item.payment_method || 'Bank Transfer')} ${paidAmount > 0 ? `• Disbursed: PKR ${paidAmount.toLocaleString()}` : ''}
+                        Payment Mode: ${escapeHtml(item.payment_method || 'Bank Transfer')} ${paidAmount > 0 ? `• Disbursed: PKR ${Math.round(paidAmount).toLocaleString('en-US')}` : ''}
                     </div>
                 </div>
-                <div class="net-amount">PKR ${netSalary.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                <div class="net-amount">PKR ${Math.round(netSalary).toLocaleString('en-US')}</div>
             </div>
 
             ${item.increment_remarks ? `
