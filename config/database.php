@@ -385,10 +385,6 @@ function migratePermissionsSchema($pdo) {
               AND (dp_status = '' OR dp_status IS NULL OR dp_status = 'Pending')
         ");
 
-        // Seed Programming & Newsroom Staff Rosters non-destructively
-        seedProgrammingStaff($pdo);
-        seedNewsroomStaff($pdo);
-
         // Auto-seed default hr_employee_profiles for any existing employees missing a profile without altering data
         $pdo->exec("
             INSERT IGNORE INTO hr_employee_profiles (employee_id, joining_date, employment_type, basic_salary, expected_hours, shift_policy, annual_leave_quota, casual_leave_quota, sick_leave_quota)
