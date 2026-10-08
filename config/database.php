@@ -48,6 +48,7 @@ function getDbConnection() {
         try {
             $pdo = new PDO($dsn, DB_USER, $pass, $options);
             if ($pdo) {
+                migratePermissionsSchema($pdo);
                 return $pdo;
             }
         } catch (PDOException $e) {
@@ -86,12 +87,20 @@ function getDbConnection() {
 }
 
 function migratePermissionsSchema($pdo) {
+    static $migrated = false;
+    if ($migrated) return;
+    $migrated = true;
+
     try {
         // Change role column to VARCHAR(50) if needed to support custom roles
         $pdo->exec("ALTER TABLE employees MODIFY COLUMN role VARCHAR(50) DEFAULT 'employee'");
+        try { $pdo->exec("ALTER TABLE employees MODIFY COLUMN email VARCHAR(191) NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees MODIFY COLUMN password_hash VARCHAR(255) NULL"); } catch (Exception $e) {}
 
-        // Add granular permission flags if not exists
+        // Add granular permission flags and active status if not exists
         $columns = [
+            'is_active' => "TINYINT DEFAULT 1",
+            'can_login' => "TINYINT DEFAULT 1",
             'can_assign_tasks' => "TINYINT DEFAULT 0",
             'can_edit_tasks' => "TINYINT DEFAULT 0",
             'can_unlock_sheets' => "TINYINT DEFAULT 0",
@@ -108,6 +117,11 @@ function migratePermissionsSchema($pdo) {
                 $pdo->exec("ALTER TABLE employees ADD COLUMN $col $def");
             }
         }
+
+        try {
+            $pdo->exec("UPDATE employees SET is_active = 1 WHERE is_active IS NULL");
+            $pdo->exec("UPDATE employees SET can_login = 1 WHERE can_login IS NULL");
+        } catch (Exception $e) {}
 
         // Check and add link column to tasks table if missing
         $taskLinkCheck = $pdo->query("SHOW COLUMNS FROM tasks LIKE 'link'")->fetch();
@@ -265,11 +279,35 @@ function migratePermissionsSchema($pdo) {
             FOREIGN KEY (action_by) REFERENCES employees(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS hr_claims (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            claim_type VARCHAR(50) DEFAULT 'fuel',
+            amount DECIMAL(10,2) NOT NULL,
+            claim_date DATE NOT NULL,
+            salary_month VARCHAR(7) NOT NULL,
+            receipt_no VARCHAR(100) NULL,
+            reason TEXT NULL,
+            description TEXT NULL,
+            route_details TEXT NULL,
+            status VARCHAR(50) DEFAULT 'pending',
+            admin_notes TEXT NULL,
+            action_by INT NULL,
+            action_at DATETIME NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+            FOREIGN KEY (action_by) REFERENCES employees(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         try {
             $pdo->exec("ALTER TABLE hr_payroll ADD COLUMN fines DECIMAL(10,2) DEFAULT 0.00");
         } catch (Exception $e) {}
         try {
             $pdo->exec("ALTER TABLE hr_payroll ADD COLUMN fine_reason TEXT NULL");
+        } catch (Exception $e) {}
+        try {
+            $pdo->exec("ALTER TABLE hr_payroll ADD COLUMN unpaid_leave_deduction DECIMAL(10,2) DEFAULT 0.00");
         } catch (Exception $e) {}
 
         ensureDepartmentAndTeamsSchema($pdo);
