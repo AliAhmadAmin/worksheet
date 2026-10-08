@@ -325,7 +325,7 @@ function renderDirectoryTable(employees) {
                     ` : ''}
                     ${((isSuperAdmin || isHr) && !isSelf && emp.role !== 'super_admin' && emp.role !== 'admin') ? (
                         isActive ? `
-                            <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; color: #dc2626; border-color: rgba(220, 38, 38, 0.35); white-space: nowrap;" onclick="event.stopPropagation(); toggleEmployeeStatus(${emp.id}, 0)" title="Deactivate Employee (Preserves All History)">
+                            <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; color: #d97706; border-color: rgba(217, 119, 6, 0.35); white-space: nowrap;" onclick="event.stopPropagation(); toggleEmployeeStatus(${emp.id}, 0)" title="Deactivate Employee (Preserves All History)">
                                 ⏸️ Deactivate
                             </button>
                         ` : `
@@ -334,6 +334,11 @@ function renderDirectoryTable(employees) {
                             </button>
                         `
                     ) : ''}
+                    ${((isSuperAdmin || isHr) && !isSelf && emp.role !== 'super_admin') ? `
+                        <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; color: #dc2626; border-color: rgba(220, 38, 38, 0.35); white-space: nowrap;" onclick="event.stopPropagation(); deleteEmployeePermanent(${emp.id})" title="Permanently Delete Duplicate / Unwanted Employee">
+                            🗑️
+                        </button>
+                    ` : ''}
                 </div>
             </td>
         `;
@@ -1068,7 +1073,7 @@ function toggleLoginCredentialsSection(prefix, isEnabled) {
 // EMPLOYEE CRUD MODALS & SUBMISSIONS
 // ==========================================
 
-function handleAvatarFileSelect(input, previewId, base64HiddenId) {
+function handleAvatarFileSelect(input, previewId, base64HiddenId, mode = 'add') {
     const file = input.files[0];
     if (!file) return;
 
@@ -1088,10 +1093,34 @@ function handleAvatarFileSelect(input, previewId, base64HiddenId) {
             preview.innerHTML = '';
             preview.style.backgroundImage = `url(${base64})`;
             preview.style.backgroundSize = 'cover';
-            preview.style.backgroundPosition = 'center';
+            preview.style.backgroundPosition = 'center center';
+            preview.style.border = '2px solid var(--primary)';
         }
+        const clearBtn = document.getElementById(`${mode}-emp-avatar-clear-btn`);
+        if (clearBtn) clearBtn.style.display = 'inline-flex';
     };
     reader.readAsDataURL(file);
+}
+
+function clearAvatarPreview(mode = 'add') {
+    const fileInput = document.getElementById(`${mode}-emp-avatar-file`);
+    const hiddenInput = document.getElementById(`${mode}-emp-avatar-base64`);
+    const preview = document.getElementById(`${mode}-emp-avatar-preview`);
+    const clearBtn = document.getElementById(`${mode}-emp-avatar-clear-btn`);
+
+    if (fileInput) fileInput.value = '';
+    if (hiddenInput) hiddenInput.value = (mode === 'edit') ? '__REMOVE__' : '';
+    if (clearBtn) clearBtn.style.display = 'none';
+
+    if (preview) {
+        preview.style.backgroundImage = 'none';
+        preview.style.border = '2px dashed #94a3b8';
+        preview.innerHTML = `
+            <div style="font-size: 32px; color: var(--text-muted); line-height: 1;">📷</div>
+            <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-top: 6px; text-align: center; line-height: 1.2;">Passport Size<br>Photo</div>
+            <div style="font-size: 10px; color: var(--primary); margin-top: 4px; font-weight: 700;">${mode === 'edit' ? 'Click to change' : 'Click to upload'}</div>
+        `;
+    }
 }
 
 function openAddEmployeeModal() {
@@ -1123,13 +1152,7 @@ function openAddEmployeeModal() {
     const fixedAllowInput = document.getElementById('add-emp-fixed-allowance');
     if (fixedAllowInput) fixedAllowInput.value = '';
     
-    const prev = document.getElementById('add-emp-avatar-preview');
-    if (prev) {
-        prev.style.backgroundImage = 'none';
-        prev.textContent = '👤';
-    }
-    const hiddenBase64 = document.getElementById('add-emp-avatar-base64');
-    if (hiddenBase64) hiddenBase64.value = '';
+    clearAvatarPreview('add');
 
     const shiftSelect = document.getElementById('add-emp-shift-hours');
     if (shiftSelect) shiftSelect.value = '8.0';
@@ -1305,6 +1328,7 @@ function openEditEmployeeModal(empId) {
     const prev = document.getElementById('edit-emp-avatar-preview');
     const hiddenBase64 = document.getElementById('edit-emp-avatar-base64');
     const fileInput = document.getElementById('edit-emp-avatar-file');
+    const clearBtn = document.getElementById('edit-emp-avatar-clear-btn');
     if (fileInput) fileInput.value = '';
     if (hiddenBase64) hiddenBase64.value = '';
 
@@ -1313,10 +1337,11 @@ function openEditEmployeeModal(empId) {
             prev.innerHTML = '';
             prev.style.backgroundImage = `url(${emp.avatar})`;
             prev.style.backgroundSize = 'cover';
-            prev.style.backgroundPosition = 'center';
+            prev.style.backgroundPosition = 'center center';
+            prev.style.border = '2px solid var(--primary)';
+            if (clearBtn) clearBtn.style.display = 'inline-flex';
         } else {
-            prev.style.backgroundImage = 'none';
-            prev.textContent = emp.name.charAt(0).toUpperCase();
+            clearAvatarPreview('edit');
         }
     }
 
@@ -1490,8 +1515,60 @@ async function toggleEmployeeStatus(empId, newStatus) {
     }
 }
 
+async function handleDeleteEmployeeFromModal() {
+    const id = document.getElementById('edit-emp-id')?.value;
+    if (!id) {
+        showToast("No employee selected.", "error");
+        return;
+    }
+    await deleteEmployeePermanent(id);
+}
+
 async function deleteEmployee(empId) {
-    await toggleEmployeeStatus(empId, 0);
+    await deleteEmployeePermanent(empId);
+}
+
+async function deleteEmployeePermanent(empId) {
+    const emp = (AppState.employees || []).find(e => e.id == empId);
+    const empName = emp ? emp.name : 'this employee';
+
+    if (AppState.currentUser && AppState.currentUser.id == empId) {
+        showToast("You cannot delete your own logged-in account.", "error");
+        return;
+    }
+
+    const confirmMsg = `⚠️ PERMANENTLY DELETE EMPLOYEE?\n\nEmployee: ${empName} (ID: ${empId})\n\nThis will permanently delete this employee record and cleanly remove all associated records (profiles, sheets, payroll entries, tasks, fines, loans).\n\nThis is irreversible. Do you want to proceed?`;
+
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    try {
+        const res = await fetch('api/employees.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'delete_employee',
+                id: empId
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message || `Employee ${empName} deleted successfully.`, "success");
+            closeModal('edit-employee-modal');
+            await loadEmployeeDirectory();
+            populateEmailSelectors();
+            populateAdminEmployeeSelector();
+            if (typeof loadPayroll === 'function') {
+                loadPayroll();
+            }
+        } else {
+            showToast(data.message || "Failed to delete employee.", "error");
+        }
+    } catch (err) {
+        showToast("Network error deleting employee.", "error");
+    }
 }
 
 // ==========================================

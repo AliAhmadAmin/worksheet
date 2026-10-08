@@ -202,34 +202,47 @@
                     <div class="modal-section">
                         <div class="modal-section-title">📋 Identity & Legal Information</div>
                         
-                        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 12px;">
-                            <div id="add-emp-avatar-preview" class="user-avatar" style="width: 48px; height: 48px; font-size: 20px; flex-shrink: 0; background-size: cover; background-position: center; border: 2px solid var(--border-color); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">👤</div>
-                            <div style="flex: 1;">
-                                <label class="form-label" style="margin-bottom: 3px;">Profile Photo (Optional)</label>
-                                <input type="file" id="add-emp-avatar-file" class="input-control" accept="image/*" style="padding: 5px 8px; font-size: 12px;" onchange="handleAvatarFileSelect(this, 'add-emp-avatar-preview', 'add-emp-avatar-base64')">
+                        <div style="display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap;">
+                            <!-- Passport-Size Photo Box -->
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0;">
+                                <div style="position: relative;">
+                                    <div id="add-emp-avatar-preview" onclick="document.getElementById('add-emp-avatar-file').click()" style="width: 112px; height: 140px; border-radius: 8px; border: 2px dashed #94a3b8; background: var(--bg-card-elevated); display: flex; flex-direction: column; align-items: center; justify-content: center; background-size: cover; background-position: center center; cursor: pointer; transition: all 0.2s ease; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" title="Click to upload passport size photo">
+                                        <div style="font-size: 32px; color: var(--text-muted); line-height: 1;">📷</div>
+                                        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-top: 6px; text-align: center; line-height: 1.2;">Passport Size<br>Photo</div>
+                                        <div style="font-size: 10px; color: var(--primary); margin-top: 4px; font-weight: 700;">Click to upload</div>
+                                    </div>
+                                    <button type="button" onclick="clearAvatarPreview('add')" id="add-emp-avatar-clear-btn" style="display: none; position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: #ef4444; color: #fff; border: 2px solid #fff; font-size: 11px; cursor: pointer; align-items: center; justify-content: center; line-height: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.25);" title="Remove photo">✕</button>
+                                </div>
+                                <input type="file" id="add-emp-avatar-file" accept="image/*" style="display: none;" onchange="handleAvatarFileSelect(this, 'add-emp-avatar-preview', 'add-emp-avatar-base64', 'add')">
                                 <input type="hidden" id="add-emp-avatar-base64">
+                                <button type="button" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; border-radius: var(--radius-sm); font-weight: 600;" onclick="document.getElementById('add-emp-avatar-file').click()">
+                                    📁 Choose Photo
+                                </button>
                             </div>
-                        </div>
 
-                        <div class="form-grid-2">
-                            <div class="form-group">
-                                <label class="form-label">Full Name *</label>
-                                <input type="text" id="add-emp-name" class="input-control" placeholder="e.g. Ali Raza" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Father / Husband Name</label>
-                                <input type="text" id="add-emp-father-name" class="input-control" placeholder="e.g. Muhammad Raza">
-                            </div>
-                        </div>
+                            <!-- Identity Form Fields -->
+                            <div style="flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 10px;">
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label class="form-label">Full Name *</label>
+                                        <input type="text" id="add-emp-name" class="input-control" placeholder="e.g. Ali Raza" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Father / Husband Name</label>
+                                        <input type="text" id="add-emp-father-name" class="input-control" placeholder="e.g. Muhammad Raza">
+                                    </div>
+                                </div>
 
-                        <div class="form-grid-2">
-                            <div class="form-group">
-                                <label class="form-label">Employee Code</label>
-                                <input type="text" id="add-emp-code" class="input-control" placeholder="e.g. DP-104 (Auto if empty)">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">CNIC No.</label>
-                                <input type="text" id="add-emp-cnic" class="input-control" placeholder="e.g. 35202-1234567-1">
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label class="form-label">Employee Code</label>
+                                        <input type="text" id="add-emp-code" class="input-control" placeholder="e.g. DP-104 (Auto if empty)">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">CNIC No.</label>
+                                        <input type="text" id="add-emp-cnic" class="input-control" placeholder="e.g. 35202-1234567-1">
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -392,43 +405,56 @@
                     <div class="modal-section">
                         <div class="modal-section-title">📋 Identity & Legal Information</div>
                         
-                        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 12px;">
-                            <div id="edit-emp-avatar-preview" class="user-avatar" style="width: 48px; height: 48px; font-size: 20px; flex-shrink: 0; background-size: cover; background-position: center; border: 2px solid var(--border-color); box-shadow: 0 2px 5px rgba(0,0,0,0.05);">👤</div>
-                            <div style="flex: 1;">
-                                <label class="form-label" style="margin-bottom: 3px;">Update Profile Photo</label>
-                                <input type="file" id="edit-emp-avatar-file" class="input-control" accept="image/*" style="padding: 5px 8px; font-size: 12px;" onchange="handleAvatarFileSelect(this, 'edit-emp-avatar-preview', 'edit-emp-avatar-base64')">
+                        <div style="display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap;">
+                            <!-- Passport-Size Photo Box -->
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0;">
+                                <div style="position: relative;">
+                                    <div id="edit-emp-avatar-preview" onclick="document.getElementById('edit-emp-avatar-file').click()" style="width: 112px; height: 140px; border-radius: 8px; border: 2px dashed #94a3b8; background: var(--bg-card-elevated); display: flex; flex-direction: column; align-items: center; justify-content: center; background-size: cover; background-position: center center; cursor: pointer; transition: all 0.2s ease; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" title="Click to upload passport size photo">
+                                        <div style="font-size: 32px; color: var(--text-muted); line-height: 1;">📷</div>
+                                        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); margin-top: 6px; text-align: center; line-height: 1.2;">Passport Size<br>Photo</div>
+                                        <div style="font-size: 10px; color: var(--primary); margin-top: 4px; font-weight: 700;">Click to change</div>
+                                    </div>
+                                    <button type="button" onclick="clearAvatarPreview('edit')" id="edit-emp-avatar-clear-btn" style="display: none; position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: #ef4444; color: #fff; border: 2px solid #fff; font-size: 11px; cursor: pointer; align-items: center; justify-content: center; line-height: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.25);" title="Remove photo">✕</button>
+                                </div>
+                                <input type="file" id="edit-emp-avatar-file" accept="image/*" style="display: none;" onchange="handleAvatarFileSelect(this, 'edit-emp-avatar-preview', 'edit-emp-avatar-base64', 'edit')">
                                 <input type="hidden" id="edit-emp-avatar-base64">
+                                <button type="button" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; border-radius: var(--radius-sm); font-weight: 600;" onclick="document.getElementById('edit-emp-avatar-file').click()">
+                                    📷 Change Photo
+                                </button>
                             </div>
-                        </div>
 
-                        <div class="form-grid-2">
-                            <div class="form-group">
-                                <label class="form-label">Full Name *</label>
-                                <input type="text" id="edit-emp-name" class="input-control" required>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Father / Husband Name</label>
-                                <input type="text" id="edit-emp-father-name" class="input-control" placeholder="e.g. Muhammad Raza">
-                            </div>
-                        </div>
+                            <!-- Identity Form Fields -->
+                            <div style="flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 10px;">
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label class="form-label">Full Name *</label>
+                                        <input type="text" id="edit-emp-name" class="input-control" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Father / Husband Name</label>
+                                        <input type="text" id="edit-emp-father-name" class="input-control" placeholder="e.g. Muhammad Raza">
+                                    </div>
+                                </div>
 
-                        <div class="form-grid-2">
-                            <div class="form-group">
-                                <label class="form-label">Employee Code</label>
-                                <input type="text" id="edit-emp-code" class="input-control" placeholder="e.g. DP-104">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">CNIC No.</label>
-                                <input type="text" id="edit-emp-cnic" class="input-control" placeholder="e.g. 35202-1234567-1">
-                            </div>
-                        </div>
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label class="form-label">Employee Code</label>
+                                        <input type="text" id="edit-emp-code" class="input-control" placeholder="e.g. DP-104">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">CNIC No.</label>
+                                        <input type="text" id="edit-emp-cnic" class="input-control" placeholder="e.g. 35202-1234567-1">
+                                    </div>
+                                </div>
 
-                        <div class="form-group" style="margin-top: 8px;">
-                            <label class="form-label">Account Status</label>
-                            <select id="edit-emp-status" class="input-control" style="font-weight: 600;">
-                                <option value="1">🟢 Active (Normal Working Staff)</option>
-                                <option value="0">⛔ Deactivated (Suspended / Retained in History)</option>
-                            </select>
+                                <div class="form-group">
+                                    <label class="form-label">Account Status</label>
+                                    <select id="edit-emp-status" class="input-control" style="font-weight: 600;">
+                                        <option value="1">🟢 Active (Normal Working Staff)</option>
+                                        <option value="0">⛔ Deactivated (Suspended / Retained in History)</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -560,9 +586,14 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline" onclick="closeModal('edit-employee-modal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary" style="padding: 9px 20px; font-weight: 700;">💾 Save Changes</button>
+                <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" class="btn btn-outline" style="color: #dc2626; border-color: rgba(220, 38, 38, 0.4); font-weight: 700; padding: 8px 14px;" onclick="handleDeleteEmployeeFromModal()" title="Permanently delete duplicate or unwanted employee">
+                        🗑️ Delete Employee
+                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('edit-employee-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary" style="padding: 9px 20px; font-weight: 700;">💾 Save Changes</button>
+                    </div>
                 </div>
             </form>
         </div>

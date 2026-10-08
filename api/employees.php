@@ -458,7 +458,10 @@ switch ($action) {
             $isActive = 1;
         }
 
-        if (!empty($avatar)) {
+        if ($avatar === '__REMOVE__') {
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = NULL, can_login = ?, is_active = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $id]);
+        } elseif (!empty($avatar)) {
             $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ? WHERE id = ?");
             $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $id]);
         } else {
@@ -809,7 +812,6 @@ switch ($action) {
 
     case 'toggle_status':
     case 'deactivate_employee':
-    case 'delete_employee':
         if (!$canManageEmp && !$isSuperAdmin) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
@@ -832,12 +834,112 @@ switch ($action) {
             exit;
         }
 
-        // Soft deactivate/reactivate - Never hard delete employees so all payroll, attendance, fines, tasks and audit logs are preserved!
         $stmt = $pdo->prepare("UPDATE employees SET is_active = ? WHERE id = ?");
         $stmt->execute([$newStatus, $id]);
 
         $msg = $newStatus === 1 ? 'Employee account reactivated successfully.' : 'Employee account deactivated successfully.';
         echo json_encode(['success' => true, 'message' => $msg]);
+        break;
+
+    case 'delete_employee':
+    case 'delete_employee_permanent':
+        if (!$canManageEmp && !$isSuperAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
+            exit;
+        }
+
+        $id = (int)($data['id'] ?? 0);
+
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Employee ID is required.']);
+            exit;
+        }
+
+        // Prevent admin from deleting themselves
+        if (($_SESSION['user_id'] ?? 0) === $id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'You cannot delete your own logged-in account.']);
+            exit;
+        }
+
+        // Fetch employee info first to verify
+        $stmtCheck = $pdo->prepare("SELECT id, name, role FROM employees WHERE id = ?");
+        $stmtCheck->execute([$id]);
+        $empToDelete = $stmtCheck->fetch();
+
+        if (!$empToDelete) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Employee not found or already deleted.']);
+            exit;
+        }
+
+        if ($empToDelete['role'] === 'super_admin' && !$isSuperAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Only Super Admin can delete Super Admin accounts.']);
+            exit;
+        }
+
+        $pdo->beginTransaction();
+        try {
+            // Disable foreign key checks for clean cascading deletion of duplicate/unwanted records
+            try { $pdo->exec("SET FOREIGN_KEY_CHECKS = 0"); } catch (Exception $e) {}
+
+            // 1. Clean up hierarchy references
+            try { $pdo->prepare("UPDATE departments SET hod_id = NULL WHERE hod_id = ?")->execute([$id]); } catch (Exception $e) {}
+
+            // 2. Clean up task references
+            try { $pdo->prepare("UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?")->execute([$id]); } catch (Exception $e) {}
+            try { $pdo->prepare("UPDATE tasks SET created_by = NULL WHERE created_by = ?")->execute([$id]); } catch (Exception $e) {}
+            try { $pdo->prepare("UPDATE tasks SET approved_by = NULL WHERE approved_by = ?")->execute([$id]); } catch (Exception $e) {}
+
+            // 3. Clean up sheet entries and daily sheets
+            try {
+                $sheetStmt = $pdo->prepare("SELECT id FROM daily_sheets WHERE employee_id = ?");
+                $sheetStmt->execute([$id]);
+                $sIds = $sheetStmt->fetchAll(PDO::FETCH_COLUMN);
+                if (!empty($sIds)) {
+                    $placeholders = implode(',', array_fill(0, count($sIds), '?'));
+                    $pdo->prepare("DELETE FROM sheet_entries WHERE sheet_id IN ($placeholders)")->execute($sIds);
+                }
+                $pdo->prepare("DELETE FROM daily_sheets WHERE employee_id = ?")->execute([$id]);
+            } catch (Exception $e) {}
+
+            // 4. Clean up HR records
+            try { $pdo->prepare("DELETE FROM hr_claims WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
+            try { $pdo->prepare("DELETE FROM hr_fines WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
+            try { $pdo->prepare("DELETE FROM hr_loans WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
+            try { $pdo->prepare("DELETE FROM hr_leaves WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
+            try { $pdo->prepare("DELETE FROM hr_payroll WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
+            try { $pdo->prepare("DELETE FROM hr_employee_profiles WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
+
+            // 5. Clean up Dispatches
+            try { $pdo->prepare("DELETE FROM programming_dispatches WHERE submitted_by = ?")->execute([$id]); } catch (Exception $e) {}
+            try { $pdo->prepare("DELETE FROM newsroom_dispatches WHERE submitted_by = ?")->execute([$id]); } catch (Exception $e) {}
+
+            // 6. Delete Employee
+            $pdo->prepare("DELETE FROM employees WHERE id = ?")->execute([$id]);
+
+            try { $pdo->exec("SET FOREIGN_KEY_CHECKS = 1"); } catch (Exception $e) {}
+
+            $pdo->commit();
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Employee "' . $empToDelete['name'] . '" deleted permanently.'
+            ]);
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            try { $pdo->exec("SET FOREIGN_KEY_CHECKS = 1"); } catch (Exception $e2) {}
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to delete employee: ' . $e->getMessage()
+            ]);
+        }
         break;
 
     default:
