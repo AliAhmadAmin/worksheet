@@ -1141,7 +1141,7 @@ switch ($action) {
                 $incentive = (float)$p['incentive'];
                 $foodBills = (float)$p['food_bills'];
                 $bonus = (float)$p['bonus'];
-                $grossAdditions = $fuel + $incentive + $foodBills + $bonus;
+                $grossAdditions = $fuel + $incentive + $bonus;
 
                 $advance = (float)$p['advance_salary'];
                 $loan = (float)$p['loan_deduction'];
@@ -1161,7 +1161,7 @@ switch ($action) {
                 }
                 $p['unpaid_leave_deduction'] = number_format($unpaidLeaveDeduction, 2, '.', '');
 
-                $grossDeductions = $advance + $loan + $fines + $wht + $deductions + $unpaidLeaveDeduction;
+                $grossDeductions = $advance + $loan + $foodBills + $fines + $wht + $deductions + $unpaidLeaveDeduction;
 
                 $netSalary = max(0, $basic + $grossAdditions - $grossDeductions);
                 $p['net_salary'] = number_format($netSalary, 2, '.', '');
@@ -1208,8 +1208,8 @@ switch ($action) {
 
         $unpaidLeaveDeduction = (isset($data['unpaid_leave_deduction']) && $data['unpaid_leave_deduction'] !== '') ? (float)$data['unpaid_leave_deduction'] : 0.00;
 
-        $grossAdditions = $fuelAllowance + $incentive + $foodBills + $bonus;
-        $grossDeductions = $advanceSalary + $loanDeduction + $fines + $whtAmount + $deductions + $unpaidLeaveDeduction;
+        $grossAdditions = $fuelAllowance + $incentive + $bonus;
+        $grossDeductions = $advanceSalary + $loanDeduction + $foodBills + $fines + $whtAmount + $deductions + $unpaidLeaveDeduction;
         $netSalary = max(0, $basicSalary + $grossAdditions - $grossDeductions);
 
         $paidAmount = (float)($data['paid_amount'] ?? 0.0);

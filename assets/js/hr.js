@@ -2261,8 +2261,8 @@ function updatePayrollSummaryStats(list) {
     let totalNet = 0;
 
     (list || []).forEach(p => {
-        const gross = parseFloat(p.basic_salary || 0) + parseFloat(p.fuel_allowance || 0) + parseFloat(p.incentive || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.bonus || 0);
-        const deductions = parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0) + parseFloat(p.fines || 0) + parseFloat(p.wht_amount || 0) + parseFloat(p.unpaid_leave_deduction || 0);
+        const gross = parseFloat(p.basic_salary || 0) + parseFloat(p.fuel_allowance || 0) + parseFloat(p.incentive || 0) + parseFloat(p.bonus || 0);
+        const deductions = parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.fines || 0) + parseFloat(p.wht_amount || 0) + parseFloat(p.deductions || 0) + parseFloat(p.unpaid_leave_deduction || 0);
         const net = parseFloat(p.net_salary || 0);
 
         totalGross += gross;
@@ -2410,13 +2410,15 @@ function renderHrPayrollTable(payroll) {
                     ${parseFloat(p.fuel_allowance || 0) > 0 ? `+${parseFloat(p.fuel_allowance).toLocaleString()}` : '--'}
                 </td>
                 <td style="font-size: 12px; font-weight: 600; color: #059669;">
-                    ${(parseFloat(p.incentive || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.bonus || 0)) > 0 ? `+${(parseFloat(p.incentive || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.bonus || 0)).toLocaleString()}` : '--'}
-                    ${parseFloat(p.food_bills || 0) > 0 ? `<div style="font-size: 10px; color: #16a34a;">🍲 Food: ${parseFloat(p.food_bills).toLocaleString()}</div>` : ''}
+                    ${(parseFloat(p.incentive || 0) + parseFloat(p.bonus || 0)) > 0 ? `+${(parseFloat(p.incentive || 0) + parseFloat(p.bonus || 0)).toLocaleString()}` : '--'}
+                    ${parseFloat(p.bonus || 0) > 0 ? `<div style="font-size: 10px; color: #10b981;">Bonus: +${parseFloat(p.bonus).toLocaleString()}</div>` : ''}
                 </td>
                 <td style="font-size: 12px; font-weight: 600; color: #dc2626;">
-                    ${(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0)) > 0 ? `-${(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0)).toLocaleString()}` : '--'}
-                    ${parseFloat(p.advance_salary || 0) > 0 ? `<div style="font-size: 10px; color: #b91c1c;">Adv: ${parseFloat(p.advance_salary).toLocaleString()}</div>` : ''}
-                    ${parseFloat(p.loan_deduction || 0) > 0 ? `<div style="font-size: 10px; color: #7c3aed;">Loan: ${parseFloat(p.loan_deduction).toLocaleString()}</div>` : ''}
+                    ${(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.deductions || 0)) > 0 ? `-${(parseFloat(p.advance_salary || 0) + parseFloat(p.loan_deduction || 0) + parseFloat(p.food_bills || 0) + parseFloat(p.deductions || 0)).toLocaleString()}` : '--'}
+                    ${parseFloat(p.advance_salary || 0) > 0 ? `<div style="font-size: 10px; color: #b91c1c;">Adv: -${parseFloat(p.advance_salary).toLocaleString()}</div>` : ''}
+                    ${parseFloat(p.loan_deduction || 0) > 0 ? `<div style="font-size: 10px; color: #7c3aed;">Loan: -${parseFloat(p.loan_deduction).toLocaleString()}</div>` : ''}
+                    ${parseFloat(p.food_bills || 0) > 0 ? `<div style="font-size: 10px; color: #dc2626;">🍲 Food: -${parseFloat(p.food_bills).toLocaleString()}</div>` : ''}
+                    ${parseFloat(p.deductions || 0) > 0 ? `<div style="font-size: 10px; color: #dc2626;">Other: -${parseFloat(p.deductions).toLocaleString()}</div>` : ''}
                 </td>
                 <td style="font-size: 12px; color: #dc2626; font-weight: 600;" title="${p.fine_reason ? escapeHtml(p.fine_reason) : ''}">
                     ${parseFloat(p.fines || 0) > 0 ? `-${parseFloat(p.fines).toLocaleString()}` : '--'}
@@ -2562,20 +2564,20 @@ function calculatePayrollModalTotals() {
     const basic = parseFloat(document.getElementById('edit-pr-basic-salary')?.value) || 0;
     const fuel = parseFloat(document.getElementById('edit-pr-fuel')?.value) || 0;
     const incentive = parseFloat(document.getElementById('edit-pr-incentive')?.value) || 0;
-    const food = parseFloat(document.getElementById('edit-pr-food-bills')?.value) || 0;
     const bonus = parseFloat(document.getElementById('edit-pr-bonus')?.value) || 0;
 
     const unpaidDed = parseFloat(document.getElementById('edit-pr-unpaid-deduction')?.value) || 0;
     const advance = parseFloat(document.getElementById('edit-pr-advance')?.value) || 0;
     const loan = parseFloat(document.getElementById('edit-pr-loan')?.value) || 0;
+    const food = parseFloat(document.getElementById('edit-pr-food-bills')?.value) || 0;
     const wht = parseFloat(document.getElementById('edit-pr-wht')?.value) || 0;
     const fines = parseFloat(document.getElementById('edit-pr-fines')?.value) || 0;
     const otherDed = parseFloat(document.getElementById('edit-pr-deductions')?.value) || 0;
 
     const paid = parseFloat(document.getElementById('edit-pr-paid-amount')?.value) || 0;
 
-    const totalAdditions = fuel + incentive + food + bonus;
-    const totalDeductions = advance + loan + wht + fines + unpaidDed + otherDed;
+    const totalAdditions = fuel + incentive + bonus;
+    const totalDeductions = advance + loan + food + wht + fines + unpaidDed + otherDed;
     const netSalary = Math.max(0, basic + totalAdditions - totalDeductions);
     const payable = Math.max(0, netSalary - paid);
 
@@ -2688,19 +2690,19 @@ function printSalarySlip(item) {
     const basicSalary = parseFloat(item.basic_salary || 0);
     const fuel = parseFloat(item.fuel_allowance || 0);
     const incentive = parseFloat(item.incentive || 0);
-    const foodBills = parseFloat(item.food_bills || 0);
     const bonus = parseFloat(item.bonus || 0);
 
     const unpaidDed = parseFloat(item.unpaid_leave_deduction || 0);
     const unpaidLeaves = parseFloat(item.unpaid_leaves || 0);
     const advance = parseFloat(item.advance_salary || 0);
     const loan = parseFloat(item.loan_deduction || 0);
+    const foodBills = parseFloat(item.food_bills || 0);
     const fines = parseFloat(item.fines || 0);
     const wht = parseFloat(item.wht_amount || 0);
     const deductions = parseFloat(item.deductions || 0);
 
-    const totalAdditions = fuel + incentive + foodBills + bonus;
-    const totalDeductions = advance + loan + fines + wht + unpaidDed + deductions;
+    const totalAdditions = fuel + incentive + bonus;
+    const totalDeductions = advance + loan + foodBills + fines + wht + unpaidDed + deductions;
     const netSalary = Math.max(0, basicSalary + totalAdditions - totalDeductions);
     const paidAmount = parseFloat(item.paid_amount || 0);
     const payableAmount = Math.max(0, netSalary - paidAmount);
@@ -2799,11 +2801,6 @@ function printSalarySlip(item) {
                             <td>Incentive / Performance</td>
                             <td class="amount" style="color: #059669;">+${incentive.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         </tr>` : ''}
-                        ${foodBills > 0 ? `
-                        <tr>
-                            <td>Food Bills Reimbursement</td>
-                            <td class="amount" style="color: #059669;">+${foodBills.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                        </tr>` : ''}
                         ${bonus > 0 ? `
                         <tr>
                             <td>Bonus ${item.bonus_reason ? `(${escapeHtml(item.bonus_reason)})` : ''}</td>
@@ -2843,6 +2840,11 @@ function printSalarySlip(item) {
                         <tr>
                             <td>Loan Installment</td>
                             <td class="amount" style="color: #dc2626;">-${loan.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        </tr>` : ''}
+                        ${foodBills > 0 ? `
+                        <tr>
+                            <td>Canteen Food Bills / Mess</td>
+                            <td class="amount" style="color: #dc2626;">-${foodBills.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         </tr>` : ''}
                         ${fines > 0 ? `
                         <tr>
@@ -2971,11 +2973,11 @@ function exportPayrollCSV() {
         "UNPAID LEAVE DEDUCTION",
         "FUEL / TRAV. / MOBILE",
         "INCENTIVE",
-        "FOOD BILLS",
         "BONUS",
         "TOTAL ADDITIONS",
         "ADVANCE SALARY",
         "LOAN DEDUCTION",
+        "CANTEEN FOOD BILLS",
         "FINES",
         "WHT TAX",
         "OTHER DEDUCTIONS",
@@ -3003,17 +3005,17 @@ function exportPayrollCSV() {
         const basic = parseFloat(p.basic_salary || 0);
         const fuel = parseFloat(p.fuel_allowance || 0);
         const incentive = parseFloat(p.incentive || 0);
-        const foodBills = parseFloat(p.food_bills || 0);
         const bonus = parseFloat(p.bonus || 0);
-        const totalAdditions = fuel + incentive + foodBills + bonus;
+        const totalAdditions = fuel + incentive + bonus;
 
         const unpaidDed = parseFloat(p.unpaid_leave_deduction || 0);
         const advance = parseFloat(p.advance_salary || 0);
         const loan = parseFloat(p.loan_deduction || 0);
+        const foodBills = parseFloat(p.food_bills || 0);
         const fines = parseFloat(p.fines || 0);
         const wht = parseFloat(p.wht_amount || 0);
         const deductions = parseFloat(p.deductions || 0);
-        const totalDeductions = advance + loan + fines + wht + unpaidDed + deductions;
+        const totalDeductions = advance + loan + foodBills + fines + wht + unpaidDed + deductions;
 
         const netSalary = parseFloat(p.net_salary || (basic + totalAdditions - totalDeductions));
         const paidAmount = parseFloat(p.paid_amount || 0);
@@ -3033,11 +3035,11 @@ function exportPayrollCSV() {
             escapeCsvValue(unpaidDed.toFixed(2)),
             escapeCsvValue(fuel.toFixed(2)),
             escapeCsvValue(incentive.toFixed(2)),
-            escapeCsvValue(foodBills.toFixed(2)),
             escapeCsvValue(bonus.toFixed(2)),
             escapeCsvValue(totalAdditions.toFixed(2)),
             escapeCsvValue(advance.toFixed(2)),
             escapeCsvValue(loan.toFixed(2)),
+            escapeCsvValue(foodBills.toFixed(2)),
             escapeCsvValue(fines.toFixed(2)),
             escapeCsvValue(wht.toFixed(2)),
             escapeCsvValue(deductions.toFixed(2)),

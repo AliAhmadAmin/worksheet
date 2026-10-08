@@ -331,11 +331,11 @@
                         <div class="form-grid-3">
                             <div class="form-group">
                                 <label class="form-label">Gross / Base Salary (PKR)</label>
-                                <input type="number" id="add-emp-salary" class="input-control" placeholder="e.g. 75000" min="0" step="500" style="font-weight: 700;">
+                                <input type="number" id="add-emp-salary" class="input-control" placeholder="e.g. 75000" min="0" step="any" style="font-weight: 700;">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Fixed Fuel / Mobile Allow.</label>
-                                <input type="number" id="add-emp-fixed-allowance" class="input-control" placeholder="e.g. 5000" min="0" step="100">
+                                <input type="number" id="add-emp-fixed-allowance" class="input-control" placeholder="e.g. 5000" min="0" step="any">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Joining Date</label>
@@ -537,11 +537,11 @@
                         <div class="form-grid-3">
                             <div class="form-group">
                                 <label class="form-label">Gross / Base Salary (PKR)</label>
-                                <input type="number" id="edit-emp-salary" class="input-control" placeholder="e.g. 75000" min="0" step="500" style="font-weight: 700;">
+                                <input type="number" id="edit-emp-salary" class="input-control" placeholder="e.g. 75000" min="0" step="any" style="font-weight: 700;">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Fixed Fuel / Mobile Allow.</label>
-                                <input type="number" id="edit-emp-fixed-allowance" class="input-control" placeholder="e.g. 5000" min="0" step="100">
+                                <input type="number" id="edit-emp-fixed-allowance" class="input-control" placeholder="e.g. 5000" min="0" step="any">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Joining Date</label>
@@ -637,30 +637,26 @@
                         <div class="form-grid-3">
                             <div class="form-group">
                                 <label class="form-label">Gross / Base Salary (PKR) *</label>
-                                <input type="number" id="edit-pr-basic-salary" class="input-control" step="100" min="0" required oninput="calculatePayrollModalTotals()" style="font-weight: 700;">
+                                <input type="number" id="edit-pr-basic-salary" class="input-control" step="any" min="0" required oninput="calculatePayrollModalTotals()" style="font-weight: 700;">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Fuel / Travel / Mobile (PKR)</label>
-                                <input type="number" id="edit-pr-fuel" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                                <input type="number" id="edit-pr-fuel" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Incentive / Performance (PKR)</label>
-                                <input type="number" id="edit-pr-incentive" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                                <input type="number" id="edit-pr-incentive" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()">
                             </div>
                         </div>
                         <div class="form-grid-2">
                             <div class="form-group">
-                                <label class="form-label">Food Bills / Reimbursement (PKR)</label>
-                                <input type="number" id="edit-pr-food-bills" class="input-control" step="50" min="0" oninput="calculatePayrollModalTotals()">
+                                <label class="form-label">Other Bonus (PKR)</label>
+                                <input type="number" id="edit-pr-bonus" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()">
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Other Bonus (PKR)</label>
-                                <input type="number" id="edit-pr-bonus" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                                <label class="form-label">Bonus / Incentive Remarks</label>
+                                <input type="text" id="edit-pr-bonus-reason" class="input-control" placeholder="e.g. Eid Bonus, Performance target achieved">
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Bonus / Incentive Remarks</label>
-                            <input type="text" id="edit-pr-bonus-reason" class="input-control" placeholder="e.g. Eid Bonus, Performance target achieved">
                         </div>
                     </div>
 
@@ -671,7 +667,7 @@
                         <div class="form-grid-3">
                             <div class="form-group">
                                 <label class="form-label" id="edit-pr-unpaid-label">Unpaid Leaves (PKR)</label>
-                                <input type="number" id="edit-pr-unpaid-deduction" class="input-control" step="0.01" min="0" oninput="handleUnpaidDeductionManualInput()" style="color: #dc2626; font-weight: 700;">
+                                <input type="number" id="edit-pr-unpaid-deduction" class="input-control" step="any" min="0" oninput="handleUnpaidDeductionManualInput()" style="color: #dc2626; font-weight: 700;">
                                 <div style="margin-top: 6px;">
                                     <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; font-weight: 600; color: #059669; user-select: none;">
                                         <input type="checkbox" id="edit-pr-waive-unpaid" onchange="toggleWaiveUnpaidDeduction()" style="width: 15px; height: 15px; accent-color: #10b981; cursor: pointer;">
@@ -681,30 +677,34 @@
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Advance Salary (PKR)</label>
-                                <input type="number" id="edit-pr-advance" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                                <input type="number" id="edit-pr-advance" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Loan Deduction (PKR)</label>
-                                <input type="number" id="edit-pr-loan" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                                <input type="number" id="edit-pr-loan" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()">
                             </div>
                         </div>
 
                         <div class="form-grid-3">
                             <div class="form-group">
+                                <label class="form-label">🍲 Canteen Food Bills (PKR)</label>
+                                <input type="number" id="edit-pr-food-bills" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()" style="color: #dc2626; font-weight: 700;">
+                            </div>
+                            <div class="form-group">
                                 <label class="form-label">WHT / Income Tax (PKR)</label>
-                                <input type="number" id="edit-pr-wht" class="input-control" step="50" min="0" oninput="calculatePayrollModalTotals()">
+                                <input type="number" id="edit-pr-wht" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Fines / Penalties (PKR)</label>
-                                <input type="number" id="edit-pr-fines" class="input-control" step="50" min="0" oninput="calculatePayrollModalTotals()">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Other Deductions (PKR)</label>
-                                <input type="number" id="edit-pr-deductions" class="input-control" step="50" min="0" oninput="calculatePayrollModalTotals()">
+                                <input type="number" id="edit-pr-fines" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()">
                             </div>
                         </div>
 
-                        <div class="form-grid-2">
+                        <div class="form-grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Other Deductions (PKR)</label>
+                                <input type="number" id="edit-pr-deductions" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()">
+                            </div>
                             <div class="form-group">
                                 <label class="form-label">Fine Reason</label>
                                 <input type="text" id="edit-pr-fine-reason" class="input-control" placeholder="e.g. Late Arrival Penalty">
@@ -748,7 +748,7 @@
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Salary Paid Amount (PKR)</label>
-                                <input type="number" id="edit-pr-paid-amount" class="input-control" step="100" min="0" oninput="calculatePayrollModalTotals()">
+                                <input type="number" id="edit-pr-paid-amount" class="input-control" step="any" min="0" oninput="calculatePayrollModalTotals()">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Payment Method</label>

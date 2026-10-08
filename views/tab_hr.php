@@ -1019,7 +1019,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
                     <div class="form-group">
                         <label class="form-label">Requested Amount (PKR)</label>
-                        <input type="number" step="100" min="500" id="hr-loan-form-amount" class="input-control" placeholder="e.g. 25000" style="width: 100%; font-weight: 700;" required oninput="calculateLoanFormDeduction()">
+                        <input type="number" step="any" min="0" id="hr-loan-form-amount" class="input-control" placeholder="e.g. 25000" style="width: 100%; font-weight: 700;" required oninput="calculateLoanFormDeduction()">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Repayment Tenure (Months)</label>
@@ -1126,13 +1126,13 @@
 
                 <div class="form-group" style="margin-bottom: 12px;">
                     <label class="form-label">Basic Salary (PKR)</label>
-                    <input type="number" step="0.01" id="hr-pay-basic-salary" class="input-control" style="width: 100%; font-weight: 700;" required oninput="calculateModalNetSalary()">
+                    <input type="number" step="any" min="0" id="hr-pay-basic-salary" class="input-control" style="width: 100%; font-weight: 700;" required oninput="calculateModalNetSalary()">
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div class="form-group">
                         <label class="form-label">Bonus (PKR)</label>
-                        <input type="number" step="0.01" id="hr-pay-bonus" class="input-control" value="0.00" style="width: 100%; color: #10b981; font-weight: 700;" oninput="calculateModalNetSalary()">
+                        <input type="number" step="any" min="0" id="hr-pay-bonus" class="input-control" value="0.00" style="width: 100%; color: #10b981; font-weight: 700;" oninput="calculateModalNetSalary()">
                     </div>
                     <div class="form-group">
                         <label class="form-label" style="font-size: 11px;">Bonus Reason</label>
@@ -1143,7 +1143,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div class="form-group">
                         <label class="form-label">Deductions / Loans (PKR)</label>
-                        <input type="number" step="0.01" id="hr-pay-deductions" class="input-control" value="0.00" style="width: 100%; color: #ef4444; font-weight: 700;" oninput="calculateModalNetSalary()">
+                        <input type="number" step="any" min="0" id="hr-pay-deductions" class="input-control" value="0.00" style="width: 100%; color: #ef4444; font-weight: 700;" oninput="calculateModalNetSalary()">
                     </div>
                     <div class="form-group">
                         <label class="form-label" style="font-size: 11px;">Deduction Reason</label>
@@ -1154,7 +1154,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
                     <div class="form-group">
                         <label class="form-label" style="color: #ef4444;">⚠️ Disciplinary Fines (PKR)</label>
-                        <input type="number" step="0.01" id="hr-pay-fines" class="input-control" value="0.00" style="width: 100%; color: #ef4444; font-weight: 700; border-color: rgba(239, 68, 68, 0.4);" oninput="calculateModalNetSalary()">
+                        <input type="number" step="any" min="0" id="hr-pay-fines" class="input-control" value="0.00" style="width: 100%; color: #ef4444; font-weight: 700; border-color: rgba(239, 68, 68, 0.4);" oninput="calculateModalNetSalary()">
                     </div>
                     <div class="form-group">
                         <label class="form-label" style="font-size: 11px; color: #ef4444;">Fine Reason / Notes</label>
@@ -1231,7 +1231,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Fine Amount (PKR)</label>
-                        <input type="number" step="50" min="50" id="hr-fine-form-amount" class="input-control" placeholder="e.g. 1000" style="width: 100%; font-weight: 700; color: #ef4444;" required>
+                        <input type="number" step="any" min="0" id="hr-fine-form-amount" class="input-control" placeholder="e.g. 1000" style="width: 100%; font-weight: 700; color: #ef4444;" required>
                     </div>
                 </div>
 
@@ -1279,7 +1279,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Amount (PKR)</label>
-                        <input type="number" step="0.01" min="1" id="hr-claim-form-amount" class="input-control" placeholder="e.g. 5000" style="width: 100%; font-weight: 700; color: #059669;" required>
+                        <input type="number" step="any" min="0" id="hr-claim-form-amount" class="input-control" placeholder="e.g. 5000" style="width: 100%; font-weight: 700; color: #059669;" required>
                     </div>
                 </div>
 
