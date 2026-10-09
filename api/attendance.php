@@ -437,34 +437,53 @@ switch ($action) {
             $empStmt->execute($params);
             $employees = $empStmt->fetchAll();
 
-            // Fetch all daily sheets for this date range
-            $sheetStmt = $pdo->prepare("
-                SELECT ds.*, 
-                       (SELECT COUNT(*) FROM sheet_entries se WHERE se.sheet_id = ds.id) as total_entries
+            $includeDetails = isset($_GET['include_details']) && ($_GET['include_details'] === '1' || $_GET['include_details'] === 'true');
+            $isSingleEmployee = ($empIdFilter !== null);
+            $needDetails = ($isSingleEmployee || $includeDetails);
+
+            // Fetch daily sheets for this date range with lean columns (avoid heavy subquery)
+            $sheetSql = "
+                SELECT ds.id, ds.employee_id, ds.sheet_date, ds.check_in_time, ds.check_out_time, 
+                       ds.total_duty_seconds, ds.is_locked, ds.work_summary, ds.remarks
                 FROM daily_sheets ds
                 WHERE ds.sheet_date BETWEEN ? AND ?
-            ");
-            $sheetStmt->execute([$startDate, $endDate]);
-            $allSheets = $sheetStmt->fetchAll();
+            ";
+            $sheetParams = [$startDate, $endDate];
+            if ($empIdFilter) {
+                $sheetSql .= " AND ds.employee_id = ?";
+                $sheetParams[] = $empIdFilter;
+            }
+            $sheetStmt = $pdo->prepare($sheetSql);
+            $sheetStmt->execute($sheetParams);
+            $allSheets = $sheetStmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Group sheets by employee_id and date
+            // Group sheets by employee_id and date for O(1) lookup
             $sheetsByEmp = [];
             foreach ($allSheets as $sh) {
                 $sheetsByEmp[$sh['employee_id']][$sh['sheet_date']] = $sh;
             }
 
-            // Fetch all approved leaves for this date range
-            $approvedLeaves = [];
+            // Fetch all approved leaves and index by employee_id for O(1) employee lookup
+            $leavesByEmp = [];
             try {
-                $leaveStmt = $pdo->prepare("
-                    SELECT * FROM hr_leaves 
+                $leaveSql = "
+                    SELECT employee_id, start_date, end_date, leave_type, reason 
+                    FROM hr_leaves 
                     WHERE status = 'approved' 
                       AND ((start_date BETWEEN ? AND ?) OR (end_date BETWEEN ? AND ?) OR (start_date <= ? AND end_date >= ?))
-                ");
-                $leaveStmt->execute([$startDate, $endDate, $startDate, $endDate, $startDate, $endDate]);
-                $approvedLeaves = $leaveStmt->fetchAll();
+                ";
+                $leaveParams = [$startDate, $endDate, $startDate, $endDate, $startDate, $endDate];
+                if ($empIdFilter) {
+                    $leaveSql .= " AND employee_id = ?";
+                    $leaveParams[] = $empIdFilter;
+                }
+                $leaveStmt = $pdo->prepare($leaveSql);
+                $leaveStmt->execute($leaveParams);
+                while ($lv = $leaveStmt->fetch(PDO::FETCH_ASSOC)) {
+                    $leavesByEmp[$lv['employee_id']][] = $lv;
+                }
             } catch (Exception $e) {
-                $approvedLeaves = [];
+                $leavesByEmp = [];
             }
 
             // Generate list of days between startDate and endDate
@@ -497,7 +516,7 @@ switch ($action) {
             ];
 
             foreach ($employees as $emp) {
-                $empId = $emp['id'];
+                $empId = (int)$emp['id'];
                 $empExpectedHours = isset($emp['expected_hours']) ? (float)$emp['expected_hours'] : 8.0;
 
                 // Determine effective daily shift hours
@@ -521,20 +540,24 @@ switch ($action) {
                     'weekly_hours' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0]
                 ];
 
+                $empLeaves = $leavesByEmp[$empId] ?? [];
+
                 foreach ($periodDates as $d) {
                     $dt = $d['date'];
                     $sheet = $sheetsByEmp[$empId][$dt] ?? null;
                     
-                    // Check if on approved leave
+                    // Check if on approved leave (O(1) list of only this employee's leaves)
                     $isOnLeave = false;
                     $leaveType = '';
                     $leaveReason = '';
-                    foreach ($approvedLeaves as $lv) {
-                        if ($lv['employee_id'] == $empId && $dt >= $lv['start_date'] && $dt <= $lv['end_date']) {
-                            $isOnLeave = true;
-                            $leaveType = $lv['leave_type'];
-                            $leaveReason = $lv['reason'] ?? '';
-                            break;
+                    if (!empty($empLeaves)) {
+                        foreach ($empLeaves as $lv) {
+                            if ($dt >= $lv['start_date'] && $dt <= $lv['end_date']) {
+                                $isOnLeave = true;
+                                $leaveType = $lv['leave_type'];
+                                $leaveReason = $lv['reason'] ?? '';
+                                break;
+                            }
                         }
                     }
 
@@ -628,27 +651,28 @@ switch ($action) {
                         }
                     }
 
-                    $empRecords[] = [
-                        'date' => $dt,
-                        'day' => $d['day'],
-                        'day_num' => $d['day_num'],
-                        'is_weekend' => $d['is_weekend'],
-                        'is_future' => $d['is_future'],
-                        'check_in' => $sheet['check_in_time'] ?? null,
-                        'check_out' => $sheet['check_out_time'] ?? null,
-                        'duty_seconds' => $dutySeconds,
-                        'duty_hours' => $dutyHours,
-                        'duty_formatted' => $dutySeconds > 0 ? formatDutyTime($dutySeconds) : '-',
-                        'status' => $status,
-                        'status_label' => $statusLabel,
-                        'badge_class' => $badgeClass,
-                        'is_locked' => $sheet ? (int)$sheet['is_locked'] : 0,
-                        'entries_count' => $sheet ? (int)$sheet['total_entries'] : 0,
-                        'leave_type' => $leaveType,
-                        'leave_reason' => $leaveReason,
-                        'work_summary' => $sheet['work_summary'] ?? '',
-                        'remarks' => $sheet['remarks'] ?? ''
-                    ];
+                    if ($needDetails) {
+                        $empRecords[] = [
+                            'date' => $dt,
+                            'day' => $d['day'],
+                            'day_num' => $d['day_num'],
+                            'is_weekend' => $d['is_weekend'],
+                            'is_future' => $d['is_future'],
+                            'check_in' => $sheet['check_in_time'] ?? null,
+                            'check_out' => $sheet['check_out_time'] ?? null,
+                            'duty_seconds' => $dutySeconds,
+                            'duty_hours' => $dutyHours,
+                            'duty_formatted' => $dutySeconds > 0 ? formatDutyTime($dutySeconds) : '-',
+                            'status' => $status,
+                            'status_label' => $statusLabel,
+                            'badge_class' => $badgeClass,
+                            'is_locked' => $sheet ? (int)$sheet['is_locked'] : 0,
+                            'leave_type' => $leaveType,
+                            'leave_reason' => $leaveReason,
+                            'work_summary' => $sheet['work_summary'] ?? '',
+                            'remarks' => $sheet['remarks'] ?? ''
+                        ];
+                    }
                 }
 
                 // Summary calculations
@@ -663,11 +687,15 @@ switch ($action) {
                 $grandTotals['total_duty_hours'] += $empSummary['total_duty_hours'];
                 $grandTotals['total_expected_hours'] += $empSummary['expected_duty_hours'];
 
-                $reportData[] = [
+                $empItem = [
                     'employee' => $emp,
-                    'summary' => $empSummary,
-                    'daily_records' => $empRecords
+                    'summary' => $empSummary
                 ];
+                if ($needDetails) {
+                    $empItem['daily_records'] = $empRecords;
+                }
+
+                $reportData[] = $empItem;
             }
 
             $grandTotals['total_duty_formatted'] = formatDutyTime($grandTotals['total_duty_seconds']);

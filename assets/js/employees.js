@@ -279,12 +279,19 @@ function renderDirectoryTable(employees) {
             ? `<code style="font-size: 12px; color: var(--text-muted);">${escapeHtml(emp.email)}</code>`
             : `<span style="font-size: 11.5px; color: var(--text-muted); font-style: italic;">No login email</span>`;
 
+        const empCodeBadge = `<span style="font-family: monospace; font-size: 10.5px; font-weight: 700; color: var(--primary); background: rgba(59,130,246,0.1); padding: 1px 5px; border-radius: 4px; margin-left: 5px;">${escapeHtml(emp.emp_code || `DP-${String(emp.id).padStart(3, '0')}`)}</span>`;
+        const phoneDisplay = (emp.phone || emp.whatsapp_number)
+            ? `<div style="font-size: 11px; color: #16a34a; font-weight: 600; margin-top: 3px; display: flex; align-items: center; gap: 3px;">📱 <span>${escapeHtml(emp.phone || emp.whatsapp_number)}</span></div>`
+            : `<div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">📱 No WhatsApp</div>`;
+
         tr.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     ${avatarHtml}
                     <div>
-                        <strong>${escapeHtml(emp.name)}</strong> ${isSelf ? '<small style="color: var(--primary); font-weight: 700;">(You)</small>' : ''}
+                        <div style="display: flex; align-items: center;">
+                            <strong>${escapeHtml(emp.name)}</strong>${empCodeBadge} ${isSelf ? '<small style="color: var(--primary); font-weight: 700; margin-left: 4px;">(You)</small>' : ''}
+                        </div>
                         <div style="display: flex; align-items: center; gap: 4px; margin-top: 3px; flex-wrap: wrap;">
                             ${shiftBadge}
                             ${statusBadge}
@@ -292,7 +299,10 @@ function renderDirectoryTable(employees) {
                     </div>
                 </div>
             </td>
-            <td>${emailDisplay}</td>
+            <td>
+                ${emailDisplay}
+                ${phoneDisplay}
+            </td>
             <td>${roleBadge}</td>
             <td>
                 <div style="font-weight: 500;">${escapeHtml(emp.designation || 'Staff')}</div>
@@ -1137,6 +1147,9 @@ function openAddEmployeeModal() {
     const codeInput = document.getElementById('add-emp-code');
     if (codeInput) codeInput.value = '';
 
+    const phoneInput = document.getElementById('add-emp-phone');
+    if (phoneInput) phoneInput.value = '';
+
     const fatherInput = document.getElementById('add-emp-father-name');
     if (fatherInput) fatherInput.value = '';
 
@@ -1189,6 +1202,7 @@ async function handleAddEmployeeSubmit(e) {
     const avatar = document.getElementById('add-emp-avatar-base64')?.value || '';
 
     const empCode = document.getElementById('add-emp-code')?.value.trim();
+    const phone = document.getElementById('add-emp-phone')?.value.trim();
     const fatherName = document.getElementById('add-emp-father-name')?.value.trim();
     const cnic = document.getElementById('add-emp-cnic')?.value.trim();
     const bankName = document.getElementById('add-emp-bank-name')?.value || 'UBL';
@@ -1220,6 +1234,8 @@ async function handleAddEmployeeSubmit(e) {
                 action: 'create_employee',
                 name,
                 emp_code: empCode,
+                phone: phone,
+                whatsapp_number: phone,
                 father_husband_name: fatherName,
                 cnic_no: cnic,
                 bank_name: bankName,
@@ -1278,6 +1294,9 @@ function openEditEmployeeModal(empId) {
 
     const codeInput = document.getElementById('edit-emp-code');
     if (codeInput) codeInput.value = emp.emp_code || `DP-${String(emp.id).padStart(3, '0')}`;
+
+    const phoneInput = document.getElementById('edit-emp-phone');
+    if (phoneInput) phoneInput.value = emp.phone || emp.whatsapp_number || emp.profile_phone || '';
 
     const fatherInput = document.getElementById('edit-emp-father-name');
     if (fatherInput) fatherInput.value = emp.father_husband_name || '';
@@ -1363,6 +1382,7 @@ async function handleEditEmployeeSubmit(e) {
     const isActive = parseInt(document.getElementById('edit-emp-status')?.value || '1', 10);
 
     const empCode = document.getElementById('edit-emp-code')?.value.trim();
+    const phone = document.getElementById('edit-emp-phone')?.value.trim();
     const fatherName = document.getElementById('edit-emp-father-name')?.value.trim();
     const cnic = document.getElementById('edit-emp-cnic')?.value.trim();
     const bankName = document.getElementById('edit-emp-bank-name')?.value || 'UBL';
@@ -1392,6 +1412,8 @@ async function handleEditEmployeeSubmit(e) {
             id,
             name,
             emp_code: empCode,
+            phone: phone,
+            whatsapp_number: phone,
             father_husband_name: fatherName,
             cnic_no: cnic,
             bank_name: bankName,

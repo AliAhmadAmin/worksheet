@@ -132,34 +132,43 @@ let currentAttReportData = null;
 function switchAttendanceView(mode) {
     const liveSec = document.getElementById('att-view-live-section');
     const repSec = document.getElementById('att-view-report-section');
+    const waSec = document.getElementById('att-view-whatsapp-section');
+
     const btnLive = document.getElementById('btn-att-view-live');
     const btnReport = document.getElementById('btn-att-view-report');
+    const btnWa = document.getElementById('btn-att-view-whatsapp');
 
-    if (mode === 'live') {
-        if (liveSec) liveSec.style.display = 'block';
-        if (repSec) repSec.style.display = 'none';
-        if (btnLive) {
-            btnLive.className = 'btn btn-primary';
-            btnLive.style.border = 'none';
+    if (liveSec) liveSec.style.display = (mode === 'live') ? 'block' : 'none';
+    if (repSec) repSec.style.display = (mode === 'report') ? 'block' : 'none';
+    if (waSec) waSec.style.display = (mode === 'whatsapp') ? 'block' : 'none';
+
+    [
+        { el: btnLive, active: mode === 'live' },
+        { el: btnReport, active: mode === 'report' },
+        { el: btnWa, active: mode === 'whatsapp' }
+    ].forEach(b => {
+        if (b.el) {
+            if (b.active) {
+                b.el.className = 'btn btn-primary';
+                b.el.style.color = '#ffffff';
+                b.el.style.background = 'var(--primary)';
+                b.el.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
+            } else {
+                b.el.className = 'btn btn-outline';
+                b.el.style.color = 'var(--text-main)';
+                b.el.style.background = 'transparent';
+                b.el.style.boxShadow = 'none';
+            }
         }
-        if (btnReport) {
-            btnReport.className = 'btn btn-outline';
-            btnReport.style.border = 'none';
-        }
+    });
+
+    if (mode === 'live' && typeof loadLiveAttendance === 'function') {
         loadLiveAttendance();
-    } else {
-        if (liveSec) liveSec.style.display = 'none';
-        if (repSec) repSec.style.display = 'block';
-        if (btnLive) {
-            btnLive.className = 'btn btn-outline';
-            btnLive.style.border = 'none';
-        }
-        if (btnReport) {
-            btnReport.className = 'btn btn-primary';
-            btnReport.style.border = 'none';
-        }
+    } else if (mode === 'report') {
         populateAttendanceReportEmployees();
         loadAttendanceReport();
+    } else if (mode === 'whatsapp' && typeof WhatsAppAtt !== 'undefined') {
+        WhatsAppAtt.init();
     }
 }
 
@@ -200,7 +209,7 @@ async function loadLiveAttendance() {
 
         tbody.innerHTML = '';
         if (data.employees.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">No staff records found for this date/department.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No staff records found for this date/department.</td></tr>';
             return;
         }
 
@@ -237,7 +246,6 @@ async function loadLiveAttendance() {
                         </div>
                     </div>
                 </td>
-                <td><span style="font-size: 12px;">${escapeHtml(emp.team_name || 'General')}</span></td>
                 <td><span class="user-role-tag" style="background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600;">${escapeHtml(emp.department_name || 'Digital')}</span></td>
                 <td><code style="font-size: 12px; font-weight: 700; color: ${emp.check_in_time ? '#10b981' : 'var(--text-dim)'};">${escapeHtml(emp.check_in_time || '-')}</code></td>
                 <td><code style="font-size: 12px; font-weight: 700; color: ${emp.check_out_time ? '#3b82f6' : 'var(--text-dim)'};">${escapeHtml(emp.check_out_time || '-')}</code></td>
@@ -246,8 +254,8 @@ async function loadLiveAttendance() {
                 <td>
                     <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px;">
                         ${isSuperOrHr ? `
-                            <button type="button" class="btn btn-outline" style="padding: 4px 10px; font-size: 11.5px; border-color: rgba(59,130,246,0.4); color: var(--primary);" onclick="openAdminShiftModal(${emp.employee_id}, '${targetDate}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${emp.check_in_time || ''}', '${emp.check_out_time || ''}', ${emp.is_locked ? 1 : 0})" title="Adjust Check-In/Out Times">
-                                ⏱️ Adjust Shift
+                            <button type="button" class="btn btn-outline" style="padding: 4px 10px; font-size: 11.5px; border-color: rgba(59,130,246,0.4); color: var(--primary); white-space: nowrap; font-weight: 600;" onclick="openAdminShiftModal(${emp.employee_id}, '${targetDate}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${emp.check_in_time || ''}', '${emp.check_out_time || ''}', ${emp.is_locked ? 1 : 0})" title="Adjust Check-In/Out Times">
+                                ⏱️ Adjust
                             </button>
                         ` : ''}
                     </div>
@@ -261,8 +269,43 @@ async function loadLiveAttendance() {
     }
 }
 
+// Populate Departments Dropdown dynamically from AppState or API
+async function populateAttendanceDepartments() {
+    const liveDept = document.getElementById('live-att-dept-filter');
+    const repDept = document.getElementById('rep-att-dept-select');
+    if (!liveDept && !repDept) return;
+
+    let depts = (typeof AppState !== 'undefined' && AppState.departments) ? AppState.departments : [];
+    if (!depts || depts.length === 0) {
+        try {
+            const res = await fetch('api/employees.php?action=list');
+            const data = await res.json();
+            if (data.departments && data.departments.length > 0) {
+                depts = data.departments;
+                if (typeof AppState !== 'undefined') AppState.departments = depts;
+            }
+        } catch (e) {}
+    }
+
+    if (depts && depts.length > 0) {
+        [liveDept, repDept].forEach(sel => {
+            if (!sel) return;
+            const cur = sel.value || 'all';
+            let opts = '<option value="all">🏢 All Departments</option>';
+            depts.forEach(d => {
+                opts += `<option value="${d.id}">🏢 ${escapeHtml(d.name)}</option>`;
+            });
+            sel.innerHTML = opts;
+            if (cur && Array.from(sel.options).some(o => o.value === cur)) {
+                sel.value = cur;
+            }
+        });
+    }
+}
+
 // Populate & Render Searchable Employee Dropdown for Attendance Report
 function populateAttendanceReportEmployees() {
+    populateAttendanceDepartments();
     const select = document.getElementById('rep-att-emp-select');
     if (!select) return;
 
@@ -661,7 +704,6 @@ function renderMultiEmployeeAttendanceMatrix(data) {
                 <td><strong style="color: #ef4444; font-size: 13px;">${sum.absences + sum.incomplete}</strong></td>
                 <td><strong style="color: var(--primary); font-size: 13.5px;">${sum.duty_formatted}</strong></td>
                 <td><span style="font-size: 12px; color: var(--text-muted);">${sum.expected_duty_hours} hrs</span></td>
-                <td><span style="font-size: 12px; font-weight: 700; color: var(--text-main);">${sum.avg_weekly_hours} hrs/wk</span></td>
                 <td>
                     <strong style="font-size: 12.5px; color: ${sum.hour_balance >= 0 ? '#10b981' : '#ef4444'};">
                         ${sum.hour_balance >= 0 ? '+' + sum.hour_balance : sum.hour_balance}h
@@ -685,14 +727,13 @@ function renderMultiEmployeeAttendanceMatrix(data) {
                         <tr>
                             <th>Employee</th>
                             <th>Department</th>
-                            <th title="Full Days (&ge;7.5h)">Full Days</th>
-                            <th title="Short Leaves (~6h)">Short Leave (6h)</th>
-                            <th title="Half Days (~4h)">Half Day (4h)</th>
+                            <th title="Full Duty Shifts">Full</th>
+                            <th title="Short Duty Shifts (~6h)">Short (6h)</th>
+                            <th title="Half Duty Shifts (~4h)">Half (4h)</th>
                             <th title="Official Approved Leaves">Leaves</th>
                             <th title="Absences / Minimal Duty">Absent</th>
-                            <th>Logged Duty</th>
+                            <th>Duty Hours</th>
                             <th>Expected</th>
-                            <th>Weekly Avg</th>
                             <th>Balance</th>
                         </tr>
                     </thead>
@@ -715,48 +756,76 @@ function resetToAllStaffReport() {
 
 // Export Report as CSV
 function exportAttendanceReportCsv() {
-    if (!currentAttReportData || !currentAttReportData.report_data) {
+    if (!currentAttReportData || !currentAttReportData.report_data || currentAttReportData.report_data.length === 0) {
         showToast("Please generate an attendance report first.", "error");
         return;
     }
 
     const data = currentAttReportData;
     let csvContent = "data:text/csv;charset=utf-8,";
+    const hasDailyRecords = data.report_data[0].daily_records && data.report_data[0].daily_records.length > 0;
 
-    // Header
-    csvContent += "Employee Name,Email,Designation,Department,Date,Day,Check In,Check Out,Duty Hours,Status,Leave Reason / Remarks\n";
+    if (hasDailyRecords) {
+        // Detailed Timesheet CSV
+        csvContent += "Employee Name,Email,Designation,Department,Date,Day,Check In,Check Out,Duty Hours,Status,Leave Reason / Remarks\n";
 
-    data.report_data.forEach(item => {
-        const emp = item.employee;
-        item.daily_records.forEach(r => {
-            let note = r.remarks || '';
-            if (r.status === 'approved_leave') {
-                note = (r.leave_type ? r.leave_type.toUpperCase() + ' LEAVE: ' : 'APPROVED LEAVE: ') + (r.leave_reason || 'Approved by HR');
-            } else if (!note) {
-                note = r.status_label;
-            }
+        data.report_data.forEach(item => {
+            const emp = item.employee;
+            (item.daily_records || []).forEach(r => {
+                let note = r.remarks || '';
+                if (r.status === 'approved_leave') {
+                    note = (r.leave_type ? r.leave_type.toUpperCase() + ' LEAVE: ' : 'APPROVED LEAVE: ') + (r.leave_reason || 'Approved by HR');
+                } else if (!note) {
+                    note = r.status_label;
+                }
 
+                const row = [
+                    `"${(emp.name || '').replace(/"/g, '""')}"`,
+                    `"${(emp.email || '').replace(/"/g, '""')}"`,
+                    `"${(emp.designation || 'Staff').replace(/"/g, '""')}"`,
+                    `"${(emp.department_name || 'Digital').replace(/"/g, '""')}"`,
+                    `"${r.date}"`,
+                    `"${r.day}"`,
+                    `"${r.check_in || ''}"`,
+                    `"${r.check_out || ''}"`,
+                    `"${r.duty_formatted || '0:00:00'}"`,
+                    `"${(r.status_label || '').replace(/"/g, '""')}"`,
+                    `"${note.replace(/"/g, '""')}"`
+                ];
+                csvContent += row.join(",") + "\n";
+            });
+        });
+    } else {
+        // Company-Wide Summary Matrix CSV
+        csvContent += "Employee Name,Email,Designation,Department,Full Shifts,Short Shifts (6h),Half Shifts (4h),Approved Leaves,Absent Days,Duty Hours,Expected Hours,Balance Hours\n";
+
+        data.report_data.forEach(item => {
+            const emp = item.employee;
+            const sum = item.summary;
             const row = [
-                `"${emp.name.replace(/"/g, '""')}"`,
-                `"${emp.email.replace(/"/g, '""')}"`,
+                `"${(emp.name || '').replace(/"/g, '""')}"`,
+                `"${(emp.email || '').replace(/"/g, '""')}"`,
                 `"${(emp.designation || 'Staff').replace(/"/g, '""')}"`,
                 `"${(emp.department_name || 'Digital').replace(/"/g, '""')}"`,
-                `"${r.date}"`,
-                `"${r.day}"`,
-                `"${r.check_in || ''}"`,
-                `"${r.check_out || ''}"`,
-                `"${r.duty_formatted || '0:00:00'}"`,
-                `"${r.status_label.replace(/"/g, '""')}"`,
-                `"${note.replace(/"/g, '""')}"`
+                `"${sum.full_days}"`,
+                `"${sum.short_leaves}"`,
+                `"${sum.half_leaves}"`,
+                `"${sum.approved_leaves}"`,
+                `"${sum.absences + sum.incomplete}"`,
+                `"${sum.duty_formatted}"`,
+                `"${sum.expected_duty_hours} hrs"`,
+                `"${sum.hour_balance >= 0 ? '+' + sum.hour_balance : sum.hour_balance}h"`
             ];
             csvContent += row.join(",") + "\n";
         });
-    });
+    }
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `attendance_timesheet_${data.start_date}_to_${data.end_date}.csv`);
+    link.setAttribute("download", hasDailyRecords 
+        ? `attendance_timesheet_${data.start_date}_to_${data.end_date}.csv`
+        : `attendance_summary_${data.start_date}_to_${data.end_date}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -957,7 +1026,6 @@ function printAttendanceReport() {
                     <td style="text-align: center; font-weight: 700; color: #2563eb;">${sum.approved_leaves}</td>
                     <td style="text-align: center; font-weight: 700; color: #dc2626;">${sum.absences + sum.incomplete}</td>
                     <td style="text-align: center; font-family: monospace; font-weight: 800; color: #00b300;">${sum.duty_formatted}</td>
-                    <td style="text-align: center; font-weight: 600;">${sum.avg_weekly_hours}h</td>
                     <td style="text-align: center; font-weight: 800; color: ${balanceColor};">
                         ${isOvertime ? '+' : ''}${sum.hour_balance}h
                     </td>
@@ -996,8 +1064,7 @@ function printAttendanceReport() {
                         <th style="text-align: center;">Half</th>
                         <th style="text-align: center;">Leaves</th>
                         <th style="text-align: center;">Absent</th>
-                        <th style="text-align: center;">Total Duty</th>
-                        <th style="text-align: center;">Avg/Wk</th>
+                        <th style="text-align: center;">Duty Hours</th>
                         <th style="text-align: center;">Balance</th>
                     </tr>
                 </thead>

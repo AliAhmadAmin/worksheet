@@ -63,23 +63,47 @@ switch ($action) {
             exit;
         }
 
-        // Validate password
-        $isValid = false;
-        if (password_verify($password, $user['password_hash']) || $password === 'DiscoverPakistan123') {
-            $isValid = true;
-        }
+        // Brute force rate-limiting check
+        $clientIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+        $rateLimitKey = 'login_attempts_' . md5($clientIp . '_' . strtolower($email));
+        $attempts = $_SESSION[$rateLimitKey] ?? ['count' => 0, 'locked_until' => 0];
 
-        if (!$isValid) {
-            http_response_code(401);
-            echo json_encode(['success' => false, 'message' => 'Invalid password. Please check your credentials.']);
+        if ($attempts['locked_until'] > time()) {
+            $remaining = ceil(($attempts['locked_until'] - time()) / 60);
+            http_response_code(429);
+            echo json_encode(['success' => false, 'message' => "Too many failed login attempts. Please wait {$remaining} minute(s) before trying again."]);
             exit;
         }
 
-        // Login success
+        // Strict Password Verification
+        $isValid = password_verify($password, $user['password_hash']);
+
+        if (!$isValid) {
+            // Increment failed attempts
+            $attempts['count'] = ($attempts['count'] ?? 0) + 1;
+            if ($attempts['count'] >= 5) {
+                $attempts['locked_until'] = time() + (15 * 60); // Lock for 15 minutes
+                $attempts['count'] = 0;
+            }
+            $_SESSION[$rateLimitKey] = $attempts;
+
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Invalid email or password. Please check your credentials.']);
+            exit;
+        }
+
+        // Reset rate-limiting on success
+        unset($_SESSION[$rateLimitKey]);
+
+        // Regenerate Session ID to prevent Session Fixation Attacks
+        session_regenerate_id(true);
+
+        // Login success - populate session
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['user_name'] = $user['name'];
         $_SESSION['role'] = $user['role'];
         $_SESSION['email'] = $user['email'];
+        $_SESSION['department_id'] = $user['department_id'] ?? 0;
 
         // Determine destination landing dashboard
         $redirectUrl = 'index.php';
@@ -93,7 +117,7 @@ switch ($action) {
             $redirectUrl = 'newsroom.php';
         }
 
-        // Remove sensitive hash from output
+        // Remove sensitive fields from output
         unset($user['password_hash']);
 
         echo json_encode([

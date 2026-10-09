@@ -207,6 +207,7 @@ switch ($action) {
         $avatar = trim($data['avatar'] ?? '');
 
         $empCode = trim($data['emp_code'] ?? '');
+        $phone = trim($data['phone'] ?? ($data['whatsapp_number'] ?? ''));
         $fatherHusbandName = trim($data['father_husband_name'] ?? '');
         $cnicNo = trim($data['cnic_no'] ?? '');
         $bankName = trim($data['bank_name'] ?? 'UBL');
@@ -261,21 +262,22 @@ switch ($action) {
         }
 
         $passwordHash = $canLogin ? password_hash($password, PASSWORD_DEFAULT) : null;
-        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, can_login, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)");
-        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar, $canLogin]);
+        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, can_login, is_active, phone, whatsapp_number, emp_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)");
+        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $phone, $phone, $empCode]);
         $newEmpId = $pdo->lastInsertId();
 
         // Default employee code if empty
         if (empty($empCode)) {
             $empCode = 'DP-' . str_pad($newEmpId, 3, '0', STR_PAD_LEFT);
+            $pdo->prepare("UPDATE employees SET emp_code = ? WHERE id = ?")->execute([$empCode, $newEmpId]);
         }
 
         // Create initial HR profile
         $stmtProf = $pdo->prepare("
-            INSERT INTO hr_employee_profiles (employee_id, emp_code, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hr_employee_profiles (employee_id, emp_code, phone, whatsapp_number, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmtProf->execute([$newEmpId, $empCode, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
+        $stmtProf->execute([$newEmpId, $empCode, $phone, $phone, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
 
         $loginMsg = $canLogin ? "with portal login enabled" : "as profile/roster only (no login)";
         echo json_encode(['success' => true, 'message' => "Employee {$name} ({$empCode}) added successfully {$loginMsg}!", 'id' => $newEmpId]);
@@ -400,6 +402,7 @@ switch ($action) {
         $avatar = trim($data['avatar'] ?? '');
 
         $empCode = trim($data['emp_code'] ?? '');
+        $phone = trim($data['phone'] ?? ($data['whatsapp_number'] ?? ''));
         $fatherHusbandName = trim($data['father_husband_name'] ?? '');
         $cnicNo = trim($data['cnic_no'] ?? '');
         $bankName = trim($data['bank_name'] ?? 'UBL');
@@ -459,22 +462,24 @@ switch ($action) {
         }
 
         if ($avatar === '__REMOVE__') {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = NULL, can_login = ?, is_active = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = NULL, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $id]);
         } elseif (!empty($avatar)) {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $phone, $phone, $empCode, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $id]);
         }
 
         // Update / Insert into hr_employee_profiles
         $stmtProf = $pdo->prepare("
-            INSERT INTO hr_employee_profiles (employee_id, emp_code, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hr_employee_profiles (employee_id, emp_code, phone, whatsapp_number, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 emp_code = VALUES(emp_code),
+                phone = VALUES(phone),
+                whatsapp_number = VALUES(whatsapp_number),
                 father_husband_name = VALUES(father_husband_name),
                 cnic_no = VALUES(cnic_no),
                 bank_name = VALUES(bank_name),
@@ -488,7 +493,7 @@ switch ($action) {
                 casual_leave_quota = VALUES(casual_leave_quota),
                 sick_leave_quota = VALUES(sick_leave_quota)
         ");
-        $stmtProf->execute([$id, $empCode, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
+        $stmtProf->execute([$id, $empCode, $phone, $phone, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
 
         // If updated user is current session user, update session name/role
         if (($_SESSION['user_id'] ?? 0) === $id) {

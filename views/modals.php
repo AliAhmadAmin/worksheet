@@ -233,10 +233,15 @@
                                     </div>
                                 </div>
 
-                                <div class="form-grid-2">
+                                <div class="form-grid-3">
                                     <div class="form-group">
                                         <label class="form-label">Employee Code</label>
-                                        <input type="text" id="add-emp-code" class="input-control" placeholder="e.g. DP-104 (Auto if empty)">
+                                        <input type="text" id="add-emp-code" class="input-control" placeholder="e.g. DP-104 (Auto)" style="font-weight: 700; color: var(--primary);">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">📱 Phone / WhatsApp</label>
+                                        <input type="text" id="add-emp-phone" class="input-control" placeholder="e.g. 03001234567" style="font-weight: 600;">
+                                        <small style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 2px;">For WhatsApp Attendance</small>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">CNIC No.</label>
@@ -436,10 +441,15 @@
                                     </div>
                                 </div>
 
-                                <div class="form-grid-2">
+                                <div class="form-grid-3">
                                     <div class="form-group">
                                         <label class="form-label">Employee Code</label>
-                                        <input type="text" id="edit-emp-code" class="input-control" placeholder="e.g. DP-104">
+                                        <input type="text" id="edit-emp-code" class="input-control" placeholder="e.g. DP-104" style="font-weight: 700; color: var(--primary);">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">📱 Phone / WhatsApp</label>
+                                        <input type="text" id="edit-emp-phone" class="input-control" placeholder="e.g. 03001234567" style="font-weight: 600;">
+                                        <small style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 2px;">For WhatsApp Attendance</small>
                                     </div>
                                     <div class="form-group">
                                         <label class="form-label">CNIC No.</label>
