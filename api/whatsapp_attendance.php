@@ -115,9 +115,15 @@ switch ($action) {
         $limit = min(300, max(10, (int)($_GET['limit'] ?? 100)));
 
         $sql = "
-            SELECT l.*, e.name as employee_name, e.emp_code, e.designation, d.name as department_name
+            SELECT l.*, 
+                   e.name as employee_name, 
+                   COALESCE(p.emp_code, e.emp_code, '') as emp_code, 
+                   e.designation, 
+                   d.name as department_name,
+                   COALESCE(NULLIF(l.sender_phone, ''), p.phone, p.whatsapp_number, e.phone, e.whatsapp_number, '') as display_phone
             FROM whatsapp_attendance_logs l
             LEFT JOIN employees e ON l.employee_id = e.id
+            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
             LEFT JOIN departments d ON e.department_id = d.id
             WHERE 1=1
         ";

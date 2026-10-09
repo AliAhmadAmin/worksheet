@@ -1,0 +1,11 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /Worksheet/
+
+    # Route ZKTeco ADMS requests without .php extension to the php handler
+    RewriteRule ^iclock/cdata$ iclock/cdata.php [L,QSA]
+    RewriteRule ^iclock/getrequest$ iclock/getrequest.php [L,QSA]
+    RewriteRule ^iclock/devicecmd$ iclock/devicecmd.php [L,QSA]
+    RewriteRule ^cdata$ iclock/cdata.php [L,QSA]
+    RewriteRule ^getrequest$ iclock/getrequest.php [L,QSA]
+</IfModule>

@@ -8,5 +8,6 @@
     <script src="assets/js/programming.js?v=<?= filemtime(__DIR__ . '/../assets/js/programming.js') ?>"></script>
     <script src="assets/js/newsroom.js?v=<?= filemtime(__DIR__ . '/../assets/js/newsroom.js') ?>"></script>
     <script src="assets/js/whatsapp_attendance.js?v=<?= filemtime(__DIR__ . '/../assets/js/whatsapp_attendance.js') ?>"></script>
+    <script src="assets/js/zkteco_attendance.js?v=<?= file_exists(__DIR__ . '/../assets/js/zkteco_attendance.js') ? filemtime(__DIR__ . '/../assets/js/zkteco_attendance.js') : time() ?>"></script>
 </body>
 </html>

@@ -44,6 +44,13 @@ try {
         $payload = $_POST;
     }
 
+    // Always log incoming requests to scratch for immediate troubleshooting
+    @file_put_contents(
+        __DIR__ . '/../scratch/webhook_requests.log', 
+        "[" . date('Y-m-d H:i:s') . "] METHOD: " . $_SERVER['REQUEST_METHOD'] . " | BODY: " . ($rawInput ?: json_encode($_POST)) . "\n", 
+        FILE_APPEND
+    );
+
     if (empty($payload)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Empty webhook payload received.']);

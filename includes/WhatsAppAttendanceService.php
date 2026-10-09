@@ -77,13 +77,36 @@ class WhatsAppAttendanceService {
         $timestamp = !empty($messageData['timestamp']) ? (int)$messageData['timestamp'] : time();
 
         // Optional Group Filter
-        if (!empty($settings['group_jid']) && !empty($groupJid)) {
-            $expectedGroup = trim($settings['group_jid']);
-            if (stripos($groupJid, $expectedGroup) === false && stripos($expectedGroup, $groupJid) === false) {
-                return [
-                    'success' => false,
-                    'message' => 'Message ignored: Not from configured WhatsApp group.'
-                ];
+        if (!empty($settings['group_jid'])) {
+            $expectedDigits = preg_replace('/[^\d]/', '', $settings['group_jid']);
+            $receivedDigits = preg_replace('/[^\d]/', '', $groupJid);
+
+            // If incoming message was from a group, verify it matches the configured group
+            if (!empty($groupJid) && !empty($expectedDigits)) {
+                if ($expectedDigits !== $receivedDigits && stripos($groupJid, $settings['group_jid']) === false && stripos($settings['group_jid'], $groupJid) === false) {
+                    // Record ignored group log so HR has full visibility
+                    $stmtLog = $this->pdo->prepare("
+                        INSERT INTO whatsapp_attendance_logs 
+                            (message_id, sender_phone, sender_name, group_jid, employee_id, raw_message, parsed_action, extracted_time, action_date, sheet_id, status, remarks)
+                        VALUES 
+                            (?, ?, ?, ?, NULL, ?, 'unknown', ?, ?, NULL, 'ignored', ?)
+                    ");
+                    $stmtLog->execute([
+                        $messageId,
+                        $senderPhone,
+                        $senderName,
+                        $groupJid,
+                        $rawText,
+                        date('h:i A', $timestamp),
+                        date('Y-m-d', $timestamp),
+                        "Message ignored: Received from group '{$groupJid}' which does not match configured group '{$settings['group_jid']}'."
+                    ]);
+
+                    return [
+                        'success' => false,
+                        'message' => "Message ignored: From non-configured group ({$groupJid})."
+                    ];
+                }
             }
         }
 
@@ -97,6 +120,16 @@ class WhatsAppAttendanceService {
         // Match Employee by Phone, Employee Code, or Push Name
         $employee = $this->findEmployee($senderPhone, $senderName, $rawText);
         $empId = $employee ? (int)$employee['id'] : null;
+
+        // If employee was matched but senderPhone was blank (e.g. from group message), populate from employee profile
+        if ($employee) {
+            if (empty($senderPhone)) {
+                $senderPhone = $employee['profile_phone'] ?? ($employee['phone'] ?? ($employee['whatsapp_number'] ?? ''));
+            }
+            if (empty($senderName)) {
+                $senderName = $employee['name'] ?? '';
+            }
+        }
 
         $logStatus = 'applied';
         $remarks = '';
@@ -164,9 +197,6 @@ class WhatsAppAttendanceService {
     /**
      * Extract Data from various OrbitSend/Baileys Webhook Formats
      */
-    /**
-     * Extract Data from various OrbitSend/Baileys Webhook Formats
-     */
     private function extractPayloadData($payload) {
         if (is_string($payload)) {
             $payload = json_decode($payload, true) ?: [];
@@ -175,58 +205,71 @@ class WhatsAppAttendanceService {
         // Save last incoming payload for debugging and verification
         @file_put_contents(__DIR__ . '/../scratch/last_webhook.json', json_encode($payload, JSON_PRETTY_PRINT));
 
-        // Format 1: Direct flat OrbitSend payload (e.g. {id: 76082, recipient: "923044301182", message: "In", ...})
-        if (isset($payload['message']) && is_string($payload['message'])) {
-            // In OrbitSend received chats, 'recipient' is the customer/sender phone number
-            $senderPhone = $payload['sender'] 
-                        ?? ($payload['recipient'] 
-                        ?? ($payload['from'] 
-                        ?? ($payload['phone'] 
-                        ?? ($payload['mobile'] 
-                        ?? ($payload['participant'] 
-                        ?? ($payload['contact'] ?? ''))))));
-
-            $senderName = $payload['sender_name'] 
-                       ?? ($payload['pushName'] 
-                       ?? ($payload['name'] 
-                       ?? ($payload['contact_name'] 
-                       ?? ($payload['profile_name'] ?? ''))));
-
-            $groupJid = $payload['group_id'] ?? ($payload['group_jid'] ?? ($payload['group'] ?? ($payload['remoteJid'] ?? '')));
-            $messageId = $payload['message_id'] ?? ($payload['id'] ?? uniqid('wa_'));
-            $timestamp = isset($payload['timestamp']) ? (int)$payload['timestamp'] : (isset($payload['created']) ? (int)$payload['created'] : time());
-
-            return [
-                'text' => $payload['message'],
-                'sender_phone' => $senderPhone,
-                'sender_name' => $senderName,
-                'group_jid' => $groupJid,
-                'message_id' => (string)$messageId,
-                'timestamp' => $timestamp
-            ];
-        }
-
-        // Format 2: Nested OrbitSend / Baileys format: data.messages or data.key
         $data = $payload['data'] ?? $payload;
         if (isset($data['messages']) && is_array($data['messages'])) {
             $data = $data['messages'][0] ?? $data;
         }
 
-        $key = $data['key'] ?? [];
-        $remoteJid = $key['remoteJid'] ?? ($data['remoteJid'] ?? ($data['from'] ?? ($payload['from'] ?? '')));
-        $isGroup = (stripos($remoteJid, '@g.us') !== false);
-        $participant = $key['participant'] 
-                    ?? ($data['participant'] 
-                    ?? ($payload['participant'] 
-                    ?? ($data['sender'] 
-                    ?? ($data['recipient'] 
-                    ?? ($data['phone'] 
-                    ?? ($data['mobile'] 
-                    ?? ($isGroup ? '' : $remoteJid)))))));
+        $key = $data['key'] ?? ($payload['key'] ?? []);
 
-        $senderPhone = $participant ?: $remoteJid;
+        // 1. Detect Group JID / ID across all known OrbitSend / Baileys attributes
+        $groupJid = '';
+        $potentialGroupFields = [
+            $data['group_id'] ?? null,
+            $data['group_jid'] ?? null,
+            $data['group'] ?? null,
+            $data['chat_id'] ?? null,
+            $data['chat'] ?? null,
+            $key['remoteJid'] ?? null,
+            $data['remoteJid'] ?? null,
+            $data['from'] ?? null,
+            $data['recipient'] ?? null,
+            $payload['group_id'] ?? null,
+            $payload['group_jid'] ?? null,
+            $payload['group'] ?? null,
+            $payload['remoteJid'] ?? null
+        ];
 
-        // Extract message text
+        foreach ($potentialGroupFields as $candidate) {
+            if ($candidate && is_string($candidate) && (stripos($candidate, '@g.us') !== false || preg_match('/^\d{15,22}$/', $candidate))) {
+                $groupJid = trim($candidate);
+                break;
+            }
+        }
+
+        // 2. Detect Sender Phone Number (ensuring it is NOT the group JID itself)
+        $senderPhone = '';
+        $potentialSenderFields = [
+            $key['participant'] ?? null,
+            $data['participant'] ?? null,
+            $payload['participant'] ?? null,
+            $data['sender'] ?? null,
+            $data['phone'] ?? null,
+            $data['mobile'] ?? null,
+            $data['from'] ?? null,
+            $payload['sender'] ?? null,
+            $payload['phone'] ?? null,
+            $payload['from'] ?? null,
+            $data['recipient'] ?? null,
+            $payload['recipient'] ?? null
+        ];
+
+        foreach ($potentialSenderFields as $candidate) {
+            if ($candidate && is_string($candidate)) {
+                $trimmed = trim($candidate);
+                // Skip if this candidate is actually a group address
+                if (stripos($trimmed, '@g.us') !== false) {
+                    continue;
+                }
+                $clean = $this->cleanPhoneNumber($trimmed);
+                if (!empty($clean) && strlen($clean) >= 10 && strlen($clean) <= 15) {
+                    $senderPhone = $trimmed;
+                    break;
+                }
+            }
+        }
+
+        // 3. Extract Message Text
         $msgObj = $data['message'] ?? ($data['msg'] ?? ($payload['message'] ?? []));
         $text = '';
         if (is_string($msgObj)) {
@@ -239,24 +282,27 @@ class WhatsAppAttendanceService {
                  ?? ($msgObj['text'] ?? ''))));
         }
 
+        // 4. Extract Push Name / Sender Name
         $pushName = $data['pushName'] 
                  ?? ($data['sender_name'] 
                  ?? ($payload['pushName'] 
                  ?? ($data['name'] 
                  ?? ($data['contact_name'] 
-                 ?? ($payload['name'] ?? '')))));
+                 ?? ($payload['sender_name']
+                 ?? ($payload['name'] ?? ''))))));
 
-        $msgId = $key['id'] ?? ($data['id'] ?? ($payload['id'] ?? uniqid('wa_')));
+        // 5. Message ID and Timestamp
+        $msgId = $key['id'] ?? ($data['id'] ?? ($payload['message_id'] ?? ($payload['id'] ?? uniqid('wa_'))));
         $ts = $data['messageTimestamp'] ?? ($data['created'] ?? ($payload['timestamp'] ?? time()));
         if (strlen((string)$ts) > 10) {
-            $ts = (int)($ts / 1000); // convert milliseconds to seconds
+            $ts = (int)($ts / 1000);
         }
 
         return [
             'text' => $text,
             'sender_phone' => $senderPhone,
-            'sender_name' => $pushName,
-            'group_jid' => $isGroup ? $remoteJid : '',
+            'sender_name' => is_string($pushName) ? $pushName : '',
+            'group_jid' => $groupJid,
             'message_id' => (string)$msgId,
             'timestamp' => (int)$ts
         ];
@@ -604,6 +650,35 @@ Output strictly valid JSON only:
             $stmt->execute([$cleanName, $cleanName]);
             $emp = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($emp) return $emp;
+        }
+
+        // 4. Fallback: Scan message text for Phone numbers or Employee Names
+        if (!empty($rawText)) {
+            // Check for phone number inside message text (e.g. "03044301182 in" or "in 03044301182")
+            if (preg_match('/\b(03\d{9}|923\d{9})\b/', $rawText, $phoneMatch)) {
+                $foundPhone = $this->cleanPhoneNumber($phoneMatch[1]);
+                $emp = $this->findEmployee($foundPhone, '', '');
+                if ($emp) return $emp;
+            }
+
+            // Check if any active employee name is mentioned in the message text
+            $stmtAll = $this->pdo->query("
+                SELECT e.*, d.name as department_name, t.name as team_name, p.emp_code
+                FROM employees e
+                LEFT JOIN departments d ON e.department_id = d.id
+                LEFT JOIN teams t ON e.team_id = t.id
+                LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
+                WHERE e.is_active = 1
+                ORDER BY LENGTH(e.name) DESC
+            ");
+            $allEmployees = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
+            $lowerText = ' ' . strtolower($rawText) . ' ';
+            foreach ($allEmployees as $empCandidate) {
+                $candidateName = strtolower(trim($empCandidate['name']));
+                if (strlen($candidateName) >= 4 && strpos($lowerText, $candidateName) !== false) {
+                    return $empCandidate;
+                }
+            }
         }
 
         return null;

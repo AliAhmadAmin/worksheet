@@ -279,6 +279,8 @@ const WhatsAppAtt = {
             const act = actionBadges[l.parsed_action] || actionBadges.unknown;
             const st = statusBadges[l.status] || statusBadges.applied;
             const deptBadge = l.department_name ? `<span style="background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700;">${escapeHtml(l.department_name)}</span>` : '';
+            const codeBadge = l.emp_code ? `<span style="background: rgba(100, 116, 139, 0.12); color: var(--text-muted); padding: 1px 5px; border-radius: 4px; font-size: 9.5px; font-weight: 700; font-family: monospace;">${escapeHtml(l.emp_code)}</span>` : '';
+            const phoneVal = l.display_phone || l.sender_phone || '';
 
             // Format logged timestamp into clean time + date
             let timeStr = l.created_at || '';
@@ -296,12 +298,13 @@ const WhatsAppAtt = {
                         <div style="font-size: 10px; color: var(--text-muted); font-family: monospace;">${escapeHtml(dateStr)}</div>
                     </td>
                     <td>
-                        <div style="font-weight: 700; font-size: 12.5px; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                        <div style="font-weight: 700; font-size: 12.5px; color: var(--text-main); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                             <span>${escapeHtml(l.employee_name || l.sender_name || 'Unknown')}</span>
+                            ${codeBadge}
                             ${deptBadge}
                         </div>
-                        <div style="font-size: 10.5px; color: var(--text-muted); font-family: monospace; margin-top: 1px;">
-                            📱 ${escapeHtml(l.sender_phone || '--')}
+                        <div style="font-size: 10.5px; color: var(--text-muted); font-family: monospace; margin-top: 2px;">
+                            📱 ${escapeHtml(phoneVal || '--')}
                         </div>
                     </td>
                     <td style="white-space: nowrap;">
@@ -500,20 +503,24 @@ function switchAttendanceView(view) {
     const liveSec = document.getElementById('att-view-live-section');
     const repSec = document.getElementById('att-view-report-section');
     const waSec = document.getElementById('att-view-whatsapp-section');
+    const zkSec = document.getElementById('att-view-zkteco-section');
 
     const btnLive = document.getElementById('btn-att-view-live');
     const btnRep = document.getElementById('btn-att-view-report');
     const btnWa = document.getElementById('btn-att-view-whatsapp');
+    const btnZk = document.getElementById('btn-att-view-zkteco');
 
     if (liveSec) liveSec.style.display = (view === 'live') ? 'block' : 'none';
     if (repSec) repSec.style.display = (view === 'report') ? 'block' : 'none';
     if (waSec) waSec.style.display = (view === 'whatsapp') ? 'block' : 'none';
+    if (zkSec) zkSec.style.display = (view === 'zkteco') ? 'block' : 'none';
 
     // Update active button styling with high-contrast active and inactive states
     [
         { el: btnLive, active: view === 'live' },
         { el: btnRep, active: view === 'report' },
-        { el: btnWa, active: view === 'whatsapp' }
+        { el: btnWa, active: view === 'whatsapp' },
+        { el: btnZk, active: view === 'zkteco' }
     ].forEach(b => {
         if (b.el) {
             if (b.active) {
@@ -536,6 +543,8 @@ function switchAttendanceView(view) {
         loadAttendanceReport();
     } else if (view === 'whatsapp') {
         WhatsAppAtt.init();
+    } else if (view === 'zkteco' && typeof ZKTecoAtt !== 'undefined') {
+        ZKTecoAtt.init();
     }
 }
 
