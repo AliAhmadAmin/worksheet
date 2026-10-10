@@ -114,8 +114,10 @@ function populateDirectoryDeptFilter() {
     const filterDept = document.getElementById('emp-dir-filter-dept');
     if (!filterDept) return;
 
-    const currentVal = filterDept.value;
-    filterDept.innerHTML = '<option value="">🏢 All Departments</option>';
+    const isGlobalAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+    const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
+
+    filterDept.innerHTML = isGlobalAdmin ? '<option value="">🏢 All Departments</option>' : '';
 
     (AppState.departments || []).forEach(d => {
         const opt = document.createElement('option');
@@ -124,7 +126,19 @@ function populateDirectoryDeptFilter() {
         filterDept.appendChild(opt);
     });
 
-    if (currentVal) filterDept.value = currentVal;
+    if (isHod || !isGlobalAdmin) {
+        if (AppState.departments && AppState.departments.length > 0) {
+            filterDept.value = AppState.departments[0].id;
+            if (AppState.departments.length <= 1) {
+                filterDept.disabled = true;
+                filterDept.style.opacity = '0.85';
+                filterDept.title = 'Restricted to your department';
+            }
+        }
+    } else {
+        const currentVal = filterDept.value;
+        if (currentVal) filterDept.value = currentVal;
+    }
 }
 
 function resetDirectoryFilters() {
@@ -1137,6 +1151,40 @@ function openAddEmployeeModal() {
     document.getElementById('add-employee-form')?.reset();
     populateModalDeptTeamSelects('add-emp-dept', 'add-emp-team', null, null);
 
+    const isHodUser = AppState.currentUser && AppState.currentUser.role === 'hod';
+    const addRoleSelect = document.getElementById('add-emp-role');
+    const addRoleBadge = document.getElementById('add-emp-role-badge');
+    const addDeptSelect = document.getElementById('add-emp-dept');
+
+    if (isHodUser) {
+        if (addRoleSelect) {
+            addRoleSelect.value = 'employee';
+            addRoleSelect.style.display = 'none';
+        }
+        if (addRoleBadge) {
+            addRoleBadge.style.display = 'flex';
+            addRoleBadge.textContent = '👤 Staff Member';
+        }
+        if (addDeptSelect) {
+            if (AppState.currentUser.department_id) {
+                addDeptSelect.value = AppState.currentUser.department_id;
+            }
+            addDeptSelect.disabled = true;
+            filterModalTeamsByDepartment(addDeptSelect.value, 'add-emp-team', null);
+        }
+    } else {
+        if (addRoleSelect) {
+            addRoleSelect.style.display = 'block';
+            addRoleSelect.disabled = false;
+        }
+        if (addRoleBadge) {
+            addRoleBadge.style.display = 'none';
+        }
+        if (addDeptSelect) {
+            addDeptSelect.disabled = false;
+        }
+    }
+
     const canLoginCheck = document.getElementById('add-emp-can-login');
     if (canLoginCheck) canLoginCheck.checked = false;
     toggleLoginCredentialsSection('add', false);
@@ -1195,9 +1243,14 @@ async function handleAddEmployeeSubmit(e) {
     const canLogin = document.getElementById('add-emp-can-login')?.checked ? 1 : 0;
     const email = document.getElementById('add-emp-email')?.value.trim();
     const password = document.getElementById('add-emp-password')?.value.trim() || 'DiscoverPakistan123';
-    const role = document.getElementById('add-emp-role')?.value || 'employee';
+    let role = document.getElementById('add-emp-role')?.value || 'employee';
     const designation = document.getElementById('add-emp-designation')?.value.trim() || '';
-    const deptId = document.getElementById('add-emp-dept')?.value;
+    let deptId = document.getElementById('add-emp-dept')?.value;
+
+    if (AppState.currentUser && AppState.currentUser.role === 'hod') {
+        role = 'employee';
+        if (!deptId) deptId = AppState.currentUser.department_id;
+    }
     const teamId = document.getElementById('add-emp-team')?.value;
     const avatar = document.getElementById('add-emp-avatar-base64')?.value || '';
 
@@ -1289,7 +1342,36 @@ function openEditEmployeeModal(empId) {
     document.getElementById('edit-emp-email').value = emp.email || '';
     let editRole = emp.role || 'employee';
     if (editRole === 'admin') editRole = 'super_admin';
-    document.getElementById('edit-emp-role').value = editRole;
+
+    const roleSelect = document.getElementById('edit-emp-role');
+    const roleBadge = document.getElementById('edit-emp-role-badge');
+    const deptSelect = document.getElementById('edit-emp-dept');
+    const isHodUser = AppState.currentUser && AppState.currentUser.role === 'hod';
+
+    if (roleSelect) {
+        roleSelect.value = editRole;
+        if (isHodUser) {
+            roleSelect.style.display = 'none';
+        } else {
+            roleSelect.style.display = 'block';
+            roleSelect.disabled = false;
+        }
+    }
+
+    if (roleBadge) {
+        if (isHodUser) {
+            roleBadge.style.display = 'flex';
+            const roleName = roleSelect ? (roleSelect.options[roleSelect.selectedIndex]?.text || '👤 Staff Member') : '👤 Staff Member';
+            roleBadge.textContent = roleName;
+        } else {
+            roleBadge.style.display = 'none';
+        }
+    }
+
+    if (deptSelect) {
+        deptSelect.disabled = isHodUser;
+    }
+
     document.getElementById('edit-emp-designation').value = emp.designation || '';
 
     const codeInput = document.getElementById('edit-emp-code');
@@ -1374,9 +1456,15 @@ async function handleEditEmployeeSubmit(e) {
     const name = document.getElementById('edit-emp-name')?.value.trim();
     const canLogin = document.getElementById('edit-emp-can-login')?.checked ? 1 : 0;
     const email = document.getElementById('edit-emp-email')?.value.trim();
-    const role = document.getElementById('edit-emp-role')?.value || 'employee';
+    let role = document.getElementById('edit-emp-role')?.value || 'employee';
     const designation = document.getElementById('edit-emp-designation')?.value.trim() || '';
-    const deptId = document.getElementById('edit-emp-dept')?.value;
+    let deptId = document.getElementById('edit-emp-dept')?.value;
+
+    if (AppState.currentUser && AppState.currentUser.role === 'hod') {
+        const existingEmp = AppState.employees.find(e => e.id == id);
+        role = existingEmp ? existingEmp.role : 'employee';
+        if (!deptId) deptId = existingEmp ? existingEmp.department_id : (AppState.currentUser.department_id || deptId);
+    }
     const teamId = document.getElementById('edit-emp-team')?.value;
     const avatar = document.getElementById('edit-emp-avatar-base64')?.value || '';
     const isActive = parseInt(document.getElementById('edit-emp-status')?.value || '1', 10);

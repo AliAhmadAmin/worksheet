@@ -1,11 +1,32 @@
 <?php
-// Load all active departments from DB dynamically
+// Load departments from DB dynamically
 $deptList = [];
+$userRoleAtt = strtolower($authUser['role'] ?? 'employee');
+$isGlobalAdminAtt = in_array($userRoleAtt, ['super_admin', 'admin']);
+$userDeptIdAtt = (int)($authUser['department_id'] ?? 0);
+
 try {
     $dbAtt = function_exists('getDbConnection') ? getDbConnection() : null;
     if ($dbAtt) {
         $stmtDepts = $dbAtt->query("SELECT id, name FROM departments WHERE is_active = 1 ORDER BY name ASC");
-        $deptList = $stmtDepts->fetchAll(PDO::FETCH_ASSOC);
+        $allDepts = $stmtDepts->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$isGlobalAdminAtt && $userRoleAtt === 'hod') {
+            $managedIds = $userDeptIdAtt > 0 ? [$userDeptIdAtt] : [];
+            if (!empty($authUser['id'])) {
+                $stmtHDepts = $dbAtt->prepare("SELECT id FROM departments WHERE hod_id = ?");
+                $stmtHDepts->execute([$authUser['id']]);
+                $extraHDepts = $stmtHDepts->fetchAll(PDO::FETCH_COLUMN);
+                if (!empty($extraHDepts)) {
+                    $managedIds = array_unique(array_merge($managedIds, array_map('intval', $extraHDepts)));
+                }
+            }
+            $deptList = array_values(array_filter($allDepts, function($d) use ($managedIds) {
+                return in_array((int)$d['id'], $managedIds);
+            }));
+        } else {
+            $deptList = $allDepts;
+        }
     }
 } catch (Exception $e) {}
 ?>
@@ -57,8 +78,10 @@ try {
                             <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700;" onclick="jumpLiveDateToday()" title="Jump to Today">⚡ Today</button>
 
                             <!-- Dynamic Department Filter -->
-                            <select id="live-att-dept-filter" class="input-control" onchange="loadLiveAttendance()" style="padding: 4px 8px; font-size: 11.5px; max-width: 180px; border-radius: var(--radius-md);">
-                                <option value="all">🏢 All Departments</option>
+                            <select id="live-att-dept-filter" class="input-control" onchange="loadLiveAttendance()" style="padding: 4px 8px; font-size: 11.5px; max-width: 180px; border-radius: var(--radius-md);" <?= (!$isGlobalAdminAtt && count($deptList) <= 1) ? 'disabled title="Restricted to your department"' : '' ?>>
+                                <?php if ($isGlobalAdminAtt): ?>
+                                    <option value="all">🏢 All Departments</option>
+                                <?php endif; ?>
                                 <?php foreach ($deptList as $d): ?>
                                     <option value="<?= htmlspecialchars($d['id']) ?>">🏢 <?= htmlspecialchars($d['name']) ?></option>
                                 <?php endforeach; ?>
@@ -156,8 +179,10 @@ try {
                             </div>
 
                             <!-- Dynamic Department Filter -->
-                            <select id="rep-att-dept-select" class="input-control" style="padding: 4px 8px; font-size: 11.5px; max-width: 170px; border-radius: var(--radius-md);" onchange="loadAttendanceReport()">
-                                <option value="all">🏢 All Departments</option>
+                            <select id="rep-att-dept-select" class="input-control" style="padding: 4px 8px; font-size: 11.5px; max-width: 170px; border-radius: var(--radius-md);" onchange="loadAttendanceReport()" <?= (!$isGlobalAdminAtt && count($deptList) <= 1) ? 'disabled title="Restricted to your department"' : '' ?>>
+                                <?php if ($isGlobalAdminAtt): ?>
+                                    <option value="all">🏢 All Departments</option>
+                                <?php endif; ?>
                                 <?php foreach ($deptList as $d): ?>
                                     <option value="<?= htmlspecialchars($d['id']) ?>">🏢 <?= htmlspecialchars($d['name']) ?></option>
                                 <?php endforeach; ?>

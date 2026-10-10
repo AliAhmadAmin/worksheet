@@ -8,7 +8,9 @@ require_once __DIR__ . '/includes/auth_check.php';
 // Ensure user has HR or Admin permissions
 $userRole = strtolower($authUser['role'] ?? '');
 $deptName = strtolower($authUser['department_name'] ?? '');
-$canAccessHr = in_array($userRole, ['hr', 'admin', 'super_admin']) || !empty($authUser['can_manage_hr']) || in_array($deptName, ['hr', 'human resources']);
+$isGlobalAdmin = in_array($userRole, ['super_admin', 'admin']);
+$isHrMember = in_array($userRole, ['hr']) || in_array($deptName, ['hr', 'human resources']);
+$canAccessHr = $isGlobalAdmin || $isHrMember || (!empty($authUser['can_manage_hr']) && $userRole !== 'hod');
 
 if (!$canAccessHr) {
     header('Location: index.php');

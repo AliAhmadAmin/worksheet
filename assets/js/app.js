@@ -282,7 +282,12 @@ async function handleLogout(e) {
 
 function hasPermission(permKey) {
     if (!AppState.currentUser) return false;
-    if (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'hod') return true;
+    if (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin') return true;
+    if (AppState.currentUser.role === 'hod') {
+        // HODs do not have global company-wide permissions
+        if (permKey === 'can_manage_hr' || permKey === 'can_manage_all_departments') return false;
+        return true;
+    }
     return !!parseInt(AppState.currentUser[permKey] || 0);
 }
 
@@ -291,7 +296,7 @@ async function loadUserData() {
 
     const isSuperAdmin = AppState.currentUser.role === 'super_admin';
     const isHod = AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'admin';
-    const isHr = AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || hasPermission('can_manage_hr');
+    const isHr = (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || hasPermission('can_manage_hr')) && AppState.currentUser.role !== 'hod';
     const canInspect = isSuperAdmin || isHod || isHr || hasPermission('can_inspect_sheets');
     const canManage = isSuperAdmin || isHod || isHr || hasPermission('can_manage_employees');
     const canAttendance = isSuperAdmin || isHod || isHr || hasPermission('can_view_attendance');
@@ -304,10 +309,14 @@ async function loadUserData() {
         if (typeof populateTaskEmployeeFilter === 'function') {
             populateTaskEmployeeFilter();
         }
-        // Default inspected employee to first staff member of their department
+        // Validate and default inspected employee to first staff member of their department (or self)
+        const inspectable = getInspectableEmployees();
+        if (AppState.adminSelectedEmpId && !inspectable.some(e => e.id == AppState.adminSelectedEmpId)) {
+            AppState.adminSelectedEmpId = null;
+        }
         if (!AppState.adminSelectedEmpId) {
-            const firstStaff = (AppState.employees || []).find(e => e.id !== AppState.currentUser.id && e.role !== 'super_admin');
-            AppState.adminSelectedEmpId = firstStaff ? firstStaff.id : (AppState.employees[0] ? AppState.employees[0].id : null);
+            const firstStaff = inspectable.find(e => e.id !== AppState.currentUser.id && e.role !== 'super_admin');
+            AppState.adminSelectedEmpId = firstStaff ? firstStaff.id : (inspectable[0] ? inspectable[0].id : AppState.currentUser.id);
         }
         const adminSelect = document.getElementById('admin-employee-select');
         if (adminSelect && AppState.adminSelectedEmpId) adminSelect.value = AppState.adminSelectedEmpId;
@@ -335,9 +344,13 @@ async function loadUserData() {
 
     const portalSwitcher = document.querySelector('.portal-switcher-wrapper');
     if (portalSwitcher) {
-        // Portal switcher available for Super Admin, Admin, and HR Managers
-        const canSwitchPortal = isSuperAdmin || AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'hr' || hasPermission('can_manage_hr');
-        portalSwitcher.style.display = canSwitchPortal ? '' : 'none';
+        if (portalSwitcher.classList.contains('static-portal')) {
+            portalSwitcher.style.display = '';
+        } else {
+            // Dropdown portal switcher is strictly for Super Admin and Admin
+            const canSwitchPortal = isSuperAdmin || AppState.currentUser.role === 'admin';
+            portalSwitcher.style.display = canSwitchPortal ? '' : 'none';
+        }
     }
 
     // Load active daily worksheet and tasks concurrently
@@ -384,16 +397,26 @@ async function updateGlobalSidebarBadges() {
     }
 }
 
+function getInspectableEmployees() {
+    let list = AppState.employees || [];
+    if (AppState.currentUser && AppState.currentUser.role === 'hod') {
+        const hodDeptId = parseInt(AppState.currentUser.department_id);
+        list = list.filter(emp => parseInt(emp.department_id) === hodDeptId || emp.id === AppState.currentUser.id);
+    }
+    return list;
+}
+
 function populateAdminEmployeeSelector() {
     const select = document.getElementById('admin-employee-select');
     const selectedNameSpan = document.getElementById('admin-emp-dropdown-selected-name');
+    const inspectable = getInspectableEmployees();
 
     if (select) {
         select.innerHTML = '';
-        AppState.employees.forEach(emp => {
+        inspectable.forEach(emp => {
             const opt = document.createElement('option');
             opt.value = emp.id;
-            opt.textContent = emp.name;
+            opt.textContent = emp.name + (emp.id === AppState.currentUser?.id ? ' (My Sheet)' : '');
             if (AppState.adminSelectedEmpId == emp.id) {
                 opt.selected = true;
             }
@@ -401,12 +424,12 @@ function populateAdminEmployeeSelector() {
         });
     }
 
-    renderAdminEmpDropdownList(AppState.employees);
+    renderAdminEmpDropdownList(inspectable);
 
     // Update selected employee label in dropdown button
-    const currentSelectedEmp = AppState.employees.find(e => e.id == AppState.adminSelectedEmpId);
+    const currentSelectedEmp = inspectable.find(e => e.id == AppState.adminSelectedEmpId);
     if (selectedNameSpan && currentSelectedEmp) {
-        selectedNameSpan.textContent = currentSelectedEmp.name;
+        selectedNameSpan.textContent = currentSelectedEmp.name + (currentSelectedEmp.id === AppState.currentUser?.id ? ' (My Sheet)' : '');
     }
 }
 
@@ -422,6 +445,7 @@ function renderAdminEmpDropdownList(employees) {
 
     employees.forEach(emp => {
         const isSelected = AppState.adminSelectedEmpId == emp.id;
+        const isSelf = AppState.currentUser && emp.id === AppState.currentUser.id;
         const item = document.createElement('div');
         item.className = `searchable-emp-item ${isSelected ? 'selected' : ''}`;
         item.style.cssText = `padding: 6px 8px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12.5px; transition: background 0.15s; ${isSelected ? 'background: rgba(59, 130, 246, 0.12); font-weight: 700;' : ''}`;
@@ -432,11 +456,18 @@ function renderAdminEmpDropdownList(employees) {
             ? `<img src="${escapeHtml(emp.avatar)}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:24px;height:24px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;\\'>${escapeHtml(avatarInitial)}</div>';">`
             : `<div style="width: 24px; height: 24px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
 
+        const roleBadge = isSelf 
+            ? `<span style="font-size: 10px; background: rgba(59, 130, 246, 0.15); color: var(--primary); padding: 1px 6px; border-radius: 4px; font-weight: 700; margin-left: 6px;">My Sheet</span>`
+            : '';
+
         item.innerHTML = `
             ${avatarHtml}
             <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                <div style="color: var(--text-main); line-height: 1.2;">${escapeHtml(emp.name)}</div>
-                <div style="font-size: 10.5px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.team_name || emp.department_name || 'Staff')}</div>
+                <div style="color: var(--text-main); line-height: 1.2; display: flex; align-items: center;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(emp.name)}</span>
+                    ${roleBadge}
+                </div>
+                <div style="font-size: 10.5px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.designation || emp.team_name || emp.department_name || 'Staff')}</div>
             </div>
             ${isSelected ? '<span style="color: var(--primary); font-size: 12px; font-weight: 800;">✓</span>' : ''}
         `;
@@ -445,12 +476,13 @@ function renderAdminEmpDropdownList(employees) {
 }
 
 function filterAdminEmpDropdown(query) {
+    const inspectable = getInspectableEmployees();
     const q = (query || '').trim().toLowerCase();
     if (!q) {
-        renderAdminEmpDropdownList(AppState.employees);
+        renderAdminEmpDropdownList(inspectable);
         return;
     }
-    const filtered = AppState.employees.filter(emp => 
+    const filtered = inspectable.filter(emp => 
         emp.name.toLowerCase().includes(q) || 
         (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
         (emp.department_name && emp.department_name.toLowerCase().includes(q))
@@ -480,18 +512,24 @@ function selectAdminEmpFromDropdown(empId) {
     const menu = document.getElementById('admin-emp-dropdown-menu');
     if (menu) menu.style.display = 'none';
 
+    const inspectable = getInspectableEmployees();
+    const currentSelectedEmp = inspectable.find(e => e.id == empId);
+    if (!currentSelectedEmp && AppState.currentUser && AppState.currentUser.role === 'hod') {
+        showToast("HOD can only switch to employees within their own department.", "warning");
+        return;
+    }
+
     AppState.adminSelectedEmpId = parseInt(empId);
 
     const select = document.getElementById('admin-employee-select');
     if (select) select.value = empId;
 
-    const currentSelectedEmp = AppState.employees.find(e => e.id == empId);
     const selectedNameSpan = document.getElementById('admin-emp-dropdown-selected-name');
     if (selectedNameSpan && currentSelectedEmp) {
-        selectedNameSpan.textContent = currentSelectedEmp.name;
+        selectedNameSpan.textContent = currentSelectedEmp.name + (currentSelectedEmp.id === AppState.currentUser?.id ? ' (My Sheet)' : '');
     }
 
-    renderAdminEmpDropdownList(AppState.employees);
+    renderAdminEmpDropdownList(inspectable);
     loadDailyWorksheet();
 }
 
@@ -628,7 +666,17 @@ function handleUserBadgeClick() {
 }
 
 function handleAdminSelectEmployee(empId) {
+    const inspectable = getInspectableEmployees();
+    const currentSelectedEmp = inspectable.find(e => e.id == empId);
+    if (!currentSelectedEmp && AppState.currentUser && AppState.currentUser.role === 'hod') {
+        showToast("HOD can only switch to employees within their own department.", "warning");
+        return;
+    }
     AppState.adminSelectedEmpId = parseInt(empId);
+    const selectedNameSpan = document.getElementById('admin-emp-dropdown-selected-name');
+    if (selectedNameSpan && currentSelectedEmp) {
+        selectedNameSpan.textContent = currentSelectedEmp.name + (currentSelectedEmp.id === AppState.currentUser?.id ? ' (My Sheet)' : '');
+    }
     loadDailyWorksheet();
 }
 

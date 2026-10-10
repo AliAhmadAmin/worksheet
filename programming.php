@@ -5,6 +5,16 @@
  */
 require_once __DIR__ . '/includes/auth_check.php';
 
+$userRolePg = strtolower($authUser['role'] ?? '');
+$deptNamePg = strtolower($authUser['department_name'] ?? '');
+$isGlobalAdminPg = in_array($userRolePg, ['super_admin', 'admin']);
+$isProgMemberPg = (stripos($deptNamePg, 'prog') !== false);
+
+if (!$isGlobalAdminPg && !$isProgMemberPg) {
+    header('Location: index.php');
+    exit;
+}
+
 $currentPortal = 'programming';
 
 // 1. Header (HTML DocType, Head, Shared Styling)

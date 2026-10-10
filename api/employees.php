@@ -26,8 +26,19 @@ $currentUserObj = $stmtUserCheck->fetch() ?: [];
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
 $isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
 $isHod = ($currentUserRole === 'hod');
-$isHr = ($currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr') || !empty($currentUserObj['can_manage_hr']));
+$isHr = ($currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr') || (!empty($currentUserObj['can_manage_hr']) && $currentUserRole !== 'hod'));
 $canManageEmp = $isSuperAdmin || $isHr || !empty($currentUserObj['can_manage_employees']);
+
+$userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+$managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
+if ($isHod) {
+    $stmtManagedDepts = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
+    $stmtManagedDepts->execute([$currentUserId]);
+    $extraDepts = $stmtManagedDepts->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($extraDepts)) {
+        $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extraDepts)));
+    }
+}
 
 switch ($action) {
     case 'list':
@@ -46,12 +57,35 @@ switch ($action) {
             }
         }
 
-        if (!$isSuperAdmin && !$isHr) {
-            // HOD and employees are restricted to their own department
+        if ($isHod) {
+            // HODs are strictly restricted to their own department (and any department they manage)
+            $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+            $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
+            $stmtManagedDepts = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
+            $stmtManagedDepts->execute([$currentUserId]);
+            $extraDepts = $stmtManagedDepts->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($extraDepts)) {
+                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extraDepts)));
+            }
+
+            if (!empty($managedDeptIds)) {
+                $placeholders = implode(',', array_fill(0, count($managedDeptIds), '?'));
+                $whereClauses[] = "(e.department_id IN ($placeholders) OR e.id = ?)";
+                foreach ($managedDeptIds as $dId) {
+                    $params[] = $dId;
+                }
+                $params[] = $currentUserId;
+            } else {
+                $whereClauses[] = "e.id = ?";
+                $params[] = $currentUserId;
+            }
+        } else if (!$isSuperAdmin && !$isHr) {
+            // Regular employees are restricted to their own department
             $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
             if ($userDeptId > 0) {
-                $whereClauses[] = "e.department_id = ?";
+                $whereClauses[] = "(e.department_id = ? OR e.id = ?)";
                 $params[] = $userDeptId;
+                $params[] = $currentUserId;
             }
         } else if ($requestedDeptId) {
             $whereClauses[] = "e.department_id = ?";
@@ -91,7 +125,19 @@ switch ($action) {
             unset($emp['password_hash']);
         }
 
-        $departments = $pdo->query("
+        $deptWhere = "WHERE d.is_active = 1";
+        $deptParams = [];
+        if ($isHod) {
+            if (!empty($managedDeptIds)) {
+                $deptPlaceholders = implode(',', array_fill(0, count($managedDeptIds), '?'));
+                $deptWhere .= " AND d.id IN ($deptPlaceholders)";
+                $deptParams = $managedDeptIds;
+            } else {
+                $deptWhere .= " AND 1=0";
+            }
+        }
+
+        $stmtDept = $pdo->prepare("
             SELECT d.*, 
                    h.name as hod_name, h.email as hod_email, h.avatar as hod_avatar,
                    (SELECT COUNT(*) FROM teams t WHERE t.department_id = d.id) as team_count,
@@ -99,18 +145,35 @@ switch ($action) {
                    (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id AND (e.team_id IS NULL OR e.team_id = 0) AND e.is_active = 1) as unassigned_count
             FROM departments d
             LEFT JOIN employees h ON d.hod_id = h.id
-            WHERE d.is_active = 1
+            {$deptWhere}
             ORDER BY d.id ASC
-        ")->fetchAll();
+        ");
+        $stmtDept->execute($deptParams);
+        $departments = $stmtDept->fetchAll();
 
-        $teams = $pdo->query("
+        $teamsWhere = "";
+        $teamsParams = [];
+        if ($isHod) {
+            if (!empty($managedDeptIds)) {
+                $teamPlaceholders = implode(',', array_fill(0, count($managedDeptIds), '?'));
+                $teamsWhere = "WHERE t.department_id IN ($teamPlaceholders)";
+                $teamsParams = $managedDeptIds;
+            } else {
+                $teamsWhere = "WHERE 1=0";
+            }
+        }
+
+        $stmtTeams = $pdo->prepare("
             SELECT t.*,
                    d.name as department_name,
                    (SELECT COUNT(*) FROM employees e WHERE e.team_id = t.id AND e.is_active = 1) as member_count
             FROM teams t
             LEFT JOIN departments d ON t.department_id = d.id
+            {$teamsWhere}
             ORDER BY t.department_id ASC, t.name ASC
-        ")->fetchAll();
+        ");
+        $stmtTeams->execute($teamsParams);
+        $teams = $stmtTeams->fetchAll();
 
         $contentTypes = $pdo->query("SELECT * FROM content_types ORDER BY id ASC")->fetchAll();
 
@@ -205,6 +268,14 @@ switch ($action) {
         $deptId = (!empty($data['department_id']) && (int)$data['department_id'] > 0) ? (int)$data['department_id'] : null;
         $teamId = (!empty($data['team_id']) && (int)$data['team_id'] > 0) ? (int)$data['team_id'] : null;
         $avatar = trim($data['avatar'] ?? '');
+
+        if ($isHod) {
+            // HOD can add staff to their own department, but role is strictly employee (Staff Member)
+            $role = 'employee';
+            if (empty($deptId) || !in_array($deptId, $managedDeptIds, true)) {
+                $deptId = !empty($managedDeptIds) ? $managedDeptIds[0] : $userDeptId;
+            }
+        }
 
         $empCode = trim($data['emp_code'] ?? '');
         $phone = trim($data['phone'] ?? ($data['whatsapp_number'] ?? ''));
@@ -400,6 +471,25 @@ switch ($action) {
         $deptId = (!empty($data['department_id']) && (int)$data['department_id'] > 0) ? (int)$data['department_id'] : null;
         $teamId = (!empty($data['team_id']) && (int)$data['team_id'] > 0) ? (int)$data['team_id'] : null;
         $avatar = trim($data['avatar'] ?? '');
+
+        if ($isHod) {
+            // HOD can only edit employees within their managed departments
+            $stmtTarget = $pdo->prepare("SELECT department_id, role FROM employees WHERE id = ?");
+            $stmtTarget->execute([$id]);
+            $targetEmp = $stmtTarget->fetch(PDO::FETCH_ASSOC);
+
+            if (!$targetEmp || !in_array((int)$targetEmp['department_id'], $managedDeptIds, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access denied: You can only edit employees in your department.']);
+                exit;
+            }
+
+            // HOD cannot reassign or change organizational role! Strictly preserve existing role
+            $role = $targetEmp['role'] ?: 'employee';
+
+            // HOD cannot transfer employee out of department
+            $deptId = (int)$targetEmp['department_id'];
+        }
 
         $empCode = trim($data['emp_code'] ?? '');
         $phone = trim($data['phone'] ?? ($data['whatsapp_number'] ?? ''));

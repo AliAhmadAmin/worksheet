@@ -49,7 +49,12 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <button type="button" class="sidebar-close-btn" onclick="toggleMobileSidebar()" aria-label="Close sidebar">✕</button>
         </div>
 
-        <!-- Department Workspace Portal Switcher Dropdown (Super Admin / Elevated Users) -->
+        <!-- Department Workspace Portal Switcher Dropdown (Super Admin / Global Admins Only) -->
+        <?php 
+        $userRole = strtolower($authUser['role'] ?? 'employee');
+        $isGlobalAdmin = in_array($userRole, ['super_admin', 'admin']);
+        ?>
+        <?php if ($isGlobalAdmin): ?>
         <div class="portal-switcher-wrapper admin-only" style="position: relative; display: none;">
             <button type="button" class="portal-switcher-btn" onclick="togglePortalMenu()" id="portal-switcher-btn" title="Switch Department Workspace Portal">
                 <span class="portal-icon"><?= $currentPortal === 'hr' ? '💼' : ($currentPortal === 'newsroom' ? '📺' : ($currentPortal === 'programming' ? '📡' : '🎬')) ?></span>
@@ -98,6 +103,17 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 </a>
             </div>
         </div>
+        <?php else: ?>
+        <div class="portal-switcher-wrapper static-portal" style="position: relative;">
+            <div class="portal-switcher-btn" style="cursor: default; pointer-events: none;" title="<?= htmlspecialchars($authUser['department_name'] ?? 'Department') ?> Workspace">
+                <span class="portal-icon"><?= $currentPortal === 'hr' ? '💼' : ($currentPortal === 'newsroom' ? '📺' : ($currentPortal === 'programming' ? '📡' : '🎬')) ?></span>
+                <div class="portal-text-block">
+                    <span class="portal-eyebrow">DEPARTMENT</span>
+                    <span class="portal-name"><?= htmlspecialchars($authUser['department_name'] ?? ($currentPortal === 'hr' ? 'HR & People' : ($currentPortal === 'newsroom' ? 'News Room' : ($currentPortal === 'programming' ? 'Programming' : 'Digital Media')))) ?></span>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Navigation Menu Scrollable Area -->

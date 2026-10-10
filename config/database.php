@@ -519,6 +519,44 @@ function ensureDepartmentAndTeamsSchema($pdo) {
         try { $pdo->exec("ALTER TABLE teams ADD COLUMN description TEXT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE teams ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (Exception $e) {}
 
+        // Customizable tracking options (content types & tracking departments) per department
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS department_tracking_options (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            department_id INT NOT NULL,
+            option_type ENUM('content_type', 'tracking_dept') NOT NULL,
+            option_name VARCHAR(100) NOT NULL,
+            sort_order INT DEFAULT 0,
+            is_active TINYINT DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_dept_type (department_id, option_type, is_active)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Dynamic worksheet columns per department
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS department_worksheet_columns (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            department_id INT NOT NULL,
+            column_key VARCHAR(64) NOT NULL,
+            column_label VARCHAR(100) NOT NULL,
+            column_type ENUM('text', 'select', 'link', 'number', 'time') NOT NULL DEFAULT 'text',
+            options_json TEXT NULL,
+            sort_order INT DEFAULT 0,
+            is_visible TINYINT DEFAULT 1,
+            is_core TINYINT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_dept_cols (department_id, is_visible, sort_order)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        try {
+            $checkCD = $pdo->query("SHOW COLUMNS FROM sheet_entries LIKE 'custom_data'")->fetch();
+            if (!$checkCD) {
+                $pdo->exec("ALTER TABLE sheet_entries ADD COLUMN custom_data LONGTEXT NULL AFTER title");
+            }
+        } catch (Exception $e) {}
+
         // Allow staff without login accounts
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN can_login TINYINT DEFAULT 1"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE employees MODIFY COLUMN email VARCHAR(191) NULL"); } catch (Exception $e) {}

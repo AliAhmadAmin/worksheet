@@ -51,6 +51,28 @@ switch ($action) {
             exit;
         }
 
+        // HOD permission check: HOD can only access their own sheet or sheets of employees in their department
+        $managedDeptIds = [];
+        if ($isHod || !$isSuperAdmin) {
+            $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+            if ($userDeptId > 0) $managedDeptIds[] = $userDeptId;
+            $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
+            $stmtManaged->execute([$currentUserId]);
+            $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($extra)) {
+                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
+            }
+        }
+
+        if ($isHod && $empId !== (int)$currentUserId && !$isSuperAdmin) {
+            $targetDeptId = (int)($employee['department_id'] ?? 0);
+            if (!in_array($targetDeptId, $managedDeptIds, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'HODs can only view worksheets for employees in their own department.']);
+                exit;
+            }
+        }
+
         // Fetch or create daily sheet
         $sheetStmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
         $sheetStmt->execute([$empId, $date]);
@@ -60,8 +82,23 @@ switch ($action) {
         if ($sheet) {
             $entriesStmt = $pdo->prepare("SELECT * FROM sheet_entries WHERE sheet_id = ? ORDER BY id ASC");
             $entriesStmt->execute([$sheet['id']]);
-            $entries = $entriesStmt->fetchAll();
+            $entries = $entriesStmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($entries as &$entry) {
+                if (!empty($entry['custom_data'])) {
+                    $entry['custom_data'] = json_decode($entry['custom_data'], true) ?: [];
+                } else {
+                    $entry['custom_data'] = [];
+                }
+            }
+            unset($entry);
         }
+
+        // Fetch dynamic columns for this employee's department
+        $empDeptId = (int)($employee['department_id'] ?? 0);
+        if ($empDeptId <= 0) $empDeptId = 2;
+
+        require_once __DIR__ . '/../includes/worksheet_columns_helper.php';
+        $columns = getDepartmentWorksheetColumns($pdo, $empDeptId, false);
 
         // Check if there is an active unclosed overnight shift from recent dates (e.g. checked in last night)
         $activeOvernightSheet = null;
@@ -91,12 +128,12 @@ switch ($action) {
             'employee' => $employee,
             'sheet' => $sheet,
             'entries' => $entries,
+            'columns' => $columns,
             'is_locked' => $sheet ? (int)$sheet['is_locked'] : 0,
             'active_overnight_sheet' => $activeOvernightSheet,
-            'can_edit' => $isSuperAdmin || ($isHod && $employee['department_id'] == ($currentUserObj['department_id'] ?? 0)) || (!$sheet || $sheet['is_locked'] == 0)
+            'can_edit' => $isSuperAdmin || ($isHod && in_array((int)$employee['department_id'], $managedDeptIds, true)) || ($empId === (int)$currentUserId) || (!$sheet || $sheet['is_locked'] == 0)
         ]);
         break;
-
     case 'save_entries':
         $empId = (int)($data['employee_id'] ?? $currentUserId);
         $date = $data['date'] ?? date('Y-m-d');
@@ -105,6 +142,28 @@ switch ($action) {
         $workSummary = $data['work_summary'] ?? '';
         $checkInTime = $data['check_in_time'] ?? null;
         $checkOutTime = $data['check_out_time'] ?? null;
+
+        // HOD permission check
+        if ($isHod && $empId !== (int)$currentUserId && !$isSuperAdmin) {
+            $empCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $empCheck->execute([$empId]);
+            $targetDeptId = (int)$empCheck->fetchColumn();
+
+            $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+            $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
+            $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
+            $stmtManaged->execute([$currentUserId]);
+            $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($extra)) {
+                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
+            }
+
+            if (!in_array($targetDeptId, $managedDeptIds, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'HODs can only save worksheets for employees in their own department.']);
+                exit;
+            }
+        }
 
         // Check lock status
         $sheetStmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
@@ -145,8 +204,8 @@ switch ($action) {
             $delEntries->execute([$sheetId]);
 
             $insEntry = $pdo->prepare("
-                INSERT INTO sheet_entries (sheet_id, time_slot, content_type, department, link, title, count_val) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO sheet_entries (sheet_id, time_slot, content_type, department, link, title, custom_data, count_val) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($entries as $row) {
@@ -154,8 +213,20 @@ switch ($action) {
                 $rawLink = trim($row['link'] ?? '');
                 $link = ($rawLink === 'upload') ? '' : $rawLink;
 
-                // A valid real work unit must have a description or link
-                if (empty($title) && empty($link)) {
+                // Extract custom column values
+                $customData = $row['custom_data'] ?? [];
+                if (!is_array($customData)) {
+                    $customData = json_decode($customData, true) ?: [];
+                }
+                foreach ($row as $k => $v) {
+                    if (!in_array($k, ['id', 'sheet_id', 'time_slot', 'content_type', 'department', 'link', 'title', 'count_val', 'custom_data', 'created_at'])) {
+                        $customData[$k] = $v;
+                    }
+                }
+                $customDataJson = !empty($customData) ? json_encode($customData) : null;
+
+                // A valid real work unit must have a description or link or custom data
+                if (empty($title) && empty($link) && empty($customData)) {
                     continue; // skip blank rows without work description
                 }
 
@@ -164,7 +235,7 @@ switch ($action) {
                 $department = trim($row['department'] ?? 'Digital');
                 $countVal = 1; // 1 real unit of work per entry row
 
-                $insEntry->execute([$sheetId, $timeSlot, $contentType, $department, $link, $title, $countVal]);
+                $insEntry->execute([$sheetId, $timeSlot, $contentType, $department, $link, $title, $customDataJson, $countVal]);
             }
 
             $pdo->commit();
@@ -187,6 +258,33 @@ switch ($action) {
         $empId = (int)($data['employee_id'] ?? 0);
         $date = $data['date'] ?? date('Y-m-d');
         $lockState = (int)($data['is_locked'] ?? 1);
+
+        if ($isHod && !$isSuperAdmin) {
+            $targetEmpId = $empId;
+            if (!$targetEmpId && $sheetId) {
+                $targetEmpId = (int)$pdo->query("SELECT employee_id FROM daily_sheets WHERE id = {$sheetId}")->fetchColumn();
+            }
+            if ($targetEmpId && $targetEmpId !== (int)$currentUserId) {
+                $empCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+                $empCheck->execute([$targetEmpId]);
+                $targetDeptId = (int)$empCheck->fetchColumn();
+
+                $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+                $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
+                $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
+                $stmtManaged->execute([$currentUserId]);
+                $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
+                if (!empty($extra)) {
+                    $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
+                }
+
+                if (!in_array($targetDeptId, $managedDeptIds, true)) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'HODs can only lock or unlock worksheets for employees in their own department.']);
+                    exit;
+                }
+            }
+        }
 
         if ($sheetId) {
             $stmt = $pdo->prepare("UPDATE daily_sheets SET is_locked = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");

@@ -117,6 +117,17 @@ switch ($action) {
             exit;
         }
 
+        if (!$isSuperAdmin) {
+            $checkEmp = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $checkEmp->execute([$assignedTo]);
+            $targetDeptId = (int)$checkEmp->fetchColumn();
+            if ($userDeptId > 0 && $targetDeptId !== $userDeptId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'You can only assign tasks to employees within your own department.']);
+                exit;
+            }
+        }
+
         $stmt = $pdo->prepare("
             INSERT INTO tasks (assigned_by, assigned_to, title, description, link, content_type, department, priority, status, due_date) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)

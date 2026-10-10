@@ -38,6 +38,29 @@ if ($sheet) {
     $entries = $entriesStmt->fetchAll();
 }
 
+// Fetch dynamic columns for this department
+$empDeptId = (int)($employee['department_id'] ?? 2);
+if ($empDeptId <= 0) $empDeptId = 2;
+
+$stmtCols = $pdo->prepare("
+    SELECT column_key, column_label, column_type 
+    FROM department_worksheet_columns 
+    WHERE department_id = ? AND is_visible = 1 
+    ORDER BY sort_order ASC, id ASC
+");
+$stmtCols->execute([$empDeptId]);
+$printCols = $stmtCols->fetchAll(PDO::FETCH_ASSOC);
+
+if (empty($printCols)) {
+    $printCols = [
+        ['column_key' => 'time_slot', 'column_label' => 'Time Slot', 'column_type' => 'time'],
+        ['column_key' => 'content_type', 'column_label' => 'Content Type', 'column_type' => 'select'],
+        ['column_key' => 'department', 'column_label' => 'Department', 'column_type' => 'select'],
+        ['column_key' => 'link', 'column_label' => 'Link / URL', 'column_type' => 'link'],
+        ['column_key' => 'title', 'column_label' => 'Work Description / Title', 'column_type' => 'text']
+    ];
+}
+
 // Format date header
 $sheetDateTime = strtotime($date);
 $formattedFullDate = date('l, d F Y', $sheetDateTime);
@@ -479,33 +502,45 @@ $emptyRowsNeeded = $entryCount < 8 ? (8 - $entryCount) : 0;
             <table class="hourly-table">
                 <thead>
                     <tr>
-                        <th style="width: 22%;">Time Slot</th>
-                        <th style="width: 15%;">Content Type</th>
-                        <th style="width: 15%;">Department</th>
-                        <th style="width: 18%;">Link / URL</th>
-                        <th style="width: 30%;">Work Description / Title</th>
+                        <?php foreach ($printCols as $col): ?>
+                            <th><?= htmlspecialchars($col['column_label']) ?></th>
+                        <?php endforeach; ?>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($entries)): ?>
-                        <?php foreach ($entries as $row): ?>
+                        <?php foreach ($entries as $row): 
+                            $cData = [];
+                            if (!empty($row['custom_data'])) {
+                                $cData = is_string($row['custom_data']) ? json_decode($row['custom_data'], true) : $row['custom_data'];
+                                if (!is_array($cData)) $cData = [];
+                            }
+                        ?>
                             <tr>
-                                <td class="cell-time"><?= htmlspecialchars($row['time_slot']) ?></td>
-                                <td class="cell-type"><?= htmlspecialchars($row['content_type']) ?></td>
-                                <td class="cell-dept"><?= htmlspecialchars($row['department']) ?></td>
-                                <td class="cell-link"><?= htmlspecialchars(($row['link'] ?? '') === 'upload' ? '' : ($row['link'] ?? '')) ?></td>
-                                <td class="cell-title"><?= htmlspecialchars($row['title']) ?></td>
+                                <?php foreach ($printCols as $col): 
+                                    $colKey = $col['column_key'];
+                                    $val = '';
+                                    if (array_key_exists($colKey, $row)) {
+                                        $val = $row[$colKey] ?? '';
+                                    } elseif (isset($cData[$colKey])) {
+                                        $val = $cData[$colKey] ?? '';
+                                    }
+                                    if ($colKey === 'link' && $val === 'upload') {
+                                        $val = '';
+                                    }
+                                    $cellClass = 'cell-' . preg_replace('/[^a-zA-Z0-9_-]/', '', $colKey);
+                                ?>
+                                    <td class="<?= $cellClass ?>"><?= htmlspecialchars((string)$val) ?></td>
+                                <?php endforeach; ?>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
 
                     <?php for ($i = 0; $i < $emptyRowsNeeded; $i++): ?>
                         <tr class="empty-row">
-                            <td class="cell-time">&nbsp;</td>
-                            <td class="cell-type"></td>
-                            <td class="cell-dept"></td>
-                            <td class="cell-link"></td>
-                            <td class="cell-title"></td>
+                            <?php foreach ($printCols as $col): ?>
+                                <td>&nbsp;</td>
+                            <?php endforeach; ?>
                         </tr>
                     <?php endfor; ?>
                 </tbody>

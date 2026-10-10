@@ -188,7 +188,7 @@
 
     <!-- MODAL: ADD EMPLOYEE -->
     <div id="add-employee-modal" class="modal-overlay">
-        <div class="modal-card modal-card-lg">
+        <div class="modal-card modal-card-lg" style="max-width: 740px;">
             <div class="modal-header">
                 <div>
                     <h3 style="display: flex; align-items: center; gap: 8px;">➕ Add New Employee</h3>
@@ -233,7 +233,7 @@
                                     </div>
                                 </div>
 
-                                <div class="form-grid-3">
+                                <div class="form-grid-2">
                                     <div class="form-group">
                                         <label class="form-label">Employee Code</label>
                                         <input type="text" id="add-emp-code" class="input-control" placeholder="e.g. DP-104 (Auto)" style="font-weight: 700; color: var(--primary);">
@@ -243,9 +243,19 @@
                                         <input type="text" id="add-emp-phone" class="input-control" placeholder="e.g. 03001234567" style="font-weight: 600;">
                                         <small style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 2px;">For WhatsApp Attendance</small>
                                     </div>
+                                </div>
+
+                                <div class="form-grid-2">
                                     <div class="form-group">
                                         <label class="form-label">CNIC No.</label>
                                         <input type="text" id="add-emp-cnic" class="input-control" placeholder="e.g. 35202-1234567-1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Account Status</label>
+                                        <select id="add-emp-status" class="input-control" style="font-weight: 600;">
+                                            <option value="1" selected>🟢 Active (Normal Working Staff)</option>
+                                            <option value="0">⛔ Deactivated</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -276,7 +286,7 @@
                                 </div>
                             </div>
 
-                            <div class="form-group">
+                            <div class="form-group" id="add-emp-role-group">
                                 <label class="form-label">System Role & Access</label>
                                 <select id="add-emp-role" class="input-control" style="font-weight: 600;">
                                     <option value="employee" selected>👤 Staff Member</option>
@@ -286,6 +296,9 @@
                                     <option value="team_lead">⭐ Team Lead</option>
                                     <option value="coordinator">🎯 Task Coordinator</option>
                                 </select>
+                                <div id="add-emp-role-badge" style="display: none; height: 38px; align-items: center; padding: 0 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-weight: 600; font-size: 13px; color: var(--text-main); user-select: none;">
+                                    👤 Staff Member
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -395,7 +408,7 @@
 
     <!-- MODAL: EDIT EMPLOYEE -->
     <div id="edit-employee-modal" class="modal-overlay">
-        <div class="modal-card modal-card-lg">
+        <div class="modal-card modal-card-lg" style="max-width: 740px;">
             <div class="modal-header">
                 <div>
                     <h3 style="display: flex; align-items: center; gap: 8px;">✏️ Edit Employee Details</h3>
@@ -441,7 +454,7 @@
                                     </div>
                                 </div>
 
-                                <div class="form-grid-3">
+                                <div class="form-grid-2">
                                     <div class="form-group">
                                         <label class="form-label">Employee Code</label>
                                         <input type="text" id="edit-emp-code" class="input-control" placeholder="e.g. DP-104" style="font-weight: 700; color: var(--primary);">
@@ -451,18 +464,20 @@
                                         <input type="text" id="edit-emp-phone" class="input-control" placeholder="e.g. 03001234567" style="font-weight: 600;">
                                         <small style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 2px;">For WhatsApp Attendance</small>
                                     </div>
+                                </div>
+
+                                <div class="form-grid-2">
                                     <div class="form-group">
                                         <label class="form-label">CNIC No.</label>
                                         <input type="text" id="edit-emp-cnic" class="input-control" placeholder="e.g. 35202-1234567-1">
                                     </div>
-                                </div>
-
-                                <div class="form-group">
-                                    <label class="form-label">Account Status</label>
-                                    <select id="edit-emp-status" class="input-control" style="font-weight: 600;">
-                                        <option value="1">🟢 Active (Normal Working Staff)</option>
-                                        <option value="0">⛔ Deactivated (Suspended / Retained in History)</option>
-                                    </select>
+                                    <div class="form-group">
+                                        <label class="form-label">Account Status</label>
+                                        <select id="edit-emp-status" class="input-control" style="font-weight: 600;">
+                                            <option value="1">🟢 Active (Normal Working Staff)</option>
+                                            <option value="0">⛔ Deactivated</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -486,7 +501,7 @@
                                     <label class="form-label">Official Email Address <span id="edit-emp-email-required-mark" style="color: #ef4444;">*</span></label>
                                     <input type="email" id="edit-emp-email" class="input-control">
                                 </div>
-                                <div class="form-group">
+                                <div class="form-group" id="edit-emp-role-group">
                                     <label class="form-label">System Role & Access</label>
                                     <select id="edit-emp-role" class="input-control" style="font-weight: 600;">
                                         <option value="employee">👤 Staff Member</option>
@@ -496,6 +511,9 @@
                                         <option value="team_lead">⭐ Team Lead</option>
                                         <option value="coordinator">🎯 Task Coordinator</option>
                                     </select>
+                                    <div id="edit-emp-role-badge" style="display: none; height: 38px; align-items: center; padding: 0 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-weight: 600; font-size: 13px; color: var(--text-main); user-select: none;">
+                                        👤 Staff Member
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1284,6 +1302,195 @@
             </div>
         </div>
     </div>
+
+    <!-- MODAL: DEPARTMENT TRACKING OPTIONS & CONTENT MATRIX SETTINGS -->
+    <div id="tracking-options-modal" class="modal-overlay">
+        <div class="modal-card modal-card-lg" style="max-width: 920px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%); border-bottom: 1px solid var(--border-color);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #2563eb, #0ea5e9); color: #fff; font-size: 22px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(37,99,235,0.25);">⚙️</div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 18px; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+                            <span>Department Tracking & Matrix Options</span>
+                            <span id="tracking-modal-dept-badge" class="badge" style="background: var(--primary-light); color: var(--primary); font-size: 11px;">Digital Media</span>
+                        </h3>
+                        <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">
+                            Configure Content Types & Tracking Desks for worksheets and the Content Matrix.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="closeModal('tracking-options-modal')">✕</button>
+            </div>
+
+            <div class="modal-body" style="padding: 18px 22px; gap: 16px; max-height: calc(85vh - 120px); overflow-y: auto;">
+                <!-- Super Admin Department Selector (Hidden for HOD) -->
+                <div id="tracking-admin-dept-picker-row" style="display: none; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 14px;">🏢</span>
+                        <strong style="font-size: 13px;">Manage Options for Department:</strong>
+                    </div>
+                    <select id="tracking-admin-dept-select" class="input-control" style="width: auto; min-width: 200px; padding: 5px 10px; font-size: 13px; font-weight: 600;" onchange="handleTrackingDeptSwitch(this.value)">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+
+                <!-- Modal Sub-Tabs Navigation -->
+                <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px; flex-wrap: wrap;">
+                    <button type="button" id="tab-btn-worksheet-cols" class="btn btn-primary tracking-modal-tab-btn" style="padding: 6px 14px; font-size: 12.5px; font-weight: 700;" onclick="switchTrackingModalTab('cols')">
+                        📋 Worksheet Columns & Layout
+                    </button>
+                    <button type="button" id="tab-btn-content-types" class="btn btn-outline tracking-modal-tab-btn" style="padding: 6px 14px; font-size: 12.5px; font-weight: 600;" onclick="switchTrackingModalTab('content_types')">
+                        🎬 Content Types
+                    </button>
+                    <button type="button" id="tab-btn-tracking-depts" class="btn btn-outline tracking-modal-tab-btn" style="padding: 6px 14px; font-size: 12.5px; font-weight: 600;" onclick="switchTrackingModalTab('tracking_depts')">
+                        🏢 Tracking Desks / Depts
+                    </button>
+                </div>
+
+                <!-- ================= TAB 1: WORKSHEET COLUMNS BUILDER ================= -->
+                <div id="tracking-tab-section-cols" class="tracking-tab-section" style="display: flex; flex-direction: column; gap: 14px;">
+                    <!-- Informational Tip Banner -->
+                    <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-md); font-size: 12px; line-height: 1.5; color: var(--text-main);">
+                        <span style="font-size: 16px; line-height: 1;">💡</span>
+                        <div>
+                            <strong>Custom Worksheet Layout:</strong> You can rename any column header, reorder columns (move <strong>◀ Left</strong> or <strong>▶ Right</strong>), change visibility, or add custom columns (Text, Dropdown Selection, Link, Number) specifically for your department's daily workflow.
+                        </div>
+                    </div>
+
+                    <!-- Add New Column Card -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 16px; box-shadow: var(--shadow-sm);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <h4 style="margin: 0; font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                                <span>➕ Add Custom Column to Worksheet</span>
+                            </h4>
+                        </div>
+
+                        <form onsubmit="handleWorksheetColumnAddSubmit(event)" style="display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: grid; grid-template-columns: 2fr 1.5fr auto; gap: 10px; align-items: end;">
+                                <div>
+                                    <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">Column Name / Header *</label>
+                                    <input type="text" id="new-col-label" class="input-control" placeholder="e.g. Story Slug, Guest Name, Status..." style="font-size: 12.5px; width: 100%;" required>
+                                </div>
+                                <div>
+                                    <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">Column Type *</label>
+                                    <select id="new-col-type" class="input-control" style="font-size: 12.5px; width: 100%;" onchange="toggleNewColumnOptionsInput(this.value)">
+                                        <option value="text">📝 Text Input</option>
+                                        <option value="select">🔽 Dropdown Selection</option>
+                                        <option value="link">🔗 Link / URL</option>
+                                        <option value="number">🔢 Number</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <button type="submit" class="btn btn-primary" style="padding: 7px 16px; font-size: 12.5px; font-weight: 700; white-space: nowrap;">
+                                        ➕ Add Column
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Additional options input when 'select' type is chosen -->
+                            <div id="new-col-options-row" style="display: none; background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px dashed var(--border-color);">
+                                <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">Dropdown Choices (Comma-separated)</label>
+                                <input type="text" id="new-col-options-input" class="input-control" placeholder="e.g. Draft, In Review, Ready to Post, Published" style="font-size: 12px; width: 100%;">
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Columns Reorder & Rename List -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                            <h4 style="margin: 0; font-size: 13.5px; font-weight: 700;">
+                                Active Columns (Ordered Left to Right in Worksheet)
+                            </h4>
+                            <span id="worksheet-columns-count-badge" class="badge" style="font-size: 11px;">5 Columns</span>
+                        </div>
+
+                        <div id="worksheet-columns-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 12px;">Loading columns...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= TAB 2: CONTENT TYPES ONLY ================= -->
+                <div id="tracking-tab-section-content-types" class="tracking-tab-section" style="display: none; flex-direction: column; gap: 14px;">
+                    <!-- Informational Tip Banner -->
+                    <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: rgba(147, 51, 234, 0.08); border: 1px solid rgba(147, 51, 234, 0.2); border-radius: var(--radius-md); font-size: 12px; line-height: 1.5; color: var(--text-main);">
+                        <span style="font-size: 16px; line-height: 1;">🎬</span>
+                        <div>
+                            <strong>Department Content Types:</strong> These categories define the type of output produced by your team (e.g. <em>Reels, YT Videos, Post Cards, FB Videos, Podcast</em>). They populate the <strong>Content Type</strong> dropdown in worksheet rows and serve as the columns in your <strong>Department Content Matrix</strong> report.
+                        </div>
+                    </div>
+
+                    <!-- Add New Content Type Card -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 16px; box-shadow: var(--shadow-sm);">
+                        <h4 style="margin: 0 0 10px 0; font-size: 13.5px; font-weight: 700;">➕ Add New Content Type</h4>
+                        <form onsubmit="handleTrackingOptionAddSubmit(event, 'content_type')" style="display: flex; gap: 8px;">
+                            <input type="text" id="new-content-type-name" class="input-control" placeholder="Add type name (e.g. Shorts, Live Stream, Highlights, Promo)..." style="flex: 1; font-size: 12.5px;" required>
+                            <button type="submit" class="btn btn-primary" style="padding: 7px 16px; font-size: 12.5px; font-weight: 700; white-space: nowrap;">
+                                ➕ Add Type
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Content Types List Card -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                            <h4 style="margin: 0; font-size: 13.5px; font-weight: 700;">Active Content Types for This Department</h4>
+                            <span id="content-types-count-badge" class="badge" style="font-size: 11px;">0 items</span>
+                        </div>
+                        <div id="tracking-content-types-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 12px;">Loading options...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= TAB 3: TRACKING DEPARTMENTS / DESKS ONLY ================= -->
+                <div id="tracking-tab-section-tracking-depts" class="tracking-tab-section" style="display: none; flex-direction: column; gap: 14px;">
+                    <!-- Informational Tip Banner -->
+                    <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-md); font-size: 12px; line-height: 1.5; color: var(--text-main);">
+                        <span style="font-size: 16px; line-height: 1;">🏢</span>
+                        <div>
+                            <strong>Tracking Desks / Departments:</strong> These define the assignment desks, target channels, or internal units your team creates work for (e.g. <em>Digital, News Room, Programming, Documentary, Others</em>). They populate the <strong>Department</strong> dropdown in worksheet rows and serve as the rows in your <strong>Department Content Matrix</strong> report.
+                        </div>
+                    </div>
+
+                    <!-- Add New Tracking Desk Card -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 16px; box-shadow: var(--shadow-sm);">
+                        <h4 style="margin: 0 0 10px 0; font-size: 13.5px; font-weight: 700;">➕ Add New Tracking Desk / Department</h4>
+                        <form onsubmit="handleTrackingOptionAddSubmit(event, 'tracking_dept')" style="display: flex; gap: 8px;">
+                            <input type="text" id="new-tracking-dept-name" class="input-control" placeholder="Add desk name (e.g. Discover Pakistan, Web Portal, Satellite Feed)..." style="flex: 1; font-size: 12.5px;" required>
+                            <button type="submit" class="btn btn-primary" style="padding: 7px 16px; font-size: 12.5px; font-weight: 700; white-space: nowrap;">
+                                ➕ Add Desk
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Tracking Desks List Card -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 14px 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                            <h4 style="margin: 0; font-size: 13.5px; font-weight: 700;">Active Tracking Desks for This Department</h4>
+                            <span id="tracking-depts-count-badge" class="badge" style="font-size: 11px;">0 items</span>
+                        </div>
+                        <div id="tracking-depts-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
+                            <div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 12px;">Loading options...</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="modal-footer" style="padding: 12px 22px; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-outline" style="color: var(--danger, #ef4444); border-color: rgba(239, 68, 68, 0.3); font-size: 12px;" onclick="handleResetActiveTrackingTabDefaults()">
+                        🔄 Reset to Defaults
+                    </button>
+                </div>
+                <button type="button" class="btn btn-primary" style="padding: 6px 18px; font-size: 13px;" onclick="closeModal('tracking-options-modal')">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
 
 
 

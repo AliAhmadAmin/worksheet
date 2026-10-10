@@ -25,9 +25,18 @@ $currentUserObj = $stmtUserCheck->fetch() ?: [];
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
 $isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
 $isHod = ($currentUserRole === 'hod');
-$isHr = ($currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr') || !empty($currentUserObj['can_manage_hr']));
+$isHr = ($currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr') || (!empty($currentUserObj['can_manage_hr']) && !in_array($currentUserRole, ['hod', 'employee'])));
 $hasGlobalAttendance = ($isSuperAdmin || $isHr);
 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+$managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
+if ($isHod) {
+    $stmtM = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
+    $stmtM->execute([$currentUserId]);
+    $extraDepts = $stmtM->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($extraDepts)) {
+        $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extraDepts)));
+    }
+}
 
 function formatDutyTime($seconds) {
     $hours = floor($seconds / 3600);
@@ -40,6 +49,17 @@ switch ($action) {
     case 'status':
         $empId = (int)($_GET['employee_id'] ?? $currentUserId);
         $date = $_GET['date'] ?? date('Y-m-d');
+
+        if ($empId !== (int)$currentUserId && !$hasGlobalAttendance) {
+            $stmtDeptCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $stmtDeptCheck->execute([$empId]);
+            $targetDept = (int)$stmtDeptCheck->fetchColumn();
+            if (!in_array($targetDept, $managedDeptIds)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access denied: You can only view status of employees in your department.']);
+                exit;
+            }
+        }
 
         $stmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
         $stmt->execute([$empId, $date]);
@@ -80,6 +100,17 @@ switch ($action) {
         $date = $data['date'] ?? date('Y-m-d');
         $today = date('Y-m-d');
         $customTime = $data['time'] ?? date('h:i A');
+
+        if ($empId !== (int)$currentUserId && !$hasGlobalAttendance) {
+            $stmtDeptCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $stmtDeptCheck->execute([$empId]);
+            $targetDept = (int)$stmtDeptCheck->fetchColumn();
+            if (!in_array($targetDept, $managedDeptIds)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access denied: You can only manage attendance for your own department.']);
+                exit;
+            }
+        }
 
         // Prevent checking in for future or past dates unless super admin / HR
         if ($date !== $today && !$hasGlobalAttendance) {
@@ -122,6 +153,17 @@ switch ($action) {
         $date = $data['date'] ?? date('Y-m-d');
         $today = date('Y-m-d');
         $customTime = $data['time'] ?? date('h:i A');
+
+        if ($empId !== (int)$currentUserId && !$hasGlobalAttendance) {
+            $stmtDeptCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $stmtDeptCheck->execute([$empId]);
+            $targetDept = (int)$stmtDeptCheck->fetchColumn();
+            if (!in_array($targetDept, $managedDeptIds)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access denied: You can only manage attendance for your own department.']);
+                exit;
+            }
+        }
 
         $stmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
         $stmt->execute([$empId, $date]);
@@ -218,12 +260,6 @@ switch ($action) {
         break;
 
     case 'admin_set_shift':
-        if (!$hasGlobalAttendance) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Unauthorized. Super Admin or HR access required.']);
-            exit;
-        }
-
         $empId = (int)($data['employee_id'] ?? 0);
         $date = $data['date'] ?? date('Y-m-d');
         $inTime = trim($data['check_in_time'] ?? '');
@@ -232,6 +268,18 @@ switch ($action) {
         if (!$empId) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Employee ID is required.']);
+            exit;
+        }
+
+        // Fetch employee department to check HOD permission scope
+        $stmtEmpDept = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+        $stmtEmpDept->execute([$empId]);
+        $targetDeptId = (int)$stmtEmpDept->fetchColumn();
+
+        $canSetShift = $hasGlobalAttendance || ($isHod && in_array($targetDeptId, $managedDeptIds, true));
+        if (!$canSetShift) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized: You can only adjust shift attendance for employees in your department.']);
             exit;
         }
 
@@ -308,9 +356,12 @@ switch ($action) {
         $whereClauses = ["e.is_active = 1"];
         $params = [$date];
 
-        if (!$hasGlobalAttendance && $userDeptId > 0) {
-            $whereClauses[] = "e.department_id = ?";
-            $params[] = $userDeptId;
+        if (!$hasGlobalAttendance && !empty($managedDeptIds)) {
+            $inDepts = implode(',', array_fill(0, count($managedDeptIds), '?'));
+            $whereClauses[] = "e.department_id IN ($inDepts)";
+            foreach ($managedDeptIds as $md) {
+                $params[] = $md;
+            }
         } else if ($deptFilter) {
             $whereClauses[] = "e.department_id = ?";
             $params[] = $deptFilter;
@@ -398,9 +449,12 @@ switch ($action) {
             $whereClauses = ["e.is_active = 1"];
             $params = [];
 
-            if (!$hasGlobalAttendance && $userDeptId > 0) {
-                $whereClauses[] = "e.department_id = ?";
-                $params[] = $userDeptId;
+            if (!$hasGlobalAttendance && !empty($managedDeptIds)) {
+                $inDepts = implode(',', array_fill(0, count($managedDeptIds), '?'));
+                $whereClauses[] = "e.department_id IN ($inDepts)";
+                foreach ($managedDeptIds as $md) {
+                    $params[] = $md;
+                }
             } else if ($deptFilter) {
                 $whereClauses[] = "e.department_id = ?";
                 $params[] = $deptFilter;

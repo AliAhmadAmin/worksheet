@@ -5,6 +5,136 @@
 const defaultContentTypes = ['YT Videos', 'FB Videos', 'Reel', 'Post Card', 'Podcast'];
 const defaultDepartments = ['News Room', 'Digital', 'Programming', 'Documentary', 'Others'];
 
+const defaultWorksheetColumns = [
+    { id: 'c1', column_key: 'time_slot', column_label: 'Time Slot', column_type: 'time', is_core: 1, is_visible: 1, sort_order: 1 },
+    { id: 'c2', column_key: 'content_type', column_label: 'Content Type', column_type: 'select', is_core: 1, is_visible: 1, sort_order: 2 },
+    { id: 'c3', column_key: 'department', column_label: 'Department', column_type: 'select', is_core: 1, is_visible: 1, sort_order: 3 },
+    { id: 'c4', column_key: 'link', column_label: 'Link / Upload', column_type: 'link', is_core: 1, is_visible: 1, sort_order: 4 },
+    { id: 'c5', column_key: 'title', column_label: 'Work Description / Title', column_type: 'text', is_core: 1, is_visible: 1, sort_order: 5 }
+];
+
+function getVisibleWorksheetColumns() {
+    if (AppState.worksheetColumns && Array.isArray(AppState.worksheetColumns) && AppState.worksheetColumns.length > 0) {
+        return AppState.worksheetColumns.filter(c => parseInt(c.is_visible) === 1).sort((a, b) => parseInt(a.sort_order) - parseInt(b.sort_order));
+    }
+    return defaultWorksheetColumns;
+}
+
+async function loadWorksheetColumns(deptId, forceReload = false) {
+    if (!deptId) {
+        deptId = AppState.currentUser ? AppState.currentUser.department_id : 2;
+    }
+    deptId = parseInt(deptId) || 2;
+
+    if (!forceReload && AppState.worksheetColumns && AppState.worksheetColumnsDeptId === deptId) {
+        return AppState.worksheetColumns;
+    }
+
+    try {
+        const res = await fetch(`api/worksheet_columns.php?action=get&all=1&department_id=${deptId}`);
+        const data = await res.json();
+        if (data.success) {
+            AppState.worksheetColumns = data.columns || [];
+            AppState.worksheetColumnsDeptId = deptId;
+            AppState.worksheetColumnsCanManage = data.can_manage;
+            return AppState.worksheetColumns;
+        }
+    } catch (err) {
+        console.error("Failed to load worksheet columns:", err);
+    }
+    return defaultWorksheetColumns;
+}
+
+
+function getAvailableContentTypes() {
+    if (AppState.trackingOptions && Array.isArray(AppState.trackingOptions.content_types) && AppState.trackingOptions.content_types.length > 0) {
+        return AppState.trackingOptions.content_types.map(c => typeof c === 'string' ? c : c.name);
+    }
+    return defaultContentTypes;
+}
+
+function getAvailableTrackingDepts() {
+    if (AppState.trackingOptions && Array.isArray(AppState.trackingOptions.tracking_departments) && AppState.trackingOptions.tracking_departments.length > 0) {
+        return AppState.trackingOptions.tracking_departments.map(d => typeof d === 'string' ? d : d.name);
+    }
+    return defaultDepartments;
+}
+
+async function loadTrackingOptions(deptId, forceReload = false) {
+    if (!deptId) {
+        deptId = AppState.currentUser ? AppState.currentUser.department_id : 2;
+    }
+    deptId = parseInt(deptId) || 2;
+
+    if (!forceReload && AppState.trackingOptions && AppState.trackingOptionsDeptId === deptId) {
+        return AppState.trackingOptions;
+    }
+
+    try {
+        const res = await fetch(`api/tracking_options.php?action=get&department_id=${deptId}`);
+        const data = await res.json();
+        if (data.success) {
+            AppState.trackingOptions = {
+                content_types: data.content_types || [],
+                tracking_departments: data.tracking_departments || []
+            };
+            AppState.trackingOptionsDeptId = deptId;
+            AppState.trackingOptionsCanManage = data.can_manage;
+            AppState.trackingOptionsDeptName = data.department_name;
+            return AppState.trackingOptions;
+        }
+    } catch (err) {
+        console.error("Failed to load tracking options:", err);
+    }
+    return null;
+}
+
+function refreshWorksheetDropdowns() {
+    const rows = document.querySelectorAll('#worksheet-table-body tr.sheet-entry-row');
+    if (rows.length === 0) return;
+
+    const availTypes = getAvailableContentTypes();
+    const availDepts = getAvailableTrackingDepts();
+
+    rows.forEach(row => {
+        const typeSelect = row.querySelector('.select-content-type');
+        const deptSelect = row.querySelector('.select-dept');
+
+        if (typeSelect) {
+            const currentVal = typeSelect.value;
+            let typeOptions = `<option value="">-- Select Content Type --</option>`;
+            let found = false;
+            availTypes.forEach(t => {
+                const isSel = (t.toLowerCase() === (currentVal || '').toLowerCase());
+                if (isSel) found = true;
+                typeOptions += `<option value="${escapeHtml(t)}" ${isSel ? 'selected' : ''}>${escapeHtml(t)}</option>`;
+            });
+            if (currentVal && !found) {
+                typeOptions += `<option value="${escapeHtml(currentVal)}" selected>${escapeHtml(currentVal)} (Custom)</option>`;
+            }
+            typeSelect.innerHTML = typeOptions;
+            if (currentVal) typeSelect.value = currentVal;
+        }
+
+        if (deptSelect) {
+            const currentVal = deptSelect.value;
+            let deptOptions = `<option value="">-- Select Department --</option>`;
+            let found = false;
+            availDepts.forEach(d => {
+                const isSel = (d.toLowerCase() === (currentVal || '').toLowerCase());
+                if (isSel) found = true;
+                deptOptions += `<option value="${escapeHtml(d)}" ${isSel ? 'selected' : ''}>${escapeHtml(d)}</option>`;
+            });
+            if (currentVal && !found) {
+                deptOptions += `<option value="${escapeHtml(currentVal)}" selected>${escapeHtml(currentVal)} (Custom)</option>`;
+            }
+            deptSelect.innerHTML = deptOptions;
+            if (currentVal) deptSelect.value = currentVal;
+        }
+    });
+}
+
+
 const defaultTimeSlots = [
     '07:00 AM to 08:00 AM',
     '07:30 AM to 09:00 AM',
@@ -42,8 +172,14 @@ const defaultTimeSlots = [
 ];
 
 function getActiveWorksheetEmpId() {
-    if (AppState.currentUser && AppState.currentUser.role === 'admin') {
-        return AppState.adminSelectedEmpId || 2;
+    const isElevated = AppState.currentUser && (
+        AppState.currentUser.role === 'admin' || 
+        AppState.currentUser.role === 'super_admin' || 
+        AppState.currentUser.role === 'hod' || 
+        hasPermission('can_inspect_sheets')
+    );
+    if (isElevated && AppState.adminSelectedEmpId) {
+        return AppState.adminSelectedEmpId;
     }
     return AppState.currentUser ? AppState.currentUser.id : 2;
 }
@@ -69,6 +205,15 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
         AppState.currentSheet = data.sheet;
         AppState.currentEntries = data.entries || [];
         AppState.isLocked = data.is_locked;
+
+        const deptId = (data.employee && data.employee.department_id) ? data.employee.department_id : (AppState.currentUser?.department_id || 2);
+        if (data.columns && data.columns.length > 0) {
+            AppState.worksheetColumns = data.columns;
+            AppState.worksheetColumnsDeptId = deptId;
+        } else {
+            await loadWorksheetColumns(deptId);
+        }
+        await loadTrackingOptions(deptId);
 
         renderWorksheetHero(data.sheet, data.employee);
         renderWorksheetTable(data.entries, data.can_edit);
@@ -103,9 +248,9 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
 }
 
 function renderWorksheetHero(sheet, empData) {
-    const isAdmin = AppState.currentUser && AppState.currentUser.role === 'admin';
+    const isElevated = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
 
-    if (isAdmin && empData) {
+    if (isElevated && empData) {
         // Update Admin Hero Inspector View
         const avatarEl = document.getElementById('admin-viewed-emp-avatar');
         const desigEl = document.getElementById('admin-meta-designation');
@@ -197,7 +342,7 @@ function renderWorksheetHero(sheet, empData) {
         const isToday = (AppState.selectedDate === todayStr);
         const isFuture = (AppState.selectedDate > todayStr);
         const isPast = (AppState.selectedDate < todayStr);
-        const isAdmin = AppState.currentUser && AppState.currentUser.role === 'admin';
+        const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
 
         const timerElem = document.getElementById('duty-timer-digits');
 
@@ -325,18 +470,41 @@ function updateLockBadge(isLocked, canEdit) {
 }
 
 function renderWorksheetTable(entries, canEdit) {
+    const thead = document.getElementById('worksheet-table-head');
     const tbody = document.getElementById('worksheet-table-body');
     if (!tbody) return;
 
+    const visibleCols = getVisibleWorksheetColumns();
+
+    // Dynamically render table headers matching HOD custom order & labels
+    if (thead) {
+        thead.innerHTML = `
+            <tr>
+                ${visibleCols.map(col => {
+                    let w = 'auto';
+                    let minW = '120px';
+                    if (col.column_key === 'time_slot') { w = '16%'; minW = '150px'; }
+                    else if (col.column_key === 'content_type') { w = '15%'; minW = '145px'; }
+                    else if (col.column_key === 'department') { w = '15%'; minW = '145px'; }
+                    else if (col.column_key === 'link') { w = '18%'; minW = '160px'; }
+                    else if (col.column_key === 'title') { w = '26%'; minW = '190px'; }
+                    return `<th class="col-${escapeHtml(col.column_key)}" style="width: ${w}; min-width: ${minW};">${escapeHtml(col.column_label)}</th>`;
+                }).join('')}
+                <th class="col-action" style="width: 4%; min-width: 45px; text-align: center;">Action</th>
+            </tr>
+        `;
+    }
+
     tbody.innerHTML = '';
+    const colCount = visibleCols.length + 1;
 
     if (!entries || entries.length === 0) {
         if (canEdit) {
-            addTableRow({ time_slot: '', content_type: '', department: '', link: '', title: '' }, canEdit);
-            addTableRow({ time_slot: '', content_type: '', department: '', link: '', title: '' }, canEdit);
-            addTableRow({ time_slot: '', content_type: '', department: '', link: '', title: '' }, canEdit);
+            addTableRow({}, canEdit);
+            addTableRow({}, canEdit);
+            addTableRow({}, canEdit);
         } else {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No entries logged for this date.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center; color: var(--text-muted); padding: 20px;">No entries logged for this date.</td></tr>`;
         }
     } else {
         entries.forEach(entry => {
@@ -388,60 +556,130 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
     const row = document.createElement('tr');
     row.className = 'sheet-entry-row';
 
-    const timeVal = data.time_slot || '';
-    const selectedType = data.content_type || '';
-    const selectedDept = data.department || '';
-    const rawLink = data.link || '';
-    const linkVal = (rawLink === 'upload') ? '' : rawLink;
-    const titleVal = data.title || '';
-
-    // Generate Content Type options with default unselected prompt
-    let typeOptions = `<option value="" ${!selectedType ? 'selected' : ''}>-- Select Content Type --</option>`;
-    typeOptions += defaultContentTypes.map(t => 
-        `<option value="${t}" ${t === selectedType ? 'selected' : ''}>${t}</option>`
-    ).join('');
-
-    // Generate Department options with default unselected prompt
-    let deptOptions = `<option value="" ${!selectedDept ? 'selected' : ''}>-- Select Department --</option>`;
-    deptOptions += defaultDepartments.map(d => 
-        `<option value="${d}" ${d === selectedDept ? 'selected' : ''}>${d}</option>`
-    ).join('');
-
+    const visibleCols = getVisibleWorksheetColumns();
     const disabledAttr = canEdit ? '' : 'disabled';
+    const customData = data.custom_data || {};
 
-    row.innerHTML = `
-        <td class="col-time-slot">
-            <input type="text" class="input-time input-control" placeholder="e.g. 5:00 to 6:00 AM" value="${escapeHtml(timeVal)}" style="width: 100%; font-weight: 600;" ${disabledAttr}>
-        </td>
-        <td class="col-content-type">
-            <select class="select-content-type input-control" style="width: 100%;" ${disabledAttr}>
-                ${typeOptions}
-            </select>
-        </td>
-        <td class="col-department">
-            <select class="select-dept input-control" style="width: 100%;" ${disabledAttr}>
-                ${deptOptions}
-            </select>
-        </td>
-        <td class="col-link">
-            <input type="text" class="input-link input-control" placeholder="Paste link or drive URL..." value="${escapeHtml(linkVal)}" style="width: 100%;">
-        </td>
-        <td class="col-description">
-            <input type="text" class="input-title input-control" placeholder="Description of task/video" value="${escapeHtml(titleVal)}" style="width: 100%;" ${disabledAttr}>
-        </td>
+    let cellsHtml = '';
+
+    visibleCols.forEach(col => {
+        const key = col.column_key;
+        const type = col.column_type;
+        const label = col.column_label;
+
+        // Extract value
+        let val = '';
+        if (key === 'time_slot') val = data.time_slot || '';
+        else if (key === 'content_type') val = data.content_type || '';
+        else if (key === 'department') val = data.department || '';
+        else if (key === 'link') {
+            const rawL = data.link || '';
+            val = (rawL === 'upload' ? '' : rawL);
+        }
+        else if (key === 'title') val = data.title || '';
+        else {
+            val = customData[key] !== undefined ? customData[key] : (data[key] || '');
+        }
+
+        if (key === 'time_slot' || type === 'time') {
+            cellsHtml += `
+                <td class="col-time-slot" data-col="${escapeHtml(key)}">
+                    <input type="text" class="input-time input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="e.g. 5:00 to 6:00 AM" value="${escapeHtml(val)}" style="width: 100%; font-weight: 600;" ${disabledAttr}>
+                </td>
+            `;
+        } else if (key === 'content_type') {
+            const availTypes = getAvailableContentTypes();
+            let typeOptions = `<option value="" ${!val ? 'selected' : ''}>-- Select ${escapeHtml(label)} --</option>`;
+            let typeFound = false;
+            availTypes.forEach(t => {
+                const isSel = (t.toLowerCase() === val.toLowerCase());
+                if (isSel) typeFound = true;
+                typeOptions += `<option value="${escapeHtml(t)}" ${isSel ? 'selected' : ''}>${escapeHtml(t)}</option>`;
+            });
+            if (val && !typeFound) {
+                typeOptions += `<option value="${escapeHtml(val)}" selected>${escapeHtml(val)} (Custom)</option>`;
+            }
+            cellsHtml += `
+                <td class="col-content-type" data-col="${escapeHtml(key)}">
+                    <select class="select-content-type input-control input-sheet-field" data-key="${escapeHtml(key)}" style="width: 100%;" ${disabledAttr}>
+                        ${typeOptions}
+                    </select>
+                </td>
+            `;
+        } else if (key === 'department') {
+            const availDepts = getAvailableTrackingDepts();
+            let deptOptions = `<option value="" ${!val ? 'selected' : ''}>-- Select ${escapeHtml(label)} --</option>`;
+            let deptFound = false;
+            availDepts.forEach(d => {
+                const isSel = (d.toLowerCase() === val.toLowerCase());
+                if (isSel) deptFound = true;
+                deptOptions += `<option value="${escapeHtml(d)}" ${isSel ? 'selected' : ''}>${escapeHtml(d)}</option>`;
+            });
+            if (val && !deptFound) {
+                deptOptions += `<option value="${escapeHtml(val)}" selected>${escapeHtml(val)} (Custom)</option>`;
+            }
+            cellsHtml += `
+                <td class="col-department" data-col="${escapeHtml(key)}">
+                    <select class="select-dept input-control input-sheet-field" data-key="${escapeHtml(key)}" style="width: 100%;" ${disabledAttr}>
+                        ${deptOptions}
+                    </select>
+                </td>
+            `;
+        } else if (type === 'select') {
+            const opts = Array.isArray(col.options) ? col.options : [];
+            let optHtml = `<option value="" ${!val ? 'selected' : ''}>-- Select ${escapeHtml(label)} --</option>`;
+            opts.forEach(op => {
+                const isSel = (String(op).toLowerCase() === String(val).toLowerCase());
+                optHtml += `<option value="${escapeHtml(op)}" ${isSel ? 'selected' : ''}>${escapeHtml(op)}</option>`;
+            });
+            if (val && !opts.some(o => String(o).toLowerCase() === String(val).toLowerCase())) {
+                optHtml += `<option value="${escapeHtml(val)}" selected>${escapeHtml(val)}</option>`;
+            }
+            cellsHtml += `
+                <td class="col-custom-select" data-col="${escapeHtml(key)}">
+                    <select class="input-control input-sheet-field" data-key="${escapeHtml(key)}" style="width: 100%;" ${disabledAttr}>
+                        ${optHtml}
+                    </select>
+                </td>
+            `;
+        } else if (type === 'link' || key === 'link') {
+            cellsHtml += `
+                <td class="col-link" data-col="${escapeHtml(key)}">
+                    <input type="text" class="input-link input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="Paste link or drive URL..." value="${escapeHtml(val)}" style="width: 100%;" ${disabledAttr}>
+                </td>
+            `;
+        } else if (type === 'number') {
+            cellsHtml += `
+                <td class="col-number" data-col="${escapeHtml(key)}">
+                    <input type="number" class="input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="0" value="${escapeHtml(val)}" style="width: 100%; font-weight: 600;" ${disabledAttr}>
+                </td>
+            `;
+        } else {
+            // Default text input
+            cellsHtml += `
+                <td class="col-description" data-col="${escapeHtml(key)}">
+                    <input type="text" class="input-title input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="${escapeHtml(label)}..." value="${escapeHtml(val)}" style="width: 100%;" ${disabledAttr}>
+                </td>
+            `;
+        }
+    });
+
+    // Action column
+    cellsHtml += `
         <td class="col-action" style="text-align: center;">
             ${canEdit ? '<button type="button" class="btn-icon-del" onclick="removeTableRow(this)" title="Delete Row">🗑️</button>' : ''}
         </td>
     `;
 
+    row.innerHTML = cellsHtml;
     tbody.appendChild(row);
 
     if (focusNew) {
         setTimeout(() => {
-            const focusTarget = row.querySelector('.input-time') || row.querySelector('.input-title');
-            if (focusTarget) {
-                focusTarget.focus();
-                focusTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            const firstInput = row.querySelector('.input-sheet-field');
+            if (firstInput) {
+                firstInput.focus();
+                firstInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }, 50);
     }
@@ -452,7 +690,7 @@ function addNewRowBelow() {
     const tbody = document.getElementById('worksheet-table-body');
     if (!tbody) return;
 
-    const isAdmin = AppState.currentUser && AppState.currentUser.role === 'admin';
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
     const canEdit = isAdmin || !AppState.isLocked;
 
     if (!canEdit) {
@@ -522,15 +760,44 @@ function saveLocalDraft() {
     const rows = document.querySelectorAll('#worksheet-table-body tr.sheet-entry-row');
     const entries = [];
     rows.forEach(r => {
-        const timeSlot = r.querySelector('.input-time')?.value || r.querySelector('.select-time')?.value || '';
-        const contentType = r.querySelector('.select-content-type')?.value || '';
-        const department = r.querySelector('.select-dept')?.value || '';
-        const rawLink = r.querySelector('.input-link')?.value || '';
-        const link = (rawLink === 'upload') ? '' : rawLink;
-        const title = r.querySelector('.input-title')?.value || '';
+        const entry = {
+            time_slot: '',
+            content_type: '',
+            department: '',
+            link: '',
+            title: '',
+            count_val: 1,
+            custom_data: {}
+        };
+        const fields = r.querySelectorAll('.input-sheet-field');
+        if (fields.length > 0) {
+            fields.forEach(f => {
+                const k = f.getAttribute('data-key');
+                const v = f.value || '';
+                if (k === 'time_slot') entry.time_slot = v;
+                else if (k === 'content_type') entry.content_type = v;
+                else if (k === 'department') entry.department = v;
+                else if (k === 'link') entry.link = (v === 'upload' ? '' : v);
+                else if (k === 'title') entry.title = v;
+                else {
+                    entry.custom_data[k] = v;
+                    entry[k] = v;
+                }
+            });
+        } else {
+            entry.time_slot = r.querySelector('.input-time')?.value || '';
+            entry.content_type = r.querySelector('.select-content-type')?.value || '';
+            entry.department = r.querySelector('.select-dept')?.value || '';
+            const rawLink = r.querySelector('.input-link')?.value || '';
+            entry.link = (rawLink === 'upload' ? '' : rawLink);
+            entry.title = r.querySelector('.input-title')?.value || '';
+        }
 
-        if (title.trim() || timeSlot.trim() || link.trim()) {
-            entries.push({ time_slot: timeSlot, content_type: contentType, department: department, link: link, title: title, count_val: 1 });
+        const hasCore = entry.title.trim() || entry.time_slot.trim() || entry.link.trim();
+        const hasCustom = Object.values(entry.custom_data).some(x => String(x).trim() !== '');
+
+        if (hasCore || hasCustom) {
+            entries.push(entry);
         }
     });
 
@@ -623,13 +890,13 @@ function setupWorksheetAutoSaveListeners() {
         tbody._hasAutoSaveListeners = true;
 
         tbody.addEventListener('input', (e) => {
-            if (e.target.matches('.input-time, .input-link, .input-title')) {
+            if (e.target.matches('.input-sheet-field, .input-time, .input-link, .input-title')) {
                 triggerAutoSave(700);
             }
         });
 
         tbody.addEventListener('change', (e) => {
-            if (e.target.matches('.input-time, .select-content-type, .select-dept')) {
+            if (e.target.matches('.input-sheet-field, .select-content-type, .select-dept, select')) {
                 triggerAutoSave(200);
             }
         });
@@ -659,7 +926,7 @@ function renderWorksheetSummary(sheet) {
 // Employee Check-In Action
 async function handleCheckIn() {
     const todayStr = getLocalDateString();
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin');
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod');
     if (AppState.selectedDate !== todayStr && !isAdmin) {
         showToast(`Check-In is only permitted on Today's date (${todayStr}).`, "error");
         return;
@@ -694,7 +961,7 @@ async function handleCheckIn() {
 // Employee Check-Out Action (Supports Overnight / Cross-Midnight Shifts)
 async function handleCheckOut() {
     const todayStr = getLocalDateString();
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin');
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod');
     const isOngoingShift = AppState.currentSheet && AppState.currentSheet.check_in_time && !AppState.currentSheet.check_out_time && (!AppState.currentSheet.is_locked);
 
     // Allow check-out if it is an active ongoing shift (e.g. night shift started yesterday) or if viewing today
@@ -954,22 +1221,45 @@ async function saveCurrentWorksheet(notify = true, isAuto = false) {
     const entries = [];
 
     rows.forEach(r => {
-        const timeSlot = r.querySelector('.input-time')?.value || r.querySelector('.select-time')?.value || '';
-        const contentType = r.querySelector('.select-content-type')?.value || '';
-        const department = r.querySelector('.select-dept')?.value || '';
-        const rawLink = r.querySelector('.input-link')?.value || '';
-        const link = (rawLink === 'upload') ? '' : rawLink;
-        const title = r.querySelector('.input-title')?.value || '';
+        const entry = {
+            time_slot: '',
+            content_type: '',
+            department: '',
+            link: '',
+            title: '',
+            count_val: 1,
+            custom_data: {}
+        };
 
-        if (title.trim() || timeSlot.trim() || link.trim()) {
-            entries.push({
-                time_slot: timeSlot,
-                content_type: contentType,
-                department: department,
-                link: link,
-                title: title,
-                count_val: 1
+        const fields = r.querySelectorAll('.input-sheet-field');
+        if (fields.length > 0) {
+            fields.forEach(f => {
+                const k = f.getAttribute('data-key');
+                const v = f.value || '';
+                if (k === 'time_slot') entry.time_slot = v;
+                else if (k === 'content_type') entry.content_type = v;
+                else if (k === 'department') entry.department = v;
+                else if (k === 'link') entry.link = (v === 'upload' ? '' : v);
+                else if (k === 'title') entry.title = v;
+                else {
+                    entry.custom_data[k] = v;
+                    entry[k] = v;
+                }
             });
+        } else {
+            entry.time_slot = r.querySelector('.input-time')?.value || '';
+            entry.content_type = r.querySelector('.select-content-type')?.value || '';
+            entry.department = r.querySelector('.select-dept')?.value || '';
+            const rawLink = r.querySelector('.input-link')?.value || '';
+            entry.link = (rawLink === 'upload' ? '' : rawLink);
+            entry.title = r.querySelector('.input-title')?.value || '';
+        }
+
+        const hasCore = entry.title.trim() || entry.time_slot.trim() || entry.link.trim();
+        const hasCustom = Object.values(entry.custom_data).some(x => String(x).trim() !== '');
+
+        if (hasCore || hasCustom) {
+            entries.push(entry);
         }
     });
 

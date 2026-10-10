@@ -125,6 +125,9 @@
                                 <button type="button" id="admin-unlock-btn" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="toggleSheetLock()">
                                     🔒 Lock Sheet
                                 </button>
+                                <button type="button" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="openTrackingOptionsModal()" title="Customize Content Types & Tracking Departments">
+                                    ⚙️ Options
+                                </button>
                                 <button type="button" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="triggerPrintSheet()">
                                     🖨️ Print
                                 </button>
@@ -162,6 +165,11 @@
                             <button type="button" class="btn btn-outline" onclick="addNewRowBelow()">
                                 ➕ Add Row
                             </button>
+                            <?php if (in_array($authUser['role'] ?? '', ['admin', 'super_admin', 'hod'])): ?>
+                            <button type="button" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="openTrackingOptionsModal()" title="Customize Content Types & Tracking Departments">
+                                ⚙️ Options
+                            </button>
+                            <?php endif; ?>
                             <button type="button" class="btn btn-primary" onclick="saveCurrentWorksheet(true)">
                                 💾 Save Sheet
                             </button>
@@ -188,7 +196,7 @@
                 <!-- Worksheet Table -->
                 <div class="table-responsive">
                     <table class="interactive-table">
-                        <thead>
+                        <thead id="worksheet-table-head">
                             <tr>
                                 <th class="col-time-slot" style="width: 18%; min-width: 160px;">Time Slot</th>
                                 <th class="col-content-type" style="width: 15%; min-width: 150px;">Content Type</th>

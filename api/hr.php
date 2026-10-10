@@ -31,9 +31,9 @@ $stmtUserCheck->execute([$currentUserId]);
 $currentUserObj = $stmtUserCheck->fetch() ?: [];
 
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
+$isHod = ($currentUserRole === 'hod' || (stripos($currentUserObj['designation'] ?? '', 'HOD') !== false && !in_array($currentUserRole, ['super_admin', 'admin'])));
 $isAdmin = ($currentUserRole === 'admin' || $currentUserRole === 'super_admin' || $currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr'));
-$canManageHr = $isAdmin || !empty($currentUserObj['can_manage_hr']);
-$isHod = ($currentUserRole === 'hod' || stripos($currentUserObj['designation'] ?? '', 'HOD') !== false || stripos($currentUserObj['designation'] ?? '', 'Director') !== false);
+$canManageHr = ($isAdmin || (!empty($currentUserObj['can_manage_hr']) && !$isHod));
 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 
 switch ($action) {
@@ -294,8 +294,10 @@ switch ($action) {
         } elseif ($isHod) {
             // HOD can see leaves from their department OR their own leaves
             if ($empFilter) {
-                $sql .= " AND l.employee_id = ?";
+                $sql .= " AND l.employee_id = ? AND (e.department_id = ? OR l.employee_id = ?)";
                 $params[] = $empFilter;
+                $params[] = $userDeptId;
+                $params[] = $currentUserId;
             } else {
                 $sql .= " AND (e.department_id = ? OR l.employee_id = ?)";
                 $params[] = $userDeptId;
@@ -524,6 +526,7 @@ switch ($action) {
         break;
 
     case 'get_profiles':
+        $empWhere = (!$canManageHr && $userDeptId > 0) ? "WHERE e.is_active = 1 AND e.department_id = {$userDeptId}" : "WHERE e.is_active = 1";
         $sql = "
             SELECT e.id, e.name, e.email, e.role, e.designation, e.avatar, e.is_active,
                    d.name as department_name, t.name as team_name,
@@ -534,7 +537,7 @@ switch ($action) {
             LEFT JOIN departments d ON e.department_id = d.id
             LEFT JOIN teams t ON e.team_id = t.id
             LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
-            WHERE e.is_active = 1
+            {$empWhere}
             ORDER BY e.name ASC
         ";
         $stmt = $pdo->query($sql);
@@ -860,8 +863,10 @@ switch ($action) {
             $params[] = $currentUserId;
         } elseif ($isHod && !$canManageHr) {
             if ($empFilter) {
-                $sql .= " AND f.employee_id = ?";
+                $sql .= " AND f.employee_id = ? AND (e.department_id = ? OR f.employee_id = ?)";
                 $params[] = $empFilter;
+                $params[] = $userDeptId;
+                $params[] = $currentUserId;
             } else {
                 $sql .= " AND (e.department_id = ? OR f.employee_id = ?)";
                 $params[] = $userDeptId;

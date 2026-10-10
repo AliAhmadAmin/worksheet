@@ -23,7 +23,17 @@
 
             <!-- Matrix 1: Department vs Content Type -->
             <div class="matrix-card">
-                <h4 style="margin-bottom: 14px; font-size: 16px; font-weight: 800;">Department Content Matrix</h4>
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+                    <div>
+                        <h4 style="margin: 0; font-size: 16px; font-weight: 800;">Department Content Matrix</h4>
+                        <span style="font-size: 11.5px; color: var(--text-muted);">Tracking desks (rows) × Content types (columns)</span>
+                    </div>
+                    <?php if (in_array($authUser['role'] ?? '', ['admin', 'super_admin', 'hod'])): ?>
+                    <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;" onclick="openTrackingOptionsModal()">
+                        ⚙️ Customize Matrix Options
+                    </button>
+                    <?php endif; ?>
+                </div>
                 <div class="table-responsive">
                     <table class="matrix-table">
                         <thead id="matrix-dept-thead">

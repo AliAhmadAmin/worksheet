@@ -5,6 +5,16 @@
  */
 require_once __DIR__ . '/includes/auth_check.php';
 
+$userRoleNr = strtolower($authUser['role'] ?? '');
+$deptNameNr = strtolower($authUser['department_name'] ?? '');
+$isGlobalAdminNr = in_array($userRoleNr, ['super_admin', 'admin']);
+$isNewsMemberNr = (stripos($deptNameNr, 'news') !== false);
+
+if (!$isGlobalAdminNr && !$isNewsMemberNr) {
+    header('Location: index.php');
+    exit;
+}
+
 $currentPortal = 'newsroom';
 
 // 1. Header (HTML DocType, Head, Shared Styling)

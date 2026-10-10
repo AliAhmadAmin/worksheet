@@ -138,7 +138,7 @@ function renderDashboardPendingQueue(pendingList) {
     }
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
-    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.can_manage_hr;
+    const isAdmin = (currentUser.role === 'admin' || currentUser.role === 'super_admin' || (currentUser.can_manage_hr && currentUser.role !== 'hod'));
     const isHod = currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director')));
     const currentUserId = currentUser.id || 0;
     const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
@@ -243,7 +243,7 @@ function renderDashboardPendingLoansQueue(loanList) {
         return;
     }
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.can_manage_hr);
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
 
     let html = '';
     loanList.forEach(l => {
@@ -683,7 +683,7 @@ function renderLeavesTable(leaves) {
     }
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
-    const isAdmin = currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.can_manage_hr;
+    const isAdmin = (currentUser.role === 'admin' || currentUser.role === 'super_admin' || (currentUser.can_manage_hr && currentUser.role !== 'hod'));
     const isHod = currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director')));
     const currentUserId = currentUser.id || 0;
     const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
@@ -1054,7 +1054,7 @@ function renderLoansTable(loans) {
         return;
     }
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.can_manage_hr);
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
     const currentUserId = AppState.currentUser ? AppState.currentUser.id : 0;
 
     const loanTypeBadges = {
@@ -1410,7 +1410,7 @@ function renderHrClaimsTable(claims) {
         return;
     }
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || AppState.currentUser.can_manage_hr);
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
 
     const typeBadges = {
         fuel: { label: '⛽ Fuel / Mileage', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7' },
@@ -1724,7 +1724,7 @@ function renderNoticesFeed(notices) {
         return;
     }
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.can_manage_hr);
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
 
     const priorityThemes = {
         urgent: { label: '🚨 Urgent / Important', bg: 'rgba(239, 68, 68, 0.08)', border: '#ef4444', text: '#ef4444' },
@@ -1958,7 +1958,7 @@ function renderFinesTable(fines) {
         return;
     }
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.can_manage_hr);
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
 
     const categoryBadges = {
         late_arrival: { label: '⏱️ Late Arrival', bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706' },
@@ -2343,7 +2343,7 @@ function renderHrPayrollTable(payroll) {
         return;
     }
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || AppState.currentUser.can_manage_hr);
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
 
     const statusBadges = {
         draft: { label: 'Draft', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280' },

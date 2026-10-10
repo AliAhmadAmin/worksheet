@@ -6,7 +6,9 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-header('Content-Type: application/json');
+if (!headers_sent()) {
+    header('Content-Type: application/json');
+}
 require_once __DIR__ . '/../config/database.php';
 
 $pdo = getDbConnection();
@@ -14,6 +16,25 @@ $action = $_GET['action'] ?? 'matrix';
 
 $startDate = $_GET['start_date'] ?? date('Y-m-d', strtotime('-7 days'));
 $endDate = $_GET['end_date'] ?? date('Y-m-d');
+
+$currentUserId = $_SESSION['user_id'] ?? 0;
+$stmtUserCheck = $pdo->prepare("SELECT * FROM employees WHERE id = ?");
+$stmtUserCheck->execute([$currentUserId]);
+$currentUserObj = $stmtUserCheck->fetch() ?: [];
+$currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
+$isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
+$isHod = ($currentUserRole === 'hod');
+$userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+
+$managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
+if ($isHod) {
+    $stmtM = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
+    $stmtM->execute([$currentUserId]);
+    $extraDepts = $stmtM->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($extraDepts)) {
+        $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extraDepts)));
+    }
+}
 
 // Helper to normalize content types for matching columns
 function normalizeMatrixContentType($cType) {
@@ -28,12 +49,42 @@ function normalizeMatrixContentType($cType) {
 
 switch ($action) {
     case 'matrix':
-        // 1. Fetch distinct Departments & Content Types
-        $departments = $pdo->query("SELECT name FROM departments WHERE is_active = 1 ORDER BY id ASC")->fetchAll(PDO::FETCH_COLUMN);
-        if (empty($departments)) {
-            $departments = ['News Room', 'Digital', 'Programming', 'Documentary', 'Others'];
+        // Determine target department
+        $targetDeptId = (!$isSuperAdmin && !empty($managedDeptIds)) ? $managedDeptIds[0] : (isset($_GET['department_id']) && (int)$_GET['department_id'] > 0 ? (int)$_GET['department_id'] : $userDeptId);
+        if ($targetDeptId <= 0) $targetDeptId = 2;
+
+        // 1. Fetch configured Tracking Departments (Rows) & Content Types (Columns) for this department
+        $trackingDepts = [];
+        try {
+            $stmtTD = $pdo->prepare("
+                SELECT option_name 
+                FROM department_tracking_options 
+                WHERE department_id = ? AND option_type = 'tracking_dept' AND is_active = 1 
+                ORDER BY sort_order ASC, id ASC
+            ");
+            $stmtTD->execute([$targetDeptId]);
+            $trackingDepts = $stmtTD->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) {}
+
+        if (empty($trackingDepts)) {
+            $trackingDepts = ['Digital', 'News Room', 'Programming', 'Documentary', 'Others'];
         }
-        $contentTypes = ['Reels', 'YT Videos', 'Post Cards', 'FB Videos', 'Podcast'];
+
+        $contentTypes = [];
+        try {
+            $stmtCT = $pdo->prepare("
+                SELECT option_name 
+                FROM department_tracking_options 
+                WHERE department_id = ? AND option_type = 'content_type' AND is_active = 1 
+                ORDER BY sort_order ASC, id ASC
+            ");
+            $stmtCT->execute([$targetDeptId]);
+            $contentTypes = $stmtCT->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) {}
+
+        if (empty($contentTypes)) {
+            $contentTypes = ['Reels', 'YT Videos', 'Post Cards', 'FB Videos', 'Podcast'];
+        }
 
         // 2. Query all entries in the date range
         $sql = "
@@ -43,39 +94,75 @@ switch ($action) {
                 SUM(COALESCE(se.count_val, 1)) as total_count
             FROM sheet_entries se
             JOIN daily_sheets ds ON se.sheet_id = ds.id
+            JOIN employees e ON ds.employee_id = e.id
             WHERE ds.sheet_date BETWEEN ? AND ?
-            GROUP BY se.department, se.content_type
         ";
+        $sqlParams = [$startDate, $endDate];
+        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+            $inD = implode(',', array_fill(0, count($managedDeptIds), '?'));
+            $sql .= " AND e.department_id IN ($inD)";
+            foreach ($managedDeptIds as $md) {
+                $sqlParams[] = $md;
+            }
+        }
+        $sql .= " GROUP BY se.department, se.content_type";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([$startDate, $endDate]);
+        $stmt->execute($sqlParams);
         $rawRows = $stmt->fetchAll();
+
+        // Dynamically include any existing raw tracking departments or content types from entries
+        foreach ($rawRows as $r) {
+            $rDept = trim($r['department'] ?? '');
+            if ($rDept !== '') {
+                $foundDept = false;
+                foreach ($trackingDepts as $td) {
+                    if (strcasecmp($td, $rDept) === 0) { $foundDept = true; break; }
+                }
+                if (!$foundDept) { $trackingDepts[] = $rDept; }
+            }
+
+            $rType = trim($r['content_type'] ?? '');
+            if ($rType !== '') {
+                $foundType = false;
+                foreach ($contentTypes as $ct) {
+                    if (strcasecmp($ct, $rType) === 0) { $foundType = true; break; }
+                }
+                if (!$foundType) { $contentTypes[] = $rType; }
+            }
+        }
 
         // 3. Build Department Matrix
         $deptMatrix = [];
         $colTotals = array_fill_keys($contentTypes, 0);
         $grandTotal = 0;
 
-        foreach ($departments as $dept) {
-            $row = [
+        foreach ($trackingDepts as $dept) {
+            $deptMatrix[$dept] = [
                 'department' => $dept,
                 'counts' => array_fill_keys($contentTypes, 0),
                 'row_total' => 0
             ];
-            $deptMatrix[$dept] = $row;
         }
 
         foreach ($rawRows as $r) {
-            $rawDept = trim($r['department'] ?? 'Digital');
-            // Canonical match department
-            $matchedDept = 'Others';
-            foreach ($departments as $d) {
+            $rawDept = trim($r['department'] ?? 'Others');
+            $matchedDept = $trackingDepts[0] ?? 'Others';
+            foreach ($trackingDepts as $d) {
                 if (strcasecmp($d, $rawDept) === 0) {
                     $matchedDept = $d;
                     break;
                 }
             }
 
-            $matchedCol = normalizeMatrixContentType($r['content_type'] ?? '');
+            $rawCol = trim($r['content_type'] ?? 'Others');
+            $matchedCol = $contentTypes[0] ?? 'Others';
+            foreach ($contentTypes as $c) {
+                if (strcasecmp($c, $rawCol) === 0) {
+                    $matchedCol = $c;
+                    break;
+                }
+            }
+
             $count = (int)$r['total_count'];
 
             if (!isset($deptMatrix[$matchedDept])) {
@@ -86,29 +173,26 @@ switch ($action) {
                 ];
             }
 
-            if (isset($deptMatrix[$matchedDept]['counts'][$matchedCol])) {
-                $deptMatrix[$matchedDept]['counts'][$matchedCol] += $count;
-            } else {
-                $deptMatrix[$matchedDept]['counts'][$matchedCol] = $count;
+            if (!isset($deptMatrix[$matchedDept]['counts'][$matchedCol])) {
+                $deptMatrix[$matchedDept]['counts'][$matchedCol] = 0;
             }
-
+            $deptMatrix[$matchedDept]['counts'][$matchedCol] += $count;
             $deptMatrix[$matchedDept]['row_total'] += $count;
-            if (isset($colTotals[$matchedCol])) {
-                $colTotals[$matchedCol] += $count;
+
+            if (!isset($colTotals[$matchedCol])) {
+                $colTotals[$matchedCol] = 0;
             }
+            $colTotals[$matchedCol] += $count;
             $grandTotal += $count;
         }
 
         // 4. Build Team & Employee Breakdown
-        $currentUserId = $_SESSION['user_id'] ?? 0;
-        $stmtUserCheck = $pdo->prepare("SELECT * FROM employees WHERE id = ?");
-        $stmtUserCheck->execute([$currentUserId]);
-        $currentUserObj = $stmtUserCheck->fetch() ?: [];
-        $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
-        $isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
-        $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
-
-        $empWhere = (!$isSuperAdmin && $userDeptId > 0) ? "WHERE e.is_active = 1 AND e.department_id = {$userDeptId}" : "WHERE e.is_active = 1";
+        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+            $inDStr = implode(',', array_map('intval', $managedDeptIds));
+            $empWhere = "WHERE e.is_active = 1 AND e.department_id IN ({$inDStr})";
+        } else {
+            $empWhere = "WHERE e.is_active = 1";
+        }
 
         $empSql = "
             SELECT 
@@ -149,12 +233,20 @@ switch ($action) {
 
             if (!$cType || $count <= 0) continue;
 
-            $matchedCol = normalizeMatrixContentType($cType);
-
-            if (isset($empMap[$empId]['counts'][$matchedCol])) {
-                $empMap[$empId]['counts'][$matchedCol] += $count;
-                $empMap[$empId]['total'] += $count;
+            $rawCol = trim($cType);
+            $matchedCol = $contentTypes[0] ?? 'Others';
+            foreach ($contentTypes as $c) {
+                if (strcasecmp($c, $rawCol) === 0) {
+                    $matchedCol = $c;
+                    break;
+                }
             }
+
+            if (!isset($empMap[$empId]['counts'][$matchedCol])) {
+                $empMap[$empId]['counts'][$matchedCol] = 0;
+            }
+            $empMap[$empId]['counts'][$matchedCol] += $count;
+            $empMap[$empId]['total'] += $count;
         }
 
         // Summary Duty Hours
@@ -164,14 +256,36 @@ switch ($action) {
                 SUM(ds.total_duty_seconds) as total_seconds,
                 COUNT(ds.id) as total_sheets
             FROM daily_sheets ds
+            JOIN employees e ON ds.employee_id = e.id
             WHERE ds.sheet_date BETWEEN ? AND ?
         ";
+        $dutyParams = [$startDate, $endDate];
+        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+            $inD = implode(',', array_fill(0, count($managedDeptIds), '?'));
+            $dutySql .= " AND e.department_id IN ($inD)";
+            foreach ($managedDeptIds as $md) {
+                $dutyParams[] = $md;
+            }
+        }
         $dutyStmt = $pdo->prepare($dutySql);
-        $dutyStmt->execute([$startDate, $endDate]);
+        $dutyStmt->execute($dutyParams);
         $dutySummary = $dutyStmt->fetch();
 
         // Total all-time content count in entire database
-        $allTimeContent = (int)$pdo->query("SELECT COALESCE(SUM(count_val), COUNT(*)) FROM sheet_entries")->fetchColumn();
+        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+            $inD = implode(',', array_fill(0, count($managedDeptIds), '?'));
+            $allTimeStmt = $pdo->prepare("
+                SELECT COALESCE(SUM(se.count_val), COUNT(*)) 
+                FROM sheet_entries se
+                JOIN daily_sheets ds ON se.sheet_id = ds.id
+                JOIN employees e ON ds.employee_id = e.id
+                WHERE e.department_id IN ($inD)
+            ");
+            $allTimeStmt->execute($managedDeptIds);
+            $allTimeContent = (int)$allTimeStmt->fetchColumn();
+        } else {
+            $allTimeContent = (int)$pdo->query("SELECT COALESCE(SUM(count_val), COUNT(*)) FROM sheet_entries")->fetchColumn();
+        }
 
         echo json_encode([
             'success' => true,
@@ -196,12 +310,24 @@ switch ($action) {
         header('Content-Disposition: attachment; filename=worksheet_report_' . $startDate . '_to_' . $endDate . '.csv');
         $output = fopen('php://output', 'w');
 
-        // CSV Header
-        fputcsv($output, ['Report: Department Content Matrix', 'Start Date: ' . $startDate, 'End Date: ' . $endDate]);
-        fputcsv($output, ['Department', 'Reels', 'YT Videos', 'Post Cards', 'FB Videos', 'Podcast', 'Total']);
+        $targetDeptId = (!$isSuperAdmin && !empty($managedDeptIds)) ? $managedDeptIds[0] : (isset($_GET['department_id']) && (int)$_GET['department_id'] > 0 ? (int)$_GET['department_id'] : $userDeptId);
+        if ($targetDeptId <= 0) $targetDeptId = 2;
 
-        $columns = ['Reels', 'YT Videos', 'Post Cards', 'FB Videos', 'Podcast'];
-        $departments = ['News Room', 'Digital', 'Programming', 'Documentary', 'Others'];
+        $trackingDepts = [];
+        try {
+            $stmtTD = $pdo->prepare("SELECT option_name FROM department_tracking_options WHERE department_id = ? AND option_type = 'tracking_dept' AND is_active = 1 ORDER BY sort_order ASC, id ASC");
+            $stmtTD->execute([$targetDeptId]);
+            $trackingDepts = $stmtTD->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) {}
+        if (empty($trackingDepts)) $trackingDepts = ['Digital', 'News Room', 'Programming', 'Documentary', 'Others'];
+
+        $contentTypes = [];
+        try {
+            $stmtCT = $pdo->prepare("SELECT option_name FROM department_tracking_options WHERE department_id = ? AND option_type = 'content_type' AND is_active = 1 ORDER BY sort_order ASC, id ASC");
+            $stmtCT->execute([$targetDeptId]);
+            $contentTypes = $stmtCT->fetchAll(PDO::FETCH_COLUMN);
+        } catch (Exception $e) {}
+        if (empty($contentTypes)) $contentTypes = ['Reels', 'YT Videos', 'Post Cards', 'FB Videos', 'Podcast'];
 
         $deptSql = "
             SELECT 
@@ -210,32 +336,74 @@ switch ($action) {
                 SUM(COALESCE(se.count_val, 1)) as total_count
             FROM sheet_entries se
             JOIN daily_sheets ds ON se.sheet_id = ds.id
+            JOIN employees e ON ds.employee_id = e.id
             WHERE ds.sheet_date BETWEEN ? AND ?
-            GROUP BY se.department, se.content_type
         ";
+        $deptSqlParams = [$startDate, $endDate];
+        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+            $inD = implode(',', array_fill(0, count($managedDeptIds), '?'));
+            $deptSql .= " AND e.department_id IN ($inD)";
+            foreach ($managedDeptIds as $md) {
+                $deptSqlParams[] = $md;
+            }
+        }
+        $deptSql .= " GROUP BY se.department, se.content_type";
         $stmt = $pdo->prepare($deptSql);
-        $stmt->execute([$startDate, $endDate]);
+        $stmt->execute($deptSqlParams);
         $rawRows = $stmt->fetchAll();
 
+        foreach ($rawRows as $r) {
+            $rDept = trim($r['department'] ?? '');
+            if ($rDept !== '') {
+                $foundDept = false;
+                foreach ($trackingDepts as $td) {
+                    if (strcasecmp($td, $rDept) === 0) { $foundDept = true; break; }
+                }
+                if (!$foundDept) { $trackingDepts[] = $rDept; }
+            }
+
+            $rType = trim($r['content_type'] ?? '');
+            if ($rType !== '') {
+                $foundType = false;
+                foreach ($contentTypes as $ct) {
+                    if (strcasecmp($ct, $rType) === 0) { $foundType = true; break; }
+                }
+                if (!$foundType) { $contentTypes[] = $rType; }
+            }
+        }
+
+        // CSV Header
+        fputcsv($output, ['Report: Department Content Matrix', 'Start Date: ' . $startDate, 'End Date: ' . $endDate]);
+        fputcsv($output, array_merge(['Tracking Department'], $contentTypes, ['Total']));
+
         $matrix = [];
-        foreach ($departments as $dept) {
-            $matrix[$dept] = array_fill_keys($columns, 0);
+        foreach ($trackingDepts as $dept) {
+            $matrix[$dept] = array_fill_keys($contentTypes, 0);
         }
 
         foreach ($rawRows as $r) {
-            $rawDept = trim($r['department'] ?? 'Digital');
-            $matchedDept = 'Others';
-            foreach ($departments as $d) {
+            $rawDept = trim($r['department'] ?? 'Others');
+            $matchedDept = $trackingDepts[0] ?? 'Others';
+            foreach ($trackingDepts as $d) {
                 if (strcasecmp($d, $rawDept) === 0) {
                     $matchedDept = $d;
                     break;
                 }
             }
 
-            $ct = normalizeMatrixContentType($r['content_type'] ?? '');
-            if (isset($matrix[$matchedDept][$ct])) {
-                $matrix[$matchedDept][$ct] += (int)$r['total_count'];
+            $rawCol = trim($r['content_type'] ?? 'Others');
+            $matchedCol = $contentTypes[0] ?? 'Others';
+            foreach ($contentTypes as $c) {
+                if (strcasecmp($c, $rawCol) === 0) {
+                    $matchedCol = $c;
+                    break;
+                }
             }
+
+            if (!isset($matrix[$matchedDept][$matchedCol])) {
+                $matrix[$matchedDept][$matchedCol] = 0;
+            }
+            $matrix[$matchedDept][$matchedCol] += (int)$r['total_count'];
         }
 
         foreach ($matrix as $dept => $vals) {
@@ -245,8 +413,9 @@ switch ($action) {
 
         fputcsv($output, []);
         fputcsv($output, ['Team & Employee Performance Breakdown']);
-        fputcsv($output, ['Team', 'Employee Name', 'Reels', 'YT Videos', 'Post Cards', 'FB Videos', 'Podcast', 'Total']);
+        fputcsv($output, array_merge(['Team', 'Employee Name'], $contentTypes, ['Total']));
 
+        $empExportWhere = (!$isSuperAdmin && !empty($managedDeptIds)) ? "WHERE e.is_active = 1 AND e.department_id IN (" . implode(',', array_map('intval', $managedDeptIds)) . ")" : "WHERE e.is_active = 1";
         $empSql = "
             SELECT 
                 t.name as team_name,
@@ -257,7 +426,7 @@ switch ($action) {
             LEFT JOIN teams t ON e.team_id = t.id
             LEFT JOIN daily_sheets ds ON ds.employee_id = e.id AND ds.sheet_date BETWEEN ? AND ?
             LEFT JOIN sheet_entries se ON se.sheet_id = ds.id
-            WHERE e.is_active = 1
+            {$empExportWhere}
             GROUP BY t.name, e.name, se.content_type
             ORDER BY t.id ASC, e.name ASC
         ";
@@ -272,13 +441,21 @@ switch ($action) {
                 $emps[$key] = [
                     'team' => $r['team_name'] ?? 'General',
                     'name' => $r['employee_name'],
-                    'counts' => array_fill_keys($columns, 0)
+                    'counts' => array_fill_keys($contentTypes, 0)
                 ];
             }
-            $ct = normalizeMatrixContentType($r['content_type'] ?? '');
-            if (isset($emps[$key]['counts'][$ct])) {
-                $emps[$key]['counts'][$ct] += (int)$r['total_count'];
+            $rawCol = trim($r['content_type'] ?? 'Others');
+            $matchedCol = $contentTypes[0] ?? 'Others';
+            foreach ($contentTypes as $c) {
+                if (strcasecmp($c, $rawCol) === 0) {
+                    $matchedCol = $c;
+                    break;
+                }
             }
+            if (!isset($emps[$key]['counts'][$matchedCol])) {
+                $emps[$key]['counts'][$matchedCol] = 0;
+            }
+            $emps[$key]['counts'][$matchedCol] += (int)$r['total_count'];
         }
 
         foreach ($emps as $e) {

@@ -287,17 +287,32 @@ async function populateAttendanceDepartments() {
         } catch (e) {}
     }
 
+    const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
+    const isGlobalAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+
     if (depts && depts.length > 0) {
         [liveDept, repDept].forEach(sel => {
             if (!sel) return;
-            const cur = sel.value || 'all';
-            let opts = '<option value="all">🏢 All Departments</option>';
+            let opts = '';
+            if (isGlobalAdmin) {
+                opts += '<option value="all">🏢 All Departments</option>';
+            }
             depts.forEach(d => {
                 opts += `<option value="${d.id}">🏢 ${escapeHtml(d.name)}</option>`;
             });
             sel.innerHTML = opts;
-            if (cur && Array.from(sel.options).some(o => o.value === cur)) {
-                sel.value = cur;
+            if (isHod || !isGlobalAdmin) {
+                sel.value = depts[0].id;
+                if (depts.length <= 1) {
+                    sel.disabled = true;
+                    sel.style.opacity = '0.85';
+                    sel.title = 'Restricted to your department';
+                }
+            } else {
+                const cur = sel.value || 'all';
+                if (cur && Array.from(sel.options).some(o => o.value === cur)) {
+                    sel.value = cur;
+                }
             }
         });
     }
@@ -333,13 +348,14 @@ function renderRepAttEmpDropdownList(list) {
     if (!container) return;
 
     const currentVal = document.getElementById('rep-att-emp-select')?.value || 'all';
+    const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
 
     let html = `
         <div class="dropdown-emp-item ${currentVal === 'all' ? 'active' : ''}" onclick="selectRepAttEmpFromDropdown('all')" style="padding: 8px 10px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s; background: ${currentVal === 'all' ? 'rgba(0, 179, 0, 0.1)' : 'transparent'};">
             <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;">👥</div>
             <div style="flex: 1; min-width: 0;">
                 <div style="font-weight: 700; font-size: 12.5px; color: ${currentVal === 'all' ? 'var(--primary)' : 'var(--text-main)'};">All Employees Summary</div>
-                <div style="font-size: 10.5px; color: var(--text-muted);">Company-wide attendance overview</div>
+                <div style="font-size: 10.5px; color: var(--text-muted);">${isHod ? 'Department staff attendance overview' : 'Company-wide attendance overview'}</div>
             </div>
             ${currentVal === 'all' ? '<span style="color: var(--primary); font-size: 13px; font-weight: 800;">✓</span>' : ''}
         </div>
@@ -1372,7 +1388,7 @@ function printAttendanceReport() {
 }
 
 function viewEmployeeSheet(empId, date) {
-    if (AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr')) {
+    if (AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'))) {
         AppState.adminSelectedEmpId = parseInt(empId);
         if (date) AppState.selectedDate = date;
         const dateInput = document.getElementById('worksheet-date-picker');
@@ -1390,3 +1406,610 @@ function viewEmployeeSheet(empId, date) {
     const wsTabBtn = document.querySelector('[data-tab="tab-worksheet"]');
     if (wsTabBtn) wsTabBtn.click();
 }
+
+/**
+ * -------------------------------------------------------------
+ * Department Tracking Options & Worksheet Column Builder Handlers
+ * -------------------------------------------------------------
+ */
+
+let currentTrackingModalDeptId = null;
+let currentTrackingModalActiveTab = 'cols';
+
+async function openTrackingOptionsModal(deptId = null) {
+    if (!deptId) {
+        if (AppState.worksheetColumnsDeptId) {
+            deptId = AppState.worksheetColumnsDeptId;
+        } else if (AppState.trackingOptionsDeptId) {
+            deptId = AppState.trackingOptionsDeptId;
+        } else if (AppState.currentUser && AppState.currentUser.department_id) {
+            deptId = AppState.currentUser.department_id;
+        } else {
+            deptId = 2; // Default Digital
+        }
+    }
+    currentTrackingModalDeptId = parseInt(deptId) || 2;
+
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin');
+    const adminPickerRow = document.getElementById('tracking-admin-dept-picker-row');
+    const adminDeptSelect = document.getElementById('tracking-admin-dept-select');
+
+    if (isAdmin && adminPickerRow && adminDeptSelect) {
+        adminPickerRow.style.display = 'flex';
+        if (AppState.departments && AppState.departments.length > 0) {
+            adminDeptSelect.innerHTML = AppState.departments.map(d => 
+                `<option value="${d.id}" ${parseInt(d.id) === currentTrackingModalDeptId ? 'selected' : ''}>${escapeHtml(d.name)}</option>`
+            ).join('');
+        }
+    } else if (adminPickerRow) {
+        adminPickerRow.style.display = 'none';
+    }
+
+    openModal('tracking-options-modal');
+    switchTrackingModalTab(currentTrackingModalActiveTab || 'cols');
+    await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+    await loadTrackingOptionsModalData(currentTrackingModalDeptId);
+}
+
+function switchTrackingModalTab(tabKey) {
+    currentTrackingModalActiveTab = tabKey;
+
+    const btnCols = document.getElementById('tab-btn-worksheet-cols');
+    const btnTypes = document.getElementById('tab-btn-content-types');
+    const btnDepts = document.getElementById('tab-btn-tracking-depts');
+
+    const secCols = document.getElementById('tracking-tab-section-cols');
+    const secTypes = document.getElementById('tracking-tab-section-content-types');
+    const secDepts = document.getElementById('tracking-tab-section-tracking-depts');
+
+    // Reset button states
+    [btnCols, btnTypes, btnDepts].forEach(b => {
+        if (b) {
+            b.className = 'btn btn-outline tracking-modal-tab-btn';
+            b.style.fontWeight = '600';
+        }
+    });
+
+    // Hide all sections first
+    if (secCols) secCols.style.display = 'none';
+    if (secTypes) secTypes.style.display = 'none';
+    if (secDepts) secDepts.style.display = 'none';
+
+    if (tabKey === 'cols') {
+        if (btnCols) { btnCols.className = 'btn btn-primary tracking-modal-tab-btn'; btnCols.style.fontWeight = '700'; }
+        if (secCols) secCols.style.display = 'flex';
+        loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+    } else if (tabKey === 'content_types') {
+        if (btnTypes) { btnTypes.className = 'btn btn-primary tracking-modal-tab-btn'; btnTypes.style.fontWeight = '700'; }
+        if (secTypes) secTypes.style.display = 'flex';
+        loadTrackingOptionsModalData(currentTrackingModalDeptId);
+    } else if (tabKey === 'tracking_depts') {
+        if (btnDepts) { btnDepts.className = 'btn btn-primary tracking-modal-tab-btn'; btnDepts.style.fontWeight = '700'; }
+        if (secDepts) secDepts.style.display = 'flex';
+        loadTrackingOptionsModalData(currentTrackingModalDeptId);
+    }
+}
+
+function toggleNewColumnOptionsInput(colType) {
+    const row = document.getElementById('new-col-options-row');
+    if (row) {
+        row.style.display = (colType === 'select') ? 'block' : 'none';
+    }
+}
+
+async function handleTrackingDeptSwitch(deptId) {
+    currentTrackingModalDeptId = parseInt(deptId) || 2;
+    await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+    await loadTrackingOptionsModalData(currentTrackingModalDeptId);
+}
+
+// ---------------------------------------------------------------------
+// WORKSHEET COLUMNS BUILDER CRUD & REORDER
+// ---------------------------------------------------------------------
+
+function renderColumnTypeBadge(type) {
+    if (type === 'select') return '<span class="badge" style="background: rgba(147, 51, 234, 0.1); color: #9333ea; font-size: 11px;">🔽 Dropdown</span>';
+    if (type === 'link') return '<span class="badge" style="background: rgba(14, 165, 233, 0.1); color: #0284c7; font-size: 11px;">🔗 Link/URL</span>';
+    if (type === 'number') return '<span class="badge" style="background: rgba(245, 158, 11, 0.1); color: #d97706; font-size: 11px;">🔢 Number</span>';
+    if (type === 'time') return '<span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #059669; font-size: 11px;">🕒 Time</span>';
+    return '<span class="badge" style="background: rgba(59, 130, 246, 0.1); color: #2563eb; font-size: 11px;">📝 Text</span>';
+}
+
+async function loadWorksheetColumnsModalData(deptId) {
+    const listContainer = document.getElementById('worksheet-columns-list');
+    const countBadge = document.getElementById('worksheet-columns-count-badge');
+    const badge = document.getElementById('tracking-modal-dept-badge');
+
+    if (listContainer) listContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 15px; font-size: 12px;">Loading columns...</div>';
+
+    try {
+        const res = await fetch(`api/worksheet_columns.php?action=get&all=1&department_id=${deptId}`);
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to load columns', 'error');
+            return;
+        }
+
+        if (badge) badge.textContent = data.department_name || 'Department';
+
+        const cols = data.columns || [];
+        AppState.worksheetColumns = cols;
+        AppState.worksheetColumnsDeptId = deptId;
+
+        const visibleCount = cols.filter(c => c.is_visible).length;
+        if (countBadge) countBadge.textContent = `${visibleCount} Active Columns (${cols.length} total)`;
+
+        if (listContainer) {
+            if (cols.length === 0) {
+                listContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 15px; font-size: 12px;">No columns found. Resetting defaults...</div>';
+            } else {
+                listContainer.innerHTML = cols.map((col, idx) => `
+                    <div class="worksheet-col-row" data-id="${col.id}" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); opacity: ${col.is_visible ? '1' : '0.55'}; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px; flex-wrap: wrap;">
+                            <span class="badge" style="font-size: 11px; background: var(--primary); color: #fff; min-width: 22px; text-align: center;">#${idx + 1}</span>
+                            ${renderColumnTypeBadge(col.column_type)}
+                            <input type="text" class="input-control" value="${escapeHtml(col.column_label)}" style="flex: 1; min-width: 130px; max-width: 260px; font-weight: 700; font-size: 12.5px; padding: 4px 8px;" onkeydown="if(event.key==='Enter'){event.preventDefault();handleRenameWorksheetColumn(${col.id}, this.value, '${escapeHtml(col.column_label)}');}" onblur="handleRenameWorksheetColumn(${col.id}, this.value, '${escapeHtml(col.column_label)}')">
+                            ${col.is_core ? '<span style="font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.05); padding: 2px 6px; border-radius: 4px;">System</span>' : '<span style="font-size: 10px; color: var(--primary); background: var(--primary-light); padding: 2px 6px; border-radius: 4px;">Custom</span>'}
+                            ${col.column_type === 'select' && !col.is_core ? `
+                                <input type="text" class="input-control" placeholder="Choices: A, B, C" value="${escapeHtml((col.options || []).join(', '))}" style="flex: 1; min-width: 140px; font-size: 11.5px; padding: 4px 8px;" title="Comma-separated dropdown choices" onchange="handleUpdateColumnOptions(${col.id}, this.value)">
+                            ` : ''}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="handleMoveWorksheetColumn(${col.id}, 'left')" title="Move column Left (earlier)">◀ Left</button>
+                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="handleMoveWorksheetColumn(${col.id}, 'right')" title="Move column Right (later)">▶ Right</button>
+                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="handleToggleWorksheetColumnVisibility(${col.id}, ${col.is_visible ? 0 : 1})" title="${col.is_visible ? 'Hide column from worksheet' : 'Show column in worksheet'}">
+                                ${col.is_visible ? '👁️ Hide' : '🚫 Show'}
+                            </button>
+                            ${!col.is_core ? `
+                                <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; color: var(--danger, #ef4444); border-color: rgba(239,68,68,0.25);" onclick="handleDeleteWorksheetColumn(${col.id}, '${escapeHtml(col.column_label)}')" title="Delete custom column">🗑️</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+    } catch (err) {
+        console.error("Error loading columns data:", err);
+        showToast("Error retrieving worksheet columns", "error");
+    }
+}
+
+async function handleWorksheetColumnAddSubmit(event) {
+    if (event) event.preventDefault();
+
+    const labelInput = document.getElementById('new-col-label');
+    const typeSelect = document.getElementById('new-col-type');
+    const optionsInput = document.getElementById('new-col-options-input');
+
+    if (!labelInput) return;
+    const label = labelInput.value.trim();
+    if (!label) {
+        showToast("Please enter a column name", "warning");
+        return;
+    }
+
+    const colType = typeSelect ? typeSelect.value : 'text';
+    const options = (colType === 'select' && optionsInput) ? optionsInput.value.trim() : '';
+
+    try {
+        const res = await fetch('api/worksheet_columns.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'add',
+                department_id: currentTrackingModalDeptId,
+                column_label: label,
+                column_type: colType,
+                options: options
+            })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to add column', 'error');
+            return;
+        }
+
+        labelInput.value = '';
+        if (optionsInput) optionsInput.value = '';
+        showToast(`Added column "${label}" successfully!`, 'success');
+
+        await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+        await loadWorksheetColumns(currentTrackingModalDeptId, true);
+        if (typeof renderWorksheetTable === 'function') {
+            renderWorksheetTable(AppState.currentEntries || [], true);
+        }
+    } catch (err) {
+        console.error("Error adding column:", err);
+        showToast("Error adding column", "error");
+    }
+}
+
+async function handleRenameWorksheetColumn(id, newLabel, oldLabel) {
+    const trimmed = (newLabel || '').trim();
+    if (!trimmed || trimmed === oldLabel) return;
+
+    try {
+        const res = await fetch('api/worksheet_columns.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'update',
+                id: id,
+                column_label: trimmed
+            })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to rename column', 'error');
+            return;
+        }
+
+        showToast(`Renamed column to "${trimmed}"`, 'success');
+        await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+        await loadWorksheetColumns(currentTrackingModalDeptId, true);
+        if (typeof renderWorksheetTable === 'function') {
+            renderWorksheetTable(AppState.currentEntries || [], true);
+        }
+    } catch (err) {
+        console.error("Error renaming column:", err);
+        showToast("Error renaming column", "error");
+    }
+}
+
+async function handleUpdateColumnOptions(id, optionsStr) {
+    try {
+        const res = await fetch('api/worksheet_columns.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'update',
+                id: id,
+                options: optionsStr
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast("Dropdown options updated", "success");
+            await loadWorksheetColumns(currentTrackingModalDeptId, true);
+            if (typeof renderWorksheetTable === 'function') {
+                renderWorksheetTable(AppState.currentEntries || [], true);
+            }
+        }
+    } catch (err) {
+        console.error("Error updating options:", err);
+    }
+}
+
+async function handleMoveWorksheetColumn(id, direction) {
+    try {
+        const res = await fetch('api/worksheet_columns.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'move',
+                id: id,
+                direction: direction
+            })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Could not move column', 'error');
+            return;
+        }
+
+        await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+        await loadWorksheetColumns(currentTrackingModalDeptId, true);
+        if (typeof renderWorksheetTable === 'function') {
+            renderWorksheetTable(AppState.currentEntries || [], true);
+        }
+    } catch (err) {
+        console.error("Error moving column:", err);
+        showToast("Error moving column", "error");
+    }
+}
+
+async function handleToggleWorksheetColumnVisibility(id, newVis) {
+    try {
+        const res = await fetch('api/worksheet_columns.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'update',
+                id: id,
+                is_visible: newVis
+            })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to update visibility', 'error');
+            return;
+        }
+
+        showToast(newVis ? 'Column shown in worksheet' : 'Column hidden from worksheet', 'info');
+        await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+        await loadWorksheetColumns(currentTrackingModalDeptId, true);
+        if (typeof renderWorksheetTable === 'function') {
+            renderWorksheetTable(AppState.currentEntries || [], true);
+        }
+    } catch (err) {
+        console.error("Error toggling column visibility:", err);
+        showToast("Error updating visibility", "error");
+    }
+}
+
+async function handleDeleteWorksheetColumn(id, label) {
+    if (!confirm(`Are you sure you want to permanently delete custom column "${label}"?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch('api/worksheet_columns.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'delete',
+                id: id
+            })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to delete column', 'error');
+            return;
+        }
+
+        showToast(`Column "${label}" deleted`, 'success');
+        await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+        await loadWorksheetColumns(currentTrackingModalDeptId, true);
+        if (typeof renderWorksheetTable === 'function') {
+            renderWorksheetTable(AppState.currentEntries || [], true);
+        }
+    } catch (err) {
+        console.error("Error deleting column:", err);
+        showToast("Error deleting column", "error");
+    }
+}
+
+async function handleResetActiveTrackingTabDefaults() {
+    if (currentTrackingModalActiveTab === 'cols') {
+        if (!confirm("Are you sure you want to reset Worksheet Columns for this department to standard defaults?")) {
+            return;
+        }
+        try {
+            const res = await fetch('api/worksheet_columns.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'reset_defaults',
+                    department_id: currentTrackingModalDeptId
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast("Worksheet columns reset to defaults", "success");
+                await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+                await loadWorksheetColumns(currentTrackingModalDeptId, true);
+                if (typeof renderWorksheetTable === 'function') {
+                    renderWorksheetTable(AppState.currentEntries || [], true);
+                }
+            }
+        } catch (e) {
+            showToast("Failed to reset columns", "error");
+        }
+    } else {
+        if (!confirm("Are you sure you want to reset Content Types and Tracking Desks for this department to standard defaults?")) {
+            return;
+        }
+        try {
+            const res = await fetch('api/tracking_options.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'reset_defaults',
+                    department_id: currentTrackingModalDeptId
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast("Tracking options reset to defaults", "success");
+                await loadTrackingOptionsModalData(currentTrackingModalDeptId);
+                await loadTrackingOptions(currentTrackingModalDeptId, true);
+                refreshWorksheetDropdowns();
+                loadReports();
+            }
+        } catch (e) {
+            showToast("Failed to reset tracking options", "error");
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
+// CONTENT TYPES & TRACKING DESKS CRUD
+// ---------------------------------------------------------------------
+
+async function loadTrackingOptionsModalData(deptId) {
+    const ctContainer = document.getElementById('tracking-content-types-list');
+    const tdContainer = document.getElementById('tracking-depts-list');
+    const badge = document.getElementById('tracking-modal-dept-badge');
+    const ctCountBadge = document.getElementById('content-types-count-badge');
+    const tdCountBadge = document.getElementById('tracking-depts-count-badge');
+
+    if (ctContainer) ctContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 15px; font-size: 12px;">Loading...</div>';
+    if (tdContainer) tdContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 15px; font-size: 12px;">Loading...</div>';
+
+    try {
+        const res = await fetch(`api/tracking_options.php?action=get&department_id=${deptId}`);
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to load tracking options', 'error');
+            return;
+        }
+
+        if (badge) badge.textContent = data.department_name || 'Department';
+
+        // Render Content Types
+        const contentTypes = data.content_types || [];
+        if (ctCountBadge) ctCountBadge.textContent = `${contentTypes.length} items`;
+        if (ctContainer) {
+            if (contentTypes.length === 0) {
+                ctContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 12px;">No content types configured yet. Add one above!</div>';
+            } else {
+                ctContainer.innerHTML = contentTypes.map(item => `
+                    <div class="tracking-item-row" data-id="${item.id}" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                        <span style="font-size: 13px; color: var(--text-muted); user-select: none;">🎬</span>
+                        <input type="text" class="input-control tracking-item-input" value="${escapeHtml(item.name)}" style="flex: 1; padding: 4px 8px; font-size: 12.5px; font-weight: 600;" onkeydown="if(event.key==='Enter'){event.preventDefault();handleTrackingOptionRename(${item.id}, this.value, '${escapeHtml(item.name)}');}">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="handleTrackingOptionRename(${item.id}, this.previousElementSibling.value, '${escapeHtml(item.name)}')" title="Save rename">💾 Save</button>
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; color: var(--danger, #ef4444); border-color: rgba(239,68,68,0.25);" onclick="handleTrackingOptionDelete(${item.id}, '${escapeHtml(item.name)}')" title="Delete this option">🗑️</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Render Tracking Departments / Desks
+        const trackingDepts = data.tracking_departments || [];
+        if (tdCountBadge) tdCountBadge.textContent = `${trackingDepts.length} items`;
+        if (tdContainer) {
+            if (trackingDepts.length === 0) {
+                tdContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 12px;">No tracking desks configured yet. Add one above!</div>';
+            } else {
+                tdContainer.innerHTML = trackingDepts.map(item => `
+                    <div class="tracking-item-row" data-id="${item.id}" style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                        <span style="font-size: 13px; color: var(--text-muted); user-select: none;">🏢</span>
+                        <input type="text" class="input-control tracking-item-input" value="${escapeHtml(item.name)}" style="flex: 1; padding: 4px 8px; font-size: 12.5px; font-weight: 600;" onkeydown="if(event.key==='Enter'){event.preventDefault();handleTrackingOptionRename(${item.id}, this.value, '${escapeHtml(item.name)}');}">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="handleTrackingOptionRename(${item.id}, this.previousElementSibling.value, '${escapeHtml(item.name)}')" title="Save rename">💾 Save</button>
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; color: var(--danger, #ef4444); border-color: rgba(239,68,68,0.25);" onclick="handleTrackingOptionDelete(${item.id}, '${escapeHtml(item.name)}')" title="Delete this option">🗑️</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+    } catch (err) {
+        console.error("Error loading tracking options data:", err);
+        showToast("Error retrieving tracking options", "error");
+    }
+}
+
+async function handleTrackingOptionAddSubmit(event, optionType) {
+    if (event) event.preventDefault();
+    const inputId = (optionType === 'content_type') ? 'new-content-type-name' : 'new-tracking-dept-name';
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    const name = input.value.trim();
+    if (!name) {
+        showToast("Please enter an option name", "warning");
+        return;
+    }
+
+    try {
+        const res = await fetch('api/tracking_options.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'add',
+                department_id: currentTrackingModalDeptId,
+                option_type: optionType,
+                option_name: name
+            })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to add option', 'error');
+            return;
+        }
+
+        input.value = '';
+        showToast(`Added "${name}" successfully`, 'success');
+
+        await loadTrackingOptionsModalData(currentTrackingModalDeptId);
+        await loadTrackingOptions(currentTrackingModalDeptId, true);
+        refreshWorksheetDropdowns();
+        loadReports();
+    } catch (err) {
+        console.error("Error adding tracking option:", err);
+        showToast("Error adding tracking option", "error");
+    }
+}
+
+async function handleTrackingOptionRename(id, newName, oldName) {
+    const trimmed = (newName || '').trim();
+    if (!trimmed) {
+        showToast("Option name cannot be empty", "warning");
+        return;
+    }
+    if (trimmed.toLowerCase() === (oldName || '').toLowerCase()) {
+        return; // No change
+    }
+
+    try {
+        const res = await fetch('api/tracking_options.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'update',
+                id: id,
+                option_name: trimmed,
+                update_entries: true
+            })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to update option', 'error');
+            return;
+        }
+
+        const histMsg = data.history_updated_rows > 0 ? ` (${data.history_updated_rows} past entries synced)` : '';
+        showToast(`Renamed to "${trimmed}"${histMsg}`, 'success');
+
+        await loadTrackingOptionsModalData(currentTrackingModalDeptId);
+        await loadTrackingOptions(currentTrackingModalDeptId, true);
+        refreshWorksheetDropdowns();
+        loadReports();
+    } catch (err) {
+        console.error("Error renaming tracking option:", err);
+        showToast("Error renaming tracking option", "error");
+    }
+}
+
+async function handleTrackingOptionDelete(id, name) {
+    if (!confirm(`Are you sure you want to remove "${name}" from tracking options? (Existing past worksheet rows will remain unaffected)`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch('api/tracking_options.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'delete',
+                id: id
+            })
+        });
+        const data = await res.json();
+
+        if (!data.success) {
+            showToast(data.message || 'Failed to delete option', 'error');
+            return;
+        }
+
+        showToast(`Removed "${name}" from tracking options`, 'success');
+
+        await loadTrackingOptionsModalData(currentTrackingModalDeptId);
+        await loadTrackingOptions(currentTrackingModalDeptId, true);
+        refreshWorksheetDropdowns();
+        loadReports();
+    } catch (err) {
+        console.error("Error deleting tracking option:", err);
+        showToast("Error deleting tracking option", "error");
+    }
+}
+
+
