@@ -34,8 +34,16 @@ $currentUserRole = strtolower($currentUserObj['role'] ?? ($_SESSION['role'] ?? '
 $userDeptName = strtolower($currentUserObj['department_name'] ?? '');
 
 $isAdmin = in_array($currentUserRole, ['super_admin', 'admin', 'manager']);
-$isDigital = (stripos($userDeptName, 'digital') !== false || stripos($userDeptName, 'news') !== false);
+$isDigital = (stripos($userDeptName, 'digital') !== false);
+$isProg = (stripos($userDeptName, 'prog') !== false);
 $canManageDigital = ($isAdmin || $isDigital);
+
+// Restrict access: strictly Programming, Digital Media, and Admins
+if (!$isAdmin && !$isDigital && !$isProg) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access Denied: Programming Handover is restricted to Programming and Digital teams.']);
+    exit;
+}
 
 switch ($action) {
     case 'list':
@@ -226,6 +234,7 @@ switch ($action) {
         $publisherName = isset($data['publisher_name']) ? trim($data['publisher_name']) : $dispatch['publisher_name'];
         $remarks = isset($data['remarks']) ? trim($data['remarks']) : $dispatch['remarks'];
         $rating = isset($data['rating']) ? trim($data['rating']) : $dispatch['rating'];
+        $link = isset($data['link']) ? trim($data['link']) : $dispatch['link'];
 
         // Auto-sync status: When published on PT, automatically mark DP status as 'Published on PT'
         $nowFormatted = date('h:i:s A');
@@ -265,11 +274,11 @@ switch ($action) {
         $stmtUpdate = $pdo->prepare("
             UPDATE programming_dispatches
             SET dp_status = ?, dp_time = ?, pt_status = ?, pt_time = ?,
-                publisher_id = ?, publisher_name = ?, remarks = ?, rating = ?,
+                publisher_id = ?, publisher_name = ?, remarks = ?, rating = ?, link = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
-        $stmtUpdate->execute([$dpStatus, $dpTime, $ptStatus, $ptTime, $publisherId, $publisherName, $remarks, $rating, $id]);
+        $stmtUpdate->execute([$dpStatus, $dpTime, $ptStatus, $ptTime, $publisherId, $publisherName, $remarks, $rating, $link, $id]);
 
         echo json_encode([
             'success' => true,
@@ -278,8 +287,22 @@ switch ($action) {
             'dp_time' => $dpTime,
             'pt_status' => $ptStatus,
             'pt_time' => $ptTime,
-            'publisher_name' => $publisherName
+            'publisher_name' => $publisherName,
+            'link' => $link
         ]);
+        break;
+
+    case 'update_link':
+        $id = (int)($data['id'] ?? 0);
+        $link = trim($data['link'] ?? '');
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Dispatch ID is required.']);
+            exit;
+        }
+        $stmt = $pdo->prepare("UPDATE programming_dispatches SET link = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$link, $id]);
+        echo json_encode(['success' => true, 'message' => 'Story link updated successfully.', 'link' => $link]);
         break;
 
     case 'update_dispatch':

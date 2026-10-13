@@ -1,5 +1,5 @@
         <!-- TAB 1: DASHBOARD / HOURLY WORKSHEET (DEDICATED PAGE) -->
-        <section id="tab-worksheet" class="tab-section active">
+        <section id="tab-worksheet" class="tab-section <?= ($currentPortal === 'digital') ? 'active' : '' ?>">
             <!-- EMPLOYEE PERSONAL SHIFT HERO (Hidden for Admin) -->
             <div id="hero-employee-container" class="shift-hero-card employee-only">
                 <div class="shift-left-meta">

@@ -336,11 +336,13 @@ try {
                                 <option value="all">⚡ All Actions</option>
                                 <option value="check_in">🟢 Check In</option>
                                 <option value="check_out">🔵 Check Out</option>
+                                <option value="task_assigned">🎯 Task Assigned</option>
                                 <option value="field_visit">🚗 Field Visit</option>
                                 <option value="back_in_office">🏢 Back in Office</option>
                                 <option value="leave_notice">🌴 Leave Notice</option>
                                 <option value="leaving_early">⚠️ Early Leave</option>
                                 <option value="short_leave">⏱️ Short Leave</option>
+                                <option value="unknown">⚪ Chat / Noise</option>
                             </select>
 
                             <!-- Status Filter Dropdown -->

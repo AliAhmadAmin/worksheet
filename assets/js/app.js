@@ -342,6 +342,25 @@ async function loadUserData() {
         btnReports.style.display = canReports ? '' : 'none';
     }
 
+    // Toggle Handover buttons based on department
+    const btnNewsroom = document.querySelector('.nav-btn[data-tab="tab-newsroom"]');
+    const btnProgramming = document.querySelector('.nav-btn[data-tab="tab-programming"]');
+    const uRole = (AppState.currentUser.role || '').toLowerCase();
+    const uDept = (AppState.currentUser.department_name || '').toLowerCase();
+    const isGlobal = (uRole === 'super_admin' || uRole === 'admin');
+    const isNews = uDept.includes('news');
+    const isProg = uDept.includes('prog');
+    const isDigital = uDept.includes('digital');
+
+    if (btnNewsroom) {
+        const canNews = isGlobal || (isNews && !isProg) || isDigital;
+        btnNewsroom.style.display = canNews ? '' : 'none';
+    }
+    if (btnProgramming) {
+        const canProg = isGlobal || (isProg && !isNews) || isDigital;
+        btnProgramming.style.display = canProg ? '' : 'none';
+    }
+
     const portalSwitcher = document.querySelector('.portal-switcher-wrapper');
     if (portalSwitcher) {
         if (portalSwitcher.classList.contains('static-portal')) {
@@ -690,6 +709,25 @@ function closeMobileSidebar() {
 
 // Tab Navigation & URL Hash Routing
 function navigateToTab(tabId, updateHash = true) {
+    if (AppState.currentUser) {
+        const uRole = (AppState.currentUser.role || '').toLowerCase();
+        const uDept = (AppState.currentUser.department_name || '').toLowerCase();
+        const isGlobal = (uRole === 'super_admin' || uRole === 'admin');
+        const isNews = uDept.includes('news');
+        const isProg = uDept.includes('prog');
+
+        if (tabId === 'tab-programming' && !isGlobal && isNews) {
+            showToast("Programming Handover is not accessible to News Room.", "warning");
+            navigateToTab('tab-newsroom', true);
+            return;
+        }
+        if (tabId === 'tab-newsroom' && !isGlobal && isProg) {
+            showToast("News Handover is not accessible to Programming.", "warning");
+            navigateToTab('tab-programming', true);
+            return;
+        }
+    }
+
     const targetSection = document.getElementById(tabId);
     if (!targetSection) return;
 
@@ -726,7 +764,8 @@ function navigateToTab(tabId, updateHash = true) {
     } else if (tabId === 'tab-hr-notices') {
         if (typeof loadHrNotices === 'function') loadHrNotices();
     } else if (tabId === 'tab-hr-fines') {
-        if (typeof loadHrFines === 'function') loadHrFines();
+        if (typeof refreshDisciplinaryCenter === 'function') refreshDisciplinaryCenter();
+        else if (typeof loadHrFines === 'function') loadHrFines();
     } else if (tabId === 'tab-hr-payroll') {
         if (typeof loadHrPayroll === 'function') loadHrPayroll();
     } else if (tabId === 'tab-employees') {

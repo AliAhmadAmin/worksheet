@@ -803,21 +803,78 @@ switch ($action) {
             exit;
         }
 
-        $title = trim($data['title'] ?? '');
-        $message = trim($data['message'] ?? '');
-        $priority = $data['priority'] ?? 'normal';
-        $targetDeptId = !empty($data['target_department_id']) ? (int)$data['target_department_id'] : null;
+        $title = trim($data['title'] ?? ($_POST['title'] ?? ''));
+        $message = trim($data['message'] ?? ($_POST['message'] ?? ''));
+        $priority = $data['priority'] ?? ($_POST['priority'] ?? 'normal');
+        $targetDeptId = !empty($data['target_department_id'] ?? ($_POST['target_department_id'] ?? null)) ? (int)($data['target_department_id'] ?? $_POST['target_department_id']) : null;
 
         if (!$title || !$message) {
             echo json_encode(['success' => false, 'message' => 'Title and announcement message are required.']);
             exit;
         }
 
+        $attachmentPath = null;
+        $attachmentName = null;
+
+        // 1. Multipart file upload ($_FILES)
+        if (!empty($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
+            $file = $_FILES['attachment'];
+            $origName = basename($file['name']);
+            $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+            $allowedExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp', 'txt', 'zip'];
+
+            if (!in_array($ext, $allowedExts)) {
+                echo json_encode(['success' => false, 'message' => "Invalid attachment format .$ext. Allowed formats: PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, WEBP, ZIP."]);
+                exit;
+            }
+
+            if ($file['size'] > 25 * 1024 * 1024) {
+                echo json_encode(['success' => false, 'message' => "Attachment is too large. Maximum size is 25MB."]);
+                exit;
+            }
+
+            $uploadDir = __DIR__ . '/../uploads/notices/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+
+            $safeFilename = 'notice_' . uniqid() . '.' . $ext;
+            $destPath = $uploadDir . $safeFilename;
+
+            if (move_uploaded_file($file['tmp_name'], $destPath)) {
+                $attachmentPath = 'uploads/notices/' . $safeFilename;
+                $attachmentName = $origName;
+            }
+        }
+        // 2. Base64 attachment payload fallback
+        elseif (!empty($data['attachment_base64']) && !empty($data['attachment_name'])) {
+            $base64Data = $data['attachment_base64'];
+            $attachmentName = basename($data['attachment_name']);
+            $ext = strtolower(pathinfo($attachmentName, PATHINFO_EXTENSION));
+            $allowedExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'jpg', 'jpeg', 'png', 'webp', 'txt', 'zip'];
+
+            if (in_array($ext, $allowedExts)) {
+                if (strpos($base64Data, ',') !== false) {
+                    $base64Data = explode(',', $base64Data)[1];
+                }
+                $decoded = base64_decode($base64Data);
+                if ($decoded !== false) {
+                    $uploadDir = __DIR__ . '/../uploads/notices/';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0777, true);
+                    }
+                    $safeFilename = 'notice_' . uniqid() . '.' . $ext;
+                    file_put_contents($uploadDir . $safeFilename, $decoded);
+                    $attachmentPath = 'uploads/notices/' . $safeFilename;
+                }
+            }
+        }
+
         $stmt = $pdo->prepare("
-            INSERT INTO hr_notices (title, message, priority, target_department_id, posted_by, is_active)
-            VALUES (?, ?, ?, ?, ?, 1)
+            INSERT INTO hr_notices (title, message, attachment_path, attachment_name, priority, target_department_id, posted_by, is_active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
         ");
-        $stmt->execute([$title, $message, $priority, $targetDeptId, $currentUserId]);
+        $stmt->execute([$title, $message, $attachmentPath, $attachmentName, $priority, $targetDeptId, $currentUserId]);
 
         echo json_encode(['success' => true, 'message' => 'Announcement posted successfully.']);
         break;
@@ -848,12 +905,14 @@ switch ($action) {
                    e.avatar as employee_avatar,
                    d.name as department_name,
                    i.name as issued_by_name,
-                   a.name as action_by_name
+                   a.name as action_by_name,
+                   sc.title as show_cause_title
             FROM hr_fines f
             JOIN employees e ON f.employee_id = e.id
             LEFT JOIN departments d ON e.department_id = d.id
             LEFT JOIN employees i ON f.issued_by = i.id
             LEFT JOIN employees a ON f.action_by = a.id
+            LEFT JOIN hr_show_cause_notices sc ON f.show_cause_id = sc.id
             WHERE 1=1
         ";
         $params = [];
@@ -927,6 +986,353 @@ switch ($action) {
         ]);
         break;
 
+    case 'get_show_cause_notices':
+        $monthFilter = $_GET['month'] ?? '';
+        $empFilter = $_GET['employee_id'] ?? null;
+        $statusFilter = $_GET['status'] ?? 'all';
+        $catFilter = $_GET['violation_category'] ?? 'all';
+
+        $sql = "
+            SELECT sc.*,
+                   e.name as employee_name,
+                   e.designation as employee_designation,
+                   e.avatar as employee_avatar,
+                   d.name as department_name,
+                   ib.name as issued_by_name,
+                   ab.name as action_by_name,
+                   f.amount as fine_amount,
+                   f.salary_month as fine_salary_month,
+                   f.status as fine_status
+            FROM hr_show_cause_notices sc
+            JOIN employees e ON sc.employee_id = e.id
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN employees ib ON sc.issued_by = ib.id
+            LEFT JOIN employees ab ON sc.action_by = ab.id
+            LEFT JOIN hr_fines f ON sc.fine_id = f.id
+            WHERE 1=1
+        ";
+        $params = [];
+
+        if (!$canManageHr && !$isHod) {
+            $sql .= " AND sc.employee_id = ?";
+            $params[] = $currentUserId;
+        } elseif ($isHod && !$canManageHr) {
+            if ($empFilter) {
+                $sql .= " AND sc.employee_id = ? AND (e.department_id = ? OR sc.employee_id = ?)";
+                $params[] = $empFilter;
+                $params[] = $userDeptId;
+                $params[] = $currentUserId;
+            } else {
+                $sql .= " AND (e.department_id = ? OR sc.employee_id = ?)";
+                $params[] = $userDeptId;
+                $params[] = $currentUserId;
+            }
+        } elseif ($empFilter) {
+            $sql .= " AND sc.employee_id = ?";
+            $params[] = $empFilter;
+        }
+
+        if (!empty($monthFilter)) {
+            $sql .= " AND (DATE_FORMAT(sc.notice_date, '%Y-%m') = ? OR DATE_FORMAT(sc.incident_date, '%Y-%m') = ?)";
+            $params[] = $monthFilter;
+            $params[] = $monthFilter;
+        }
+
+        if (!empty($statusFilter) && $statusFilter !== 'all') {
+            $sql .= " AND sc.status = ?";
+            $params[] = $statusFilter;
+        }
+
+        if (!empty($catFilter) && $catFilter !== 'all') {
+            $sql .= " AND sc.violation_category = ?";
+            $params[] = $catFilter;
+        }
+
+        $sql .= " ORDER BY sc.notice_date DESC, sc.created_at DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $notices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $pendingReplyCount = 0;
+        $underReviewCount = 0;
+        $satisfiedCount = 0;
+        $fineIssuedCount = 0;
+
+        foreach ($notices as $n) {
+            if ($n['status'] === 'pending_reply') $pendingReplyCount++;
+            elseif ($n['status'] === 'under_review') $underReviewCount++;
+            elseif ($n['status'] === 'satisfied_closed') $satisfiedCount++;
+            elseif ($n['status'] === 'fine_issued') $fineIssuedCount++;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'notices' => $notices,
+            'stats' => [
+                'total_notices' => count($notices),
+                'pending_reply_count' => $pendingReplyCount,
+                'under_review_count' => $underReviewCount,
+                'satisfied_count' => $satisfiedCount,
+                'fine_issued_count' => $fineIssuedCount
+            ]
+        ]);
+        break;
+
+    case 'issue_show_cause':
+        if (!$canManageHr && !$isHod) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: Only Admins, HR and HODs can issue show cause notices.']);
+            exit;
+        }
+
+        $empId = (int)($data['employee_id'] ?? 0);
+        $incidentDate = !empty($data['incident_date']) ? $data['incident_date'] : date('Y-m-d');
+        $noticeDate = !empty($data['notice_date']) ? $data['notice_date'] : date('Y-m-d');
+        $deadlineDate = !empty($data['deadline_date']) ? $data['deadline_date'] : null;
+        $violationCategory = $data['violation_category'] ?? 'sop_violation';
+        $title = trim($data['title'] ?? '');
+        $allegationDetails = trim($data['allegation_details'] ?? '');
+
+        if ($empId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Please select an employee.']);
+            exit;
+        }
+        if (!$title) {
+            echo json_encode(['success' => false, 'message' => 'Please enter a notice subject / title.']);
+            exit;
+        }
+        if (!$allegationDetails) {
+            echo json_encode(['success' => false, 'message' => 'Please describe the allegation / incident details.']);
+            exit;
+        }
+
+        // HOD validation: can only issue for departmental staff
+        if ($isHod && !$canManageHr) {
+            $stmtEmpCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $stmtEmpCheck->execute([$empId]);
+            $targetDeptId = (int)$stmtEmpCheck->fetchColumn();
+            if ($targetDeptId !== $userDeptId) {
+                echo json_encode(['success' => false, 'message' => 'HODs can only issue notices for staff in their own department.']);
+                exit;
+            }
+        }
+
+        $validCategories = ['late_arrival', 'unauthorized_absence', 'sop_violation', 'negligence', 'misconduct', 'other'];
+        if (!in_array($violationCategory, $validCategories)) {
+            $violationCategory = 'sop_violation';
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO hr_show_cause_notices 
+                (employee_id, issued_by, notice_date, incident_date, violation_category, title, allegation_details, deadline_date, status)
+            VALUES 
+                (?, ?, ?, ?, ?, ?, ?, ?, 'pending_reply')
+        ");
+        $stmt->execute([$empId, $currentUserId, $noticeDate, $incidentDate, $violationCategory, $title, $allegationDetails, $deadlineDate]);
+
+        echo json_encode(['success' => true, 'message' => 'Show Cause Notice issued to employee successfully.']);
+        break;
+
+    case 'submit_show_cause_reply':
+        $noticeId = (int)($data['notice_id'] ?? ($_POST['notice_id'] ?? 0));
+        $replyText = trim($data['employee_reply'] ?? ($_POST['employee_reply'] ?? ''));
+
+        if ($noticeId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid notice ID.']);
+            exit;
+        }
+        if (!$replyText) {
+            echo json_encode(['success' => false, 'message' => 'Please provide your explanation / response.']);
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT * FROM hr_show_cause_notices WHERE id = ?");
+        $stmtCheck->execute([$noticeId]);
+        $notice = $stmtCheck->fetch();
+
+        if (!$notice) {
+            echo json_encode(['success' => false, 'message' => 'Show Cause Notice not found.']);
+            exit;
+        }
+
+        // Only the assigned employee or HR/Admin can submit reply
+        if ($notice['employee_id'] != $currentUserId && !$canManageHr) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: You can only reply to your own show cause notice.']);
+            exit;
+        }
+
+        $attachmentPath = null;
+        $attachmentName = null;
+
+        // Check file upload from $_FILES
+        if (!empty($_FILES['reply_attachment']) && $_FILES['reply_attachment']['error'] === UPLOAD_ERR_OK) {
+            $file = $_FILES['reply_attachment'];
+            $origName = basename($file['name']);
+            $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+            $allowedExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'webp', 'txt'];
+
+            if (!in_array($ext, $allowedExts)) {
+                echo json_encode(['success' => false, 'message' => "Invalid attachment format .$ext. Allowed: PDF, DOC, DOCX, XLS, JPG, PNG, WEBP."]);
+                exit;
+            }
+
+            if ($file['size'] > 20 * 1024 * 1024) {
+                echo json_encode(['success' => false, 'message' => 'Attachment exceeds 20MB limit.']);
+                exit;
+            }
+
+            $uploadDir = __DIR__ . '/../uploads/showcause/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+
+            $safeFilename = 'reply_' . uniqid() . '.' . $ext;
+            $destPath = $uploadDir . $safeFilename;
+
+            if (move_uploaded_file($file['tmp_name'], $destPath)) {
+                $attachmentPath = 'uploads/showcause/' . $safeFilename;
+                $attachmentName = $origName;
+            }
+        } elseif (!empty($data['reply_attachment_base64']) && !empty($data['reply_attachment_name'])) {
+            $base64Data = $data['reply_attachment_base64'];
+            $attachmentName = basename($data['reply_attachment_name']);
+            $ext = strtolower(pathinfo($attachmentName, PATHINFO_EXTENSION));
+            $allowedExts = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'webp', 'txt'];
+
+            if (in_array($ext, $allowedExts)) {
+                if (strpos($base64Data, ',') !== false) {
+                    $base64Data = explode(',', $base64Data)[1];
+                }
+                $decoded = base64_decode($base64Data);
+                if ($decoded !== false) {
+                    $uploadDir = __DIR__ . '/../uploads/showcause/';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0777, true);
+                    }
+                    $safeFilename = 'reply_' . uniqid() . '.' . $ext;
+                    if (file_put_contents($uploadDir . $safeFilename, $decoded)) {
+                        $attachmentPath = 'uploads/showcause/' . $safeFilename;
+                    }
+                }
+            }
+        }
+
+        $stmt = $pdo->prepare("
+            UPDATE hr_show_cause_notices 
+            SET employee_reply = ?,
+                reply_submitted_at = NOW(),
+                reply_attachment_path = COALESCE(?, reply_attachment_path),
+                reply_attachment_name = COALESCE(?, reply_attachment_name),
+                status = 'under_review'
+            WHERE id = ?
+        ");
+        $stmt->execute([$replyText, $attachmentPath, $attachmentName, $noticeId]);
+
+        echo json_encode(['success' => true, 'message' => 'Response submitted successfully. Awaiting HR review.']);
+        break;
+
+    case 'decide_show_cause':
+        if (!$canManageHr && !$isHod) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: Only Admins, HR and HODs can decide show cause inquiries.']);
+            exit;
+        }
+
+        $noticeId = (int)($data['notice_id'] ?? 0);
+        $decision = $data['decision'] ?? ''; // 'satisfied' or 'fine_issued'
+        $remarks = trim($data['decision_remarks'] ?? '');
+
+        if ($noticeId <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid notice ID.']);
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT * FROM hr_show_cause_notices WHERE id = ?");
+        $stmtCheck->execute([$noticeId]);
+        $notice = $stmtCheck->fetch();
+
+        if (!$notice) {
+            echo json_encode(['success' => false, 'message' => 'Show Cause Notice not found.']);
+            exit;
+        }
+
+        if ($decision === 'satisfied') {
+            // Satisfied with explanation -> close without penalty
+            $stmt = $pdo->prepare("
+                UPDATE hr_show_cause_notices 
+                SET status = 'satisfied_closed',
+                    decision_remarks = ?,
+                    action_by = ?,
+                    action_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$remarks ?: 'Explanation accepted. Case closed with no disciplinary deduction.', $currentUserId, $noticeId]);
+
+            echo json_encode(['success' => true, 'message' => 'Explanation accepted. Show Cause Notice closed successfully.']);
+            break;
+        } elseif ($decision === 'fine_issued') {
+            // Not satisfied -> issue fine
+            $amount = (float)($data['fine_amount'] ?? 0);
+            $salaryMonth = !empty($data['salary_month']) ? $data['salary_month'] : date('Y-m');
+            $fineCategory = !empty($data['fine_category']) ? $data['fine_category'] : $notice['violation_category'];
+
+            if ($amount <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Please enter a valid fine amount to impose.']);
+                exit;
+            }
+
+            $fineReason = 'Show Cause Notice #' . $noticeId . ' (' . $notice['title'] . '): ' . ($remarks ?: 'Explanation not satisfactory.');
+
+            // Insert into hr_fines
+            $stmtFine = $pdo->prepare("
+                INSERT INTO hr_fines 
+                    (employee_id, fine_date, amount, fine_category, reason, salary_month, status, issued_by, show_cause_id)
+                VALUES 
+                    (?, CURDATE(), ?, ?, ?, ?, 'applied', ?, ?)
+            ");
+            $stmtFine->execute([
+                $notice['employee_id'],
+                $amount,
+                $fineCategory,
+                $fineReason,
+                $salaryMonth,
+                $currentUserId,
+                $noticeId
+            ]);
+            $newFineId = (int)$pdo->lastInsertId();
+
+            // Update show cause notice
+            $stmt = $pdo->prepare("
+                UPDATE hr_show_cause_notices 
+                SET status = 'fine_issued',
+                    fine_id = ?,
+                    decision_remarks = ?,
+                    action_by = ?,
+                    action_at = NOW()
+                WHERE id = ?
+            ");
+            $stmt->execute([$newFineId, $remarks ?: 'Explanation rejected; fine penalty imposed.', $currentUserId, $noticeId]);
+
+            echo json_encode(['success' => true, 'message' => 'Disciplinary fine issued and applied to payroll successfully.']);
+            break;
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Invalid decision option.']);
+            exit;
+        }
+        break;
+
+    case 'delete_show_cause':
+        if (!$canManageHr) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: Admin/HR permission required.']);
+            exit;
+        }
+
+        $noticeId = (int)($data['notice_id'] ?? 0);
+        $stmt = $pdo->prepare("DELETE FROM hr_show_cause_notices WHERE id = ?");
+        $stmt->execute([$noticeId]);
+
+        echo json_encode(['success' => true, 'message' => 'Show cause notice deleted successfully.']);
+        break;
+
     case 'add_fine':
         if (!$canManageHr && !$isHod) {
             echo json_encode(['success' => false, 'message' => 'Access denied: Only Admins, HR and HODs can issue fines.']);
@@ -939,6 +1345,7 @@ switch ($action) {
         $salaryMonth = !empty($data['salary_month']) ? $data['salary_month'] : date('Y-m', strtotime($fineDate));
         $fineCategory = $data['fine_category'] ?? 'sop_violation';
         $reason = trim($data['reason'] ?? '');
+        $showCauseId = !empty($data['show_cause_id']) ? (int)$data['show_cause_id'] : null;
 
         if ($empId <= 0) {
             echo json_encode(['success' => false, 'message' => 'Please select an employee.']);
@@ -971,11 +1378,23 @@ switch ($action) {
 
         $stmt = $pdo->prepare("
             INSERT INTO hr_fines 
-                (employee_id, fine_date, amount, fine_category, reason, salary_month, status, issued_by)
+                (employee_id, fine_date, amount, fine_category, reason, salary_month, status, issued_by, show_cause_id)
             VALUES 
-                (?, ?, ?, ?, ?, ?, 'applied', ?)
+                (?, ?, ?, ?, ?, ?, 'applied', ?, ?)
         ");
-        $stmt->execute([$empId, $fineDate, $amount, $fineCategory, $reason, $salaryMonth, $currentUserId]);
+        $stmt->execute([$empId, $fineDate, $amount, $fineCategory, $reason, $salaryMonth, $currentUserId, $showCauseId]);
+        $newFineId = (int)$pdo->lastInsertId();
+
+        if ($showCauseId) {
+            try {
+                $stmtScUpdate = $pdo->prepare("
+                    UPDATE hr_show_cause_notices 
+                    SET status = 'fine_issued', fine_id = ?, decision_remarks = ?, action_by = ?, action_at = NOW()
+                    WHERE id = ?
+                ");
+                $stmtScUpdate->execute([$newFineId, $reason, $currentUserId, $showCauseId]);
+            } catch (Exception $e) {}
+        }
 
         echo json_encode(['success' => true, 'message' => 'Disciplinary fine issued successfully.']);
         break;

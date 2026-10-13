@@ -186,9 +186,22 @@ function renderProgrammingMatrix(dispatches) {
             ratingHtml = `<span style="color: #f59e0b; font-weight: 700; font-size: 12px;" title="${escapeHtml(d.rating)}/5">⭐ ${escapeHtml(d.rating)}</span>`;
         }
 
-        const linkHtml = d.link
-            ? `<a href="${escapeHtml(d.link)}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 14px;" title="Open Content Link">🔗</a>`
-            : `<span style="color: var(--text-dim);">-</span>`;
+        const linkInputHtml = `
+            <div style="display: flex; align-items: center; gap: 4px; min-width: 150px;">
+                <input type="url" class="prog-link-input" value="${escapeHtml(d.link || '')}" 
+                       placeholder="Paste story link..." 
+                       style="width: 100%; font-size: 11px; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-family: monospace;"
+                       onchange="quickUpdateProgLink(${d.id}, this.value)"
+                       title="Paste story link here (press Enter or click away to save)">
+                ${d.link ? `
+                    <a href="${escapeHtml(d.link)}" target="_blank" rel="noopener noreferrer" 
+                       style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; background: rgba(59, 130, 246, 0.12); color: #2563eb; text-decoration: none; font-size: 12px; flex-shrink: 0;" 
+                       title="Open published link in new tab">
+                        🔗
+                    </a>
+                ` : '<span style="color: var(--text-dim); font-size: 11px; width: 24px; text-align: center; flex-shrink: 0;">—</span>'}
+            </div>
+        `;
 
         // Sender & Publisher Avatars
         const senderAvatar = d.sender_avatar 
@@ -298,7 +311,7 @@ function renderProgrammingMatrix(dispatches) {
 
                 <!-- 7. Link (Border separator to Digital Zone) -->
                 <td style="text-align: center; border-right: 3px solid var(--border-color);">
-                    ${linkHtml}
+                    ${linkInputHtml}
                 </td>
 
                 <!-- 8. DP Status -->
@@ -396,6 +409,30 @@ async function quickUpdateProgStatus(id, field, value) {
         }
     } catch (err) {
         showToast("Status update failed.", "error");
+    }
+}
+
+// 🔗 1-Click / OnChange Quick Update for Published Story Link
+async function quickUpdateProgLink(id, value) {
+    try {
+        const res = await fetch('api/programming.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'update_link',
+                id: id,
+                link: (value || '').trim()
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast("Story link saved.", "success");
+            loadProgrammingDispatches();
+        } else {
+            showToast(data.message || "Failed to save link", "error");
+        }
+    } catch (err) {
+        showToast("Network error saving story link.", "error");
     }
 }
 
@@ -509,7 +546,23 @@ function openEditDispatchModal(id) {
     document.getElementById('edit-prog-rating').value = item.rating || '';
     document.getElementById('edit-prog-remarks').value = item.remarks || '';
 
+    const linkInput = document.getElementById('edit-prog-link');
+    if (linkInput) linkInput.value = item.link || '';
+    updateEditProgLinkButton(item.link || '');
+
     openModal('edit-dispatch-modal');
+}
+
+function updateEditProgLinkButton(val) {
+    const btn = document.getElementById('edit-prog-link-btn');
+    if (!btn) return;
+    const clean = (val || '').trim();
+    if (clean) {
+        btn.href = clean;
+        btn.style.display = 'inline-flex';
+    } else {
+        btn.style.display = 'none';
+    }
 }
 
 // Auto-fill time in edit modal when status is picked
@@ -553,6 +606,7 @@ async function handleEditDispatchSubmit(event) {
         dispatch_date: document.getElementById('edit-prog-date')?.value,
         sender_name: document.getElementById('edit-prog-sender')?.value.trim(),
         dispatch_time: document.getElementById('edit-prog-time')?.value.trim(),
+        link: document.getElementById('edit-prog-link')?.value.trim(),
         dp_status: document.getElementById('edit-prog-dp-status')?.value,
         dp_time: document.getElementById('edit-prog-dp-time')?.value.trim(),
         pt_status: document.getElementById('edit-prog-pt-status')?.value,

@@ -62,14 +62,34 @@ class WhatsAppAttendanceService {
 
         // Extract message fields from various OrbitSend/WhatsApp payload structures
         $messageData = $this->extractPayloadData($payload);
-        if (!$messageData || empty($messageData['text'])) {
+        if (!$messageData || (empty($messageData['text']) && empty($messageData['media_type']))) {
             return [
                 'success' => false,
-                'message' => 'No readable text message found in webhook payload.'
+                'message' => 'No readable text or voice message found in webhook payload.'
             ];
         }
 
-        $rawText = trim($messageData['text']);
+        $rawText = trim($messageData['text'] ?? '');
+        $isVoiceMessage = false;
+
+        // If this is an audio / voice note message, transcribe it using AI
+        if (!empty($messageData['media_type']) && $messageData['media_type'] === 'audio') {
+            $isVoiceMessage = true;
+            $transcription = $this->transcribeAudioMessage($messageData['media_url'] ?? '', $messageData['media_base64'] ?? '', $settings);
+            if (!empty($transcription)) {
+                $rawText = $transcription;
+            } elseif (empty($rawText)) {
+                $rawText = "[🎤 Voice Note" . (!empty($messageData['audio_duration']) ? " ({$messageData['audio_duration']}s)" : "") . "]";
+            }
+        }
+
+        if (empty($rawText)) {
+            return [
+                'success' => false,
+                'message' => 'Empty message content.'
+            ];
+        }
+
         $senderPhone = $this->cleanPhoneNumber($messageData['sender_phone'] ?? '');
         $senderName = trim($messageData['sender_name'] ?? '');
         $groupJid = trim($messageData['group_jid'] ?? '');
@@ -134,13 +154,95 @@ class WhatsAppAttendanceService {
         $logStatus = 'applied';
         $remarks = '';
         $sheetId = null;
+        $taskId = null;
 
         if (!$employee) {
             $logStatus = 'unmatched';
             $remarks = "Sender not recognized (Phone: '{$senderPhone}', Name: '{$senderName}'). Please map phone number in Employee Profile.";
         } elseif ($action === 'unknown') {
-            $logStatus = 'ignored';
-            $remarks = "Message did not match attendance keywords (In/Out/Leave). Message: '{$rawText}'";
+            // Check if this message is a Task Assignment!
+            // Supports: "DP-48983 please post story", "DP1114 please add story", "48983 please...", "@Aroosa please..."
+            $targetEmp = null;
+            $matchedToken = '';
+
+            if (preg_match('/\b(?:@?([A-Za-z]{2,5}[-_]?\d{1,8})|@?(\d{4,8}))\b/i', $rawText, $codeMatch)) {
+                $matchedToken = !empty($codeMatch[1]) ? $codeMatch[1] : $codeMatch[2];
+                $targetEmp = $this->findEmployeeByCode($matchedToken);
+            }
+
+            if (!$targetEmp) {
+                $targetEmp = $this->findEmployeeByNameMention($rawText, $employee['department_id'] ?? null);
+                if ($targetEmp) {
+                    $matchedToken = $targetEmp['name'];
+                }
+            }
+
+            if ($targetEmp) {
+                $senderEmp = $this->findEmployeeByPhone($senderPhone) ?: $employee;
+                $senderId = $senderEmp ? (int)$senderEmp['id'] : 1;
+                $senderNameStr = $senderEmp ? $senderEmp['name'] : ($senderName ?: 'Supervisor');
+
+                // Clean conversational greetings & fillers from speech/message
+                $cleanTitle = $this->cleanConversationalTaskTitle($rawText, $targetEmp);
+                if (empty($cleanTitle) || strlen($cleanTitle) < 3) {
+                    $cleanTitle = "Task for " . $targetEmp['name'];
+                }
+
+                $link = '';
+                if (preg_match('/([a-zA-Z]:\\\\[^\r\n"\'<>]+|https?:\/\/[^\s]+)/', $rawText, $pathMatch)) {
+                    $link = trim($pathMatch[1]);
+                }
+
+                // Detect due date & priority from Roman Urdu/English speech keywords
+                $dueDate = date('Y-m-d');
+                if (preg_match('/\b(?:kal|tomorrow|agle\s+din)\b/i', $rawText)) {
+                    $dueDate = date('Y-m-d', strtotime('+1 day'));
+                }
+                $priority = 'medium';
+                if (preg_match('/\b(?:urgent|fauran|jaldi|emergency|asap)\b/i', $rawText)) {
+                    $priority = 'urgent';
+                }
+
+                $targetDept = $targetEmp['department_name'] ?? ($targetEmp['department'] ?? 'Digital');
+                $targetCodeClean = $targetEmp['emp_code'] ?: ('DP-' . $targetEmp['id']);
+                $descPrefix = $isVoiceMessage ? "🎙️ Assigned via WhatsApp Voice Note" : "Assigned via WhatsApp";
+
+                $stmtTask = $this->pdo->prepare("
+                    INSERT INTO tasks (assigned_by, assigned_to, title, description, link, content_type, department, priority, status, due_date, emp_code)
+                    VALUES (?, ?, ?, ?, ?, 'WhatsApp Task', ?, ?, 'pending', ?, ?)
+                ");
+                $stmtTask->execute([
+                    $senderId,
+                    $targetEmp['id'],
+                    $cleanTitle,
+                    "{$descPrefix} by {$senderNameStr}: \"{$rawText}\"",
+                    $link,
+                    $targetDept,
+                    $priority,
+                    $dueDate,
+                    $targetCodeClean
+                ]);
+                $taskId = (int)$this->pdo->lastInsertId();
+
+                $action = 'task_assigned';
+                $logStatus = 'applied';
+                $voiceTag = $isVoiceMessage ? " [🎙️ Voice Note]" : "";
+                $remarks = "🎯 Task #{$taskId} automatically created & assigned to {$targetEmp['name']} ({$targetCodeClean}) by {$senderNameStr}.{$voiceTag}";
+                $empId = $targetEmp['id'];
+
+                // Dispatch WhatsApp task alert to target employee
+                try {
+                    require_once __DIR__ . '/HodWhatsAppService.php';
+                    $hodService = new HodWhatsAppService($this->pdo);
+                    $hodService->sendTaskWhatsAppNotification($taskId, $senderId);
+                } catch (Exception $e) {}
+            } elseif (!empty($matchedToken)) {
+                $logStatus = 'ignored';
+                $remarks = "Message mentions '{$matchedToken}' but employee was not found in system. Message: '{$rawText}'";
+            } else {
+                $logStatus = 'ignored';
+                $remarks = "Message did not match attendance keywords (In/Out/Leave). Message: '{$rawText}'";
+            }
         } else {
             // Apply attendance action to daily_sheets
             $applyResult = $this->applyToDailySheet($employee, $action, $extractedTime, $actionDate, $rawText, $parsed);
@@ -155,9 +257,9 @@ class WhatsAppAttendanceService {
         // Record in whatsapp_attendance_logs
         $stmtLog = $this->pdo->prepare("
             INSERT INTO whatsapp_attendance_logs 
-                (message_id, sender_phone, sender_name, group_jid, employee_id, raw_message, parsed_action, extracted_time, action_date, sheet_id, status, remarks)
+                (message_id, sender_phone, sender_name, group_jid, employee_id, raw_message, parsed_action, extracted_time, action_date, sheet_id, status, remarks, task_id)
             VALUES 
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmtLog->execute([
             $messageId,
@@ -171,7 +273,8 @@ class WhatsAppAttendanceService {
             $actionDate,
             $sheetId,
             $logStatus,
-            $remarks
+            $remarks,
+            $taskId
         ]);
 
         $logId = $this->pdo->lastInsertId();
@@ -269,9 +372,14 @@ class WhatsAppAttendanceService {
             }
         }
 
-        // 3. Extract Message Text
+        // 3. Extract Message Text and Audio/Voice Notes
         $msgObj = $data['message'] ?? ($data['msg'] ?? ($payload['message'] ?? []));
         $text = '';
+        $mediaType = 'text';
+        $mediaUrl = '';
+        $mediaBase64 = '';
+        $audioDuration = 0;
+
         if (is_string($msgObj)) {
             $text = $msgObj;
         } elseif (is_array($msgObj)) {
@@ -280,6 +388,20 @@ class WhatsAppAttendanceService {
                  ?? ($msgObj['imageMessage']['caption'] 
                  ?? ($msgObj['videoMessage']['caption'] 
                  ?? ($msgObj['text'] ?? ''))));
+
+            // Check for Audio / Voice Note Message (PTT)
+            if (!empty($msgObj['audioMessage'])) {
+                $mediaType = 'audio';
+                $audioObj = $msgObj['audioMessage'];
+                $mediaUrl = $audioObj['url'] ?? ($data['media_url'] ?? ($data['audio_url'] ?? ''));
+                $mediaBase64 = $audioObj['base64'] ?? ($data['base64'] ?? ($data['audio_base64'] ?? ''));
+                $audioDuration = (int)($audioObj['seconds'] ?? ($data['seconds'] ?? 0));
+            } elseif (!empty($data['audio_url']) || !empty($data['media_url']) || (!empty($data['mimetype']) && strpos($data['mimetype'], 'audio') !== false)) {
+                $mediaType = 'audio';
+                $mediaUrl = $data['audio_url'] ?? ($data['media_url'] ?? '');
+                $mediaBase64 = $data['base64'] ?? ($data['audio_base64'] ?? '');
+                $audioDuration = (int)($data['seconds'] ?? 0);
+            }
         }
 
         // 4. Extract Push Name / Sender Name
@@ -300,6 +422,10 @@ class WhatsAppAttendanceService {
 
         return [
             'text' => $text,
+            'media_type' => $mediaType,
+            'media_url' => $mediaUrl,
+            'media_base64' => $mediaBase64,
+            'audio_duration' => $audioDuration,
             'sender_phone' => $senderPhone,
             'sender_name' => is_string($pushName) ? $pushName : '',
             'group_jid' => $groupJid,
@@ -553,6 +679,237 @@ Output strictly valid JSON only:
         }
 
         return null;
+    }
+
+    public function findEmployeeByCode($code) {
+        if (empty($code)) return null;
+        $codeClean = strtoupper(str_replace(['-', ' '], '', trim($code)));
+        $codeHyphen = preg_replace('/^([A-Z]+)(\d+)$/', '$1-$2', $codeClean);
+        $digits = preg_replace('/\D/', '', $code);
+
+        $stmtCode = $this->pdo->prepare("
+            SELECT e.*, d.name as department_name, t.name as team_name, COALESCE(NULLIF(p.emp_code, ''), NULLIF(e.emp_code, ''), CONCAT('DP-', e.id)) as emp_code, p.phone as profile_phone
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN teams t ON e.team_id = t.id
+            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
+            WHERE e.is_active = 1 AND (
+                (? != '' AND e.id = ?)
+                OR REPLACE(p.emp_code, '-', '') = ? 
+                OR p.emp_code = ? 
+                OR REPLACE(e.emp_code, '-', '') = ?
+                OR e.emp_code = ?
+            )
+            LIMIT 1
+        ");
+        $stmtCode->execute([$digits, $digits, $codeClean, $codeHyphen, $codeClean, $codeHyphen]);
+        return $stmtCode->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function findEmployeeByNameMention($text, $deptId = null) {
+        if (empty($text)) return null;
+        
+        $sql = "
+            SELECT e.*, d.name as department_name, t.name as team_name, COALESCE(NULLIF(p.emp_code, ''), NULLIF(e.emp_code, ''), CONCAT('DP-', e.id)) as emp_code, p.phone as profile_phone
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN teams t ON e.team_id = t.id
+            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
+            WHERE e.is_active = 1
+        ";
+        $params = [];
+        if ($deptId) {
+            $sql .= " ORDER BY (e.department_id = ?) DESC, LENGTH(e.name) DESC";
+            $params[] = (int)$deptId;
+        } else {
+            $sql .= " ORDER BY LENGTH(e.name) DESC";
+        }
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $cleanText = strtolower($text);
+        foreach ($employees as $emp) {
+            $fullName = strtolower(trim($emp['name']));
+            if (empty($fullName)) continue;
+
+            // Full name mention e.g. "@Aroosa Tayyab", "Aroosa Tayyab sb"
+            if (preg_match('/\b@?' . preg_quote($fullName, '/') . '(?:\s+(?:sb|sahab|sahib|bhai|jan|jee|ji|sir|madam))?\b/i', $cleanText)) {
+                return $emp;
+            }
+
+            // Distinctive name part with >= 4 letters (e.g. "Sultan sb", "Aroosa g", "Adnan bhai")
+            $parts = explode(' ', $fullName);
+            foreach ($parts as $part) {
+                if (strlen($part) >= 4 && !in_array($part, ['muhammad', 'mohammad', 'syed', 'syeda', 'malik', 'khan', 'ahmad', 'ahmed'])) {
+                    if (preg_match('/\b@?' . preg_quote($part, '/') . '(?:\s+(?:sb|sahab|sahib|bhai|jan|jee|ji|sir|madam))?\b/i', $cleanText)) {
+                        return $emp;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Clean Conversational Greetings, Fillers & Employee Mentions from Roman Urdu/Urdu Task Messages
+     */
+    public function cleanConversationalTaskTitle($rawText, $targetEmp = null) {
+        $t = $rawText;
+
+        // Strip target employee name and honorifics
+        if ($targetEmp) {
+            $parts = explode(' ', $targetEmp['name']);
+            foreach ($parts as $p) {
+                if (strlen($p) >= 3 && !in_array(strtolower($p), ['muhammad', 'mohammad', 'syed'])) {
+                    $t = preg_replace('/\b@?' . preg_quote($p, '/') . '(?:\s+(?:sb|sahab|sahib|bhai|jan|jee|ji|sir|madam))?\b/i', '', $t);
+                }
+            }
+        }
+
+        // Strip conversational greetings, check-ins, and filler phrases
+        $patterns = [
+            '/\b(?:kese\s+hain\s+ap|kese\s+ho|kya\s+hal\s+hai|kya\s+haal\s+he|kya\s+scene\s+hai)\b[\.\,\!\?]?/i',
+            '/\b(?:assalam\s*o\s*alaikum|wsalam|salam|aoa|a\.o\.a|hello|hi|good\s*morning|good\s*evening)\b[\.\,\!\?]?/i',
+            '/\b(?:acha\s+yr|acha\s+yaar|acha\s+bhai|acha\s+jee|yr|yaar|sunen|suno|bhai\s+zara|zara|plz|please)\b[\.\,\!\?]?/i',
+            '/\b(?:sb|sahab|sahib|bhai|jan|jee|ji|sir)\b/i'
+        ];
+        foreach ($patterns as $pat) {
+            $t = preg_replace($pat, '', $t);
+        }
+
+        // Clean leading/trailing punctuation and symbols
+        $t = trim(preg_replace('/^[\s\.\,\:\-\!\?]+|[\s\.\,\:\-\!\?]+$/', '', $t));
+        return $t ?: $rawText;
+    }
+
+    /**
+     * Transcribe Audio / Voice Note Message via AI Speech-to-Text (Gemini / Whisper)
+     */
+    public function transcribeAudioMessage($audioUrl, $audioBase64 = '', $settings = null) {
+        $settings = $settings ?: $this->getSettings();
+        $apiKey = $settings['ai_api_key'] ?? '';
+        if (empty($apiKey)) return null;
+
+        $provider = strtolower($settings['ai_provider'] ?? 'auto');
+
+        // 1. Google Gemini 1.5 Flash Audio Transcription
+        if ($provider === 'gemini' || ($provider === 'auto' && strpos($apiKey, 'AIza') === 0)) {
+            $base64Data = $audioBase64;
+            if (empty($base64Data) && !empty($audioUrl)) {
+                $audioBytes = @file_get_contents($audioUrl);
+                if ($audioBytes) {
+                    $base64Data = base64_encode($audioBytes);
+                }
+            }
+            if (empty($base64Data)) return null;
+
+            $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . urlencode($apiKey);
+            $prompt = "Please transcribe this audio voice note accurately. It is spoken in Urdu, Roman Urdu, or English by television broadcast staff. Return ONLY the transcribed text verbatim with no extra commentary.";
+
+            $payload = [
+                'contents' => [
+                    [
+                        'parts' => [
+                            ['text' => $prompt],
+                            [
+                                'inline_data' => [
+                                    'mime_type' => 'audio/ogg',
+                                    'data' => $base64Data
+                                ]
+                            ]
+                        ]
+                    ]
+                ],
+                'generationConfig' => [
+                    'temperature' => 0.1
+                ]
+            ];
+
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 25);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $res = curl_exec($ch);
+            curl_close($ch);
+
+            if ($res) {
+                $json = json_decode($res, true);
+                $transcription = trim($json['candidates'][0]['content']['parts'][0]['text'] ?? '');
+                if (!empty($transcription)) return $transcription;
+            }
+        } elseif ($provider === 'openai' || ($provider === 'auto' && strpos($apiKey, 'sk-') === 0)) {
+            // 2. OpenAI Whisper API
+            $rawAudio = '';
+            if (!empty($audioBase64)) {
+                $rawAudio = base64_decode($audioBase64);
+            } elseif (!empty($audioUrl)) {
+                $rawAudio = @file_get_contents($audioUrl);
+            }
+            if (empty($rawAudio)) return null;
+
+            $tmpFile = tempnam(sys_get_temp_dir(), 'wa_voice_') . '.ogg';
+            file_put_contents($tmpFile, $rawAudio);
+
+            $ch = curl_init('https://api.openai.com/v1/audio/transcriptions');
+            $cfile = new CURLFile($tmpFile, 'audio/ogg', 'voice.ogg');
+            $fields = [
+                'file' => $cfile,
+                'model' => 'whisper-1',
+                'language' => 'ur'
+            ];
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $fields);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Authorization: Bearer ' . $apiKey
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 25);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            $res = curl_exec($ch);
+            curl_close($ch);
+            @unlink($tmpFile);
+
+            if ($res) {
+                $json = json_decode($res, true);
+                if (!empty($json['text'])) {
+                    return trim($json['text']);
+                }
+            }
+        }
+        return null;
+    }
+
+    public function findEmployeeByPhone($phone) {
+        $cleanPhone = $this->cleanPhoneNumber($phone);
+        if (empty($cleanPhone)) return null;
+
+        $variants = [$cleanPhone];
+        if (substr($cleanPhone, 0, 1) === '0') {
+            $variants[] = '92' . substr($cleanPhone, 1);
+            $variants[] = substr($cleanPhone, 1);
+        }
+
+        $placeholders = implode(',', array_fill(0, count($variants), '?'));
+        $sql = "
+            SELECT e.*, d.name as department_name, t.name as team_name, p.emp_code, p.phone as profile_phone
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            LEFT JOIN teams t ON e.team_id = t.id
+            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
+            WHERE e.is_active = 1 AND (
+                REPLACE(REPLACE(REPLACE(REPLACE(p.phone, ' ', ''), '-', ''), '+', ''), '92', '0') IN ({$placeholders})
+                OR REPLACE(REPLACE(REPLACE(REPLACE(p.whatsapp_number, ' ', ''), '-', ''), '+', ''), '92', '0') IN ({$placeholders})
+                OR REPLACE(REPLACE(REPLACE(REPLACE(e.whatsapp_number, ' ', ''), '-', ''), '+', ''), '92', '0') IN ({$placeholders})
+                OR REPLACE(REPLACE(REPLACE(REPLACE(e.phone, ' ', ''), '-', ''), '+', ''), '92', '0') IN ({$placeholders})
+            )
+            LIMIT 1
+        ";
+        $allParams = array_merge($variants, $variants, $variants, $variants);
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($allParams);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     /**

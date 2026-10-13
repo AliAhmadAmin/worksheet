@@ -37,6 +37,10 @@
                             </div>
                         </div>
 
+                        <button type="button" class="btn btn-outline admin-only" onclick="openHodWhatsAppModal()" title="Configure your personal OrbitSend WhatsApp credentials & AI Vision" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                            <span>💬</span> <span>WhatsApp & AI</span>
+                        </button>
+
                         <button type="button" class="btn btn-primary admin-only" onclick="openAssignTaskModal()">
                             ➕ Assign New Task
                         </button>

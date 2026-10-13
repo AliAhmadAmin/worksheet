@@ -29,9 +29,11 @@ require_once __DIR__ . '/includes/navbar.php';
     <?php
     // Core Programming Handover Matrix View
     require_once __DIR__ . '/views/tab_programming.php';
-    // Supporting Views (Integrated Staff Attendance & Employee Directory)
+    require_once __DIR__ . '/views/tab_worksheet.php';
+    require_once __DIR__ . '/views/tab_tasks.php';
     require_once __DIR__ . '/views/tab_attendance.php';
     require_once __DIR__ . '/views/tab_employees.php';
+    require_once __DIR__ . '/views/tab_hr.php';
     ?>
 </main>
 

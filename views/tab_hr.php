@@ -621,15 +621,19 @@
 <section id="tab-hr-notices" class="tab-section">
     <div class="worksheet-container">
         
-        <div class="worksheet-card" style="margin-bottom: 18px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                <div>
-                    <h2 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 2px;">
-                        📢 Company Notice Board & Broadcasts
-                    </h2>
-                    <p style="color: var(--text-muted); font-size: 12.5px; margin: 0;">
-                        Official announcements, holiday notices, urgent alerts, and event updates.
-                    </p>
+        <div class="worksheet-card" style="margin-bottom: 20px;">
+            <!-- Notice Board Header (Properly closed flex row) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="font-size: 26px;">📢</div>
+                    <div>
+                        <h2 style="font-size: 19px; font-weight: 800; color: var(--text-main); margin: 0 0 2px 0;">
+                            Company Notice Board & Broadcasts
+                        </h2>
+                        <p style="color: var(--text-muted); font-size: 12.5px; margin: 0;">
+                            Official announcements, policy circulars, urgent alerts, and event updates.
+                        </p>
+                    </div>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -640,40 +644,44 @@
                         🔄 Refresh
                     </button>
                 </div>
-        <!-- Unified Filter Toolbar -->
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <!-- Search Box -->
-            <div style="position: relative; flex: 1; min-width: 220px; max-width: 320px;">
-                <input type="text" id="hr-notice-search" class="input-control" placeholder="🔍 Search notices, announcements..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyNoticesClientFilters()">
             </div>
 
-            <!-- Dropdown Filter Pills -->
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                <select id="hr-notice-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyNoticesClientFilters()">
-                    <option value="">🏢 All Departments</option>
-                </select>
+            <!-- Unified Filter Toolbar (Full width) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; background: var(--bg-card-elevated); padding: 12px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color); width: 100%;">
+                <!-- Search Box -->
+                <div style="position: relative; flex: 1; min-width: 240px; max-width: 360px;">
+                    <input type="text" id="hr-notice-search" class="input-control" placeholder="🔍 Search notices, announcements..." style="width: 100%; padding: 8px 14px; font-size: 12.5px; border-radius: var(--radius-md);" oninput="applyNoticesClientFilters()">
+                </div>
 
-                <select id="hr-notice-priority-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyNoticesClientFilters()">
-                    <option value="all">📢 All Priorities</option>
-                    <option value="urgent">🚨 Urgent / Important</option>
-                    <option value="holiday">🎉 Holiday Schedule</option>
-                    <option value="event">🏆 Company Event</option>
-                    <option value="normal">📢 General Notice</option>
-                </select>
+                <!-- Dropdown Filter Pills -->
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;">
+                    <select id="hr-notice-dept-filter" class="input-control" style="width: auto; padding: 8px 12px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyNoticesClientFilters()">
+                        <option value="">🏢 All Departments</option>
+                    </select>
 
-                <button type="button" id="hr-notice-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetNoticesFilters()" title="Reset all filters">
-                    ↺ Reset
-                </button>
-                
-                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-notices-count-label">
-                    Showing 0 notices
-                </span>
+                    <select id="hr-notice-priority-filter" class="input-control" style="width: auto; padding: 8px 12px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyNoticesClientFilters()">
+                        <option value="all">📢 All Priorities</option>
+                        <option value="urgent">🚨 Urgent / Important</option>
+                        <option value="holiday">🎉 Holiday Schedule</option>
+                        <option value="event">🏆 Company Event</option>
+                        <option value="normal">📢 General Notice</option>
+                    </select>
+
+                    <button type="button" id="hr-notice-reset-filters-btn" class="btn btn-outline" style="padding: 8px 12px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetNoticesFilters()" title="Reset all filters">
+                        ↺ Reset
+                    </button>
+                    
+                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-notices-count-label">
+                        Showing 0 notices
+                    </span>
+                </div>
             </div>
-        </div>
 
-        <div id="hr-notices-feed" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
-            <div style="text-align: center; padding: 40px; color: var(--text-muted); grid-column: 1 / -1;">
-                Loading company notices...
+            <!-- Feed Grid (Full width across card) -->
+            <div id="hr-notices-feed" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; width: 100%;">
+                <div style="text-align: center; padding: 50px 20px; color: var(--text-muted); grid-column: 1 / -1; width: 100%;">
+                    Loading company notices...
+                </div>
             </div>
         </div>
 
@@ -685,119 +693,217 @@
 <section id="tab-hr-fines" class="tab-section">
     <div class="worksheet-container">
 
-        <!-- Fines Header Card -->
+        <!-- Fines & Disciplinary Header Card -->
         <div class="worksheet-card" style="margin-bottom: 18px;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div>
                     <h2 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 2px; display: flex; align-items: center; gap: 8px;">
-                        ⚠️ Disciplinary Fines & Penalties Center
+                        ⚠️ Disciplinary & Show Cause Inquiry Center
                     </h2>
                     <p style="color: var(--text-muted); font-size: 12.5px; margin: 0;">
-                        Track policy violations, late arrivals, negligence, and manage deductions applied to monthly payroll.
+                        Issue formal show cause notices, receive employee explanations, conduct inquiry reviews, and enforce payroll fine deductions.
                     </p>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-primary" onclick="openIssueFineModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
-                        ➕ Issue Fine
+                    <button type="button" class="btn" onclick="openIssueShowCauseModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; background: #d97706; color: #ffffff; border: 1px solid #b45309; box-shadow: 0 1px 3px rgba(217, 119, 6, 0.3);">
+                        📜 Issue Show Cause Notice
                     </button>
-                    <button type="button" class="btn btn-outline" onclick="loadHrFines()" title="Refresh Fines">
+                    <button type="button" class="btn btn-primary" onclick="openIssueFineModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                        ➕ Issue Direct Fine
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="refreshDisciplinaryCenter()" title="Refresh All Disciplinary Records">
                         🔄 Refresh
                     </button>
                 </div>
             </div>
 
-            <!-- Fines Summary Metrics -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px;">
+            <!-- Disciplinary Summary Metrics -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 14px;">
+                <div style="padding: 12px 16px; background: rgba(217, 119, 6, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(217, 119, 6, 0.25);">
+                    <div style="font-size: 11px; font-weight: 800; color: #d97706; text-transform: uppercase;">📜 Show Cause Inquiries</div>
+                    <div id="hr-sc-stat-total" style="font-size: 19px; font-weight: 800; color: #d97706; margin-top: 2px;">0 Inquiries</div>
+                    <div id="hr-sc-stat-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">0 pending employee reply</div>
+                </div>
+
                 <div style="padding: 12px 16px; background: rgba(239, 68, 68, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(239, 68, 68, 0.2);">
-                    <div style="font-size: 11px; font-weight: 800; color: #ef4444; text-transform: uppercase;">🔴 Total Active Fines</div>
+                    <div style="font-size: 11px; font-weight: 800; color: #ef4444; text-transform: uppercase;">🔴 Active Fine Deductions</div>
                     <div id="hr-fines-total-applied-amount" style="font-size: 19px; font-weight: 800; color: #ef4444; margin-top: 2px;">PKR 0</div>
                     <div id="hr-fines-total-applied-count" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">0 penalties applied to payroll</div>
                 </div>
 
                 <div style="padding: 12px 16px; background: rgba(16, 185, 129, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.2);">
-                    <div style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase;">🟢 Total Waived / Forgiven</div>
+                    <div style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase;">🟢 Waived / Cleared Cases</div>
                     <div id="hr-fines-total-waived-amount" style="font-size: 19px; font-weight: 800; color: #10b981; margin-top: 2px;">PKR 0</div>
                     <div id="hr-fines-total-waived-count" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">0 forgiven penalties</div>
                 </div>
 
                 <div style="padding: 12px 16px; background: rgba(59, 130, 246, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(59, 130, 246, 0.2);">
-                    <div style="font-size: 11px; font-weight: 800; color: #3b82f6; text-transform: uppercase;">📋 Total Records</div>
+                    <div style="font-size: 11px; font-weight: 800; color: #3b82f6; text-transform: uppercase;">📋 Total Disciplinary Actions</div>
                     <div id="hr-fines-total-count" style="font-size: 19px; font-weight: 800; color: #3b82f6; margin-top: 2px;">0 Records</div>
-                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Recorded disciplinary incidents</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Logged incidents & inquiries</div>
                 </div>
             </div>
         </div>
 
-        <!-- Fines Records Interactive Table -->
+        <!-- Disciplinary Center Tabs Card -->
         <div class="worksheet-card">
-            <!-- Unified Filter Toolbar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                <!-- Search Box -->
-                <div style="position: relative; flex: 1; min-width: 200px; max-width: 280px;">
-                    <input type="text" id="hr-fines-search" class="input-control" placeholder="🔍 Search employee, violation, reason..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyFinesClientFilters()">
+            <!-- Sub-Navigation View Toggle -->
+            <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border-color); margin-bottom: 16px; padding-bottom: 0;">
+                <button type="button" id="hr-disc-tab-btn-showcause" class="btn" onclick="switchDisciplinarySubView('showcause')" style="font-weight: 800; font-size: 13px; border-radius: 8px 8px 0 0; padding: 10px 18px; border: none; background: #d97706; color: #ffffff; cursor: pointer; transition: all 0.2s;">
+                    📜 Show Cause Notices & Inquiries 
+                    <span id="hr-sc-pending-badge" style="margin-left: 6px; background: rgba(255,255,255,0.28); color: #fff; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 800;">0</span>
+                </button>
+                <button type="button" id="hr-disc-tab-btn-fines" class="btn" onclick="switchDisciplinarySubView('fines')" style="font-weight: 700; font-size: 13px; border-radius: 8px 8px 0 0; padding: 10px 18px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s;">
+                    ⚠️ Disciplinary Fines & Deductions 
+                    <span id="hr-fines-count-badge" style="margin-left: 6px; background: var(--bg-card-elevated); color: var(--text-muted); padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 800;">0</span>
+                </button>
+            </div>
+
+            <!-- SUBVIEW 1: SHOW CAUSE NOTICES & INQUIRIES -->
+            <div id="hr-disc-view-showcause">
+                <!-- Unified Filter Toolbar for Show Cause Notices -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <!-- Search Box -->
+                    <div style="position: relative; flex: 1; min-width: 200px; max-width: 280px;">
+                        <input type="text" id="hr-sc-search" class="input-control" placeholder="🔍 Search employee, notice, allegation..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyShowCauseClientFilters()">
+                    </div>
+
+                    <!-- Dropdown Filter Pills -->
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                        <input type="month" id="hr-sc-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrShowCauseNotices()">
+
+                        <select id="hr-sc-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyShowCauseClientFilters()">
+                            <option value="">🏢 All Departments</option>
+                        </select>
+
+                        <select id="hr-sc-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrShowCauseNotices()">
+                            <option value="all">All Inquiry Statuses</option>
+                            <option value="pending_reply" selected>⏳ Awaiting Employee Reply</option>
+                            <option value="under_review">🔍 Response Under Review</option>
+                            <option value="satisfied_closed">🟢 Explanation Accepted (No Fine)</option>
+                            <option value="fine_issued">🔴 Fine Imposed</option>
+                        </select>
+
+                        <select id="hr-sc-cat-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrShowCauseNotices()">
+                            <option value="all">⚠️ All Violations</option>
+                            <option value="late_arrival">⏱️ Late Arrival</option>
+                            <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
+                            <option value="sop_violation">⚠️ SOP / Policy Violation</option>
+                            <option value="negligence">⚠️ Negligence / Damage</option>
+                            <option value="misconduct">🛑 Misconduct</option>
+                            <option value="other">📝 Other Reason</option>
+                        </select>
+
+                        <select id="hr-sc-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrShowCauseNotices()">
+                            <option value="">👤 All Employees</option>
+                        </select>
+
+                        <button type="button" id="hr-sc-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetShowCauseFilters()" title="Reset all filters">
+                            ↺ Reset
+                        </button>
+                        
+                        <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-sc-count-label">
+                            Showing 0 notice(s)
+                        </span>
+                    </div>
                 </div>
 
-                <!-- Dropdown Filter Pills -->
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                    <input type="month" id="hr-fines-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrFines()">
-
-                    <select id="hr-fines-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyFinesClientFilters()">
-                        <option value="">🏢 All Departments</option>
-                    </select>
-
-                    <select id="hr-fines-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
-                        <option value="all">All Statuses</option>
-                        <option value="applied" selected>🔴 Applied</option>
-                        <option value="waived">🟢 Waived</option>
-                    </select>
-
-                    <select id="hr-fines-cat-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
-                        <option value="all">⚠️ All Violations</option>
-                        <option value="late_arrival">⏱️ Late Arrival</option>
-                        <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
-                        <option value="sop_violation">⚠️ SOP / Policy Violation</option>
-                        <option value="negligence">⚠️ Negligence / Damage</option>
-                        <option value="misconduct">🛑 Misconduct</option>
-                        <option value="other">📝 Other Reason</option>
-                    </select>
-
-                    <select id="hr-fines-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
-                        <option value="">👤 All Employees</option>
-                    </select>
-
-                    <button type="button" id="hr-fines-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetFinesFilters()" title="Reset all filters">
-                        ↺ Reset
-                    </button>
-                    
-                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-fines-count-label">
-                        Showing 0 record(s)
-                    </span>
+                <div class="table-responsive">
+                    <table class="interactive-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 18%; min-width: 170px;">Employee</th>
+                                <th style="width: 9%; min-width: 90px;">Notice Date</th>
+                                <th style="width: 16%; min-width: 140px;">Violation Category & Title</th>
+                                <th style="width: 21%; min-width: 180px;">Allegation & Incident Details</th>
+                                <th style="width: 9%; min-width: 85px;">Reply Deadline</th>
+                                <th style="width: 14%; min-width: 130px;">Employee Explanation</th>
+                                <th style="width: 13%; min-width: 110px; text-align: center;">Inquiry Status</th>
+                                <th style="width: 10%; min-width: 100px; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hr-sc-table-body">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                                    Loading show cause notices...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <div class="table-responsive">
-                <table class="interactive-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 20%; min-width: 170px;">Employee</th>
-                            <th style="width: 10%; min-width: 95px;">Incident Date</th>
-                            <th style="width: 14%; min-width: 130px;">Violation Category</th>
-                            <th style="width: 22%; min-width: 180px;">Reason & Incident Details</th>
-                            <th style="width: 10%; min-width: 90px;">Salary Month</th>
-                            <th style="width: 10%; min-width: 95px;">Fine Amount</th>
-                            <th style="width: 8%; min-width: 85px; text-align: center;">Status</th>
-                            <th style="width: 6%; min-width: 75px; text-align: center;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="hr-fines-table-body">
-                        <tr>
-                            <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
-                                Loading disciplinary fine records...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- SUBVIEW 2: DIRECT FINES & DEDUCTIONS -->
+            <div id="hr-disc-view-fines" style="display: none;">
+                <!-- Unified Filter Toolbar for Fines -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <!-- Search Box -->
+                    <div style="position: relative; flex: 1; min-width: 200px; max-width: 280px;">
+                        <input type="text" id="hr-fines-search" class="input-control" placeholder="🔍 Search employee, violation, reason..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyFinesClientFilters()">
+                    </div>
+
+                    <!-- Dropdown Filter Pills -->
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                        <input type="month" id="hr-fines-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrFines()">
+
+                        <select id="hr-fines-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyFinesClientFilters()">
+                            <option value="">🏢 All Departments</option>
+                        </select>
+
+                        <select id="hr-fines-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
+                            <option value="all">All Fine Statuses</option>
+                            <option value="applied" selected>🔴 Applied</option>
+                            <option value="waived">🟢 Waived</option>
+                        </select>
+
+                        <select id="hr-fines-cat-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
+                            <option value="all">⚠️ All Violations</option>
+                            <option value="late_arrival">⏱️ Late Arrival</option>
+                            <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
+                            <option value="sop_violation">⚠️ SOP / Policy Violation</option>
+                            <option value="negligence">⚠️ Negligence / Damage</option>
+                            <option value="misconduct">🛑 Misconduct</option>
+                            <option value="other">📝 Other Reason</option>
+                        </select>
+
+                        <select id="hr-fines-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
+                            <option value="">👤 All Employees</option>
+                        </select>
+
+                        <button type="button" id="hr-fines-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetFinesFilters()" title="Reset all filters">
+                            ↺ Reset
+                        </button>
+                        
+                        <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-fines-count-label">
+                            Showing 0 record(s)
+                        </span>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="interactive-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%; min-width: 170px;">Employee</th>
+                                <th style="width: 10%; min-width: 95px;">Incident Date</th>
+                                <th style="width: 14%; min-width: 130px;">Violation Category</th>
+                                <th style="width: 22%; min-width: 180px;">Reason & Incident Details</th>
+                                <th style="width: 10%; min-width: 90px;">Salary Month</th>
+                                <th style="width: 10%; min-width: 95px;">Fine Amount</th>
+                                <th style="width: 8%; min-width: 85px; text-align: center;">Status</th>
+                                <th style="width: 6%; min-width: 75px; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hr-fines-table-body">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 30px; color: var(--text-muted);">
+                                    Loading disciplinary fine records...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -1065,7 +1171,7 @@
 
 <!-- 3. Create Notice Modal (Admin Only) -->
 <div id="hr-create-notice-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 500px;">
+    <div class="modal-card" style="max-width: 550px;">
         <div class="modal-header">
             <h3 class="modal-title">📢 Post Announcement / Notice</h3>
             <button type="button" class="modal-close" onclick="closeModal('hr-create-notice-modal')">&times;</button>
@@ -1099,10 +1205,25 @@
                     <label class="form-label">Announcement Content</label>
                     <textarea id="hr-notice-message" class="input-control" rows="4" placeholder="Write the full message details for the workforce..." style="width: 100%; resize: vertical;" required></textarea>
                 </div>
+
+                <div class="form-group" style="margin-bottom: 6px;">
+                    <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>📎 Attachment (PDF, Document, Image)</span>
+                        <span id="hr-notice-file-info" style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Optional</span>
+                    </label>
+                    <div style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 14px; text-align: center; background: var(--bg-card-elevated); cursor: pointer; transition: border-color 0.2s;" onclick="document.getElementById('hr-notice-file').click()" id="hr-notice-dropzone">
+                        <input type="file" id="hr-notice-file" style="display: none;" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp,.txt,.zip" onchange="handleNoticeFileSelected(this)">
+                        <div id="hr-notice-file-display">
+                            <span style="font-size: 20px; display: block; margin-bottom: 4px;">📄</span>
+                            <span style="font-size: 12.5px; font-weight: 700; color: var(--primary);">Choose File (PDF, DOCX, Images)</span>
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Max 25MB • Circulars, policies, memos</div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('hr-create-notice-modal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">📢 Broadcast Notice</button>
+                <button type="submit" class="btn btn-primary" style="font-weight: 700;">📢 Broadcast Notice</button>
             </div>
         </form>
     </div>
@@ -1335,3 +1456,201 @@
         </div>
     </div>
 </div>
+
+<!-- ================= 7. SHOW CAUSE NOTICE MODALS ================= -->
+
+<!-- Modal A: Issue Show Cause Notice Modal -->
+<div id="hr-issue-showcause-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 540px;">
+        <div class="modal-header">
+            <h3 class="modal-title">📜 Issue Formal Show Cause Notice</h3>
+            <button type="button" class="modal-close" onclick="closeModal('hr-issue-showcause-modal')">&times;</button>
+        </div>
+        <form id="hr-issue-showcause-form" onsubmit="handleIssueShowCauseSubmit(event)">
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Employee</label>
+                    <select id="hr-sc-form-emp-id" class="input-control" style="width: 100%; font-weight: 600;" required>
+                        <!-- Dynamic Staff List -->
+                    </select>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label">Notice Date</label>
+                        <input type="date" id="hr-sc-form-notice-date" class="input-control" style="width: 100%;" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Incident / Violation Date</label>
+                        <input type="date" id="hr-sc-form-incident-date" class="input-control" style="width: 100%; font-weight: 600;" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                    <div class="form-group">
+                        <label class="form-label">Violation Category</label>
+                        <select id="hr-sc-form-category" class="input-control" style="width: 100%; font-weight: 600;" required>
+                            <option value="late_arrival">⏱️ Late Arrival</option>
+                            <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
+                            <option value="sop_violation" selected>⚠️ SOP / Policy Violation</option>
+                            <option value="negligence">⚠️ Negligence / Damage</option>
+                            <option value="misconduct">🛑 Misconduct</option>
+                            <option value="other">📝 Other Incident</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Response Deadline Date</label>
+                        <input type="date" id="hr-sc-form-deadline" class="input-control" style="width: 100%; font-weight: 600;" required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Notice Subject / Allegation Title</label>
+                    <input type="text" id="hr-sc-form-title" class="input-control" placeholder="e.g. Explanation called regarding unannounced absence on Oct 12" style="width: 100%; font-weight: 600;" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Allegation & Incident Details (Fact Finding)</label>
+                    <textarea id="hr-sc-form-details" class="input-control" rows="4" placeholder="Detail the specific incident, negligence, time of breach, or failure to perform duties. Ask the employee to submit their written justification before the deadline..." style="width: 100%; resize: vertical;" required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('hr-issue-showcause-modal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background: #d97706; border-color: #d97706;">📜 Issue Notice to Employee</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal B: Submit Employee Response / Explanation Modal -->
+<div id="hr-reply-showcause-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 560px;">
+        <div class="modal-header">
+            <h3 class="modal-title">✍️ Submit Response to Show Cause Notice</h3>
+            <button type="button" class="modal-close" onclick="closeModal('hr-reply-showcause-modal')">&times;</button>
+        </div>
+        <form id="hr-reply-showcause-form" onsubmit="handleSubmitShowCauseReply(event)">
+            <input type="hidden" id="hr-reply-sc-notice-id" value="">
+            <div class="modal-body">
+                <!-- Summary of Allegation -->
+                <div id="hr-reply-sc-summary-box" style="background: rgba(217, 119, 6, 0.08); border: 1px solid rgba(217, 119, 6, 0.25); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 16px;">
+                    <!-- Rendered Dynamically -->
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-weight: 700;">Employee Explanation / Justification *</label>
+                    <textarea id="hr-reply-sc-text" class="input-control" rows="5" placeholder="State your detailed clarification, circumstances, evidence, reasons for absence/delay, or defense..." style="width: 100%; resize: vertical;" required></textarea>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Supporting Evidence / Attachment (Optional)</label>
+                    <input type="file" id="hr-reply-sc-file" class="input-control" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp,.txt" style="width: 100%; padding: 6px;">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Upload medical certificate, screenshot, gate pass, or signed explanation (Max 20MB).</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('hr-reply-showcause-modal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background: #2563eb; border-color: #2563eb;">📤 Submit Formal Explanation</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal C: Review & Disciplinary Decision Modal -->
+<div id="hr-decide-showcause-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 580px;">
+        <div class="modal-header">
+            <h3 class="modal-title">⚖️ Review & Disciplinary Decision</h3>
+            <button type="button" class="modal-close" onclick="closeModal('hr-decide-showcause-modal')">&times;</button>
+        </div>
+        <form id="hr-decide-showcause-form" onsubmit="handleShowCauseDecisionSubmit(event)">
+            <input type="hidden" id="hr-decide-sc-notice-id" value="">
+            <div class="modal-body">
+                <!-- Case Summary Review Box -->
+                <div id="hr-decide-sc-summary-box" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 16px;">
+                    <!-- Rendered Dynamically -->
+                </div>
+
+                <!-- Decision Toggle -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 800; font-size: 13px;">Management Inquiry Findings *</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px;">
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(16, 185, 129, 0.08); border: 2px solid #10b981; border-radius: var(--radius-sm); cursor: pointer;">
+                            <input type="radio" name="hr_sc_decision" value="satisfied" checked onchange="toggleDecisionFineInputs()">
+                            <div>
+                                <b style="color: #10b981; font-size: 13px;">🟢 Accept Explanation</b>
+                                <div style="font-size: 11px; color: var(--text-muted);">Satisfied with reply. Close without fine penalty.</div>
+                            </div>
+                        </label>
+
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(239, 68, 68, 0.08); border: 2px solid #ef4444; border-radius: var(--radius-sm); cursor: pointer;">
+                            <input type="radio" name="hr_sc_decision" value="fine_issued" onchange="toggleDecisionFineInputs()">
+                            <div>
+                                <b style="color: #ef4444; font-size: 13px;">🔴 Not Satisfied</b>
+                                <div style="font-size: 11px; color: var(--text-muted);">Reject reply and issue disciplinary payroll fine.</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Conditional Fine Imposition Section -->
+                <div id="hr-decide-sc-fine-section" style="display: none; background: rgba(239, 68, 68, 0.05); border: 1px dashed rgba(239, 68, 68, 0.4); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px;">
+                    <div style="font-size: 12px; font-weight: 800; color: #ef4444; text-transform: uppercase; margin-bottom: 10px;">
+                        ⚠️ Disciplinary Fine Imposition Details
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px;">
+                        <div class="form-group">
+                            <label class="form-label">Fine Amount (PKR) *</label>
+                            <input type="number" step="any" min="0" id="hr-decide-sc-fine-amount" class="input-control" placeholder="e.g. 1500" style="width: 100%; font-weight: 800; color: #ef4444;">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Deduction Month *</label>
+                            <input type="month" id="hr-decide-sc-fine-month" class="input-control" style="width: 100%; font-weight: 600;" value="<?php echo date('Y-m'); ?>">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category</label>
+                        <select id="hr-decide-sc-fine-cat" class="input-control" style="width: 100%; font-weight: 600;">
+                            <option value="late_arrival">⏱️ Late Arrival</option>
+                            <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
+                            <option value="sop_violation" selected>⚠️ SOP / Policy Violation</option>
+                            <option value="negligence">⚠️ Negligence / Damage</option>
+                            <option value="misconduct">🛑 Misconduct</option>
+                            <option value="other">📝 Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Final Decision Remarks -->
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label">Official Decision Remarks / Findings</label>
+                    <textarea id="hr-decide-sc-remarks" class="input-control" rows="3" placeholder="State management findings, verbal counseling, warning issued, or grounds for fine imposition..." style="width: 100%; resize: vertical;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('hr-decide-showcause-modal')">Cancel</button>
+                <button type="submit" id="hr-decide-sc-submit-btn" class="btn btn-primary" style="background: #10b981; border-color: #10b981;">
+                    ⚖️ Confirm Decision
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal D: View Full Show Cause Inquiry Record -->
+<div id="hr-view-showcause-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 620px;">
+        <div class="modal-header">
+            <h3 class="modal-title">📜 Show Cause Notice & Inquiry Record</h3>
+            <button type="button" class="modal-close" onclick="closeModal('hr-view-showcause-modal')">&times;</button>
+        </div>
+        <div class="modal-body" id="hr-view-showcause-content" style="padding: 18px 20px;">
+            <!-- Rendered Dynamically -->
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-outline" onclick="closeModal('hr-view-showcause-modal')">Close</button>
+            <button type="button" class="btn btn-primary" onclick="printShowCauseRecord()">🖨️ Print Inquiry Summary</button>
+        </div>
+    </div>
+</div>
+

@@ -28,7 +28,7 @@ $stmtUser = $pdo->prepare("SELECT role, can_manage_employees, can_manage_hr FROM
 $stmtUser->execute([$currentUserId]);
 $user = $stmtUser->fetch() ?: [];
 
-$isAdmin = ($user['role'] ?? '') === 'admin' || ($user['role'] ?? '') === 'super_admin' || !empty($user['can_manage_employees']) || !empty($user['can_manage_hr']);
+$isAdmin = ($user['role'] ?? '') === 'admin' || ($user['role'] ?? '') === 'super_admin' || ($user['role'] ?? '') === 'hod' || !empty($user['can_manage_employees']) || !empty($user['can_manage_hr']);
 
 switch ($action) {
     case 'get_settings':
@@ -212,6 +212,120 @@ switch ($action) {
         echo json_encode([
             'success' => true,
             'result' => $result
+        ]);
+        break;
+
+    case 'convert_to_task':
+        if (!$isAdmin) {
+            echo json_encode(['success' => false, 'message' => 'Access denied.']);
+            exit;
+        }
+
+        $logId = (int)($data['log_id'] ?? ($_GET['log_id'] ?? ($_POST['log_id'] ?? 0)));
+        if (!$logId) {
+            echo json_encode(['success' => false, 'message' => 'Log ID is required.']);
+            exit;
+        }
+
+        $stmtLog = $pdo->prepare("SELECT * FROM whatsapp_attendance_logs WHERE id = ?");
+        $stmtLog->execute([$logId]);
+        $logRow = $stmtLog->fetch(PDO::FETCH_ASSOC);
+
+        if (!$logRow) {
+            echo json_encode(['success' => false, 'message' => 'Log entry not found.']);
+            exit;
+        }
+
+        $rawText = trim($logRow['raw_message'] ?? '');
+        $targetEmp = null;
+        $targetCode = '';
+
+        if (preg_match('/\b(?:@?([A-Za-z]{2,5}[-_]?\d{1,8})|@?(\d{4,8}))\b/i', $rawText, $codeMatch)) {
+            $codeToken = !empty($codeMatch[1]) ? $codeMatch[1] : $codeMatch[2];
+            $targetCode = strtoupper(str_replace('-', '', $codeToken));
+            $targetEmp = $service->findEmployeeByCode($codeToken);
+        }
+
+        if (!$targetEmp) {
+            $targetEmp = $service->findEmployeeByNameMention($rawText, $logRow['department_id'] ?? null);
+            if ($targetEmp) {
+                $targetCode = $targetEmp['emp_code'] ?: ('DP-' . $targetEmp['id']);
+            }
+        }
+
+        if (!$targetEmp && !empty($logRow['employee_id'])) {
+            $stmtEmp = $pdo->prepare("
+                SELECT e.*, d.name as department_name, p.emp_code 
+                FROM employees e 
+                LEFT JOIN departments d ON e.department_id = d.id 
+                LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id 
+                WHERE e.id = ?
+            ");
+            $stmtEmp->execute([$logRow['employee_id']]);
+            $targetEmp = $stmtEmp->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$targetEmp) {
+            echo json_encode(['success' => false, 'message' => 'Could not determine target employee for this task.']);
+            exit;
+        }
+
+        // Determine assigner
+        $senderEmp = $service->findEmployeeByPhone($logRow['sender_phone'] ?? '');
+        $senderId = $senderEmp ? (int)$senderEmp['id'] : (int)($_SESSION['user_id'] ?? 1);
+        $senderNameStr = $senderEmp ? $senderEmp['name'] : (!empty($_SESSION['name']) ? $_SESSION['name'] : 'Supervisor');
+
+        // Clean task title
+        $cleanTitle = trim(preg_replace('/^\s*(?:@?DP-?\d{1,4}|@?EMP-?\d{1,4})[\s,:-]+/i', '', $rawText));
+        if (empty($cleanTitle)) {
+            $cleanTitle = "Task for " . $targetEmp['name'];
+        }
+
+        // Extract link / path if any
+        $link = '';
+        if (preg_match('/([a-zA-Z]:\\\\[^\r\n"\'<>]+|https?:\/\/[^\s]+)/', $rawText, $pathMatch)) {
+            $link = trim($pathMatch[1]);
+        }
+
+        $targetDept = $targetEmp['department_name'] ?? ($targetEmp['department'] ?? 'Digital');
+        $targetCodeClean = $targetEmp['emp_code'] ?: ($targetCode ?: 'DP1114');
+
+        $stmtTask = $pdo->prepare("
+            INSERT INTO tasks (assigned_by, assigned_to, title, description, link, content_type, department, priority, status, due_date, emp_code)
+            VALUES (?, ?, ?, ?, ?, 'WhatsApp Task', ?, 'medium', 'pending', CURDATE(), ?)
+        ");
+        $stmtTask->execute([
+            $senderId,
+            $targetEmp['id'],
+            $cleanTitle,
+            "Assigned via WhatsApp by {$senderNameStr}: \"{$rawText}\"",
+            $link,
+            $targetDept,
+            $targetCodeClean
+        ]);
+        $newTaskId = (int)$pdo->lastInsertId();
+
+        // Update the log row
+        $newRemarks = "🎯 Task #{$newTaskId} created & assigned to {$targetEmp['name']} ({$targetCodeClean}) by {$senderNameStr}.";
+        $stmtUp = $pdo->prepare("
+            UPDATE whatsapp_attendance_logs 
+            SET parsed_action = 'task_assigned', status = 'applied', employee_id = ?, remarks = ?, task_id = ?
+            WHERE id = ?
+        ");
+        $stmtUp->execute([$targetEmp['id'], $newRemarks, $newTaskId, $logId]);
+
+        // Send WhatsApp notification to target employee
+        try {
+            require_once __DIR__ . '/../includes/HodWhatsAppService.php';
+            $hodService = new HodWhatsAppService($pdo);
+            $hodService->sendTaskWhatsAppNotification($newTaskId, $senderId);
+        } catch (Exception $e) {}
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Successfully created Task #{$newTaskId} for {$targetEmp['name']}!",
+            'task_id' => $newTaskId,
+            'employee_name' => $targetEmp['name']
         ]);
         break;
 

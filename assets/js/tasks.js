@@ -170,10 +170,15 @@ async function loadAssignedTasks() {
         AppState.tasks = tasks;
         const pendingTasks = tasks.filter(t => t.status !== 'completed');
 
-        if (countBadge) {
-            countBadge.textContent = pendingTasks.length;
-            countBadge.style.display = pendingTasks.length > 0 ? 'inline-block' : 'none';
-        }
+        const countBadges = [
+            document.getElementById('pending-task-badge'),
+            document.getElementById('pending-task-badge-nr'),
+            document.getElementById('pending-task-badge-pg')
+        ].filter(Boolean);
+        countBadges.forEach(b => {
+            b.textContent = pendingTasks.length;
+            b.style.display = pendingTasks.length > 0 ? 'inline-block' : 'none';
+        });
 
         // Render KPI counters on Task Assigner page
         renderTaskMetrics(tasks);
@@ -363,10 +368,18 @@ function renderAssignTaskEmpDropdownList(employees) {
             ? `<img src="${escapeHtml(emp.avatar)}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:26px;height:26px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;\\'>${escapeHtml(avatarInitial)}</div>';">`
             : `<div style="width: 26px; height: 26px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
 
+        const codeVal = emp.emp_code || emp.employee_code || '';
+        const empCodeBadge = codeVal 
+            ? `<span style="display: inline-block; background: rgba(59, 130, 246, 0.12); color: var(--primary); font-family: monospace; font-size: 10.5px; padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: 6px;">${escapeHtml(codeVal)}</span>` 
+            : '';
+
         item.innerHTML = `
             ${avatarHtml}
             <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                <div style="color: var(--text-main); line-height: 1.2;">${escapeHtml(emp.name)}</div>
+                <div style="color: var(--text-main); line-height: 1.2; display: flex; align-items: center;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(emp.name)}</span>
+                    ${empCodeBadge}
+                </div>
                 <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.designation || 'Staff')} • ${escapeHtml(emp.team_name || emp.department_name || 'Team')}</div>
             </div>
             ${isSelected ? '<span style="color: var(--primary); font-size: 12px; font-weight: 800;">✓</span>' : ''}
@@ -381,12 +394,15 @@ function filterAssignTaskEmpDropdown(query) {
         renderAssignTaskEmpDropdownList(AppState.employees);
         return;
     }
-    const filtered = (AppState.employees || []).filter(emp => 
-        emp.name.toLowerCase().includes(q) || 
-        (emp.email && emp.email.toLowerCase().includes(q)) ||
-        (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
-        (emp.department_name && emp.department_name.toLowerCase().includes(q))
-    );
+    const filtered = (AppState.employees || []).filter(emp => {
+        const code = (emp.emp_code || emp.employee_code || '').toLowerCase();
+        return emp.name.toLowerCase().includes(q) || 
+            code.includes(q) ||
+            (emp.email && emp.email.toLowerCase().includes(q)) ||
+            (emp.phone && emp.phone.includes(q)) ||
+            (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
+            (emp.department_name && emp.department_name.toLowerCase().includes(q));
+    });
     renderAssignTaskEmpDropdownList(filtered);
 }
 
@@ -562,6 +578,7 @@ function openAssignTaskModal() {
     }
 
     renderAssignTaskEmpDropdownList(AppState.employees);
+    clearTaskImageScan();
     openModal('assign-task-modal');
 }
 
@@ -573,6 +590,7 @@ async function handleCreateTaskSubmit(e) {
     const desc = document.getElementById('assign-task-desc')?.value;
     const rawLink = document.getElementById('assign-task-link')?.value || '';
     const cleanLink = sanitizePathString(rawLink);
+    const sendWa = document.getElementById('assign-task-send-wa')?.checked ? 1 : 0;
 
     if (!empId || !title) {
         showToast("Please select an employee and enter a task title.", "error");
@@ -588,7 +606,8 @@ async function handleCreateTaskSubmit(e) {
                 assigned_to: empId,
                 title: title,
                 description: desc,
-                link: cleanLink
+                link: cleanLink,
+                send_whatsapp: sendWa
             })
         });
         const data = await res.json();
@@ -596,6 +615,7 @@ async function handleCreateTaskSubmit(e) {
             showToast(data.message, 'success');
             closeModal('assign-task-modal');
             document.getElementById('assign-task-form')?.reset();
+            clearTaskImageScan();
             await loadAssignedTasks();
         } else {
             showToast(data.message, 'error');
@@ -770,14 +790,17 @@ function renderAdminTaskList(tasks) {
 
     tasks.forEach(t => {
         const tr = document.createElement('tr');
+        const isCompleted = t.status === 'completed';
         const assignedShort = formatTaskDateTimeShort(t.created_at);
         const completedShort = formatTaskDateTimeShort(t.completed_at);
-        const isCompleted = t.status === 'completed';
+
+        const waBadge = (t.whatsapp_sent == 1)
+            ? `<span title="${escapeHtml(t.whatsapp_status || 'Sent via WhatsApp')}" style="color: #10b981; font-size: 10px; font-weight: 700; background: rgba(16, 185, 129, 0.1); padding: 1px 5px; border-radius: 3px; display: inline-flex; align-items: center; gap: 3px;">💬 Sent</span>`
+            : `<button type="button" onclick="event.stopPropagation(); resendTaskWhatsApp(${t.id})" class="btn btn-outline" style="padding: 1px 6px; font-size: 9.5px; border-color: rgba(16, 185, 129, 0.4); color: #10b981; border-radius: 3px;" title="Send WhatsApp notification now">💬 Send WA</button>`;
 
         tr.innerHTML = `
             <td>
-                <strong style="color: var(--text-main); font-size: 12.5px;">${escapeHtml(t.employee_name)}</strong>
-                <div style="font-size: 11px; color: var(--text-dim);">${escapeHtml(t.employee_designation || 'Staff')}</div>
+                <strong style="color: var(--text-main); font-size: 12.5px;">${escapeHtml(t.employee_name || 'Unassigned')}</strong>
             </td>
             <td>
                 <div style="font-weight: 700; font-size: 13px; color: var(--primary); cursor: pointer; ${isCompleted ? 'text-decoration: line-through; opacity: 0.75;' : ''}" onclick="openViewTaskModal(${t.id})" title="Click to view complete details">
@@ -819,6 +842,7 @@ function renderAdminTaskList(tasks) {
             </td>
             <td>
                 <div style="display: flex; align-items: center; gap: 4px; justify-content: center; white-space: nowrap;">
+                    ${waBadge}
                     <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px;" onclick="openViewTaskModal(${t.id})" title="View Details">
                         👁️
                     </button>
@@ -1009,3 +1033,333 @@ document.addEventListener('click', (e) => {
         editMenu.style.display = 'none';
     }
 });
+
+// ==========================================
+// AI TASK IMAGE SCANNER & CLIPBOARD PASTE
+// ==========================================
+
+function handleTaskImageSelected(input) {
+    if (!input || !input.files || !input.files[0]) return;
+    const file = input.files[0];
+    processTaskImageFile(file);
+}
+
+function processTaskImageFile(file) {
+    if (!file || !file.type.startsWith('image/')) {
+        showToast('Please select a valid image file.', 'error');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result;
+        const hiddenInput = document.getElementById('ai-task-image-base64');
+        const previewImg = document.getElementById('ai-task-image-preview');
+        const nameEl = document.getElementById('ai-task-image-name');
+        const statusEl = document.getElementById('ai-task-scan-status');
+        const wrapper = document.getElementById('ai-task-image-preview-wrapper');
+
+        if (hiddenInput) hiddenInput.value = base64;
+        if (previewImg) previewImg.src = base64;
+        if (nameEl) nameEl.textContent = file.name || 'Screenshot.png';
+        if (statusEl) {
+            statusEl.textContent = 'Ready to read with AI ✨';
+            statusEl.style.color = 'var(--text-muted)';
+        }
+        if (wrapper) wrapper.style.display = 'flex';
+
+        // Auto-trigger scan for instant convenience!
+        triggerAiTaskImageScan();
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearTaskImageScan() {
+    const fileInput = document.getElementById('ai-task-image-file');
+    const hiddenInput = document.getElementById('ai-task-image-base64');
+    const previewImg = document.getElementById('ai-task-image-preview');
+    const wrapper = document.getElementById('ai-task-image-preview-wrapper');
+    const statusEl = document.getElementById('ai-task-scan-status');
+
+    if (fileInput) fileInput.value = '';
+    if (hiddenInput) hiddenInput.value = '';
+    if (previewImg) previewImg.src = '';
+    if (statusEl) statusEl.textContent = 'Ready to scan with AI';
+    if (wrapper) wrapper.style.display = 'none';
+}
+
+async function triggerAiTaskImageScan() {
+    const base64 = document.getElementById('ai-task-image-base64')?.value;
+    if (!base64) {
+        showToast('Please upload or paste an image first.', 'warning');
+        return;
+    }
+
+    const scanBtn = document.getElementById('ai-task-scan-btn');
+    const btnText = document.getElementById('ai-task-scan-btn-text');
+    const statusEl = document.getElementById('ai-task-scan-status');
+
+    if (scanBtn) scanBtn.disabled = true;
+    if (btnText) btnText.textContent = 'Scanning...';
+    if (statusEl) {
+        statusEl.textContent = 'AI is reading file paths & text...';
+        statusEl.style.color = 'var(--primary)';
+    }
+
+    try {
+        const contextText = document.getElementById('assign-task-title')?.value || '';
+        const res = await fetch('api/hod_tasks_whatsapp.php?action=ai_read_task_image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image_base64: base64,
+                context_text: contextText
+            })
+        });
+        const data = await res.json();
+
+        if (data.success && data.data) {
+            const parsed = data.data;
+
+            // Fill Path / Link
+            if (parsed.file_or_folder_path) {
+                const linkInput = document.getElementById('assign-task-link');
+                if (linkInput) linkInput.value = parsed.file_or_folder_path;
+            }
+
+            // Fill Task Title
+            if (parsed.task_title) {
+                const titleInput = document.getElementById('assign-task-title');
+                if (titleInput && (!titleInput.value || titleInput.value.trim() === '')) {
+                    titleInput.value = parsed.task_title;
+                }
+            }
+
+            // Fill Description
+            if (parsed.description) {
+                const descInput = document.getElementById('assign-task-desc');
+                if (descInput) {
+                    if (descInput.value && descInput.value.trim() !== '') {
+                        descInput.value += '\n\n' + parsed.description;
+                    } else {
+                        descInput.value = parsed.description;
+                    }
+                }
+            }
+
+            // Match & select Employee if code detected (e.g. DP1114)
+            if (parsed.matched_employee) {
+                selectAssignTaskEmpFromDropdown(parsed.matched_employee.id);
+                showToast(`🎯 Matched employee: ${parsed.matched_employee.name} (${parsed.matched_employee.emp_code || ''})!`, 'success');
+            } else if (parsed.employee_code) {
+                // Try searching in loaded employees
+                const cleanCode = parsed.employee_code.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                const matched = (AppState.employees || []).find(e => {
+                    const empC = (e.emp_code || e.employee_code || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                    return empC && empC === cleanCode;
+                });
+                if (matched) {
+                    selectAssignTaskEmpFromDropdown(matched.id);
+                    showToast(`🎯 Matched employee code: ${matched.name} (${parsed.employee_code})!`, 'success');
+                }
+            }
+
+            if (statusEl) {
+                statusEl.textContent = '✅ Analysis complete: Fields auto-filled!';
+                statusEl.style.color = '#10b981';
+            }
+            showToast('AI successfully analyzed image & filled task fields!', 'success');
+        } else {
+            if (statusEl) {
+                statusEl.textContent = '⚠️ ' + (data.message || 'AI could not read text from image');
+                statusEl.style.color = '#ef4444';
+            }
+            showToast(data.message || 'AI analysis failed.', 'error');
+        }
+    } catch (err) {
+        if (statusEl) {
+            statusEl.textContent = '⚠️ Network error during AI analysis';
+            statusEl.style.color = '#ef4444';
+        }
+        showToast('Error connecting to AI vision service.', 'error');
+    } finally {
+        if (scanBtn) scanBtn.disabled = false;
+        if (btnText) btnText.textContent = 'Read with AI';
+    }
+}
+
+// Global Clipboard Paste Listener for Screenshots (Ctrl+V)
+window.addEventListener('paste', (e) => {
+    const modal = document.getElementById('assign-task-modal');
+    if (!modal || !modal.classList.contains('active')) return;
+
+    const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            if (blob) {
+                e.preventDefault();
+                processTaskImageFile(blob);
+                showToast('📷 Screenshot captured from clipboard! Analyzing with AI...', 'info');
+                break;
+            }
+        }
+    }
+});
+
+// ==========================================
+// HOD WHATSAPP & AI SETTINGS MODAL
+// ==========================================
+
+async function openHodWhatsAppModal() {
+    const modal = document.getElementById('hod-whatsapp-modal');
+    if (!modal) return;
+
+    openModal('hod-whatsapp-modal');
+
+    try {
+        const res = await fetch('api/hod_tasks_whatsapp.php?action=get_settings');
+        const data = await res.json();
+        if (data.success && data.settings) {
+            const s = data.settings;
+            const urlInput = document.getElementById('hod-wa-api-url');
+            const secretInput = document.getElementById('hod-wa-api-secret');
+            const uniqueInput = document.getElementById('hod-wa-unique-id');
+            const autoSendCheckbox = document.getElementById('hod-wa-auto-send');
+            const providerSelect = document.getElementById('hod-ai-provider');
+            const aiKeyInput = document.getElementById('hod-ai-api-key');
+            const webhookInput = document.getElementById('hod-wa-webhook-url');
+            const testPhoneInput = document.getElementById('hod-wa-test-phone');
+
+            if (urlInput) urlInput.value = s.api_url || 'https://app.orbitsend.com/api/send/whatsapp';
+            if (secretInput) {
+                secretInput.value = '';
+                secretInput.placeholder = s.masked_secret || 'Enter OrbitSend Secret Key';
+            }
+            if (uniqueInput) uniqueInput.value = s.unique_id || '';
+            if (autoSendCheckbox) autoSendCheckbox.checked = s.auto_send_on_assign != 0;
+            if (providerSelect) providerSelect.value = s.ai_provider || 'auto';
+            if (aiKeyInput) {
+                aiKeyInput.value = '';
+                aiKeyInput.placeholder = s.has_ai_key ? '•••••••••••• (Configured)' : 'Enter Google Gemini or OpenAI API Key';
+            }
+            if (webhookInput) webhookInput.value = data.webhook_url || '';
+            if (testPhoneInput && !testPhoneInput.value && AppState.currentUser) {
+                testPhoneInput.value = AppState.currentUser.phone || AppState.currentUser.whatsapp_number || '';
+            }
+        }
+    } catch (err) {
+        showToast('Failed to load WhatsApp & AI settings', 'error');
+    }
+}
+
+async function handleHodWhatsAppSettingsSubmit(e) {
+    if (e) e.preventDefault();
+
+    const apiUrl = document.getElementById('hod-wa-api-url')?.value.trim();
+    const apiSecret = document.getElementById('hod-wa-api-secret')?.value.trim();
+    const uniqueId = document.getElementById('hod-wa-unique-id')?.value.trim();
+    const autoSend = document.getElementById('hod-wa-auto-send')?.checked ? 1 : 0;
+    const aiProvider = document.getElementById('hod-ai-provider')?.value || 'auto';
+    const aiApiKey = document.getElementById('hod-ai-api-key')?.value.trim();
+
+    try {
+        const res = await fetch('api/hod_tasks_whatsapp.php?action=save_settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                api_url: apiUrl,
+                api_secret: apiSecret,
+                unique_id: uniqueId,
+                auto_send_on_assign: autoSend,
+                ai_provider: aiProvider,
+                ai_api_key: aiApiKey
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+            closeModal('hod-whatsapp-modal');
+        } else {
+            showToast(data.message, 'error');
+        }
+    } catch (err) {
+        showToast('Failed to save settings', 'error');
+    }
+}
+
+async function testHodWhatsAppConnection() {
+    const testPhone = document.getElementById('hod-wa-test-phone')?.value.trim();
+    const apiSecret = document.getElementById('hod-wa-api-secret')?.value.trim();
+    const uniqueId = document.getElementById('hod-wa-unique-id')?.value.trim();
+    const btn = document.getElementById('hod-wa-test-btn');
+
+    if (!testPhone) {
+        showToast('Please enter a test phone number (e.g. 03001234567).', 'warning');
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+    showToast('Sending test WhatsApp message via OrbitSend...', 'info');
+
+    try {
+        const res = await fetch('api/hod_tasks_whatsapp.php?action=test_connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                test_phone: testPhone,
+                api_secret: apiSecret,
+                unique_id: uniqueId
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+        } else {
+            showToast(data.message, 'error');
+        }
+    } catch (err) {
+        showToast('Failed to test WhatsApp connection', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function copyHodWebhookUrl() {
+    const input = document.getElementById('hod-wa-webhook-url');
+    if (!input || !input.value) return;
+    navigator.clipboard.writeText(input.value).then(() => {
+        showToast('OrbitSend Webhook URL copied to clipboard!', 'success');
+    }).catch(() => {
+        input.select();
+        document.execCommand('copy');
+        showToast('Copied to clipboard!', 'success');
+    });
+}
+
+async function resendTaskWhatsApp(taskId) {
+    if (!taskId) return;
+    showToast('Sending WhatsApp task notification...', 'info');
+
+    try {
+        const res = await fetch('api/tasks.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'send_whatsapp',
+                task_id: taskId
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+            await loadAssignedTasks();
+        } else {
+            showToast(data.message, 'error');
+        }
+    } catch (err) {
+        showToast('Failed to dispatch WhatsApp notification', 'error');
+    }
+}

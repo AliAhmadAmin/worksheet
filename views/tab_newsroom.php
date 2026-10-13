@@ -139,7 +139,7 @@
                         <th style="width: 130px; min-width: 120px;">Channel</th>
                         <th style="width: 140px; min-width: 130px;">News Sender</th>
                         <th style="width: 90px; min-width: 85px;">Time</th>
-                        <th style="width: 60px; min-width: 50px; text-align: center; border-right: 3px solid var(--border-color);">Link</th>
+                        <th style="width: 170px; min-width: 160px; text-align: center; border-right: 3px solid var(--border-color);">Story Link</th>
 
                         <!-- Digital Columns -->
                         <th style="width: 165px; min-width: 160px;">DP Status</th>
@@ -174,21 +174,25 @@
                     📺 Dispatch New Story / Package to Digital
                 </h3>
                 <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">
-                    Send breaking news bulletin, reporter package, or ticker story to Digital Media Team.
+                    Dispatch news package or ticker to Digital Media.
                 </p>
             </div>
             <button type="button" class="btn-modal-close" onclick="closeModal('dispatch-news-modal')">✕</button>
         </div>
         <form id="dispatch-news-form" onsubmit="handleNewsDispatchSubmit(event)">
+            <!-- Auto-populated Date & Time -->
+            <input type="hidden" id="news-dispatch-date">
+            <input type="hidden" id="news-dispatch-time">
+
             <div class="modal-body" style="gap: 14px;">
                 <div class="form-group">
                     <label class="form-label">News Title / Slug *</label>
-                    <input type="text" id="news-dispatch-title" class="input-control" placeholder="e.g. Breaking: Supreme Court Verdict Package, Prime Time News Rundown" required style="font-weight: 700; font-size: 13.5px;">
+                    <input type="text" id="news-dispatch-title" class="input-control" placeholder="Story title or slug" required style="font-weight: 700; font-size: 13.5px;">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Network Path / WhatsApp / Video Location *</label>
-                    <input type="text" id="news-dispatch-path" class="input-control" placeholder="e.g. \\10.0.0.5\NEWSROOM\PACKAGES\2026-10-06\COURT_REPORT_V1" required style="font-family: monospace; font-size: 12px;">
+                    <label class="form-label">Network Path / WhatsApp / Location *</label>
+                    <input type="text" id="news-dispatch-path" class="input-control" placeholder="\\Server path or WhatsApp link" required style="font-family: monospace; font-size: 12px;">
                 </div>
 
                 <div class="form-grid-2">
@@ -210,21 +214,12 @@
                     </div>
                 </div>
 
-                <div class="form-grid-3">
-                    <div class="form-group">
-                        <label class="form-label">Dispatch Date</label>
-                        <input type="date" id="news-dispatch-date" class="input-control">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Dispatch Time</label>
-                        <input type="text" id="news-dispatch-time" class="input-control" placeholder="Auto now (e.g. 03:23:51 PM)">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Source Link (Optional)</label>
-                        <input type="url" id="news-dispatch-link" class="input-control" placeholder="https://drive.google.com/...">
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Story Link (Optional)</span>
+                        <span style="font-size: 11px; color: var(--text-dim); font-weight: normal;">Usually added later after story is published</span>
+                    </label>
+                    <input type="url" id="news-dispatch-link" class="input-control" placeholder="Optional - can be pasted later directly in the table">
                 </div>
             </div>
             <div class="modal-footer">
@@ -322,7 +317,7 @@
 
                         <div class="form-group">
                             <label class="form-label">DP Publishing Time</label>
-                            <input type="text" id="edit-news-dp-time" class="input-control" placeholder="e.g. 04:15:00 PM">
+                            <input type="text" id="edit-news-dp-time" class="input-control" placeholder="Publish time">
                         </div>
                     </div>
 
@@ -342,7 +337,7 @@
 
                         <div class="form-group">
                             <label class="form-label">PT Publishing Time</label>
-                            <input type="text" id="edit-news-pt-time" class="input-control" placeholder="e.g. 04:20:00 PM">
+                            <input type="text" id="edit-news-pt-time" class="input-control" placeholder="Publish time">
                         </div>
                     </div>
 
@@ -367,9 +362,19 @@
                         </div>
                     </div>
 
+                    <div class="form-group">
+                        <label class="form-label">Published Story Link (URL)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="url" id="edit-news-link" class="input-control" placeholder="https://..." style="flex: 1;" oninput="updateEditNewsLinkButton(this.value)">
+                            <a id="edit-news-link-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="display: none; align-items: center; padding: 0 12px; font-size: 12px; white-space: nowrap;" title="Open link in new tab">
+                                🔗 Open
+                            </a>
+                        </div>
+                    </div>
+
                     <div class="form-group" style="margin-bottom: 0;">
                         <label class="form-label">Digital Remarks / Notes</label>
-                        <textarea id="edit-news-remarks" class="input-control" rows="2" placeholder="e.g. Published on FB & YouTube Shorts at 04:30 PM. Audio clean."></textarea>
+                        <textarea id="edit-news-remarks" class="input-control" rows="2" placeholder="Remarks or publishing notes..."></textarea>
                     </div>
                 </div>
             </div>

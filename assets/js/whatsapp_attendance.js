@@ -260,6 +260,7 @@ const WhatsAppAtt = {
         const actionBadges = {
             check_in: { label: '🟢 Check In', bg: 'rgba(16, 185, 129, 0.12)', color: '#059669' },
             check_out: { label: '🔵 Check Out', bg: 'rgba(59, 130, 246, 0.12)', color: '#2563eb' },
+            task_assigned: { label: '🎯 Task Assigned', bg: 'rgba(99, 102, 241, 0.15)', color: '#4f46e5' },
             field_visit: { label: '🚗 Field Visit', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7' },
             back_in_office: { label: '🏢 Back in Office', bg: 'rgba(16, 185, 129, 0.12)', color: '#059669' },
             leave_notice: { label: '🌴 Leave Notice', bg: 'rgba(168, 85, 247, 0.12)', color: '#9333ea' },
@@ -270,6 +271,7 @@ const WhatsAppAtt = {
 
         const statusBadges = {
             applied: { label: 'Applied ✅', bg: 'rgba(16, 185, 129, 0.15)', color: '#059669' },
+            task_created: { label: 'Task Created 🎯', bg: 'rgba(99, 102, 241, 0.15)', color: '#4f46e5' },
             unmatched: { label: 'Unmatched ⚠️', bg: 'rgba(239, 68, 68, 0.15)', color: '#dc2626' },
             ignored: { label: 'Ignored ⚪', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280' }
         };
@@ -289,6 +291,42 @@ const WhatsAppAtt = {
                 const parts = l.created_at.split(' ');
                 dateStr = parts[0];
                 timeStr = parts[1];
+            }
+
+            // Status display + Task Actions
+            let statusHtml = '';
+            if (l.task_id) {
+                statusHtml = `
+                    <div>
+                        <span style="display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; background: rgba(99, 102, 241, 0.15); color: #4f46e5; white-space: nowrap;">
+                            Task Created ✅
+                        </span>
+                        <div style="margin-top: 3px;">
+                            <button type="button" class="btn btn-outline" style="padding: 1px 7px; font-size: 10px; border-radius: 4px; border-color: rgba(99, 102, 241, 0.4); color: #4f46e5; font-weight: 700; cursor: pointer;" onclick="WhatsAppAtt.viewTask(${l.task_id})" title="View Assigned Task #${l.task_id}">
+                                👁️ Task #${l.task_id}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (l.status === 'ignored' || l.parsed_action === 'unknown') {
+                statusHtml = `
+                    <div>
+                        <span style="display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; background: ${st.bg}; color: ${st.color}; white-space: nowrap;">
+                            ${st.label}
+                        </span>
+                        <div style="margin-top: 3px;">
+                            <button type="button" class="btn btn-outline" style="padding: 1px 7px; font-size: 9.5px; border-radius: 4px; border-color: rgba(99, 102, 241, 0.4); color: #4f46e5; font-weight: 700; cursor: pointer; white-space: nowrap;" onclick="WhatsAppAtt.convertToTask(${l.id})" title="Convert message into an official task for the employee">
+                                🎯 To Task
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                statusHtml = `
+                    <span style="display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10.5px; font-weight: 700; background: ${st.bg}; color: ${st.color}; white-space: nowrap;">
+                        ${st.label}
+                    </span>
+                `;
             }
 
             html += `
@@ -320,13 +358,12 @@ const WhatsAppAtt = {
                             <span style="background: var(--bg-card-elevated); padding: 3px 7px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 11.5px; color: var(--text-main); font-family: monospace; font-weight: 600;">
                                 💬 "${escapeHtml(l.raw_message || '')}"
                             </span>
+                            ${l.task_id ? `<span style="background: rgba(99, 102, 241, 0.12); color: #4f46e5; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700;">🎯 Linked Task #${l.task_id}</span>` : ''}
                             ${l.remarks ? `<span style="font-size: 10.5px; color: var(--text-muted);">${escapeHtml(l.remarks)}</span>` : ''}
                         </div>
                     </td>
                     <td style="text-align: center; white-space: nowrap;">
-                        <span style="display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10.5px; font-weight: 700; background: ${st.bg}; color: ${st.color}; white-space: nowrap;">
-                            ${st.label}
-                        </span>
+                        ${statusHtml}
                     </td>
                 </tr>
             `;
@@ -495,6 +532,57 @@ const WhatsAppAtt = {
         } catch (err) {
             showToast('Failed to fetch groups from OrbitSend', 'error');
         }
+    },
+
+    async convertToTask(logId) {
+        if (!confirm('Convert this WhatsApp message into an official assigned task for the employee?')) return;
+        try {
+            if (typeof showToast === 'function') {
+                showToast('Converting message to task...', 'info');
+            }
+            const res = await fetch('api/whatsapp_attendance.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'convert_to_task',
+                    log_id: logId
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (typeof showToast === 'function') {
+                    showToast(data.message || 'Task created successfully!', 'success');
+                } else {
+                    alert(data.message || 'Task created successfully!');
+                }
+                this.loadLogs();
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast(data.message || 'Could not convert to task', 'error');
+                } else {
+                    alert(data.message || 'Could not convert to task');
+                }
+            }
+        } catch (err) {
+            console.error('Error converting WhatsApp message to task:', err);
+            if (typeof showToast === 'function') {
+                showToast('Network error converting message to task', 'error');
+            }
+        }
+    },
+
+    async viewTask(taskId) {
+        if (typeof navigateToTab === 'function') {
+            navigateToTab('tab-tasks');
+        }
+        if (typeof loadAssignedTasks === 'function') {
+            await loadAssignedTasks();
+        }
+        setTimeout(() => {
+            if (typeof openViewTaskModal === 'function') {
+                openViewTaskModal(taskId);
+            }
+        }, 300);
     }
 };
 

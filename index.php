@@ -5,6 +5,23 @@
  */
 require_once __DIR__ . '/includes/auth_check.php';
 
+$userRoleIdx = strtolower($authUser['role'] ?? '');
+$deptLowerIdx = strtolower($authUser['department_name'] ?? '');
+$isGlobalAdminIdx = in_array($userRoleIdx, ['super_admin', 'admin']);
+
+if (!$isGlobalAdminIdx) {
+    if (stripos($deptLowerIdx, 'news') !== false) {
+        header('Location: newsroom.php' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''));
+        exit;
+    } elseif (stripos($deptLowerIdx, 'prog') !== false) {
+        header('Location: programming.php' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''));
+        exit;
+    } elseif ($userRoleIdx === 'hr' || stripos($deptLowerIdx, 'hr') !== false) {
+        header('Location: hr.php' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''));
+        exit;
+    }
+}
+
 $currentPortal = 'digital';
 
 // 1. Header (HTML DocType, Head, Styles)

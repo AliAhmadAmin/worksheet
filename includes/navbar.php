@@ -52,7 +52,18 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- Department Workspace Portal Switcher Dropdown (Super Admin / Global Admins Only) -->
         <?php 
         $userRole = strtolower($authUser['role'] ?? 'employee');
+        $userDept = strtolower($authUser['department_name'] ?? '');
         $isGlobalAdmin = in_array($userRole, ['super_admin', 'admin']);
+        $isNewsDept = (stripos($userDept, 'news') !== false);
+        $isProgDept = (stripos($userDept, 'prog') !== false);
+        $isDigitalDept = (stripos($userDept, 'digital') !== false);
+
+        // Access permissions:
+        // - News Handover: visible to News Room, Digital Media, or Global Admin (Programming cannot see)
+        $canViewNewsHandover = $isGlobalAdmin || ($isNewsDept && !$isProgDept) || $isDigitalDept;
+
+        // - Program Handover: visible to Programming, Digital Media, or Global Admin (News Room cannot see)
+        $canViewProgHandover = $isGlobalAdmin || ($isProgDept && !$isNewsDept) || $isDigitalDept;
         ?>
         <?php if ($isGlobalAdmin): ?>
         <div class="portal-switcher-wrapper admin-only" style="position: relative; display: none;">
@@ -131,16 +142,20 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-label" id="tasks-nav-tab-label">Assigned Tasks</span>
                 <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
             </button>
+            <?php if ($canViewNewsHandover): ?>
             <button type="button" class="nav-btn" data-tab="tab-newsroom" data-route="newsroom">
                 <span class="nav-icon">📺</span>
                 <span class="nav-label">News Handover</span>
                 <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
             </button>
+            <?php endif; ?>
+            <?php if ($canViewProgHandover): ?>
             <button type="button" class="nav-btn" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
                 <span class="nav-label">Program Handover</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </button>
+            <?php endif; ?>
         </div>
 
         <!-- People & Services Category -->
@@ -164,7 +179,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
-                <span class="nav-label">Fines & Penalties</span>
+                <span class="nav-label">Disciplinary & Fines</span>
             </button>
         </div>
 
@@ -194,14 +209,15 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-label">News Handover</span>
                 <span id="pending-news-badge-nr" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
             </button>
-            <a href="index.php" class="nav-btn" style="text-decoration: none;">
+            <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon">📝</span>
                 <span class="nav-label">Digital Sheet</span>
-            </a>
-            <a href="index.php#tasks" class="nav-btn" style="text-decoration: none;">
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon">🎯</span>
                 <span class="nav-label">My Tasks</span>
-            </a>
+                <span id="pending-task-badge-nr" class="nav-badge" style="display: none;">0</span>
+            </button>
         </div>
 
         <!-- Operations & Staff Category -->
@@ -215,10 +231,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📁</span>
                 <span class="nav-label">Staff Directory</span>
             </button>
-            <a href="hr.php#leaves" class="nav-btn" style="text-decoration: none;">
+            <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
-            </a>
+            </button>
         </div>
 
     <?php elseif ($currentPortal === 'programming'): ?>
@@ -230,14 +246,15 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-label">Handover Board</span>
                 <span id="pending-prog-badge-pg" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </button>
-            <a href="index.php" class="nav-btn" style="text-decoration: none;">
+            <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon">📝</span>
                 <span class="nav-label">Digital Sheet</span>
-            </a>
-            <a href="index.php#tasks" class="nav-btn" style="text-decoration: none;">
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon">🎯</span>
                 <span class="nav-label">My Tasks</span>
-            </a>
+                <span id="pending-task-badge-pg" class="nav-badge" style="display: none;">0</span>
+            </button>
         </div>
 
         <!-- Operations & Staff Category -->
@@ -251,10 +268,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📁</span>
                 <span class="nav-label">Staff Directory</span>
             </button>
-            <a href="hr.php#leaves" class="nav-btn" style="text-decoration: none;">
+            <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
-            </a>
+            </button>
         </div>
 
     <?php elseif ($currentPortal === 'hr'): ?>
@@ -295,7 +312,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
-                <span class="nav-label">Fines & Penalties</span>
+                <span class="nav-label">Disciplinary & Fines</span>
             </button>
         </div>
 

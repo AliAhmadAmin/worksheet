@@ -139,7 +139,7 @@
                         <th style="width: 130px; min-width: 120px;">Channel</th>
                         <th style="width: 140px; min-width: 130px;">News Sender</th>
                         <th style="width: 90px; min-width: 85px;">Time</th>
-                        <th style="width: 60px; min-width: 50px; text-align: center; border-right: 3px solid var(--border-color);">Link</th>
+                        <th style="width: 170px; min-width: 160px; text-align: center; border-right: 3px solid var(--border-color);">Story Link</th>
 
                         <!-- Digital Columns -->
                         <th style="width: 165px; min-width: 160px;">DP Status</th>
@@ -223,8 +223,11 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Source Link (Optional)</label>
-                        <input type="url" id="dispatch-link" class="input-control" placeholder="https://drive.google.com/...">
+                        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>Story Link (Optional)</span>
+                            <span style="font-size: 11px; color: var(--text-dim); font-weight: normal;">Usually added later after published</span>
+                        </label>
+                        <input type="url" id="dispatch-link" class="input-control" placeholder="Optional - can be pasted later directly in table">
                     </div>
                 </div>
             </div>
@@ -359,6 +362,16 @@
                                 <option value="2">⭐⭐ Needs Improvement (2/5)</option>
                                 <option value="1">⭐ Poor (1/5)</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Published Story Link (URL)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="url" id="edit-prog-link" class="input-control" placeholder="https://..." style="flex: 1;" oninput="updateEditProgLinkButton(this.value)">
+                            <a id="edit-prog-link-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="display: none; align-items: center; padding: 0 12px; font-size: 12px; white-space: nowrap;" title="Open link in new tab">
+                                🔗 Open
+                            </a>
                         </div>
                     </div>
 

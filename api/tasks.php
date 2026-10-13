@@ -7,6 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/HodWhatsAppService.php';
 
 $pdo = getDbConnection();
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
@@ -40,6 +41,8 @@ switch ($action) {
                 SELECT t.*, 
                        COALESCE(e.name, 'Unassigned') as employee_name, 
                        COALESCE(e.designation, 'Staff') as employee_designation,
+                       COALESCE(e.emp_code, t.emp_code, '') as employee_code,
+                       COALESCE(e.whatsapp_number, e.phone, '') as employee_phone,
                        COALESCE(a.name, 'Admin') as assigner_name
                 FROM tasks t
                 LEFT JOIN employees e ON t.assigned_to = e.id
@@ -72,6 +75,7 @@ switch ($action) {
             $sql = "
                 SELECT t.*, 
                        COALESCE(e.name, 'Unassigned') as employee_name,
+                       COALESCE(e.emp_code, t.emp_code, '') as employee_code,
                        COALESCE(a.name, 'Admin') as assigner_name
                 FROM tasks t
                 LEFT JOIN employees e ON t.assigned_to = e.id
@@ -79,6 +83,7 @@ switch ($action) {
                 WHERE t.assigned_to = ?
             ";
             $params = [$currentUserId];
+
             if ($statusFilter) {
                 $sql .= " AND t.status = ?";
                 $params[] = $statusFilter;
@@ -110,6 +115,7 @@ switch ($action) {
         $department = trim($data['department'] ?? 'Digital');
         $priority = $data['priority'] ?? 'medium';
         $dueDate = !empty($data['due_date']) ? $data['due_date'] : null;
+        $sendWhatsApp = isset($data['send_whatsapp']) ? (bool)$data['send_whatsapp'] : true;
 
         if (!$assignedTo || empty($title)) {
             http_response_code(400);
@@ -117,10 +123,14 @@ switch ($action) {
             exit;
         }
 
+        // Fetch employee details (department & code)
+        $checkEmp = $pdo->prepare("SELECT department_id, emp_code FROM employees WHERE id = ?");
+        $checkEmp->execute([$assignedTo]);
+        $empInfo = $checkEmp->fetch(PDO::FETCH_ASSOC);
+        $targetDeptId = (int)($empInfo['department_id'] ?? 0);
+        $empCode = $empInfo['emp_code'] ?? '';
+
         if (!$isSuperAdmin) {
-            $checkEmp = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
-            $checkEmp->execute([$assignedTo]);
-            $targetDeptId = (int)$checkEmp->fetchColumn();
             if ($userDeptId > 0 && $targetDeptId !== $userDeptId) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'You can only assign tasks to employees within your own department.']);
@@ -129,12 +139,47 @@ switch ($action) {
         }
 
         $stmt = $pdo->prepare("
-            INSERT INTO tasks (assigned_by, assigned_to, title, description, link, content_type, department, priority, status, due_date) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+            INSERT INTO tasks (assigned_by, assigned_to, title, description, link, content_type, department, priority, status, due_date, emp_code) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
         ");
-        $stmt->execute([$currentUserId, $assignedTo, $title, $description, $link, $contentType, $department, $priority, $dueDate]);
+        $stmt->execute([$currentUserId, $assignedTo, $title, $description, $link, $contentType, $department, $priority, $dueDate, $empCode]);
+        $newTaskId = (int)$pdo->lastInsertId();
 
-        echo json_encode(['success' => true, 'message' => 'Task assigned successfully.', 'task_id' => $pdo->lastInsertId()]);
+        $waResult = null;
+        if ($sendWhatsApp) {
+            $waService = new HodWhatsAppService($pdo);
+            $waResult = $waService->sendTaskWhatsAppNotification($newTaskId, $currentUserId);
+        }
+
+        $msg = 'Task assigned successfully.';
+        if ($waResult && !empty($waResult['success'])) {
+            $msg .= ' ' . $waResult['message'];
+        }
+
+        echo json_encode([
+            'success' => true, 
+            'message' => $msg, 
+            'task_id' => $newTaskId,
+            'whatsapp_result' => $waResult
+        ]);
+        break;
+
+    case 'send_whatsapp':
+        if (!$canAssign) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'You do not have permission to send task notifications.']);
+            exit;
+        }
+
+        $taskId = (int)($data['task_id'] ?? 0);
+        if (!$taskId) {
+            echo json_encode(['success' => false, 'message' => 'Task ID is required.']);
+            exit;
+        }
+
+        $waService = new HodWhatsAppService($pdo);
+        $res = $waService->sendTaskWhatsAppNotification($taskId, $currentUserId);
+        echo json_encode($res);
         break;
 
     case 'update_status':

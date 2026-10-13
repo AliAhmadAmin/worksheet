@@ -273,6 +273,8 @@ function migratePermissionsSchema($pdo) {
             id INT AUTO_INCREMENT PRIMARY KEY,
             title VARCHAR(255) NOT NULL,
             message TEXT NOT NULL,
+            attachment_path VARCHAR(255) NULL,
+            attachment_name VARCHAR(255) NULL,
             priority ENUM('normal', 'urgent', 'holiday', 'event') DEFAULT 'normal',
             target_department_id INT NULL,
             posted_by INT NOT NULL,
@@ -321,6 +323,35 @@ function migratePermissionsSchema($pdo) {
             FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
             FOREIGN KEY (action_by) REFERENCES employees(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS hr_show_cause_notices (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            issued_by INT NOT NULL,
+            notice_date DATE NOT NULL,
+            incident_date DATE NOT NULL,
+            violation_category ENUM('late_arrival', 'unauthorized_absence', 'sop_violation', 'negligence', 'misconduct', 'other') DEFAULT 'sop_violation',
+            title VARCHAR(255) NOT NULL,
+            allegation_details TEXT NOT NULL,
+            deadline_date DATE NULL,
+            employee_reply TEXT NULL,
+            reply_submitted_at DATETIME NULL,
+            reply_attachment_path VARCHAR(255) NULL,
+            reply_attachment_name VARCHAR(255) NULL,
+            status ENUM('pending_reply', 'under_review', 'satisfied_closed', 'fine_issued') DEFAULT 'pending_reply',
+            decision_remarks TEXT NULL,
+            action_by INT NULL,
+            action_at DATETIME NULL,
+            fine_id INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+            FOREIGN KEY (issued_by) REFERENCES employees(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        try {
+            $pdo->exec("ALTER TABLE hr_fines ADD COLUMN show_cause_id INT NULL");
+        } catch (Exception $e) {}
 
         try {
             $pdo->exec("ALTER TABLE hr_payroll ADD COLUMN fines DECIMAL(10,2) DEFAULT 0.00");
@@ -483,6 +514,34 @@ function migratePermissionsSchema($pdo) {
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN whatsapp_number VARCHAR(50) NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN phone VARCHAR(50) NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN emp_code VARCHAR(50) NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE whatsapp_attendance_logs MODIFY COLUMN parsed_action VARCHAR(50) DEFAULT 'unknown'"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE whatsapp_attendance_logs MODIFY COLUMN status VARCHAR(50) DEFAULT 'applied'"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE whatsapp_attendance_logs ADD COLUMN task_id INT NULL"); } catch (Exception $e) {}
+
+        // HOD WhatsApp Gateway & AI Configuration Schema
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS hod_whatsapp_settings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            hod_id INT NOT NULL UNIQUE,
+            department_id INT NULL,
+            api_url VARCHAR(255) DEFAULT 'https://app.orbitsend.com/api/send/whatsapp',
+            api_secret VARCHAR(255) NULL,
+            unique_id VARCHAR(255) NULL,
+            webhook_token VARCHAR(255) NULL,
+            ai_provider VARCHAR(50) DEFAULT 'auto',
+            ai_api_key VARCHAR(255) NULL,
+            is_enabled TINYINT DEFAULT 1,
+            auto_send_on_assign TINYINT DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_hod (hod_id),
+            INDEX idx_dept (department_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        try { $pdo->exec("ALTER TABLE tasks ADD COLUMN whatsapp_sent TINYINT DEFAULT 0"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE tasks ADD COLUMN whatsapp_status VARCHAR(100) NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE tasks ADD COLUMN task_image VARCHAR(255) NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE tasks ADD COLUMN emp_code VARCHAR(50) NULL"); } catch (Exception $e) {}
 
     } catch (Exception $e) {
         // Ignore if already migrated

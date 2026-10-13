@@ -1,15 +1,51 @@
     <!-- MODAL: ASSIGN NEW TASK -->
     <div id="assign-task-modal" class="modal-overlay">
-        <div class="modal-card">
+        <div class="modal-card modal-card-lg" style="max-width: 650px;">
             <div class="modal-header">
-                <h3>🎯 Assign Task to Employee</h3>
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">🎯 Assign Task to Employee</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Assign tasks by Employee Code or Name with AI image auto-fill & WhatsApp dispatch.</p>
+                </div>
                 <button type="button" class="btn-modal-close" onclick="closeModal('assign-task-modal')">✕</button>
             </div>
             <form id="assign-task-form" onsubmit="handleCreateTaskSubmit(event)">
-                <div class="modal-body">
+                <div class="modal-body" style="gap: 14px;">
+                    <!-- AI Image Scanner: Upload or Paste Screenshot (Ctrl+V) -->
+                    <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.08)); border: 1.5px dashed var(--primary); border-radius: var(--radius-md); padding: 10px 14px;">
+                        <div id="ai-task-scanner-dropzone" style="cursor: pointer;" onclick="document.getElementById('ai-task-image-file').click()">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-size: 20px;">📷</span>
+                                    <div>
+                                        <strong style="font-size: 13px; color: var(--primary);">AI Image Reader & Auto-Fill</strong>
+                                        <span style="font-size: 11px; color: var(--text-muted); display: block;">Paste screenshot (Ctrl+V) or click to upload. AI reads Windows path, employee code & instructions!</span>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; flex-shrink: 0;" onclick="event.stopPropagation(); document.getElementById('ai-task-image-file').click()">
+                                    📁 Browse
+                                </button>
+                            </div>
+                        </div>
+                        <input type="file" id="ai-task-image-file" accept="image/*" style="display: none;" onchange="handleTaskImageSelected(this)">
+                        <input type="hidden" id="ai-task-image-base64">
+
+                        <!-- Image Preview & Scan Action -->
+                        <div id="ai-task-image-preview-wrapper" style="display: none; margin-top: 10px; align-items: center; gap: 12px; background: var(--bg-card); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                            <img id="ai-task-image-preview" src="" style="width: 52px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);">
+                            <div style="flex: 1; min-width: 0;">
+                                <div id="ai-task-image-name" style="font-size: 12px; font-weight: 700; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Screenshot.png</div>
+                                <div id="ai-task-scan-status" style="font-size: 11px; color: var(--text-muted);">Ready to scan with AI</div>
+                            </div>
+                            <button type="button" class="btn btn-primary" id="ai-task-scan-btn" onclick="triggerAiTaskImageScan()" style="font-size: 11.5px; padding: 6px 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+                                <span>✨</span> <span id="ai-task-scan-btn-text">Read with AI</span>
+                            </button>
+                            <button type="button" class="btn btn-outline" onclick="clearTaskImageScan()" style="font-size: 11px; padding: 4px 8px;" title="Remove image">✕</button>
+                        </div>
+                    </div>
+
                     <!-- Assign to Employee (Searchable with Avatar like Dashboard) -->
                     <div class="form-group">
-                        <label class="form-label">Assign To Employee *</label>
+                        <label class="form-label">Assign To Employee (Search Name or Code e.g. DP1114) *</label>
                         <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
                             <div id="assign-task-emp-avatar" class="admin-inspector-avatar" style="width: 38px; height: 38px; font-size: 16px;">👤</div>
                             <div class="searchable-dropdown-wrapper" id="assign-task-emp-search-wrapper" style="position: relative; flex: 1;">
@@ -22,7 +58,7 @@
                                 <!-- Floating Search Dropdown Menu -->
                                 <div id="assign-task-emp-dropdown-menu" class="searchable-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 1050; padding: 8px; text-align: left;">
                                     <div style="padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 6px;">
-                                        <input type="text" id="assign-task-emp-search-input" class="input-control" placeholder="🔍 Search employee by name, team..." style="width: 100%; padding: 6px 10px; font-size: 12.5px;" oninput="filterAssignTaskEmpDropdown(this.value)" autocomplete="off">
+                                        <input type="text" id="assign-task-emp-search-input" class="input-control" placeholder="🔍 Search employee by Code (DP1114), name, team..." style="width: 100%; padding: 6px 10px; font-size: 12.5px;" oninput="filterAssignTaskEmpDropdown(this.value)" autocomplete="off">
                                     </div>
                                     <div id="assign-task-emp-dropdown-list" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
                                         <!-- Populated dynamically -->
@@ -38,18 +74,117 @@
                     </div>
 
                     <div class="form-group">
+                        <label class="form-label">Path / Link (Local Folder or Web URL)</label>
+                        <input type="text" id="assign-task-link" class="input-control" placeholder="e.g. C:\xampp\htdocs\Worksheet or D:\Footage\Episode 10" oninput="this.value = this.value.replace(/^[&quot;']+|[&quot;']+$/g, '').trim()" style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">
+                    </div>
+
+                    <div class="form-group">
                         <label class="form-label">Instructions / Description</label>
                         <textarea id="assign-task-desc" class="form-textarea" placeholder="Specific guidelines, format, or tags..." rows="3"></textarea>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Path / Link (Local Folder or Web URL)</label>
-                        <input type="text" id="assign-task-link" class="input-control" placeholder="e.g. C:\xampp\htdocs\Worksheet or https://drive.google.com/..." oninput="this.value = this.value.replace(/^[&quot;']+|[&quot;']+$/g, '').trim()" style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px;">
+                    <!-- WhatsApp Notification Toggle -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                        <label for="assign-task-send-wa" style="font-size: 12.5px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                            <span>💬</span> <span>Notify Employee via WhatsApp (OrbitSend)</span>
+                        </label>
+                        <input type="checkbox" id="assign-task-send-wa" checked style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline" onclick="closeModal('assign-task-modal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Assign Task</button>
+                    <button type="submit" class="btn btn-primary" style="font-weight: 700; padding: 9px 20px;">🚀 Assign Task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: HOD WHATSAPP & AI SETTINGS -->
+    <div id="hod-whatsapp-modal" class="modal-overlay">
+        <div class="modal-card modal-card-lg" style="max-width: 660px;">
+            <div class="modal-header">
+                <div>
+                    <h3 style="display: flex; align-items: center; gap: 8px;">💬 HOD WhatsApp & AI Gateway</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Connect your personal OrbitSend WhatsApp account & AI Vision to automate employee task dispatch.</p>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="closeModal('hod-whatsapp-modal')">✕</button>
+            </div>
+            <form id="hod-whatsapp-form" onsubmit="handleHodWhatsAppSettingsSubmit(event)">
+                <div class="modal-body" style="gap: 16px;">
+                    <!-- Section 1: OrbitSend WhatsApp Credentials -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">📡 OrbitSend WhatsApp Gateway</div>
+                        <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px;">
+                            Each HOD can attach their own OrbitSend credentials so tasks are dispatched directly from your own WhatsApp.
+                        </p>
+                        <div class="form-group">
+                            <label class="form-label">OrbitSend API URL</label>
+                            <input type="text" id="hod-wa-api-url" class="input-control" value="https://app.orbitsend.com/api/send/whatsapp" style="font-family: monospace; font-size: 12px;">
+                        </div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">OrbitSend Secret Key *</label>
+                                <input type="password" id="hod-wa-api-secret" class="input-control" placeholder="Enter OrbitSend Secret Key" style="font-family: monospace;">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Account / Unique ID *</label>
+                                <input type="text" id="hod-wa-unique-id" class="input-control" placeholder="e.g. 1784542798c74d..." style="font-family: monospace;">
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px; background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                            <label for="hod-wa-auto-send" style="font-size: 12px; font-weight: 600; cursor: pointer; margin: 0; display: flex; align-items: center; gap: 6px;">
+                                ⚡ Auto-send WhatsApp message whenever a new task is assigned
+                            </label>
+                            <input type="checkbox" id="hod-wa-auto-send" checked style="width: 17px; height: 17px; cursor: pointer; accent-color: var(--primary);">
+                        </div>
+                    </div>
+
+                    <!-- Section 2: AI Vision & Text Parsing (Gemini / OpenAI) -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">✨ AI Multimodal Vision (Image & Path Reader)</div>
+                        <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px;">
+                            Used by the Task Scanner to automatically read file paths (e.g. C:\..., D:\Footage), employee codes, and instructions from screenshots or photos.
+                        </p>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">AI Engine Provider</label>
+                                <select id="hod-ai-provider" class="input-control">
+                                    <option value="auto">Auto Detect (Gemini / OpenAI)</option>
+                                    <option value="gemini">Google Gemini Flash (Recommended)</option>
+                                    <option value="openai">OpenAI GPT-4o-mini</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">AI API Key</label>
+                                <input type="password" id="hod-ai-api-key" class="input-control" placeholder="AI API Key (or leave empty for company key)" style="font-family: monospace;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Connection Test & Webhook URL -->
+                    <div class="modal-section">
+                        <div class="modal-section-title">🧪 Connection Test & Incoming Webhook</div>
+                        <div class="form-group">
+                            <label class="form-label">OrbitSend Webhook URL (Optional: Paste into OrbitSend Webhooks)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="text" id="hod-wa-webhook-url" class="input-control" readonly style="font-family: monospace; font-size: 11.5px; background: var(--bg-card-elevated);">
+                                <button type="button" class="btn btn-outline" onclick="copyHodWebhookUrl()" style="white-space: nowrap; font-size: 11.5px;">📋 Copy</button>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: flex-end; margin-top: 10px;">
+                            <div class="form-group" style="flex: 1; margin: 0;">
+                                <label class="form-label" style="font-size: 11px;">Test Phone Number</label>
+                                <input type="text" id="hod-wa-test-phone" class="input-control" placeholder="e.g. 03001234567">
+                            </div>
+                            <button type="button" class="btn btn-outline" id="hod-wa-test-btn" onclick="testHodWhatsAppConnection()" style="height: 38px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                                📱 Send Test WhatsApp
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('hod-whatsapp-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="font-weight: 700; padding: 8px 20px;">💾 Save WhatsApp & AI Settings</button>
                 </div>
             </form>
         </div>

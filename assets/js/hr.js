@@ -35,7 +35,7 @@ async function loadHrDashboard() {
     } else if (document.getElementById('tab-hr-notices')?.classList.contains('active')) {
         await loadHrNotices();
     } else if (document.getElementById('tab-hr-fines')?.classList.contains('active')) {
-        await loadHrFines();
+        await refreshDisciplinaryCenter();
     } else if (document.getElementById('tab-hr-payroll')?.classList.contains('active')) {
         await loadHrPayroll();
     }
@@ -371,6 +371,13 @@ function renderDashboardNoticesWidget(notices) {
                 <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
                     ${escapeHtml(n.message)}
                 </div>
+                ${n.attachment_path ? `
+                <div style="margin-top: 5px;">
+                    <a href="${escapeHtml(n.attachment_path)}" target="_blank" download="${escapeHtml(n.attachment_name || 'attachment')}" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--primary); text-decoration: none;">
+                        <span>📎</span> ${escapeHtml(n.attachment_name || 'View Attachment')}
+                    </a>
+                </div>
+                ` : ''}
                 <div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;">
                     Posted by ${escapeHtml(n.posted_by_name || 'Admin')} • ${escapeHtml(n.created_at?.slice(0, 10) || '')}
                 </div>
@@ -532,6 +539,36 @@ async function populateHrEmployeeDropdowns() {
         });
     }
 
+    // Filter dropdown in Show Cause table
+    const scFilter = document.getElementById('hr-sc-emp-filter');
+    if (scFilter) {
+        const currentVal = scFilter.value;
+        scFilter.innerHTML = '<option value="">All Employees</option>';
+        employees.forEach(emp => {
+            const opt = document.createElement('option');
+            opt.value = emp.id;
+            opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
+            scFilter.appendChild(opt);
+        });
+        scFilter.value = currentVal;
+    }
+
+    // Modal employee select for Show Cause
+    const modalScEmpSelect = document.getElementById('hr-sc-form-emp-id');
+    if (modalScEmpSelect) {
+        const currentVal = modalScEmpSelect.value;
+        modalScEmpSelect.innerHTML = '';
+        employees.forEach(emp => {
+            const opt = document.createElement('option');
+            opt.value = emp.id;
+            opt.textContent = `${emp.name} (${emp.designation || 'Staff'})`;
+            if (currentVal ? emp.id == currentVal : (AppState.currentUser && emp.id == AppState.currentUser.id)) {
+                opt.selected = true;
+            }
+            modalScEmpSelect.appendChild(opt);
+        });
+    }
+
     // Filter dropdown in Claims table
     const claimsFilter = document.getElementById('hr-claims-emp-filter');
     if (claimsFilter) {
@@ -568,6 +605,7 @@ async function populateHrEmployeeDropdowns() {
         'hr-loan-dept-filter',
         'hr-claims-dept-filter',
         'hr-notice-dept-filter',
+        'hr-sc-dept-filter',
         'hr-fines-dept-filter'
     ];
     deptDropdownIds.forEach(id => {
@@ -1715,10 +1753,10 @@ function renderNoticesFeed(notices) {
 
     if (!notices || notices.length === 0) {
         feed.innerHTML = `
-            <div style="text-align: center; padding: 50px 20px; color: var(--text-muted); grid-column: 1 / -1;">
-                <div style="font-size: 36px; margin-bottom: 8px;">📢</div>
-                <div style="font-weight: 700; font-size: 15px;">No Company Notices Posted</div>
-                <div style="font-size: 12.5px; margin-top: 4px;">Click "+ Post Announcement" above to broadcast a new update.</div>
+            <div style="text-align: center; padding: 60px 20px; color: var(--text-muted); grid-column: 1 / -1; width: 100%;">
+                <div style="font-size: 42px; margin-bottom: 12px;">📢</div>
+                <div style="font-weight: 800; font-size: 17px; color: var(--text-main);">No Company Notices Posted</div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 6px;">Click "+ Post Announcement" above to broadcast a new update.</div>
             </div>
         `;
         return;
@@ -1736,23 +1774,45 @@ function renderNoticesFeed(notices) {
     let html = '';
     notices.forEach(n => {
         const theme = priorityThemes[n.priority] || priorityThemes.normal;
+        const hasAttach = !!n.attachment_path;
+        const isPdf = hasAttach && (n.attachment_path.toLowerCase().endsWith('.pdf') || (n.attachment_name && n.attachment_name.toLowerCase().endsWith('.pdf')));
+        const isImg = hasAttach && (n.attachment_path.match(/\.(jpg|jpeg|png|webp|gif)$/i) || (n.attachment_name && n.attachment_name.match(/\.(jpg|jpeg|png|webp|gif)$/i)));
+        const attachIcon = isPdf ? '📕' : (isImg ? '🖼️' : '📄');
+
         html += `
-            <div class="worksheet-card" style="border-left: 4px solid ${theme.border}; background: var(--bg-card); display: flex; flex-direction: column; justify-content: space-between;">
+            <div class="worksheet-card" style="border-left: 4px solid ${theme.border}; background: var(--bg-card); display: flex; flex-direction: column; justify-content: space-between; border-radius: var(--radius-md); box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
                 <div>
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
                         <span style="font-size: 11px; font-weight: 800; color: ${theme.text}; background: ${theme.bg}; padding: 3px 8px; border-radius: 4px;">
                             ${theme.label}
                         </span>
-                        ${n.target_department_name ? `<span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">🏢 ${escapeHtml(n.target_department_name)}</span>` : '<span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">🏢 All Departments</span>'}
+                        ${n.target_department_name ? `<span style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">🏢 ${escapeHtml(n.target_department_name)}</span>` : '<span style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">🏢 All Departments</span>'}
                     </div>
 
-                    <h3 style="font-size: 16px; font-weight: 800; color: var(--text-main); margin-bottom: 8px; line-height: 1.3;">
+                    <h3 style="font-size: 16px; font-weight: 800; color: var(--text-main); margin-bottom: 8px; line-height: 1.35;">
                         ${escapeHtml(n.title)}
                     </h3>
 
-                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; white-space: pre-line; margin-bottom: 16px;">
+                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.55; white-space: pre-line; margin-bottom: 12px;">
                         ${escapeHtml(n.message)}
                     </p>
+
+                    ${hasAttach ? `
+                    <div style="margin-top: 10px; margin-bottom: 14px; padding: 10px 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; min-width: 0;">
+                            <span style="font-size: 20px; flex-shrink: 0;">${attachIcon}</span>
+                            <div style="overflow: hidden; min-width: 0;">
+                                <div style="font-size: 12.5px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    ${escapeHtml(n.attachment_name || 'Official Attachment')}
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-muted);">${isPdf ? 'PDF Document' : (isImg ? 'Image Attachment' : 'Attached File')}</div>
+                            </div>
+                        </div>
+                        <a href="${escapeHtml(n.attachment_path)}" target="_blank" download="${escapeHtml(n.attachment_name || 'attachment')}" class="btn btn-outline" style="padding: 5px 11px; font-size: 11.5px; font-weight: 700; text-decoration: none; white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;" title="Download Attachment">
+                            <span>⬇️</span> Download
+                        </a>
+                    </div>
+                    ` : ''}
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: auto; font-size: 11.5px; color: var(--text-dim);">
@@ -1770,11 +1830,53 @@ function renderNoticesFeed(notices) {
     feed.innerHTML = html;
 }
 
+function handleNoticeFileSelected(input) {
+    const display = document.getElementById('hr-notice-file-display');
+    const info = document.getElementById('hr-notice-file-info');
+    if (!input.files || input.files.length === 0) {
+        if (display) {
+            display.innerHTML = `
+                <span style="font-size: 20px; display: block; margin-bottom: 4px;">📄</span>
+                <span style="font-size: 12.5px; font-weight: 700; color: var(--primary);">Choose File (PDF, DOCX, Images)</span>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Max 25MB • Circulars, policies, memos</div>
+            `;
+        }
+        if (info) info.textContent = 'Optional';
+        return;
+    }
+
+    const file = input.files[0];
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    const icon = isPdf ? '📕' : (file.type && file.type.startsWith('image/') ? '🖼️' : '📄');
+
+    if (display) {
+        display.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span style="font-size: 22px;">${icon}</span>
+                <div style="text-align: left; max-width: 280px; overflow: hidden;">
+                    <div style="font-weight: 700; font-size: 13px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(file.name)}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">${sizeMb} MB</div>
+                </div>
+                <button type="button" class="btn btn-outline" style="margin-left: 8px; padding: 3px 8px; font-size: 11px; color: #ef4444;" onclick="event.stopPropagation(); clearNoticeAttachment();">✕ Remove</button>
+            </div>
+        `;
+    }
+    if (info) info.textContent = `Attached: ${file.name}`;
+}
+
+function clearNoticeAttachment() {
+    const input = document.getElementById('hr-notice-file');
+    if (input) input.value = '';
+    handleNoticeFileSelected(input || { files: [] });
+}
+
 function openCreateNoticeModal() {
     populateHrEmployeeDropdowns();
     document.getElementById('hr-notice-title').value = '';
     document.getElementById('hr-notice-message').value = '';
     document.getElementById('hr-notice-priority').value = 'normal';
+    clearNoticeAttachment();
     openModal('hr-create-notice-modal');
 }
 
@@ -1785,23 +1887,28 @@ async function handleSaveNoticeSubmit(e) {
     const message = document.getElementById('hr-notice-message')?.value.trim();
     const priority = document.getElementById('hr-notice-priority')?.value || 'normal';
     const targetDeptId = document.getElementById('hr-notice-target-dept')?.value;
+    const fileInput = document.getElementById('hr-notice-file');
 
     if (!title || !message) {
         showToast("Please enter title and announcement content.", "error");
         return;
     }
 
+    const formData = new FormData();
+    formData.append('action', 'save_notice');
+    formData.append('title', title);
+    formData.append('message', message);
+    formData.append('priority', priority);
+    if (targetDeptId) formData.append('target_department_id', targetDeptId);
+
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+        formData.append('attachment', fileInput.files[0]);
+    }
+
     try {
         const res = await fetch('api/hr.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'save_notice',
-                title: title,
-                message: message,
-                priority: priority,
-                target_department_id: targetDeptId
-            })
+            body: formData
         });
         const data = await res.json();
 
@@ -1842,7 +1949,752 @@ async function handleDeleteNotice(noticeId) {
 }
 
 
-// ================= 4. DISCIPLINARY FINES & PENALTIES =================
+// ================= 4. DISCIPLINARY & SHOW CAUSE INQUIRY CENTER =================
+
+function switchDisciplinarySubView(view) {
+    HrState.disciplinarySubTab = view || 'showcause';
+    const scView = document.getElementById('hr-disc-view-showcause');
+    const finesView = document.getElementById('hr-disc-view-fines');
+    const btnSc = document.getElementById('hr-disc-tab-btn-showcause');
+    const btnFines = document.getElementById('hr-disc-tab-btn-fines');
+
+    if (view === 'fines') {
+        if (scView) scView.style.display = 'none';
+        if (finesView) finesView.style.display = 'block';
+
+        if (btnSc) {
+            btnSc.style.background = 'transparent';
+            btnSc.style.color = 'var(--text-muted)';
+        }
+        if (btnFines) {
+            btnFines.style.background = 'var(--primary)';
+            btnFines.style.color = '#ffffff';
+        }
+        loadHrFines();
+    } else {
+        if (scView) scView.style.display = 'block';
+        if (finesView) finesView.style.display = 'none';
+
+        if (btnSc) {
+            btnSc.style.background = '#d97706';
+            btnSc.style.color = '#ffffff';
+        }
+        if (btnFines) {
+            btnFines.style.background = 'transparent';
+            btnFines.style.color = 'var(--text-muted)';
+        }
+        loadHrShowCauseNotices();
+    }
+}
+
+async function refreshDisciplinaryCenter() {
+    await Promise.all([loadHrShowCauseNotices(), loadHrFines()]);
+}
+
+async function loadHrShowCauseNotices() {
+    const tbody = document.getElementById('hr-sc-table-body');
+    if (!tbody) return;
+
+    const monthFilter = document.getElementById('hr-sc-month-filter')?.value || '';
+    const statusFilter = document.getElementById('hr-sc-status-filter')?.value || 'all';
+    const catFilter = document.getElementById('hr-sc-cat-filter')?.value || 'all';
+    const empFilter = document.getElementById('hr-sc-emp-filter')?.value || '';
+
+    let url = `api/hr.php?action=get_show_cause_notices&status=${encodeURIComponent(statusFilter)}&violation_category=${encodeURIComponent(catFilter)}`;
+    if (monthFilter) url += `&month=${encodeURIComponent(monthFilter)}`;
+    if (empFilter) url += `&employee_id=${encodeURIComponent(empFilter)}`;
+
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.success) {
+            HrState.showCauseNotices = data.notices || [];
+
+            const stats = data.stats || {};
+            const statTotalEl = document.getElementById('hr-sc-stat-total');
+            const statSubEl = document.getElementById('hr-sc-stat-sub');
+            const pendingBadgeEl = document.getElementById('hr-sc-pending-badge');
+
+            if (statTotalEl) statTotalEl.textContent = `${stats.total_notices || 0} Inquiries`;
+            if (statSubEl) statSubEl.textContent = `${stats.pending_reply_count || 0} awaiting reply • ${stats.under_review_count || 0} under review`;
+            if (pendingBadgeEl) pendingBadgeEl.textContent = `${(stats.pending_reply_count || 0) + (stats.under_review_count || 0)}`;
+
+            applyShowCauseClientFilters();
+        } else {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading notices')}</td></tr>`;
+        }
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading show cause notices.</td></tr>`;
+    }
+}
+
+function applyShowCauseClientFilters() {
+    const search = (document.getElementById('hr-sc-search')?.value || '').toLowerCase().trim();
+    const dept = (document.getElementById('hr-sc-dept-filter')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('hr-sc-status-filter')?.value || 'all';
+    const cat = document.getElementById('hr-sc-cat-filter')?.value || 'all';
+    const month = document.getElementById('hr-sc-month-filter')?.value || '';
+    const empId = document.getElementById('hr-sc-emp-filter')?.value || '';
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const resetBtn = document.getElementById('hr-sc-reset-filters-btn');
+    if (resetBtn) {
+        const isFiltered = !!(search || dept || empId || status !== 'pending_reply' || cat !== 'all' || (month && month !== currentMonth));
+        resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
+    }
+
+    let list = HrState.showCauseNotices || [];
+
+    if (dept) {
+        list = list.filter(n => {
+            const dName = (n.department_name || '').toLowerCase();
+            return dName === dept || (n.department_id && String(n.department_id) === dept);
+        });
+    }
+
+    if (search) {
+        list = list.filter(n => {
+            return (n.employee_name && n.employee_name.toLowerCase().includes(search)) ||
+                   (n.title && n.title.toLowerCase().includes(search)) ||
+                   (n.allegation_details && n.allegation_details.toLowerCase().includes(search)) ||
+                   (n.employee_reply && n.employee_reply.toLowerCase().includes(search)) ||
+                   (n.violation_category && n.violation_category.toLowerCase().includes(search)) ||
+                   (n.status && n.status.toLowerCase().includes(search));
+        });
+    }
+
+    renderShowCauseTable(list);
+}
+
+function resetShowCauseFilters() {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    if (document.getElementById('hr-sc-search')) document.getElementById('hr-sc-search').value = '';
+    if (document.getElementById('hr-sc-dept-filter')) document.getElementById('hr-sc-dept-filter').value = '';
+    if (document.getElementById('hr-sc-status-filter')) document.getElementById('hr-sc-status-filter').value = 'all';
+    if (document.getElementById('hr-sc-cat-filter')) document.getElementById('hr-sc-cat-filter').value = 'all';
+    if (document.getElementById('hr-sc-month-filter')) document.getElementById('hr-sc-month-filter').value = currentMonth;
+    if (document.getElementById('hr-sc-emp-filter')) document.getElementById('hr-sc-emp-filter').value = '';
+    loadHrShowCauseNotices();
+}
+
+function renderShowCauseTable(notices) {
+    const tbody = document.getElementById('hr-sc-table-body');
+    const countLabel = document.getElementById('hr-sc-count-label');
+    if (!tbody) return;
+
+    if (countLabel) {
+        countLabel.textContent = `Showing ${notices.length} notice(s)`;
+    }
+
+    if (!notices || notices.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+                    <div style="font-size: 32px; margin-bottom: 8px;">📜</div>
+                    <div style="font-weight: 700; font-size: 14px;">No Show Cause Inquiries Found</div>
+                    <div style="font-size: 12px; margin-top: 4px;">Click "📜 Issue Show Cause Notice" above to call for an employee explanation.</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const currentUserId = AppState.currentUser ? AppState.currentUser.id : null;
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
+    const isHod = AppState.currentUser && (AppState.currentUser.role === 'hod' || (AppState.currentUser.designation && AppState.currentUser.designation.toLowerCase().includes('hod')));
+
+    const categoryBadges = {
+        late_arrival: { label: '⏱️ Late Arrival', bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706' },
+        unauthorized_absence: { label: '🚫 Absence', bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' },
+        sop_violation: { label: '⚠️ Policy Breach', bg: 'rgba(139, 92, 246, 0.12)', color: '#8b5cf6' },
+        negligence: { label: '⚠️ Negligence', bg: 'rgba(249, 115, 22, 0.12)', color: '#ea580c' },
+        misconduct: { label: '🛑 Misconduct', bg: 'rgba(220, 38, 38, 0.12)', color: '#dc2626' },
+        other: { label: '📝 Incident', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280' }
+    };
+
+    let html = '';
+    notices.forEach(n => {
+        const catBadge = categoryBadges[n.violation_category] || categoryBadges.sop_violation;
+        const avatarInitial = n.employee_name ? n.employee_name.charAt(0).toUpperCase() : '👤';
+        const avatarHtml = n.employee_avatar
+            ? `<img src="${escapeHtml(n.employee_avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" alt="${escapeHtml(n.employee_name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width:28px;height:28px;font-size:12px;\\'>${escapeHtml(avatarInitial)}</div>';">`
+            : `<div class="user-avatar" style="width: 28px; height: 28px; font-size: 12px;">${escapeHtml(avatarInitial)}</div>`;
+
+        // Status badge
+        let statusBadge = '';
+        if (n.status === 'pending_reply') {
+            statusBadge = `<span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: rgba(217, 119, 6, 0.12); color: #d97706;">⏳ Awaiting Reply</span>`;
+        } else if (n.status === 'under_review') {
+            statusBadge = `<span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: rgba(37, 99, 235, 0.12); color: #2563eb;">🔍 Under Review</span>`;
+        } else if (n.status === 'satisfied_closed') {
+            statusBadge = `<span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: rgba(16, 185, 129, 0.12); color: #10b981;">🟢 Explanation Accepted</span>`;
+        } else if (n.status === 'fine_issued') {
+            statusBadge = `<span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: rgba(239, 68, 68, 0.12); color: #ef4444;">🔴 Fine PKR ${Math.round(parseFloat(n.fine_amount || 0)).toLocaleString('en-US')}</span>`;
+        }
+
+        // Employee explanation column preview
+        let replyHtml = '';
+        if (n.employee_reply) {
+            replyHtml = `
+                <div style="font-size: 11.5px; color: var(--text-main); line-height: 1.35; max-height: 48px; overflow: hidden; text-overflow: ellipsis;">
+                    ${escapeHtml(n.employee_reply)}
+                </div>
+            `;
+            if (n.reply_attachment_path) {
+                replyHtml += `
+                    <div style="margin-top: 4px;">
+                        <a href="${escapeHtml(n.reply_attachment_path)}" target="_blank" download style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #2563eb; text-decoration: none; background: rgba(37, 99, 235, 0.08); padding: 2px 6px; border-radius: 4px;">
+                            📎 ${escapeHtml(n.reply_attachment_name || 'Proof Attachment')}
+                        </a>
+                    </div>
+                `;
+            }
+        } else {
+            replyHtml = `<span style="color: #d97706; font-size: 11.5px; font-weight: 600;">⏳ Awaiting response</span>`;
+        }
+
+        // Deadline
+        let deadlineHtml = '';
+        if (n.deadline_date) {
+            const isOverdue = n.status === 'pending_reply' && new Date(n.deadline_date) < new Date(new Date().toDateString());
+            deadlineHtml = `<span style="font-size: 11.5px; font-weight: 700; color: ${isOverdue ? '#ef4444' : 'var(--text-main)'};">${escapeHtml(n.deadline_date)} ${isOverdue ? '<span title="Overdue deadline">⚠️</span>' : ''}</span>`;
+        } else {
+            deadlineHtml = `<span style="color: var(--text-muted); font-size: 11px;">Open</span>`;
+        }
+
+        // Actions
+        const canManage = (isAdmin || isHod);
+        const isMyNotice = (currentUserId && n.employee_id == currentUserId);
+
+        let buttons = [];
+
+        // If pending reply, employee can respond (or management on employee's behalf)
+        if (n.status === 'pending_reply') {
+            if (isMyNotice || canManage) {
+                buttons.push(`
+                    <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; font-weight: 700; color: #2563eb; border-color: #2563eb;" onclick="openShowCauseReplyModal(${n.id})" title="Submit employee explanation">
+                        ✍️ Reply
+                    </button>
+                `);
+            }
+        }
+
+        // If under review, management can decide (Accept or Impose Fine)
+        if (n.status === 'under_review' && canManage) {
+            buttons.push(`
+                <button type="button" class="btn" style="padding: 3px 8px; font-size: 11px; font-weight: 800; background: #d97706; color: #fff; border: 1px solid #b45309;" onclick="openShowCauseDecideModal(${n.id})" title="Review response and decide (Clear or Issue Fine)">
+                    ⚖️ Decide
+                </button>
+            `);
+        }
+
+        // View full inquiry record button
+        buttons.push(`
+            <button type="button" class="btn btn-outline" style="padding: 3px 6px; font-size: 11px;" onclick="viewShowCauseDetails(${n.id})" title="View full inquiry record">
+                👁️ View
+            </button>
+        `);
+
+        // Delete button for Admin
+        if (isAdmin) {
+            buttons.push(`
+                <button type="button" class="btn-icon-del" style="padding: 3px 6px;" onclick="handleDeleteShowCause(${n.id})" title="Delete inquiry record">🗑️</button>
+            `);
+        }
+
+        const actionHtml = `<div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">${buttons.join('')}</div>`;
+
+        html += `
+            <tr>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        ${avatarHtml}
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">${escapeHtml(n.employee_name)}</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(n.employee_designation || 'Staff')} • ${escapeHtml(n.department_name || 'General')}</div>
+                        </div>
+                    </div>
+                </td>
+                <td style="font-size: 12px; font-weight: 600; color: var(--text-main);">
+                    <div>${escapeHtml(n.notice_date)}</div>
+                    <div style="font-size: 10px; color: var(--text-muted); margin-top: 1px;">Incident: ${escapeHtml(n.incident_date)}</div>
+                </td>
+                <td>
+                    <span style="display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 10.5px; font-weight: 700; background: ${catBadge.bg}; color: ${catBadge.color}; margin-bottom: 3px;">
+                        ${catBadge.label}
+                    </span>
+                    <div style="font-size: 12px; font-weight: 700; color: var(--text-main); line-height: 1.3;">${escapeHtml(n.title)}</div>
+                </td>
+                <td>
+                    <div style="font-size: 12px; color: var(--text-main); line-height: 1.4; max-height: 54px; overflow: hidden; text-overflow: ellipsis;">
+                        ${escapeHtml(n.allegation_details)}
+                    </div>
+                    <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">Issued by ${escapeHtml(n.issued_by_name || 'HR')}</div>
+                </td>
+                <td>
+                    ${deadlineHtml}
+                </td>
+                <td>
+                    ${replyHtml}
+                </td>
+                <td style="text-align: center;">
+                    ${statusBadge}
+                </td>
+                <td style="text-align: center;">
+                    ${actionHtml}
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+async function openIssueShowCauseModal() {
+    await populateHrEmployeeDropdowns();
+    const today = new Date().toISOString().slice(0, 10);
+    const deadlineDefault = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const noticeDateInput = document.getElementById('hr-sc-form-notice-date');
+    const incidentDateInput = document.getElementById('hr-sc-form-incident-date');
+    const deadlineInput = document.getElementById('hr-sc-form-deadline');
+    const titleInput = document.getElementById('hr-sc-form-title');
+    const detailsInput = document.getElementById('hr-sc-form-details');
+    const catInput = document.getElementById('hr-sc-form-category');
+
+    if (noticeDateInput) noticeDateInput.value = today;
+    if (incidentDateInput) incidentDateInput.value = today;
+    if (deadlineInput) deadlineInput.value = deadlineDefault;
+    if (titleInput) titleInput.value = '';
+    if (detailsInput) detailsInput.value = '';
+    if (catInput) catInput.value = 'sop_violation';
+
+    openModal('hr-issue-showcause-modal');
+}
+
+async function handleIssueShowCauseSubmit(e) {
+    if (e) e.preventDefault();
+
+    const empId = document.getElementById('hr-sc-form-emp-id')?.value;
+    const noticeDate = document.getElementById('hr-sc-form-notice-date')?.value;
+    const incidentDate = document.getElementById('hr-sc-form-incident-date')?.value;
+    const deadlineDate = document.getElementById('hr-sc-form-deadline')?.value;
+    const category = document.getElementById('hr-sc-form-category')?.value;
+    const title = document.getElementById('hr-sc-form-title')?.value.trim();
+    const details = document.getElementById('hr-sc-form-details')?.value.trim();
+
+    if (!empId) {
+        showToast("Please select an employee.", "error");
+        return;
+    }
+    if (!title) {
+        showToast("Please enter a notice subject / title.", "error");
+        return;
+    }
+    if (!details) {
+        showToast("Please provide allegation / incident details.", "error");
+        return;
+    }
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'issue_show_cause',
+                employee_id: empId,
+                notice_date: noticeDate,
+                incident_date: incidentDate,
+                deadline_date: deadlineDate,
+                violation_category: category,
+                title: title,
+                allegation_details: details
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast("Show Cause Notice issued successfully.", "success");
+            closeModal('hr-issue-showcause-modal');
+            await loadHrShowCauseNotices();
+        } else {
+            showToast(data.message || "Failed to issue show cause notice.", "error");
+        }
+    } catch (err) {
+        showToast("Network error issuing show cause notice.", "error");
+    }
+}
+
+function openShowCauseReplyModal(noticeId) {
+    const notice = (HrState.showCauseNotices || []).find(n => n.id == noticeId);
+    if (!notice) {
+        showToast("Notice not found.", "error");
+        return;
+    }
+
+    const idInput = document.getElementById('hr-reply-sc-notice-id');
+    const summaryBox = document.getElementById('hr-reply-sc-summary-box');
+    const replyInput = document.getElementById('hr-reply-sc-text');
+    const fileInput = document.getElementById('hr-reply-sc-file');
+
+    if (idInput) idInput.value = notice.id;
+    if (replyInput) replyInput.value = notice.employee_reply || '';
+    if (fileInput) fileInput.value = '';
+
+    if (summaryBox) {
+        summaryBox.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px;">
+                <div>
+                    <div style="font-size: 13.5px; font-weight: 800; color: #92400e;">${escapeHtml(notice.title)}</div>
+                    <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+                        <b>Employee:</b> ${escapeHtml(notice.employee_name)} • <b>Issued:</b> ${escapeHtml(notice.notice_date)} • <b>Incident:</b> ${escapeHtml(notice.incident_date)}
+                    </div>
+                </div>
+                <div style="text-align: right; font-size: 11px;">
+                    <span style="font-weight: 800; color: #dc2626;">Deadline: ${escapeHtml(notice.deadline_date || 'Open')}</span>
+                </div>
+            </div>
+            <div style="font-size: 12px; color: var(--text-main); background: rgba(255,255,255,0.7); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(217, 119, 6, 0.2); line-height: 1.4;">
+                <b>Allegations:</b> ${escapeHtml(notice.allegation_details)}
+            </div>
+        `;
+    }
+
+    openModal('hr-reply-showcause-modal');
+}
+
+async function handleSubmitShowCauseReply(e) {
+    if (e) e.preventDefault();
+
+    const noticeId = document.getElementById('hr-reply-sc-notice-id')?.value;
+    const replyText = document.getElementById('hr-reply-sc-text')?.value.trim();
+    const fileInput = document.getElementById('hr-reply-sc-file');
+
+    if (!noticeId) {
+        showToast("Invalid notice ID.", "error");
+        return;
+    }
+    if (!replyText) {
+        showToast("Please provide your written explanation.", "error");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('action', 'submit_show_cause_reply');
+    formData.append('notice_id', noticeId);
+    formData.append('employee_reply', replyText);
+
+    if (fileInput && fileInput.files && fileInput.files[0]) {
+        formData.append('reply_attachment', fileInput.files[0]);
+    }
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast("Explanation response submitted successfully.", "success");
+            closeModal('hr-reply-showcause-modal');
+            await loadHrShowCauseNotices();
+        } else {
+            showToast(data.message || "Failed to submit response.", "error");
+        }
+    } catch (err) {
+        showToast("Network error submitting response.", "error");
+    }
+}
+
+function openShowCauseDecideModal(noticeId) {
+    const notice = (HrState.showCauseNotices || []).find(n => n.id == noticeId);
+    if (!notice) {
+        showToast("Notice not found.", "error");
+        return;
+    }
+
+    const idInput = document.getElementById('hr-decide-sc-notice-id');
+    const summaryBox = document.getElementById('hr-decide-sc-summary-box');
+    const remarksInput = document.getElementById('hr-decide-sc-remarks');
+    const fineAmountInput = document.getElementById('hr-decide-sc-fine-amount');
+    const fineMonthInput = document.getElementById('hr-decide-sc-fine-month');
+    const fineCatInput = document.getElementById('hr-decide-sc-fine-cat');
+
+    if (idInput) idInput.value = notice.id;
+    if (remarksInput) remarksInput.value = '';
+    if (fineAmountInput) fineAmountInput.value = '';
+    if (fineMonthInput) fineMonthInput.value = new Date().toISOString().slice(0, 7);
+    if (fineCatInput) fineCatInput.value = notice.violation_category || 'sop_violation';
+
+    // Reset radio to 'satisfied'
+    const radios = document.getElementsByName('hr_sc_decision');
+    for (let r of radios) {
+        if (r.value === 'satisfied') r.checked = true;
+    }
+    toggleDecisionFineInputs();
+
+    if (summaryBox) {
+        summaryBox.innerHTML = `
+            <div style="margin-bottom: 8px;">
+                <div style="font-size: 13.5px; font-weight: 800; color: var(--text-main);">${escapeHtml(notice.title)}</div>
+                <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+                    <b>Employee:</b> ${escapeHtml(notice.employee_name)} (${escapeHtml(notice.department_name || 'General')}) • <b>Incident Date:</b> ${escapeHtml(notice.incident_date)}
+                </div>
+            </div>
+            <div style="font-size: 12px; color: var(--text-main); background: var(--bg-card); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; line-height: 1.4;">
+                <b style="color: #d97706;">Allegation:</b> ${escapeHtml(notice.allegation_details)}
+            </div>
+            <div style="font-size: 12px; color: var(--text-main); background: rgba(37, 99, 235, 0.05); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(37, 99, 235, 0.2); line-height: 1.4;">
+                <b style="color: #2563eb;">Employee Explanation:</b> ${escapeHtml(notice.employee_reply || 'No written explanation provided.')}
+                ${notice.reply_attachment_path ? `
+                    <div style="margin-top: 6px;">
+                        <a href="${escapeHtml(notice.reply_attachment_path)}" target="_blank" download style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #2563eb; text-decoration: none;">
+                            📎 View / Download Submitted Proof: ${escapeHtml(notice.reply_attachment_name || 'Attachment')}
+                        </a>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    openModal('hr-decide-showcause-modal');
+}
+
+function toggleDecisionFineInputs() {
+    let selectedVal = 'satisfied';
+    const radios = document.getElementsByName('hr_sc_decision');
+    for (let r of radios) {
+        if (r.checked) selectedVal = r.value;
+    }
+
+    const fineSection = document.getElementById('hr-decide-sc-fine-section');
+    const submitBtn = document.getElementById('hr-decide-sc-submit-btn');
+
+    if (selectedVal === 'fine_issued') {
+        if (fineSection) fineSection.style.display = 'block';
+        if (submitBtn) {
+            submitBtn.style.background = '#dc2626';
+            submitBtn.style.borderColor = '#dc2626';
+            submitBtn.textContent = '⚠️ Confirm: Reject & Issue Disciplinary Fine';
+        }
+    } else {
+        if (fineSection) fineSection.style.display = 'none';
+        if (submitBtn) {
+            submitBtn.style.background = '#10b981';
+            submitBtn.style.borderColor = '#10b981';
+            submitBtn.textContent = '🟢 Confirm: Accept Explanation (Close Inquiry)';
+        }
+    }
+}
+
+async function handleShowCauseDecisionSubmit(e) {
+    if (e) e.preventDefault();
+
+    const noticeId = document.getElementById('hr-decide-sc-notice-id')?.value;
+    let decision = 'satisfied';
+    const radios = document.getElementsByName('hr_sc_decision');
+    for (let r of radios) {
+        if (r.checked) decision = r.value;
+    }
+
+    const remarks = document.getElementById('hr-decide-sc-remarks')?.value.trim();
+    const fineAmount = document.getElementById('hr-decide-sc-fine-amount')?.value;
+    const fineMonth = document.getElementById('hr-decide-sc-fine-month')?.value;
+    const fineCategory = document.getElementById('hr-decide-sc-fine-cat')?.value;
+
+    if (!noticeId) {
+        showToast("Invalid notice ID.", "error");
+        return;
+    }
+
+    if (decision === 'fine_issued') {
+        if (!fineAmount || parseFloat(fineAmount) <= 0) {
+            showToast("Please enter a valid fine amount to impose.", "error");
+            return;
+        }
+        if (!fineMonth) {
+            showToast("Please select the salary deduction month.", "error");
+            return;
+        }
+    }
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'decide_show_cause',
+                notice_id: noticeId,
+                decision: decision,
+                decision_remarks: remarks,
+                fine_amount: fineAmount,
+                salary_month: fineMonth,
+                fine_category: fineCategory
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message || "Decision recorded successfully.", "success");
+            closeModal('hr-decide-showcause-modal');
+            await refreshDisciplinaryCenter();
+            if (document.getElementById('tab-hr-payroll')?.classList.contains('active')) {
+                await loadHrPayroll();
+            }
+        } else {
+            showToast(data.message || "Failed to record decision.", "error");
+        }
+    } catch (err) {
+        showToast("Network error recording decision.", "error");
+    }
+}
+
+function viewShowCauseDetails(noticeId) {
+    const notice = (HrState.showCauseNotices || []).find(n => n.id == noticeId);
+    if (!notice) {
+        showToast("Notice record not found.", "error");
+        return;
+    }
+
+    const container = document.getElementById('hr-view-showcause-content');
+    if (!container) return;
+
+    let statusHtml = '';
+    if (notice.status === 'pending_reply') {
+        statusHtml = `<span style="background: rgba(217, 119, 6, 0.15); color: #d97706; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 12px;">⏳ Awaiting Employee Response</span>`;
+    } else if (notice.status === 'under_review') {
+        statusHtml = `<span style="background: rgba(37, 99, 235, 0.15); color: #2563eb; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 12px;">🔍 Explanation Submitted (Under Review)</span>`;
+    } else if (notice.status === 'satisfied_closed') {
+        statusHtml = `<span style="background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 12px;">🟢 Explanation Accepted (No Penalty)</span>`;
+    } else if (notice.status === 'fine_issued') {
+        statusHtml = `<span style="background: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 4px 10px; border-radius: 12px; font-weight: 800; font-size: 12px;">🔴 Disciplinary Fine Imposed (PKR ${Math.round(parseFloat(notice.fine_amount || 0)).toLocaleString('en-US')})</span>`;
+    }
+
+    container.innerHTML = `
+        <div style="border-bottom: 2px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <h4 style="font-size: 16px; font-weight: 800; margin: 0; color: var(--text-main);">${escapeHtml(notice.title)}</h4>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
+                    Notice #${notice.id} • Issued on ${escapeHtml(notice.notice_date)} • Incident: ${escapeHtml(notice.incident_date)}
+                </div>
+            </div>
+            <div>
+                ${statusHtml}
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 12px;">
+            <div><b>Staff Member:</b> ${escapeHtml(notice.employee_name)}</div>
+            <div><b>Department:</b> ${escapeHtml(notice.department_name || 'General')}</div>
+            <div><b>Issued By:</b> ${escapeHtml(notice.issued_by_name || 'HR')}</div>
+            <div><b>Explanation Deadline:</b> ${escapeHtml(notice.deadline_date || 'N/A')}</div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+            <div style="font-size: 12px; font-weight: 800; color: #d97706; text-transform: uppercase; margin-bottom: 4px;">
+                ⚠️ Allegation & Charge Details
+            </div>
+            <div style="padding: 12px; background: rgba(217, 119, 6, 0.06); border: 1px solid rgba(217, 119, 6, 0.2); border-radius: var(--radius-sm); font-size: 12.5px; line-height: 1.5; color: var(--text-main);">
+                ${escapeHtml(notice.allegation_details)}
+            </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+            <div style="font-size: 12px; font-weight: 800; color: #2563eb; text-transform: uppercase; margin-bottom: 4px; display: flex; justify-content: space-between;">
+                <span>✍️ Employee Explanation & Defense</span>
+                <span style="font-weight: 600; font-size: 11px; text-transform: none; color: var(--text-muted);">${notice.reply_submitted_at ? 'Submitted: ' + escapeHtml(notice.reply_submitted_at) : ''}</span>
+            </div>
+            <div style="padding: 12px; background: rgba(37, 99, 235, 0.06); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: var(--radius-sm); font-size: 12.5px; line-height: 1.5; color: var(--text-main);">
+                ${notice.employee_reply ? escapeHtml(notice.employee_reply) : '<i style="color: var(--text-muted);">No response submitted yet.</i>'}
+                ${notice.reply_attachment_path ? `
+                    <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(37, 99, 235, 0.3);">
+                        <a href="${escapeHtml(notice.reply_attachment_path)}" target="_blank" download style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #2563eb; text-decoration: none;">
+                            📎 Attached Verification Document: ${escapeHtml(notice.reply_attachment_name || 'Download Proof')}
+                        </a>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+
+        ${notice.decision_remarks || notice.action_at ? `
+            <div style="margin-bottom: 12px;">
+                <div style="font-size: 12px; font-weight: 800; color: ${notice.status === 'fine_issued' ? '#ef4444' : '#10b981'}; text-transform: uppercase; margin-bottom: 4px;">
+                    ⚖️ Inquiry Finding & Management Final Decision
+                </div>
+                <div style="padding: 12px; background: ${notice.status === 'fine_issued' ? 'rgba(239, 68, 68, 0.06)' : 'rgba(16, 185, 129, 0.06)'}; border: 1px solid ${notice.status === 'fine_issued' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)'}; border-radius: var(--radius-sm); font-size: 12.5px; line-height: 1.5; color: var(--text-main);">
+                    <div>${escapeHtml(notice.decision_remarks || 'Case reviewed and concluded.')}</div>
+                    ${notice.fine_amount ? `
+                        <div style="margin-top: 6px; font-weight: 800; color: #ef4444;">
+                            Deduction Applied: PKR ${Math.round(parseFloat(notice.fine_amount)).toLocaleString('en-US')} (Salary Month: ${escapeHtml(notice.fine_salary_month || 'N/A')})
+                        </div>
+                    ` : ''}
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+                        Decided by ${escapeHtml(notice.action_by_name || 'Management')} on ${escapeHtml(notice.action_at || 'N/A')}
+                    </div>
+                </div>
+            </div>
+        ` : ''}
+    `;
+
+    openModal('hr-view-showcause-modal');
+}
+
+function printShowCauseRecord() {
+    const content = document.getElementById('hr-view-showcause-content');
+    if (!content) return;
+    const printWindow = window.open('', '', 'width=800,height=600');
+    printWindow.document.write(`
+        <html>
+            <head>
+                <title>Show Cause Inquiry Record</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 25px; color: #1e293b; }
+                    h4 { margin-top: 0; }
+                </style>
+            </head>
+            <body>
+                <h2 style="margin-top:0; border-bottom: 2px solid #333; padding-bottom: 6px;">Internal Disciplinary Inquiry Summary</h2>
+                ${content.innerHTML}
+                <div style="margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px;">
+                    <div><b>Employee Signature:</b> ___________________</div>
+                    <div><b>HR / Authority Signature:</b> ___________________</div>
+                </div>
+            </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 250);
+}
+
+async function handleDeleteShowCause(noticeId) {
+    if (!confirm("Are you sure you want to delete this show cause notice?")) return;
+
+    try {
+        const res = await fetch('api/hr.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete_show_cause', notice_id: noticeId })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast("Show cause notice deleted.", "info");
+            await loadHrShowCauseNotices();
+        } else {
+            showToast(data.message || "Failed to delete notice.", "error");
+        }
+    } catch (err) {
+        showToast("Network error deleting notice.", "error");
+    }
+}
+
+// ----------------- Fines & Penalties -----------------
 
 async function loadHrFines() {
     const tbody = document.getElementById('hr-fines-table-body');
@@ -1939,10 +2791,14 @@ function resetFinesFilters() {
 function renderFinesTable(fines) {
     const tbody = document.getElementById('hr-fines-table-body');
     const countLabel = document.getElementById('hr-fines-count-label');
+    const finesCountBadge = document.getElementById('hr-fines-count-badge');
     if (!tbody) return;
 
     if (countLabel) {
         countLabel.textContent = `Showing ${fines.length} fine record(s)`;
+    }
+    if (finesCountBadge) {
+        finesCountBadge.textContent = fines.length;
     }
 
     if (!fines || fines.length === 0) {
@@ -1951,7 +2807,7 @@ function renderFinesTable(fines) {
                 <td colspan="8" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
                     <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
                     <div style="font-weight: 700; font-size: 14px;">No Disciplinary Fines Recorded</div>
-                    <div style="font-size: 12px; margin-top: 4px;">Click "+ Issue Fine" above to log a penalty or violation.</div>
+                    <div style="font-size: 12px; margin-top: 4px;">Click "+ Issue Direct Fine" above to log a penalty or violation.</div>
                 </td>
             </tr>
         `;
@@ -2022,6 +2878,11 @@ function renderFinesTable(fines) {
                     <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: ${catBadge.bg}; color: ${catBadge.color};">
                         ${catBadge.label}
                     </span>
+                    ${f.show_cause_id ? `
+                        <div style="margin-top: 3px;">
+                            <span style="display: inline-block; font-size: 10px; font-weight: 800; background: rgba(217, 119, 6, 0.12); color: #d97706; padding: 1px 6px; border-radius: 4px;">📜 From Show Cause Notice</span>
+                        </div>
+                    ` : ''}
                 </td>
                 <td>
                     <div style="font-size: 12.5px; color: var(--text-main); font-weight: 500; line-height: 1.4;">${escapeHtml(f.reason)}</div>
