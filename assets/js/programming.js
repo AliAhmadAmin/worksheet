@@ -21,15 +21,25 @@ let ProgState = {
 };
 
 // Auto-initialize when tab is loaded or page opened
+let progIsInitializing = false;
+let progIsInitialized = false;
+
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('tab-programming')) {
         initProgrammingModule();
     }
 });
 
-async function initProgrammingModule() {
-    await fetchProgMetadata();
-    await loadProgrammingDispatches();
+async function initProgrammingModule(force = false) {
+    if (!force && (progIsInitializing || progIsInitialized)) return;
+    progIsInitializing = true;
+    try {
+        await fetchProgMetadata();
+        await loadProgrammingDispatches();
+        progIsInitialized = true;
+    } finally {
+        progIsInitializing = false;
+    }
 }
 
 async function fetchProgMetadata() {

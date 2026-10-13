@@ -64,9 +64,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
 
         // - Program Handover: visible to Programming, Digital Media, or Global Admin (News Room cannot see)
         $canViewProgHandover = $isGlobalAdmin || ($isProgDept && !$isNewsDept) || $isDigitalDept;
+        $canViewManagement = $isGlobalAdmin || $userRole === 'hod' || !empty($authUser['can_view_reports']) || !empty($authUser['can_view_attendance']) || !empty($authUser['can_manage_employees']);
         ?>
         <?php if ($isGlobalAdmin): ?>
-        <div class="portal-switcher-wrapper admin-only" style="position: relative; display: none;">
+        <div class="portal-switcher-wrapper admin-only" style="position: relative;">
             <button type="button" class="portal-switcher-btn" onclick="togglePortalMenu()" id="portal-switcher-btn" title="Switch Department Workspace Portal">
                 <span class="portal-icon"><?= $currentPortal === 'hr' ? '💼' : ($currentPortal === 'newsroom' ? '📺' : ($currentPortal === 'programming' ? '📡' : '🎬')) ?></span>
                 <div class="portal-text-block">
@@ -184,7 +185,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         </div>
 
         <!-- Department Management Category -->
-        <div class="sidebar-nav-group admin-only" style="display: none;">
+        <div class="sidebar-nav-group admin-only" style="<?= $canViewManagement ? '' : 'display: none;' ?>">
             <div class="sidebar-nav-title">MANAGEMENT</div>
             <button type="button" class="nav-btn admin-only" data-tab="tab-reports" data-route="reports">
                 <span class="nav-icon">📊</span>

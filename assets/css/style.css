@@ -1585,6 +1585,14 @@ body {
     pointer-events: auto;
 }
 
+/* Nested & Child Dialogs Stack on Top of Parent Overlays */
+#add-team-modal,
+#edit-team-modal,
+#add-department-modal,
+#edit-department-modal {
+    z-index: 10050;
+}
+
 .modal-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);

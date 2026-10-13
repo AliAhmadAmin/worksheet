@@ -40,6 +40,10 @@ if ($isHod) {
     }
 }
 
+if (in_array($action, ['list', 'get'])) {
+    session_write_close();
+}
+
 switch ($action) {
     case 'list':
         $requestedDeptId = isset($_GET['department_id']) ? (int)$_GET['department_id'] : null;
@@ -597,8 +601,7 @@ switch ($action) {
 
     case 'create_department':
         if (!$canManageEmp && !$isHr && !$isSuperAdmin) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required to create departments.']);
             exit;
         }
 
@@ -607,34 +610,48 @@ switch ($action) {
         $hodId = (!empty($data['hod_id']) && (int)$data['hod_id'] > 0) ? (int)$data['hod_id'] : null;
 
         if (empty($name)) {
-            http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Department name is required.']);
             exit;
         }
 
-        // Check duplicate name
-        $stmtCheck = $pdo->prepare("SELECT id FROM departments WHERE LOWER(name) = LOWER(?) AND is_active = 1");
-        $stmtCheck->execute([$name]);
-        if ($stmtCheck->fetch()) {
-            http_response_code(409);
-            echo json_encode(['success' => false, 'message' => "A department named '{$name}' already exists."]);
-            exit;
+        try {
+            // Check if department name already exists (either active or inactive)
+            $stmtCheck = $pdo->prepare("SELECT id, is_active FROM departments WHERE LOWER(name) = LOWER(?)");
+            $stmtCheck->execute([$name]);
+            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                if ((int)$existing['is_active'] === 1) {
+                    echo json_encode(['success' => false, 'message' => "A department named '{$name}' already exists."]);
+                    exit;
+                } else {
+                    // Reactivate previously archived/deleted department
+                    $stmtReactivate = $pdo->prepare("UPDATE departments SET is_active = 1, description = ?, hod_id = ? WHERE id = ?");
+                    $stmtReactivate->execute([$description, $hodId, $existing['id']]);
+                    $newDeptId = (int)$existing['id'];
+                }
+            } else {
+                $stmtInsert = $pdo->prepare("INSERT INTO departments (name, description, hod_id, is_active) VALUES (?, ?, ?, 1)");
+                $stmtInsert->execute([$name, $description, $hodId]);
+                $newDeptId = (int)$pdo->lastInsertId();
+            }
+
+            if ($hodId && $newDeptId) {
+                $stmtUpdateHod = $pdo->prepare("UPDATE employees SET role = 'hod', department_id = ? WHERE id = ?");
+                $stmtUpdateHod->execute([$newDeptId, $hodId]);
+            }
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Department '{$name}' created successfully!",
+                'id' => $newDeptId
+            ]);
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'message' => "Database error creating department: " . $e->getMessage()
+            ]);
         }
-
-        $stmtInsert = $pdo->prepare("INSERT INTO departments (name, description, hod_id, is_active) VALUES (?, ?, ?, 1)");
-        $stmtInsert->execute([$name, $description, $hodId]);
-        $newDeptId = (int)$pdo->lastInsertId();
-
-        if ($hodId) {
-            $stmtUpdateHod = $pdo->prepare("UPDATE employees SET role = 'hod', department_id = ? WHERE id = ?");
-            $stmtUpdateHod->execute([$newDeptId, $hodId]);
-        }
-
-        echo json_encode([
-            'success' => true,
-            'message' => "Department '{$name}' created successfully!",
-            'id' => $newDeptId
-        ]);
         break;
 
     case 'update_department':

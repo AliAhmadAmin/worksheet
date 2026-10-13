@@ -31,6 +31,10 @@ $canAssign = $isSuperAdmin || $isHod || !empty($currentUserObj['can_assign_tasks
 $canEdit = $isSuperAdmin || $isHod || !empty($currentUserObj['can_edit_tasks']);
 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 
+if (in_array($action, ['get_tasks', 'get_task_details'])) {
+    session_write_close();
+}
+
 switch ($action) {
     case 'get_tasks':
         $empFilter = $_GET['employee_id'] ?? null;

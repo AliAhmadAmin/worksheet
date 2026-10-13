@@ -45,6 +45,11 @@ if (!$isAdmin && !$isDigital && !$isProg) {
     exit;
 }
 
+// Release session lock on read actions to allow parallel requests without locking
+if (in_array($action, ['list', 'get_meta'])) {
+    session_write_close();
+}
+
 switch ($action) {
     case 'list':
         $date = $_GET['date'] ?? null;

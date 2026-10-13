@@ -104,6 +104,7 @@ async function initApp() {
         if (window.__INITIAL_USER__) {
             AppState.currentUser = window.__INITIAL_USER__;
             renderUserBar();
+            applyRoleBasedVisibility(AppState.currentUser);
         }
 
         // Parallel fetch of master data and fallback auth check
@@ -291,20 +292,66 @@ function hasPermission(permKey) {
     return !!parseInt(AppState.currentUser[permKey] || 0);
 }
 
+function applyRoleBasedVisibility(user) {
+    if (!user) return;
+    const isSuperAdmin = user.role === 'super_admin';
+    const isHod = user.role === 'hod' || user.role === 'admin';
+    const isHr = (user.role === 'hr' || (user.department_name && user.department_name.toLowerCase() === 'hr') || !!parseInt(user.can_manage_hr || 0)) && user.role !== 'hod';
+    const canInspect = isSuperAdmin || isHod || isHr || !!parseInt(user.can_inspect_sheets || 0);
+    const canManage = isSuperAdmin || isHod || isHr || !!parseInt(user.can_manage_employees || 0);
+    const canAttendance = isSuperAdmin || isHod || isHr || !!parseInt(user.can_view_attendance || 0);
+    const canReports = isSuperAdmin || isHod || isHr || !!parseInt(user.can_view_reports || 0);
+
+    if (canInspect) {
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+        document.querySelectorAll('.employee-only').forEach(el => el.style.display = 'none');
+    } else {
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.employee-only').forEach(el => el.style.display = '');
+    }
+
+    const btnAttendance = document.querySelector('.nav-btn[data-tab="tab-attendance"]');
+    if (btnAttendance) btnAttendance.style.display = canAttendance ? '' : 'none';
+
+    const btnEmployees = document.querySelector('.nav-btn[data-tab="tab-employees"]');
+    if (btnEmployees) btnEmployees.style.display = canManage ? '' : 'none';
+
+    const btnReports = document.querySelector('.nav-btn[data-tab="tab-reports"]');
+    if (btnReports) btnReports.style.display = canReports ? '' : 'none';
+
+    const btnNewsroom = document.querySelector('.nav-btn[data-tab="tab-newsroom"]');
+    const btnProgramming = document.querySelector('.nav-btn[data-tab="tab-programming"]');
+    const uRole = (user.role || '').toLowerCase();
+    const uDept = (user.department_name || '').toLowerCase();
+    const isGlobal = (uRole === 'super_admin' || uRole === 'admin');
+    const isNews = uDept.includes('news');
+    const isProg = uDept.includes('prog');
+    const isDigital = uDept.includes('digital');
+
+    if (btnNewsroom) {
+        btnNewsroom.style.display = (isGlobal || (isNews && !isProg) || isDigital) ? '' : 'none';
+    }
+    if (btnProgramming) {
+        btnProgramming.style.display = (isGlobal || (isProg && !isNews) || isDigital) ? '' : 'none';
+    }
+
+    const portalSwitcher = document.querySelector('.portal-switcher-wrapper');
+    if (portalSwitcher && !portalSwitcher.classList.contains('static-portal')) {
+        portalSwitcher.style.display = (isSuperAdmin || user.role === 'admin') ? '' : 'none';
+    }
+}
+
 async function loadUserData() {
     if (!AppState.currentUser) return;
+
+    applyRoleBasedVisibility(AppState.currentUser);
 
     const isSuperAdmin = AppState.currentUser.role === 'super_admin';
     const isHod = AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'admin';
     const isHr = (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || hasPermission('can_manage_hr')) && AppState.currentUser.role !== 'hod';
     const canInspect = isSuperAdmin || isHod || isHr || hasPermission('can_inspect_sheets');
-    const canManage = isSuperAdmin || isHod || isHr || hasPermission('can_manage_employees');
-    const canAttendance = isSuperAdmin || isHod || isHr || hasPermission('can_view_attendance');
-    const canReports = isSuperAdmin || isHod || isHr || hasPermission('can_view_reports');
 
     if (canInspect) {
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
-        document.querySelectorAll('.employee-only').forEach(el => el.style.display = 'none');
         populateAdminEmployeeSelector();
         if (typeof populateTaskEmployeeFilter === 'function') {
             populateTaskEmployeeFilter();
@@ -321,62 +368,26 @@ async function loadUserData() {
         const adminSelect = document.getElementById('admin-employee-select');
         if (adminSelect && AppState.adminSelectedEmpId) adminSelect.value = AppState.adminSelectedEmpId;
     } else {
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-        document.querySelectorAll('.employee-only').forEach(el => el.style.display = '');
         AppState.adminSelectedEmpId = null;
     }
 
-    // Toggle specific navigation tab buttons based on permissions
-    const btnAttendance = document.querySelector('.nav-btn[data-tab="tab-attendance"]');
-    if (btnAttendance) {
-        btnAttendance.style.display = canAttendance ? '' : 'none';
-    }
+    // Only eagerly load data for the currently visible tab to avoid network congestion and session blocking
+    const activeSection = document.querySelector('.tab-section.active');
+    const activeTabId = activeSection ? activeSection.id : 'tab-worksheet';
 
-    const btnEmployees = document.querySelector('.nav-btn[data-tab="tab-employees"]');
-    if (btnEmployees) {
-        btnEmployees.style.display = canManage ? '' : 'none';
+    const loadPromises = [];
+    if (activeTabId === 'tab-worksheet') {
+        loadPromises.push(loadDailyWorksheet());
+    } else if (activeTabId === 'tab-tasks') {
+        loadPromises.push(loadAssignedTasks());
+    } else if (activeTabId === 'tab-newsroom') {
+        if (typeof initNewsroomModule === 'function') loadPromises.push(initNewsroomModule());
+    } else if (activeTabId === 'tab-programming') {
+        if (typeof initProgrammingModule === 'function') loadPromises.push(initProgrammingModule());
     }
-
-    const btnReports = document.querySelector('.nav-btn[data-tab="tab-reports"]');
-    if (btnReports) {
-        btnReports.style.display = canReports ? '' : 'none';
+    if (loadPromises.length > 0) {
+        await Promise.all(loadPromises);
     }
-
-    // Toggle Handover buttons based on department
-    const btnNewsroom = document.querySelector('.nav-btn[data-tab="tab-newsroom"]');
-    const btnProgramming = document.querySelector('.nav-btn[data-tab="tab-programming"]');
-    const uRole = (AppState.currentUser.role || '').toLowerCase();
-    const uDept = (AppState.currentUser.department_name || '').toLowerCase();
-    const isGlobal = (uRole === 'super_admin' || uRole === 'admin');
-    const isNews = uDept.includes('news');
-    const isProg = uDept.includes('prog');
-    const isDigital = uDept.includes('digital');
-
-    if (btnNewsroom) {
-        const canNews = isGlobal || (isNews && !isProg) || isDigital;
-        btnNewsroom.style.display = canNews ? '' : 'none';
-    }
-    if (btnProgramming) {
-        const canProg = isGlobal || (isProg && !isNews) || isDigital;
-        btnProgramming.style.display = canProg ? '' : 'none';
-    }
-
-    const portalSwitcher = document.querySelector('.portal-switcher-wrapper');
-    if (portalSwitcher) {
-        if (portalSwitcher.classList.contains('static-portal')) {
-            portalSwitcher.style.display = '';
-        } else {
-            // Dropdown portal switcher is strictly for Super Admin and Admin
-            const canSwitchPortal = isSuperAdmin || AppState.currentUser.role === 'admin';
-            portalSwitcher.style.display = canSwitchPortal ? '' : 'none';
-        }
-    }
-
-    // Load active daily worksheet and tasks concurrently
-    await Promise.all([
-        loadDailyWorksheet(),
-        loadAssignedTasks()
-    ]);
 
     // Asynchronously update badges without blocking UI rendering
     updateGlobalSidebarBadges();
@@ -817,14 +828,38 @@ function setupTabNavigation() {
     handleHashChange();
 }
 
+let currentModalZIndex = 10000;
+const activeModalStack = [];
+
 function openModal(id) {
     const m = document.getElementById(id);
-    if (m) m.classList.add('active');
+    if (!m) return;
+
+    currentModalZIndex += 10;
+    m.style.zIndex = currentModalZIndex;
+    m.classList.add('active');
+    if (!activeModalStack.includes(id)) {
+        activeModalStack.push(id);
+    }
 }
 
 function closeModal(id) {
     const m = document.getElementById(id);
-    if (m) m.classList.remove('active');
+    if (!m) return;
+
+    m.classList.remove('active');
+    const idx = activeModalStack.indexOf(id);
+    if (idx !== -1) {
+        activeModalStack.splice(idx, 1);
+    }
+    if (activeModalStack.length === 0) {
+        currentModalZIndex = 10000;
+    }
+    setTimeout(() => {
+        if (!m.classList.contains('active')) {
+            m.style.zIndex = '';
+        }
+    }, 250);
 }
 
 function parseDateTime(dateStr, timeStr) {

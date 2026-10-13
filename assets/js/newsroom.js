@@ -22,15 +22,25 @@ let NewsState = {
 };
 
 // Auto-initialize when tab is loaded or page opened
+let newsroomIsInitializing = false;
+let newsroomIsInitialized = false;
+
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('tab-newsroom')) {
         initNewsroomModule();
     }
 });
 
-async function initNewsroomModule() {
-    await fetchNewsMetadata();
-    await loadNewsroomDispatches();
+async function initNewsroomModule(force = false) {
+    if (!force && (newsroomIsInitializing || newsroomIsInitialized)) return;
+    newsroomIsInitializing = true;
+    try {
+        await fetchNewsMetadata();
+        await loadNewsroomDispatches();
+        newsroomIsInitialized = true;
+    } finally {
+        newsroomIsInitializing = false;
+    }
 }
 
 async function fetchNewsMetadata() {

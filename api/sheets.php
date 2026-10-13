@@ -29,6 +29,10 @@ $isHod = ($currentUserRole === 'hod');
 $canUnlock = $isSuperAdmin || $isHod || !empty($currentUserObj['can_unlock_sheets']);
 $canInspect = $isSuperAdmin || $isHod || !empty($currentUserObj['can_inspect_sheets']);
 
+if (in_array($action, ['get_sheet', 'get_day_summary', 'get_range_summary', 'print_sheet'])) {
+    session_write_close();
+}
+
 switch ($action) {
     case 'get_sheet':
         $empId = (int)($_GET['employee_id'] ?? $currentUserId);

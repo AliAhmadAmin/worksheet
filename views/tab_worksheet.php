@@ -1,7 +1,11 @@
         <!-- TAB 1: DASHBOARD / HOURLY WORKSHEET (DEDICATED PAGE) -->
+        <?php
+        $userRoleWs = strtolower($authUser['role'] ?? '');
+        $canInspectWs = in_array($userRoleWs, ['super_admin', 'admin', 'hod']) || !empty($authUser['can_inspect_sheets']);
+        ?>
         <section id="tab-worksheet" class="tab-section <?= ($currentPortal === 'digital') ? 'active' : '' ?>">
             <!-- EMPLOYEE PERSONAL SHIFT HERO (Hidden for Admin) -->
-            <div id="hero-employee-container" class="shift-hero-card employee-only">
+            <div id="hero-employee-container" class="shift-hero-card employee-only" style="<?= $canInspectWs ? 'display: none;' : '' ?>">
                 <div class="shift-left-meta">
                     <div id="hero-profile-avatar" class="meta-profile-circle" onclick="openMyProfileModal()" style="cursor: pointer; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;" title="Click to edit profile & photo">
                         <?php if (!empty($authUser['avatar'])): ?>
@@ -56,7 +60,7 @@
             <!-- Main Worksheet Area (Full Width) -->
             <div class="worksheet-card">
                 <!-- ADMIN INTEGRATED INSPECTOR & CONTROLLER HEADER -->
-                <div class="admin-only" style="display: none; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 18px;">
+                <div class="admin-only" style="<?= $canInspectWs ? '' : 'display: none;' ?>; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 18px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 14px;">
                         <div>
                             <h3 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 2px;">Employee Worksheet Inspector & Live Editor</h3>

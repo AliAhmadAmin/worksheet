@@ -742,17 +742,18 @@ async function handleSaveDepartmentSubmit(e) {
                 hod_id: hodId || null
             })
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
 
-        if (data.success) {
+        if (data && data.success) {
             showToast(data.message, "success");
             closeModal('add-department-modal');
             await loadEmployeeDirectory();
         } else {
-            showToast(data.message, "error");
+            showToast((data && data.message) ? data.message : "Failed to create department. Please try again.", "error");
         }
     } catch (err) {
-        showToast("Failed to create department.", "error");
+        console.error("Error creating department:", err);
+        showToast("Network error creating department.", "error");
     }
 }
 
