@@ -535,7 +535,17 @@ const WhatsAppAtt = {
     },
 
     async convertToTask(logId) {
-        if (!confirm('Convert this WhatsApp message into an official assigned task for the employee?')) return;
+        const confirmed = await showConfirmDialog({
+            title: "Convert WhatsApp Message to Task",
+            message: "Convert this WhatsApp message into an official assigned task for the employee?",
+            detail: "The message contents will be pre-filled into an assigned task record.",
+            confirmText: "Convert to Task",
+            cancelText: "Cancel",
+            type: "primary",
+            icon: "💬"
+        });
+        if (!confirmed) return;
+
         try {
             if (typeof showToast === 'function') {
                 showToast('Converting message to task...', 'info');
@@ -552,15 +562,11 @@ const WhatsAppAtt = {
             if (data.success) {
                 if (typeof showToast === 'function') {
                     showToast(data.message || 'Task created successfully!', 'success');
-                } else {
-                    alert(data.message || 'Task created successfully!');
                 }
                 this.loadLogs();
             } else {
                 if (typeof showToast === 'function') {
                     showToast(data.message || 'Could not convert to task', 'error');
-                } else {
-                    alert(data.message || 'Could not convert to task');
                 }
             }
         } catch (err) {

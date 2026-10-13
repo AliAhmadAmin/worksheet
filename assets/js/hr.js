@@ -941,9 +941,23 @@ async function handleApplyLeaveSubmit(e) {
 async function handleLeaveAction(leaveId, status) {
     let notes = '';
     if (status === 'rejected') {
-        notes = prompt("Enter reason for rejection (optional):") || '';
+        const input = await showPromptDialog({
+            title: "Reject Leave Application",
+            message: "Please state the reason for rejecting this leave application:",
+            placeholder: "e.g. Workload requirements, overlapping team leaves...",
+            confirmText: "Reject Leave"
+        });
+        if (input === null) return;
+        notes = input;
     } else if (status === 'approved_by_hod') {
-        notes = prompt("Enter HOD endorsement note (optional):", "Recommended for approval") || '';
+        const input = await showPromptDialog({
+            title: "HOD Endorsement Note",
+            message: "Optional remarks or recommendation for HR approval:",
+            defaultValue: "Recommended for approval",
+            confirmText: "Endorse Leave"
+        });
+        if (input === null) return;
+        notes = input;
     }
 
     try {
@@ -974,7 +988,16 @@ async function handleLeaveAction(leaveId, status) {
 }
 
 async function handleDeleteLeave(leaveId) {
-    if (!confirm("Are you sure you want to cancel/remove this leave record?")) return;
+    const confirmed = await showConfirmDialog({
+        title: "Cancel Leave Application",
+        message: "Are you sure you want to cancel and remove this leave record?",
+        detail: "This application will be removed from HR leave logs.",
+        confirmText: "Remove Leave",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/hr.php', {
@@ -1277,9 +1300,25 @@ async function handleLoanAction(loanId, status) {
     let paidAmount = null;
 
     if (status === 'rejected') {
-        adminNotes = prompt("Enter reason for rejection (optional):") || '';
+        const input = await showPromptDialog({
+            title: "Reject Loan / Advance Request",
+            message: "Please state the reason for rejecting this request (optional):",
+            placeholder: "e.g. Existing open loan balance, policy cap...",
+            confirmText: "Reject Request"
+        });
+        if (input === null) return;
+        adminNotes = input;
     } else if (status === 'repaid') {
-        if (!confirm("Are you sure you want to mark this loan as fully repaid?")) return;
+        const confirmed = await showConfirmDialog({
+            title: "Mark Loan as Fully Repaid",
+            message: "Are you sure you want to mark this loan as fully repaid?",
+            detail: "This will update the remaining balance to zero and mark the loan as settled.",
+            confirmText: "Mark Repaid",
+            cancelText: "Cancel",
+            type: "success",
+            icon: "✅"
+        });
+        if (!confirmed) return;
     }
 
     try {
@@ -1309,7 +1348,16 @@ async function handleLoanAction(loanId, status) {
 }
 
 async function handleDeleteLoan(loanId) {
-    if (!confirm("Are you sure you want to cancel/remove this loan application?")) return;
+    const confirmed = await showConfirmDialog({
+        title: "Cancel Loan Application",
+        message: "Are you sure you want to cancel and remove this loan application?",
+        detail: "This entry will be permanently removed from company loan logs.",
+        confirmText: "Remove Application",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/hr.php', {
@@ -1626,7 +1674,14 @@ async function handleSaveClaimSubmit(e) {
 async function handleUpdateClaimStatus(claimId, status) {
     let adminNotes = '';
     if (status === 'rejected') {
-        adminNotes = prompt("Enter reason for rejection (optional):") || '';
+        const input = await showPromptDialog({
+            title: "Reject Allowance / Claim",
+            message: "Please state the reason for rejecting this claim (optional):",
+            placeholder: "e.g. Exceeded policy cap, missing receipt...",
+            confirmText: "Reject Claim"
+        });
+        if (input === null) return;
+        adminNotes = input;
     }
 
     try {
@@ -1655,7 +1710,16 @@ async function handleUpdateClaimStatus(claimId, status) {
 }
 
 async function handleDeleteClaim(claimId) {
-    if (!confirm("Are you sure you want to delete this allowance / claim entry?")) return;
+    const confirmed = await showConfirmDialog({
+        title: "Delete Allowance / Claim",
+        message: "Are you sure you want to delete this allowance / claim entry?",
+        detail: "This entry will be deleted and will no longer be considered in payroll calculations.",
+        confirmText: "Delete Entry",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/hr.php', {
@@ -1926,7 +1990,16 @@ async function handleSaveNoticeSubmit(e) {
 }
 
 async function handleDeleteNotice(noticeId) {
-    if (!confirm("Are you sure you want to archive this notice?")) return;
+    const confirmed = await showConfirmDialog({
+        title: "Archive Company Notice",
+        message: "Are you sure you want to archive this notice?",
+        detail: "The notice will no longer be active on employee notice boards.",
+        confirmText: "Archive Notice",
+        cancelText: "Cancel",
+        type: "warning",
+        icon: "📢"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/hr.php', {
@@ -2673,7 +2746,16 @@ function printShowCauseRecord() {
 }
 
 async function handleDeleteShowCause(noticeId) {
-    if (!confirm("Are you sure you want to delete this show cause notice?")) return;
+    const confirmed = await showConfirmDialog({
+        title: "Delete Show Cause Notice",
+        message: "Are you sure you want to permanently delete this show cause notice?",
+        detail: "The notice, hearing date, and any submitted explanations will be removed.",
+        confirmText: "Delete Notice",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/hr.php', {
@@ -2996,7 +3078,14 @@ async function handleIssueFineSubmit(e) {
 async function handleFineAction(fineId, status) {
     let waivedReason = '';
     if (status === 'waived') {
-        waivedReason = prompt("Enter reason for waiving / forgiving this fine (optional):", "Waived upon managerial review") || '';
+        const input = await showPromptDialog({
+            title: "Waive / Forgive Fine",
+            message: "State reason for waiving or forgiving this penalty (optional):",
+            defaultValue: "Waived upon managerial review",
+            confirmText: "Waive Fine"
+        });
+        if (input === null) return;
+        waivedReason = input;
     }
 
     try {
@@ -3027,7 +3116,16 @@ async function handleFineAction(fineId, status) {
 }
 
 async function handleDeleteFine(fineId) {
-    if (!confirm("Are you sure you want to delete this fine record?")) return;
+    const confirmed = await showConfirmDialog({
+        title: "Delete Fine Record",
+        message: "Are you sure you want to delete this fine record permanently?",
+        detail: "This deduction will be removed and will not be applied to payroll.",
+        confirmText: "Delete Fine",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/hr.php', {

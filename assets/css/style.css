@@ -1593,6 +1593,16 @@ body {
     z-index: 10050;
 }
 
+#app-confirm-dialog-modal,
+#app-prompt-dialog-modal {
+    z-index: 10100;
+}
+
+.app-dialog-card {
+    border-radius: var(--radius-xl, 18px) !important;
+    box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--border-color) !important;
+}
+
 .modal-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);

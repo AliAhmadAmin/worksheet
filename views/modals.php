@@ -1626,6 +1626,60 @@
         </div>
     </div>
 
+    <!-- GLOBAL PROFESSIONAL CONFIRMATION DIALOG -->
+    <div id="app-confirm-dialog-modal" class="modal-overlay" style="z-index: 10100;">
+        <div class="modal-card app-dialog-card" style="max-width: 440px; border-radius: 18px; text-align: center; padding: 0;">
+            <div style="padding: 26px 24px 20px; display: flex; flex-direction: column; align-items: center;">
+                <div id="app-confirm-icon-wrap" style="width: 58px; height: 58px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 16px; background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1.5px solid rgba(239, 68, 68, 0.25); transition: all 0.2s ease;">
+                    <span id="app-confirm-icon">⚠️</span>
+                </div>
+                <h3 id="app-confirm-title" style="margin: 0 0 8px 0; font-size: 18px; font-weight: 800; color: var(--text-main); letter-spacing: -0.2px;">Confirm Action</h3>
+                <div id="app-confirm-message" style="font-size: 13.5px; color: var(--text-muted); line-height: 1.55; word-break: break-word; white-space: pre-line; max-height: 240px; overflow-y: auto;">
+                    Are you sure you want to proceed?
+                </div>
+                <div id="app-confirm-subnote" style="display: none; margin-top: 12px; padding: 10px 14px; background: var(--bg-card-elevated); border-radius: 8px; font-size: 11.5px; color: var(--text-muted); border: 1px dashed var(--border-color); text-align: left; width: 100%;">
+                </div>
+            </div>
+            <div style="background: var(--bg-card-elevated, #f8fafc); padding: 14px 20px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+                <button type="button" id="app-confirm-cancel-btn" class="btn btn-outline" style="min-width: 90px; padding: 8px 18px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                    Cancel
+                </button>
+                <button type="button" id="app-confirm-proceed-btn" class="btn btn-danger" style="min-width: 110px; padding: 8px 20px; font-size: 13px; font-weight: 700; border-radius: 8px;">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GLOBAL PROFESSIONAL PROMPT DIALOG -->
+    <div id="app-prompt-dialog-modal" class="modal-overlay" style="z-index: 10100;">
+        <div class="modal-card app-dialog-card" style="max-width: 480px; border-radius: 18px; padding: 0;">
+            <div style="padding: 22px 24px 16px;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <div id="app-prompt-icon-wrap" style="width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; background: rgba(59, 130, 246, 0.12); color: var(--accent-blue, #2563eb); border: 1px solid rgba(59, 130, 246, 0.25);">
+                        <span id="app-prompt-icon">📝</span>
+                    </div>
+                    <div style="flex: 1;">
+                        <h3 id="app-prompt-title" style="margin: 0; font-size: 16.5px; font-weight: 800; color: var(--text-main);">Input Required</h3>
+                        <p id="app-prompt-message" style="margin: 3px 0 0 0; font-size: 12.5px; color: var(--text-muted); line-height: 1.4;">Please provide details below:</p>
+                    </div>
+                    <button type="button" class="btn-modal-close" id="app-prompt-close-btn" style="align-self: flex-start;">✕</button>
+                </div>
+                <div style="margin-top: 14px;">
+                    <textarea id="app-prompt-input" class="input-control" rows="3" style="width: 100%; font-size: 13px; resize: vertical; border-radius: 8px;" placeholder=""></textarea>
+                </div>
+            </div>
+            <div style="background: var(--bg-card-elevated, #f8fafc); padding: 12px 20px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+                <button type="button" id="app-prompt-cancel-btn" class="btn btn-outline" style="min-width: 85px; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                    Cancel
+                </button>
+                <button type="button" id="app-prompt-submit-btn" class="btn btn-primary" style="min-width: 95px; padding: 8px 18px; font-size: 13px; font-weight: 700; border-radius: 8px;">
+                    Submit
+                </button>
+            </div>
+        </div>
+    </div>
+
 
 
 

@@ -1743,9 +1743,16 @@ async function handleToggleWorksheetColumnVisibility(id, newVis) {
 }
 
 async function handleDeleteWorksheetColumn(id, label) {
-    if (!confirm(`Are you sure you want to permanently delete custom column "${label}"?`)) {
-        return;
-    }
+    const confirmed = await showConfirmDialog({
+        title: "Delete Custom Column",
+        message: `Permanently delete custom column "${label}"?`,
+        detail: "This column will no longer appear in worksheet tables for this department.",
+        confirmText: "Delete Column",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/worksheet_columns.php', {
@@ -1777,9 +1784,16 @@ async function handleDeleteWorksheetColumn(id, label) {
 
 async function handleResetActiveTrackingTabDefaults() {
     if (currentTrackingModalActiveTab === 'cols') {
-        if (!confirm("Are you sure you want to reset Worksheet Columns for this department to standard defaults?")) {
-            return;
-        }
+        const confirmed = await showConfirmDialog({
+            title: "Reset Column Configuration",
+            message: "Reset Worksheet Columns for this department to standard system defaults?",
+            detail: "Custom column labels and ordering will be restored to default values.",
+            confirmText: "Reset Columns",
+            cancelText: "Cancel",
+            type: "warning",
+            icon: "🔄"
+        });
+        if (!confirmed) return;
         try {
             const res = await fetch('api/worksheet_columns.php', {
                 method: 'POST',
@@ -1802,9 +1816,16 @@ async function handleResetActiveTrackingTabDefaults() {
             showToast("Failed to reset columns", "error");
         }
     } else {
-        if (!confirm("Are you sure you want to reset Content Types and Tracking Desks for this department to standard defaults?")) {
-            return;
-        }
+        const confirmed = await showConfirmDialog({
+            title: "Reset Tracking Options",
+            message: "Reset Content Types and Tracking Desks for this department to system defaults?",
+            detail: "Existing past entries will remain intact, and options list will revert to defaults.",
+            confirmText: "Reset Options",
+            cancelText: "Cancel",
+            type: "warning",
+            icon: "🔄"
+        });
+        if (!confirmed) return;
         try {
             const res = await fetch('api/tracking_options.php', {
                 method: 'POST',
@@ -1980,9 +2001,16 @@ async function handleTrackingOptionRename(id, newName, oldName) {
 }
 
 async function handleTrackingOptionDelete(id, name) {
-    if (!confirm(`Are you sure you want to remove "${name}" from tracking options? (Existing past worksheet rows will remain unaffected)`)) {
-        return;
-    }
+    const confirmed = await showConfirmDialog({
+        title: "Remove Tracking Option",
+        message: `Remove "${name}" from tracking options?`,
+        detail: "Existing past worksheet rows will remain unaffected.",
+        confirmText: "Remove Option",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/tracking_options.php', {

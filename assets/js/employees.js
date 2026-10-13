@@ -825,7 +825,16 @@ async function deleteDepartment(deptId) {
     const dept = (AppState.departments || []).find(d => parseInt(d.id, 10) === parseInt(deptId, 10));
     const deptName = dept ? dept.name : 'this department';
 
-    if (!confirm(`Are you sure you want to remove ${deptName}?`)) return;
+    const confirmed = await showConfirmDialog({
+        title: "Delete Department",
+        message: `Are you sure you want to remove ${deptName}?`,
+        detail: "Associated teams and tracking configurations may also be affected.",
+        confirmText: "Delete Department",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🏢"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/employees.php', {
@@ -997,7 +1006,16 @@ async function deleteTeam(teamId, deptId) {
     const team = (AppState.teams || []).find(t => parseInt(t.id, 10) === parseInt(teamId, 10));
     const teamName = team ? team.name : 'this team';
 
-    if (!confirm(`Are you sure you want to remove ${teamName}? Assigned staff will be reset to Unassigned.`)) return;
+    const confirmed = await showConfirmDialog({
+        title: "Delete Team",
+        message: `Are you sure you want to remove team "${teamName}"?`,
+        detail: "Assigned staff members will be reset to Unassigned.",
+        confirmText: "Delete Team",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "👥"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/employees.php', {
@@ -1593,13 +1611,20 @@ async function toggleEmployeeStatus(empId, newStatus) {
     const empName = emp ? emp.name : 'this employee';
     const actionText = newStatus === 1 ? 'reactivate' : 'deactivate';
 
-    const confirmMsg = newStatus === 1
-        ? `Reactivate account for ${empName}? They will be restored to active status.`
-        : `Deactivate ${empName}?\n\nThey will no longer be able to log in, but all historical records (payroll, attendance, loans, tasks) will remain safely intact.`;
-
-    if (!confirm(confirmMsg)) {
-        return;
-    }
+    const confirmed = await showConfirmDialog({
+        title: newStatus === 1 ? "Reactivate Employee Account" : "Deactivate Employee Account",
+        message: newStatus === 1
+            ? `Reactivate account for ${empName}?`
+            : `Deactivate account for ${empName}?`,
+        detail: newStatus === 1
+            ? "The employee will be restored to active status and will be permitted to log in."
+            : "The employee will no longer be able to log in, but all historical records (payroll, sheets, loans, tasks) will remain intact.",
+        confirmText: newStatus === 1 ? "Reactivate Account" : "Deactivate Account",
+        cancelText: "Cancel",
+        type: newStatus === 1 ? "success" : "warning",
+        icon: newStatus === 1 ? "✅" : "⚠️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/employees.php', {
@@ -1648,11 +1673,16 @@ async function deleteEmployeePermanent(empId) {
         return;
     }
 
-    const confirmMsg = `⚠️ PERMANENTLY DELETE EMPLOYEE?\n\nEmployee: ${empName} (ID: ${empId})\n\nThis will permanently delete this employee record and cleanly remove all associated records (profiles, sheets, payroll entries, tasks, fines, loans).\n\nThis is irreversible. Do you want to proceed?`;
-
-    if (!confirm(confirmMsg)) {
-        return;
-    }
+    const confirmed = await showConfirmDialog({
+        title: "Permanently Delete Employee",
+        message: `Permanently delete ${empName} (ID: ${empId})?`,
+        detail: "<strong>⚠️ Warning:</strong> This action is irreversible. All linked historical records (profiles, sheets, payroll entries, tasks, fines, loans) will be permanently deleted.",
+        confirmText: "Permanently Delete",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/employees.php', {

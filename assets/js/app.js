@@ -80,6 +80,206 @@ function showToast(message, type = 'info') {
     }, 3500);
 }
 
+// Professional replacement for native browser alert popups
+window.alert = function(message) {
+    if (typeof showToast === 'function') {
+        showToast(String(message || ''), 'info');
+    }
+};
+
+// Professional Asynchronous Confirmation Dialog
+function showConfirmDialog({
+    title = 'Confirm Action',
+    message = 'Are you sure you want to proceed?',
+    detail = '',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    type = 'danger', // 'danger' | 'warning' | 'primary' | 'success' | 'info'
+    icon = null
+} = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('app-confirm-dialog-modal');
+        if (!modal) {
+            resolve(window.confirm(message));
+            return;
+        }
+
+        const titleEl = document.getElementById('app-confirm-title');
+        const msgEl = document.getElementById('app-confirm-message');
+        const subnoteEl = document.getElementById('app-confirm-subnote');
+        const iconEl = document.getElementById('app-confirm-icon');
+        const iconWrap = document.getElementById('app-confirm-icon-wrap');
+        const cancelBtn = document.getElementById('app-confirm-cancel-btn');
+        const proceedBtn = document.getElementById('app-confirm-proceed-btn');
+
+        if (titleEl) titleEl.textContent = title;
+        if (msgEl) msgEl.textContent = message;
+
+        if (subnoteEl) {
+            if (detail) {
+                subnoteEl.style.display = 'block';
+                subnoteEl.innerHTML = detail;
+            } else {
+                subnoteEl.style.display = 'none';
+                subnoteEl.innerHTML = '';
+            }
+        }
+
+        if (cancelBtn) cancelBtn.textContent = cancelText;
+        if (proceedBtn) proceedBtn.textContent = confirmText;
+
+        // Visual icon & button color styling
+        let iconGlyph = icon;
+        let iconBg = 'rgba(239, 68, 68, 0.12)';
+        let iconBorder = 'rgba(239, 68, 68, 0.25)';
+        let iconColor = '#ef4444';
+        let btnClass = 'btn btn-danger';
+
+        if (type === 'danger') {
+            iconGlyph = iconGlyph || '⚠️';
+            iconBg = 'rgba(239, 68, 68, 0.12)';
+            iconBorder = 'rgba(239, 68, 68, 0.25)';
+            iconColor = '#ef4444';
+            btnClass = 'btn btn-danger';
+        } else if (type === 'warning') {
+            iconGlyph = iconGlyph || '🔔';
+            iconBg = 'rgba(245, 158, 11, 0.12)';
+            iconBorder = 'rgba(245, 158, 11, 0.25)';
+            iconColor = '#f59e0b';
+            btnClass = 'btn btn-primary';
+        } else if (type === 'success') {
+            iconGlyph = iconGlyph || '✅';
+            iconBg = 'rgba(16, 185, 129, 0.12)';
+            iconBorder = 'rgba(16, 185, 129, 0.25)';
+            iconColor = '#10b981';
+            btnClass = 'btn btn-primary';
+        } else {
+            iconGlyph = iconGlyph || 'ℹ️';
+            iconBg = 'rgba(37, 99, 235, 0.12)';
+            iconBorder = 'rgba(37, 99, 235, 0.25)';
+            iconColor = '#2563eb';
+            btnClass = 'btn btn-primary';
+        }
+
+        if (iconEl) iconEl.textContent = iconGlyph;
+        if (iconWrap) {
+            iconWrap.style.background = iconBg;
+            iconWrap.style.borderColor = iconBorder;
+            iconWrap.style.color = iconColor;
+        }
+        if (proceedBtn) proceedBtn.className = btnClass;
+
+        let isHandled = false;
+
+        const cleanup = (result) => {
+            if (isHandled) return;
+            isHandled = true;
+            document.removeEventListener('keydown', keyHandler);
+            closeModal('app-confirm-dialog-modal');
+            resolve(result);
+        };
+
+        const keyHandler = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cleanup(false);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                cleanup(true);
+            }
+        };
+
+        if (cancelBtn) cancelBtn.onclick = () => cleanup(false);
+        if (proceedBtn) proceedBtn.onclick = () => cleanup(true);
+
+        document.addEventListener('keydown', keyHandler);
+        openModal('app-confirm-dialog-modal');
+        setTimeout(() => {
+            if (proceedBtn) proceedBtn.focus();
+        }, 50);
+    });
+}
+window.showConfirmDialog = showConfirmDialog;
+
+// Professional Asynchronous Prompt Dialog
+function showPromptDialog({
+    title = 'Input Required',
+    message = 'Please provide details below:',
+    placeholder = '',
+    defaultValue = '',
+    confirmText = 'Submit',
+    cancelText = 'Cancel',
+    required = false
+} = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('app-prompt-dialog-modal');
+        if (!modal) {
+            resolve(window.prompt(message, defaultValue));
+            return;
+        }
+
+        const titleEl = document.getElementById('app-prompt-title');
+        const msgEl = document.getElementById('app-prompt-message');
+        const inputEl = document.getElementById('app-prompt-input');
+        const cancelBtn = document.getElementById('app-prompt-cancel-btn');
+        const submitBtn = document.getElementById('app-prompt-submit-btn');
+        const closeBtn = document.getElementById('app-prompt-close-btn');
+
+        if (titleEl) titleEl.textContent = title;
+        if (msgEl) msgEl.textContent = message;
+        if (inputEl) {
+            inputEl.value = defaultValue || '';
+            inputEl.placeholder = placeholder || '';
+            inputEl.style.borderColor = '';
+        }
+        if (cancelBtn) cancelBtn.textContent = cancelText;
+        if (submitBtn) submitBtn.textContent = confirmText;
+
+        let isHandled = false;
+
+        const cleanup = (result) => {
+            if (isHandled) return;
+            isHandled = true;
+            document.removeEventListener('keydown', keyHandler);
+            closeModal('app-prompt-dialog-modal');
+            resolve(result);
+        };
+
+        const keyHandler = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cleanup(null);
+            }
+        };
+
+        if (cancelBtn) cancelBtn.onclick = () => cleanup(null);
+        if (closeBtn) closeBtn.onclick = () => cleanup(null);
+        if (submitBtn) {
+            submitBtn.onclick = () => {
+                const val = inputEl ? inputEl.value.trim() : '';
+                if (required && !val) {
+                    if (inputEl) {
+                        inputEl.focus();
+                        inputEl.style.borderColor = 'var(--danger)';
+                    }
+                    return;
+                }
+                cleanup(inputEl ? inputEl.value : '');
+            };
+        }
+
+        document.addEventListener('keydown', keyHandler);
+        openModal('app-prompt-dialog-modal');
+        setTimeout(() => {
+            if (inputEl) {
+                inputEl.focus();
+                inputEl.select();
+            }
+        }, 80);
+    });
+}
+window.showPromptDialog = showPromptDialog;
+
 function formatDuration(seconds) {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);

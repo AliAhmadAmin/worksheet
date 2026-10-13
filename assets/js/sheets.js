@@ -970,9 +970,16 @@ async function handleCheckOut() {
         return;
     }
 
-    if (!confirm("Are you sure you want to Check Out? Once you check out, your duty hours will be finalized and sheet will be LOCKED.")) {
-        return;
-    }
+    const confirmed = await showConfirmDialog({
+        title: "Confirm Duty Shift Check-Out",
+        message: "Are you sure you want to check out now?",
+        detail: "<strong>Notice:</strong> Your duty hours and logged entries will be finalized for this shift, and the worksheet will be <strong>LOCKED</strong>.",
+        confirmText: "Check Out & Lock",
+        cancelText: "Keep Working",
+        type: "danger",
+        icon: "⏱️"
+    });
+    if (!confirmed) return;
 
     const empId = AppState.currentUser ? AppState.currentUser.id : 1;
     const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1012,7 +1019,16 @@ async function handleAdminCheckIn() {
 
     // If already checked in, give choice to update now or open shift editor
     if (AppState.currentSheet && AppState.currentSheet.check_in_time) {
-        if (!confirm(`${empName} is currently recorded as checked in at ${AppState.currentSheet.check_in_time}.\n\nDo you want to update the check-in time to NOW (${nowTime})?\n(Click Cancel to open the custom Shift Editor instead)`)) {
+        const updateNow = await showConfirmDialog({
+            title: "Shift Already Checked In",
+            message: `${empName} is currently recorded as checked in at ${AppState.currentSheet.check_in_time}.`,
+            detail: `Would you like to overwrite check-in time with <strong>NOW (${nowTime})</strong>, or open the custom Shift Editor instead?`,
+            confirmText: `Update to NOW (${nowTime})`,
+            cancelText: "Open Shift Editor",
+            type: "warning",
+            icon: "🔄"
+        });
+        if (!updateNow) {
             openAdminShiftModal();
             return;
         }
@@ -1051,15 +1067,31 @@ async function handleAdminCheckOut() {
 
     if (!AppState.currentSheet || !AppState.currentSheet.check_in_time) {
         // No check-in record: offer to open shift editor or auto check-in
-        if (confirm(`${empName} has not checked in yet for ${date}.\n\nWould you like to open the Shift Editor to specify both Check-In and Check-Out times?`)) {
+        const openEditor = await showConfirmDialog({
+            title: "Check-In Record Missing",
+            message: `${empName} has not checked in yet for ${date}.`,
+            detail: "Would you like to open the Shift Editor to specify both Check-In and Check-Out times?",
+            confirmText: "Open Shift Editor",
+            cancelText: "Cancel",
+            type: "warning",
+            icon: "⚠️"
+        });
+        if (openEditor) {
             openAdminShiftModal();
-            return;
         }
-    }
-
-    if (!confirm(`Check out ${empName} for ${date} at ${nowTime}?\nThis will calculate total duty hours and lock the worksheet.`)) {
         return;
     }
+
+    const confirmed = await showConfirmDialog({
+        title: "Confirm Admin Check-Out",
+        message: `Check out ${empName} for ${date} at ${nowTime}?`,
+        detail: "This will calculate total duty hours and lock the worksheet for this shift.",
+        confirmText: "Check Out & Lock",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "⏱️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/attendance.php', {
@@ -1181,9 +1213,16 @@ async function handleAdminClearShift() {
     const date = document.getElementById('admin-shift-date')?.value || AppState.selectedDate;
     const empName = document.getElementById('admin-shift-modal-emp-name')?.textContent || 'Employee';
 
-    if (!confirm(`Are you sure you want to clear/reset the check-in and check-out records for ${empName} on ${date}?`)) {
-        return;
-    }
+    const confirmed = await showConfirmDialog({
+        title: "Reset Shift Records",
+        message: `Clear attendance shift records for ${empName} on ${date}?`,
+        detail: "This will remove the Check-In and Check-Out timestamps and unlock the daily worksheet.",
+        confirmText: "Reset Shift",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🔄"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/attendance.php', {

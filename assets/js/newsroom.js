@@ -644,7 +644,16 @@ async function handleEditNewsSubmit(event) {
 // 🗑️ Delete Story Dispatch
 async function deleteNewsDispatch() {
     if (!NewsState.currentEditId) return;
-    if (!confirm("Are you sure you want to permanently delete this news dispatch record?")) return;
+    const confirmed = await showConfirmDialog({
+        title: "Delete News Dispatch",
+        message: "Are you sure you want to permanently delete this news dispatch record?",
+        detail: "This dispatch entry will be removed from News Handover.",
+        confirmText: "Delete Dispatch",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/newsroom.php', {

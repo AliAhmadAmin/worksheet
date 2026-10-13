@@ -651,9 +651,16 @@ async function deleteCurrentDispatch() {
     const id = ProgState.currentEditId;
     if (!id) return;
 
-    if (!confirm("Are you sure you want to delete this dispatch record permanently?")) {
-        return;
-    }
+    const confirmed = await showConfirmDialog({
+        title: "Delete Dispatch Record",
+        message: "Are you sure you want to permanently delete this dispatch record?",
+        detail: "This entry will be permanently removed from Programming Handover.",
+        confirmText: "Delete Record",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
 
     try {
         const res = await fetch('api/programming.php', {

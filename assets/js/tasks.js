@@ -136,10 +136,24 @@ function copyPathToClipboard(path) {
         navigator.clipboard.writeText(clean).then(() => {
             showToast(`📋 Copied: ${clean}`, "success");
         }).catch(() => {
-            prompt("Copy path below (Ctrl+C):", clean);
+            if (typeof showPromptDialog === 'function') {
+                showPromptDialog({
+                    title: "Copy File / Directory Path",
+                    message: "Select and copy the file path below (Ctrl+C):",
+                    defaultValue: clean,
+                    confirmText: "Close"
+                });
+            }
         });
     } else {
-        prompt("Copy path below (Ctrl+C):", clean);
+        if (typeof showPromptDialog === 'function') {
+            showPromptDialog({
+                title: "Copy File / Directory Path",
+                message: "Select and copy the file path below (Ctrl+C):",
+                defaultValue: clean,
+                confirmText: "Close"
+            });
+        }
     }
 }
 
@@ -867,7 +881,16 @@ async function deleteTask(taskId) {
         return;
     }
 
-    if (!confirm("Are you sure you want to delete this assigned task?")) return;
+    const confirmed = await showConfirmDialog({
+        title: "Delete Assigned Task",
+        message: "Are you sure you want to permanently delete this assigned task?",
+        detail: "This task assignment will be removed from the system.",
+        confirmText: "Delete Task",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "🗑️"
+    });
+    if (!confirmed) return;
     try {
         const res = await fetch('api/tasks.php', {
             method: 'POST',
