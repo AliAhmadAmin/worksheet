@@ -1,3 +1,8 @@
+<?php
+$userRoleModal = strtolower($authUser['role'] ?? '');
+$userDeptModal = strtolower($authUser['department_name'] ?? '');
+$canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) || (stripos($userDeptModal, 'hr') !== false) || (!empty($authUser['can_manage_hr']) && $userRoleModal !== 'hod');
+?>
     <!-- MODAL: ASSIGN NEW TASK -->
     <div id="assign-task-modal" class="modal-overlay">
         <div class="modal-card modal-card-lg" style="max-width: 650px;">
@@ -478,9 +483,9 @@
                         </div>
                     </div>
 
-                    <!-- Section 4: Salary, Bank & Entitlements -->
-                    <div class="modal-section">
-                        <div class="modal-section-title">💵 Salary, Allowances & Bank Disbursal</div>
+                    <!-- Section 4: Salary, Bank & Entitlements (Confidential - HR & Super Admin Only) -->
+                    <div class="modal-section" id="add-emp-salary-section" style="<?= $canViewSalaryModal ? '' : 'display: none !important;' ?>">
+                        <div class="modal-section-title">💵 Salary, Allowances & Bank Disbursal <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">(Confidential • HR / Admin Only)</span></div>
                         <div class="form-grid-3">
                             <div class="form-group">
                                 <label class="form-label">Gross / Base Salary (PKR)</label>
@@ -516,8 +521,12 @@
                                 <input type="text" id="add-emp-bank-account" class="input-control" placeholder="e.g. 0123456789012 or PK00UNIL...">
                             </div>
                         </div>
+                    </div>
 
-                        <div class="form-grid-3" style="margin-top: 6px;">
+                    <!-- Section 5: Leave Entitlements & Quotas -->
+                    <div class="modal-section" id="add-emp-leaves-section">
+                        <div class="modal-section-title">🏖️ Leave Entitlements & Quotas</div>
+                        <div class="form-grid-3">
                             <div class="form-group">
                                 <label class="form-label" style="font-size: 11px;">Annual Leaves</label>
                                 <input type="number" id="add-emp-annual-quota" class="input-control" value="14" min="0" style="text-align: center; font-weight: 700;">
@@ -694,9 +703,9 @@
                         </div>
                     </div>
 
-                    <!-- Section 4: Salary, Bank & Entitlements -->
-                    <div class="modal-section">
-                        <div class="modal-section-title">💵 Salary, Allowances & Bank Disbursal</div>
+                    <!-- Section 4: Salary, Bank & Entitlements (Confidential - HR & Super Admin Only) -->
+                    <div class="modal-section" id="edit-emp-salary-section" style="<?= $canViewSalaryModal ? '' : 'display: none !important;' ?>">
+                        <div class="modal-section-title">💵 Salary, Allowances & Bank Disbursal <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">(Confidential • HR / Admin Only)</span></div>
                         <div class="form-grid-3">
                             <div class="form-group">
                                 <label class="form-label">Gross / Base Salary (PKR)</label>
@@ -732,8 +741,12 @@
                                 <input type="text" id="edit-emp-bank-account" class="input-control" placeholder="e.g. 0123456789012 or PK00UNIL...">
                             </div>
                         </div>
+                    </div>
 
-                        <div class="form-grid-3" style="margin-top: 6px;">
+                    <!-- Section 5: Leave Entitlements & Quotas -->
+                    <div class="modal-section" id="edit-emp-leaves-section">
+                        <div class="modal-section-title">🏖️ Leave Entitlements & Quotas</div>
+                        <div class="form-grid-3">
                             <div class="form-group">
                                 <label class="form-label" style="font-size: 11px;">Annual Leaves</label>
                                 <input type="number" id="edit-emp-annual-quota" class="input-control" value="14" min="0" style="text-align: center; font-weight: 700;">

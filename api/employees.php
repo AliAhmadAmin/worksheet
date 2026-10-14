@@ -124,9 +124,18 @@ switch ($action) {
         $stmt->execute($params);
         $employees = $stmt->fetchAll();
 
-        // Strip password hashes
+        // Strip password hashes & protect confidential financial data
+        $canAccessSalary = ($isSuperAdmin || $isHr) && !$isHod;
         foreach ($employees as &$emp) {
             unset($emp['password_hash']);
+            if (!$canAccessSalary) {
+                // Strictly protect salary and bank account numbers from HODs
+                unset($emp['basic_salary']);
+                unset($emp['hourly_rate']);
+                unset($emp['fixed_allowance']);
+                unset($emp['bank_name']);
+                unset($emp['bank_account_no']);
+            }
         }
 
         $deptWhere = "WHERE d.is_active = 1";
@@ -279,6 +288,11 @@ switch ($action) {
             if (empty($deptId) || !in_array($deptId, $managedDeptIds, true)) {
                 $deptId = !empty($managedDeptIds) ? $managedDeptIds[0] : $userDeptId;
             }
+            // HOD cannot set salary or bank details
+            $data['bank_name'] = 'UBL';
+            $data['bank_account_no'] = '';
+            $data['fixed_allowance'] = 0.0;
+            $data['basic_salary'] = 0.0;
         }
 
         $empCode = trim($data['emp_code'] ?? '');
@@ -493,6 +507,17 @@ switch ($action) {
 
             // HOD cannot transfer employee out of department
             $deptId = (int)$targetEmp['department_id'];
+
+            // HOD cannot view or edit salary, allowances, or bank details! Preserve existing values from database
+            $stmtCurrProf = $pdo->prepare("SELECT basic_salary, fixed_allowance, bank_name, bank_account_no FROM hr_employee_profiles WHERE employee_id = ?");
+            $stmtCurrProf->execute([$id]);
+            $currProf = $stmtCurrProf->fetch(PDO::FETCH_ASSOC);
+            if ($currProf) {
+                $data['basic_salary'] = isset($currProf['basic_salary']) ? (float)$currProf['basic_salary'] : 0.0;
+                $data['fixed_allowance'] = isset($currProf['fixed_allowance']) ? (float)$currProf['fixed_allowance'] : 0.0;
+                $data['bank_name'] = $currProf['bank_name'] ?: 'UBL';
+                $data['bank_account_no'] = $currProf['bank_account_no'] ?: '';
+            }
         }
 
         $empCode = trim($data['emp_code'] ?? '');

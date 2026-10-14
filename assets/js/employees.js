@@ -1171,6 +1171,15 @@ function openAddEmployeeModal() {
     populateModalDeptTeamSelects('add-emp-dept', 'add-emp-team', null, null);
 
     const isHodUser = AppState.currentUser && AppState.currentUser.role === 'hod';
+    const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+    const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || AppState.currentUser.can_manage_hr);
+    const canManageSalary = (isSuperAdmin || isHr) && !isHodUser;
+
+    const addSalarySec = document.getElementById('add-emp-salary-section');
+    if (addSalarySec) {
+        addSalarySec.style.display = canManageSalary ? '' : 'none';
+    }
+
     const addRoleSelect = document.getElementById('add-emp-role');
     const addRoleBadge = document.getElementById('add-emp-role-badge');
     const addDeptSelect = document.getElementById('add-emp-dept');
@@ -1299,35 +1308,45 @@ async function handleAddEmployeeSubmit(e) {
     }
 
     try {
+        const isHodUser = AppState.currentUser && AppState.currentUser.role === 'hod';
+        const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+        const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || AppState.currentUser.can_manage_hr);
+        const canManageSalary = (isSuperAdmin || isHr) && !isHodUser;
+
+        const payload = {
+            action: 'create_employee',
+            name,
+            emp_code: empCode,
+            phone: phone,
+            whatsapp_number: phone,
+            father_husband_name: fatherName,
+            cnic_no: cnic,
+            can_login: canLogin,
+            email: email || null,
+            password,
+            role,
+            designation,
+            department_id: deptId,
+            team_id: teamId || null,
+            avatar,
+            expected_hours: expectedHours,
+            joining_date: joiningDate,
+            annual_leave_quota: annualQuota,
+            casual_leave_quota: casualQuota,
+            sick_leave_quota: sickQuota
+        };
+
+        if (canManageSalary) {
+            payload.bank_name = bankName;
+            payload.bank_account_no = bankAccount;
+            payload.fixed_allowance = fixedAllowance;
+            payload.basic_salary = basicSalary;
+        }
+
         const res = await fetch('api/employees.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'create_employee',
-                name,
-                emp_code: empCode,
-                phone: phone,
-                whatsapp_number: phone,
-                father_husband_name: fatherName,
-                cnic_no: cnic,
-                bank_name: bankName,
-                bank_account_no: bankAccount,
-                fixed_allowance: fixedAllowance,
-                can_login: canLogin,
-                email: email || null,
-                password,
-                role,
-                designation,
-                department_id: deptId,
-                team_id: teamId || null,
-                avatar,
-                expected_hours: expectedHours,
-                basic_salary: basicSalary,
-                joining_date: joiningDate,
-                annual_leave_quota: annualQuota,
-                casual_leave_quota: casualQuota,
-                sick_leave_quota: sickQuota
-            })
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
 
@@ -1366,6 +1385,14 @@ function openEditEmployeeModal(empId) {
     const roleBadge = document.getElementById('edit-emp-role-badge');
     const deptSelect = document.getElementById('edit-emp-dept');
     const isHodUser = AppState.currentUser && AppState.currentUser.role === 'hod';
+    const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+    const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || AppState.currentUser.can_manage_hr);
+    const canManageSalary = (isSuperAdmin || isHr) && !isHodUser;
+
+    const editSalarySec = document.getElementById('edit-emp-salary-section');
+    if (editSalarySec) {
+        editSalarySec.style.display = canManageSalary ? '' : 'none';
+    }
 
     if (roleSelect) {
         roleSelect.value = editRole;
@@ -1406,13 +1433,13 @@ function openEditEmployeeModal(empId) {
     if (cnicInput) cnicInput.value = emp.cnic_no || '';
 
     const bankSelect = document.getElementById('edit-emp-bank-name');
-    if (bankSelect) bankSelect.value = emp.bank_name || 'UBL';
+    if (bankSelect) bankSelect.value = canManageSalary ? (emp.bank_name || 'UBL') : 'UBL';
 
     const accountInput = document.getElementById('edit-emp-bank-account');
-    if (accountInput) accountInput.value = emp.bank_account_no || '';
+    if (accountInput) accountInput.value = canManageSalary ? (emp.bank_account_no || '') : '';
 
     const fixedAllowInput = document.getElementById('edit-emp-fixed-allowance');
-    if (fixedAllowInput) fixedAllowInput.value = (emp.fixed_allowance && parseFloat(emp.fixed_allowance) > 0) ? parseFloat(emp.fixed_allowance) : '';
+    if (fixedAllowInput) fixedAllowInput.value = (canManageSalary && emp.fixed_allowance && parseFloat(emp.fixed_allowance) > 0) ? parseFloat(emp.fixed_allowance) : '';
 
     const shiftSelect = document.getElementById('edit-emp-shift-hours');
     if (shiftSelect) {
@@ -1423,7 +1450,7 @@ function openEditEmployeeModal(empId) {
 
     const salaryInput = document.getElementById('edit-emp-salary');
     if (salaryInput) {
-        salaryInput.value = (emp.basic_salary && parseFloat(emp.basic_salary) > 0) ? parseFloat(emp.basic_salary) : '';
+        salaryInput.value = (canManageSalary && emp.basic_salary && parseFloat(emp.basic_salary) > 0) ? parseFloat(emp.basic_salary) : '';
     }
 
     const joinInput = document.getElementById('edit-emp-joining-date');
@@ -1514,6 +1541,11 @@ async function handleEditEmployeeSubmit(e) {
     }
 
     try {
+        const isHodUser = AppState.currentUser && AppState.currentUser.role === 'hod';
+        const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+        const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || AppState.currentUser.can_manage_hr);
+        const canManageSalary = (isSuperAdmin || isHr) && !isHodUser;
+
         const payload = {
             action: 'update_employee',
             id,
@@ -1523,9 +1555,6 @@ async function handleEditEmployeeSubmit(e) {
             whatsapp_number: phone,
             father_husband_name: fatherName,
             cnic_no: cnic,
-            bank_name: bankName,
-            bank_account_no: bankAccount,
-            fixed_allowance: fixedAllowance,
             can_login: canLogin,
             email: email || null,
             role,
@@ -1533,13 +1562,20 @@ async function handleEditEmployeeSubmit(e) {
             department_id: deptId,
             team_id: teamId || null,
             expected_hours: expectedHours,
-            basic_salary: basicSalary,
             joining_date: joiningDate,
             annual_leave_quota: annualQuota,
             casual_leave_quota: casualQuota,
             sick_leave_quota: sickQuota,
             is_active: isActive
         };
+
+        if (canManageSalary) {
+            payload.bank_name = bankName;
+            payload.bank_account_no = bankAccount;
+            payload.fixed_allowance = fixedAllowance;
+            payload.basic_salary = basicSalary;
+        }
+
         if (avatar) payload.avatar = avatar;
 
         const res = await fetch('api/employees.php', {
