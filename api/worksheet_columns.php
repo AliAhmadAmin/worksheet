@@ -109,12 +109,14 @@ switch ($action) {
         $stmtMax->execute([$deptId]);
         $nextOrder = (int)$stmtMax->fetchColumn();
 
+        $editableAfterLock = isset($data['editable_after_lock']) ? ((int)$data['editable_after_lock'] ? 1 : 0) : ($type === 'link' ? 1 : 0);
+
         $stmtIns = $pdo->prepare("
             INSERT INTO department_worksheet_columns 
-            (department_id, column_key, column_label, column_type, options_json, sort_order, is_visible, is_core)
-            VALUES (?, ?, ?, ?, ?, ?, 1, 0)
+            (department_id, column_key, column_label, column_type, options_json, sort_order, is_visible, is_core, editable_after_lock)
+            VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?)
         ");
-        $stmtIns->execute([$deptId, $columnKey, $label, $type, $optionsJson, $nextOrder]);
+        $stmtIns->execute([$deptId, $columnKey, $label, $type, $optionsJson, $nextOrder, $editableAfterLock]);
         $newId = (int)$pdo->lastInsertId();
 
         echo json_encode([
@@ -127,8 +129,46 @@ switch ($action) {
                 'column_type' => $type,
                 'sort_order' => $nextOrder,
                 'is_visible' => 1,
-                'is_core' => 0
+                'is_core' => 0,
+                'editable_after_lock' => $editableAfterLock
             ]
+        ]);
+        break;
+
+    case 'toggle_editable_after_lock':
+        $id = (int)($data['id'] ?? 0);
+        if (!$id) {
+            if (!headers_sent()) http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Column ID is required.']);
+            exit;
+        }
+
+        $stmtFind = $pdo->prepare("SELECT * FROM department_worksheet_columns WHERE id = ?");
+        $stmtFind->execute([$id]);
+        $col = $stmtFind->fetch(PDO::FETCH_ASSOC);
+
+        if (!$col) {
+            if (!headers_sent()) http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Column not found.']);
+            exit;
+        }
+
+        $colDeptId = (int)$col['department_id'];
+        if (!$isSuperAdmin && !($isHod && in_array($colDeptId, $managedDeptIds))) {
+            if (!headers_sent()) http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access denied: You can only edit columns for your own department.']);
+            exit;
+        }
+
+        $newState = isset($data['editable_after_lock']) ? ((int)$data['editable_after_lock'] ? 1 : 0) : ((int)($col['editable_after_lock'] ?? 0) ? 0 : 1);
+        $pdo->prepare("UPDATE department_worksheet_columns SET editable_after_lock = ?, updated_at = NOW() WHERE id = ?")
+            ->execute([$newState, $id]);
+
+        echo json_encode([
+            'success' => true,
+            'id' => $id,
+            'editable_after_lock' => $newState,
+            'message' => $newState ? 'Field is now editable after checkout.' : 'Field is now locked upon checkout.'
         ]);
         break;
 
@@ -160,6 +200,7 @@ switch ($action) {
 
         $label = isset($data['column_label']) ? trim($data['column_label']) : $col['column_label'];
         $isVisible = isset($data['is_visible']) ? ((int)$data['is_visible'] ? 1 : 0) : (int)$col['is_visible'];
+        $editableAfterLock = isset($data['editable_after_lock']) ? ((int)$data['editable_after_lock'] ? 1 : 0) : (int)($col['editable_after_lock'] ?? 0);
         $optionsJson = $col['options_json'];
 
         if (isset($data['options'])) {
@@ -172,10 +213,10 @@ switch ($action) {
 
         $stmtUp = $pdo->prepare("
             UPDATE department_worksheet_columns 
-            SET column_label = ?, is_visible = ?, options_json = ?, updated_at = NOW() 
+            SET column_label = ?, is_visible = ?, editable_after_lock = ?, options_json = ?, updated_at = NOW() 
             WHERE id = ?
         ");
-        $stmtUp->execute([$label, $isVisible, $optionsJson, $id]);
+        $stmtUp->execute([$label, $isVisible, $editableAfterLock, $optionsJson, $id]);
 
         echo json_encode(['success' => true, 'message' => 'Column updated successfully.']);
         break;

@@ -127,15 +127,20 @@ switch ($action) {
             }
         }
 
+        $isLocked = $sheet ? (int)$sheet['is_locked'] : 0;
+        $isAdminOrHod = $isSuperAdmin || ($isHod && in_array((int)$employee['department_id'], $managedDeptIds, true));
+        $canEditAll = $isAdminOrHod || ($isLocked === 0);
+
         echo json_encode([
             'success' => true,
             'employee' => $employee,
             'sheet' => $sheet,
             'entries' => $entries,
             'columns' => $columns,
-            'is_locked' => $sheet ? (int)$sheet['is_locked'] : 0,
+            'is_locked' => $isLocked,
             'active_overnight_sheet' => $activeOvernightSheet,
-            'can_edit' => $isSuperAdmin || ($isHod && in_array((int)$employee['department_id'], $managedDeptIds, true)) || ($empId === (int)$currentUserId) || (!$sheet || $sheet['is_locked'] == 0)
+            'can_edit' => $canEditAll,
+            'can_edit_after_lock' => $isLocked === 1 && ($empId === (int)$currentUserId || $isAdminOrHod)
         ]);
         break;
     case 'save_entries':
@@ -147,12 +152,14 @@ switch ($action) {
         $checkInTime = $data['check_in_time'] ?? null;
         $checkOutTime = $data['check_out_time'] ?? null;
 
+        // Fetch employee details
+        $empCheck = $pdo->prepare("SELECT id, name, department_id FROM employees WHERE id = ?");
+        $empCheck->execute([$empId]);
+        $targetEmployee = $empCheck->fetch();
+        $targetDeptId = $targetEmployee ? (int)$targetEmployee['department_id'] : 2;
+
         // HOD permission check
         if ($isHod && $empId !== (int)$currentUserId && !$isSuperAdmin) {
-            $empCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
-            $empCheck->execute([$empId]);
-            $targetDeptId = (int)$empCheck->fetchColumn();
-
             $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
             $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
             $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
@@ -169,12 +176,16 @@ switch ($action) {
             }
         }
 
+        $isAdminOrHod = $isSuperAdmin || ($isHod && in_array($targetDeptId, $managedDeptIds, true));
+
         // Check lock status
         $sheetStmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
         $sheetStmt->execute([$empId, $date]);
         $sheet = $sheetStmt->fetch();
 
-        // Allow saving entries (especially links) even when locked, without modifying duty times unless admin
+        $isSheetLocked = $sheet && (int)$sheet['is_locked'] === 1;
+
+        // Allow saving entries (especially links / post-checkout allowed fields) even when locked
         $pdo->beginTransaction();
         try {
             if (!$sheet) {
@@ -184,6 +195,7 @@ switch ($action) {
                 ");
                 $insertSheet->execute([$empId, $date, $checkInTime, $checkOutTime, $remarks, $workSummary]);
                 $sheetId = $pdo->lastInsertId();
+                $prevRows = [];
             } else {
                 $sheetId = $sheet['id'];
                 $updateFields = ["remarks = ?", "work_summary = ?", "updated_at = CURRENT_TIMESTAMP"];
@@ -201,6 +213,23 @@ switch ($action) {
 
                 $updateSheet = $pdo->prepare("UPDATE daily_sheets SET " . implode(', ', $updateFields) . " WHERE id = ?");
                 $updateSheet->execute($params);
+
+                // Fetch previous entries before replacement
+                $stmtPrev = $pdo->prepare("SELECT * FROM sheet_entries WHERE sheet_id = ? ORDER BY id ASC");
+                $stmtPrev->execute([$sheetId]);
+                $prevRows = $stmtPrev->fetchAll(PDO::FETCH_ASSOC);
+            }
+
+            // If locked and user is NOT admin/HOD, enforce post-checkout column editing rules
+            $allowedPostLockKeys = [];
+            if ($isSheetLocked && !$isAdminOrHod) {
+                require_once __DIR__ . '/../includes/worksheet_columns_helper.php';
+                $deptCols = getDepartmentWorksheetColumns($pdo, $targetDeptId, true);
+                foreach ($deptCols as $dc) {
+                    if (!empty($dc['editable_after_lock'])) {
+                        $allowedPostLockKeys[$dc['column_key']] = true;
+                    }
+                }
             }
 
             // Delete old entries and insert updated set
@@ -212,7 +241,20 @@ switch ($action) {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
+            $idx = 0;
             foreach ($entries as $row) {
+                // If locked and not admin/HOD, employee cannot create new rows beyond previously logged rows
+                if ($isSheetLocked && !$isAdminOrHod) {
+                    if ($idx >= count($prevRows)) {
+                        break;
+                    }
+                }
+
+                $prevRow = isset($prevRows[$idx]) ? $prevRows[$idx] : null;
+
+                $timeSlot = trim($row['time_slot'] ?? '');
+                $contentType = trim($row['content_type'] ?? 'FB Videos');
+                $department = trim($row['department'] ?? 'Digital');
                 $title = trim($row['title'] ?? '');
                 $rawLink = trim($row['link'] ?? '');
                 $link = ($rawLink === 'upload') ? '' : $rawLink;
@@ -227,19 +269,48 @@ switch ($action) {
                         $customData[$k] = $v;
                     }
                 }
+
+                // If locked and not admin, preserve previous values for columns that are NOT editable after lock
+                if ($isSheetLocked && !$isAdminOrHod && $prevRow) {
+                    if (!isset($allowedPostLockKeys['time_slot'])) {
+                        $timeSlot = $prevRow['time_slot'];
+                    }
+                    if (!isset($allowedPostLockKeys['content_type'])) {
+                        $contentType = $prevRow['content_type'];
+                    }
+                    if (!isset($allowedPostLockKeys['department'])) {
+                        $department = $prevRow['department'];
+                    }
+                    if (!isset($allowedPostLockKeys['title'])) {
+                        $title = $prevRow['title'];
+                    }
+                    if (!isset($allowedPostLockKeys['link'])) {
+                        $link = $prevRow['link'];
+                    }
+
+                    // For custom data, keep previous values for disallowed keys
+                    $prevCustom = !empty($prevRow['custom_data']) ? json_decode($prevRow['custom_data'], true) : [];
+                    if (is_array($prevCustom)) {
+                        foreach ($prevCustom as $pk => $pv) {
+                            if (!isset($allowedPostLockKeys[$pk])) {
+                                $customData[$pk] = $pv;
+                            }
+                        }
+                    }
+                }
+
                 $customDataJson = !empty($customData) ? json_encode($customData) : null;
 
                 // A valid real work unit must have a description or link or custom data
                 if (empty($title) && empty($link) && empty($customData)) {
+                    $idx++;
                     continue; // skip blank rows without work description
                 }
 
-                $timeSlot = trim($row['time_slot'] ?? '');
-                $contentType = trim($row['content_type'] ?? 'FB Videos');
-                $department = trim($row['department'] ?? 'Digital');
                 $countVal = 1; // 1 real unit of work per entry row
 
                 $insEntry->execute([$sheetId, $timeSlot, $contentType, $department, $link, $title, $customDataJson, $countVal]);
+                $idx++;
             }
 
             $pdo->commit();

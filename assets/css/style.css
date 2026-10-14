@@ -1297,6 +1297,27 @@ body {
     transform: scale(1.05);
 }
 
+/* Disabled locked fields in worksheet table */
+.interactive-table input:disabled,
+.interactive-table select:disabled {
+    background: var(--bg-card-elevated, #f8fafc) !important;
+    color: var(--text-muted) !important;
+    border-color: var(--border-color) !important;
+    cursor: not-allowed !important;
+    opacity: 0.72;
+}
+
+/* Post-checkout editable fields */
+.sheet-entry-row input:not(:disabled)[style*="rgba(16, 185, 129"] {
+    background: var(--bg-input) !important;
+    transition: all 0.2s ease;
+}
+
+.sheet-entry-row input:not(:disabled)[style*="rgba(16, 185, 129"]:focus {
+    border-color: var(--success) !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25) !important;
+}
+
 .interactive-table tr:hover td {
     background: var(--bg-card-elevated);
 }

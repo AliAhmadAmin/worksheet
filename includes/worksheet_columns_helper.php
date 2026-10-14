@@ -18,17 +18,17 @@ if (!function_exists('ensureDepartmentDefaultColumns')) {
         }
 
         $defaults = [
-            ['time_slot', 'Time Slot', 'time', null, 1, 1, 1],
-            ['content_type', 'Content Type', 'select', null, 2, 1, 1],
-            ['department', 'Department', 'select', null, 3, 1, 1],
-            ['link', 'Link / Upload', 'link', null, 4, 1, 1],
-            ['title', 'Work Description / Title', 'text', null, 5, 1, 1]
+            ['time_slot', 'Time Slot', 'time', null, 1, 1, 1, 0],
+            ['content_type', 'Content Type', 'select', null, 2, 1, 1, 0],
+            ['department', 'Department', 'select', null, 3, 1, 1, 0],
+            ['link', 'Link / Upload', 'link', null, 4, 1, 1, 1],
+            ['title', 'Work Description / Title', 'text', null, 5, 1, 1, 0]
         ];
 
         $ins = $pdo->prepare("
             INSERT INTO department_worksheet_columns 
-            (department_id, column_key, column_label, column_type, options_json, sort_order, is_visible, is_core)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (department_id, column_key, column_label, column_type, options_json, sort_order, is_visible, is_core, editable_after_lock)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         foreach ($defaults as $col) {
@@ -40,7 +40,8 @@ if (!function_exists('ensureDepartmentDefaultColumns')) {
                 $col[3],
                 $col[4],
                 $col[5],
-                $col[6]
+                $col[6],
+                $col[7]
             ]);
         }
     }
@@ -55,7 +56,7 @@ if (!function_exists('getDepartmentWorksheetColumns')) {
 
         $whereSql = $includeHidden ? "WHERE department_id = ?" : "WHERE department_id = ? AND is_visible = 1";
         $stmtCols = $pdo->prepare("
-            SELECT id, column_key, column_label, column_type, options_json, sort_order, is_visible, is_core 
+            SELECT id, column_key, column_label, column_type, options_json, sort_order, is_visible, is_core, editable_after_lock 
             FROM department_worksheet_columns 
             {$whereSql}
             ORDER BY sort_order ASC, id ASC
@@ -67,6 +68,7 @@ if (!function_exists('getDepartmentWorksheetColumns')) {
             $col['is_visible'] = (int)$col['is_visible'];
             $col['is_core'] = (int)$col['is_core'];
             $col['sort_order'] = (int)$col['sort_order'];
+            $col['editable_after_lock'] = isset($col['editable_after_lock']) ? (int)$col['editable_after_lock'] : 0;
             if (!empty($col['options_json'])) {
                 $decoded = json_decode($col['options_json'], true);
                 $col['options'] = is_array($decoded) ? $decoded : array_filter(array_map('trim', explode(',', $col['options_json'])));

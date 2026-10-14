@@ -1555,7 +1555,14 @@ async function loadWorksheetColumnsModalData(deptId) {
                                 <input type="text" class="input-control" placeholder="Choices: A, B, C" value="${escapeHtml((col.options || []).join(', '))}" style="flex: 1; min-width: 140px; font-size: 11.5px; padding: 4px 8px;" title="Comma-separated dropdown choices" onchange="handleUpdateColumnOptions(${col.id}, this.value)">
                             ` : ''}
                         </div>
-                        <div style="display: flex; align-items: center; gap: 4px;">
+                        <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+                            <button type="button" 
+                                    class="btn btn-outline" 
+                                    style="padding: 3px 8px; font-size: 11px; font-weight: 700; ${col.editable_after_lock ? 'color: var(--success); border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);' : 'color: var(--text-muted); border-color: var(--border-color);'}" 
+                                    onclick="handleToggleWorksheetColumnPostLock(${col.id}, ${col.editable_after_lock ? 0 : 1})" 
+                                    title="Toggle whether employees can edit this field after shift checkout (e.g. adding story URLs once published)">
+                                ${col.editable_after_lock ? '🔓 Post-Checkout: Editable' : '🔒 Post-Checkout: Locked'}
+                            </button>
                             <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="handleMoveWorksheetColumn(${col.id}, 'left')" title="Move column Left (earlier)">◀ Left</button>
                             <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="handleMoveWorksheetColumn(${col.id}, 'right')" title="Move column Right (later)">▶ Right</button>
                             <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="handleToggleWorksheetColumnVisibility(${col.id}, ${col.is_visible ? 0 : 1})" title="${col.is_visible ? 'Hide column from worksheet' : 'Show column in worksheet'}">
@@ -1575,12 +1582,44 @@ async function loadWorksheetColumnsModalData(deptId) {
     }
 }
 
+async function handleToggleWorksheetColumnPostLock(id, newState) {
+    try {
+        const res = await fetch('api/worksheet_columns.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'toggle_editable_after_lock',
+                id: id,
+                editable_after_lock: newState
+            })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            showToast(data.message || 'Failed to update rule', 'error');
+            return;
+        }
+
+        showToast(data.message || 'Updated post-checkout rule', 'success');
+        await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
+        await loadWorksheetColumns(currentTrackingModalDeptId, true);
+        if (typeof renderWorksheetTable === 'function') {
+            const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
+            renderWorksheetTable(AppState.currentEntries || [], isAdmin || !AppState.isLocked);
+        }
+    } catch (err) {
+        console.error("Error updating post-lock status:", err);
+        showToast("Error updating post-lock status", "error");
+    }
+}
+window.handleToggleWorksheetColumnPostLock = handleToggleWorksheetColumnPostLock;
+
 async function handleWorksheetColumnAddSubmit(event) {
     if (event) event.preventDefault();
 
     const labelInput = document.getElementById('new-col-label');
     const typeSelect = document.getElementById('new-col-type');
     const optionsInput = document.getElementById('new-col-options-input');
+    const editableAfterLockCheckbox = document.getElementById('new-col-editable-after-lock');
 
     if (!labelInput) return;
     const label = labelInput.value.trim();
@@ -1591,6 +1630,7 @@ async function handleWorksheetColumnAddSubmit(event) {
 
     const colType = typeSelect ? typeSelect.value : 'text';
     const options = (colType === 'select' && optionsInput) ? optionsInput.value.trim() : '';
+    const editableAfterLock = (editableAfterLockCheckbox && editableAfterLockCheckbox.checked) ? 1 : 0;
 
     try {
         const res = await fetch('api/worksheet_columns.php', {
@@ -1601,7 +1641,8 @@ async function handleWorksheetColumnAddSubmit(event) {
                 department_id: currentTrackingModalDeptId,
                 column_label: label,
                 column_type: colType,
-                options: options
+                options: options,
+                editable_after_lock: editableAfterLock
             })
         });
         const data = await res.json();
@@ -1613,12 +1654,14 @@ async function handleWorksheetColumnAddSubmit(event) {
 
         labelInput.value = '';
         if (optionsInput) optionsInput.value = '';
+        if (editableAfterLockCheckbox) editableAfterLockCheckbox.checked = false;
         showToast(`Added column "${label}" successfully!`, 'success');
 
         await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
         await loadWorksheetColumns(currentTrackingModalDeptId, true);
         if (typeof renderWorksheetTable === 'function') {
-            renderWorksheetTable(AppState.currentEntries || [], true);
+            const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
+            renderWorksheetTable(AppState.currentEntries || [], isAdmin || !AppState.isLocked);
         }
     } catch (err) {
         console.error("Error adding column:", err);

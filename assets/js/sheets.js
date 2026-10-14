@@ -432,13 +432,20 @@ function updateLockBadge(isLocked, canEdit) {
     const badgeText = isLocked ? '🔒 Locked (Checked Out)' : '🔓 Active / Unlocked';
     const badgeClass = isLocked ? 'badge-lock locked' : 'badge-lock unlocked';
 
+    const allowedCols = (AppState.worksheetColumns || []).filter(c => c.is_visible && (c.editable_after_lock === 1 || c.editable_after_lock === '1')).map(c => c.column_label);
+    const postLockHint = allowedCols.length > 0 
+        ? `Post-checkout editing permitted for: ${allowedCols.join(', ')}` 
+        : 'Worksheet is completely locked.';
+
     if (adminLockBadge) {
         adminLockBadge.className = badgeClass;
         adminLockBadge.innerHTML = badgeText;
+        if (isLocked) adminLockBadge.title = postLockHint;
     }
     if (empLockBadge) {
         empLockBadge.className = badgeClass;
         empLockBadge.innerHTML = badgeText;
+        if (isLocked) empLockBadge.title = postLockHint;
     }
 
     if (adminLockCtrl) {
@@ -450,9 +457,9 @@ function updateLockBadge(isLocked, canEdit) {
     const btnSave = document.getElementById('btn-save-sheet');
     if (btnSave) {
         btnSave.disabled = false;
-        if (isLocked && AppState.currentUser?.role !== 'admin') {
+        if (isLocked && AppState.currentUser?.role !== 'admin' && AppState.currentUser?.role !== 'super_admin') {
             btnSave.innerHTML = '💾 Save Links / Sheet';
-            btnSave.title = 'Save your added links to this locked sheet';
+            btnSave.title = 'Save your added links/updates to this locked sheet';
         } else {
             btnSave.innerHTML = '💾 Save Sheet';
             btnSave.title = 'Save all entries';
@@ -463,9 +470,17 @@ function updateLockBadge(isLocked, canEdit) {
     const btnAddRowBottom = document.getElementById('btn-add-row-bottom');
     if (btnAddRow) {
         btnAddRow.disabled = !canEdit;
+        if (!canEdit && isLocked) {
+            btnAddRow.title = "Worksheet is locked after checkout. Adding new rows is disabled.";
+        } else {
+            btnAddRow.title = "Add a new work row";
+        }
     }
     if (btnAddRowBottom) {
         btnAddRowBottom.disabled = !canEdit;
+        if (!canEdit && isLocked) {
+            btnAddRowBottom.title = "Worksheet is locked after checkout. Adding new rows is disabled.";
+        }
     }
 }
 
@@ -475,6 +490,8 @@ function renderWorksheetTable(entries, canEdit) {
     if (!tbody) return;
 
     const visibleCols = getVisibleWorksheetColumns();
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
+    const isLocked = !!(AppState.isLocked && !isAdmin);
 
     // Dynamically render table headers matching HOD custom order & labels
     if (thead) {
@@ -488,7 +505,9 @@ function renderWorksheetTable(entries, canEdit) {
                     else if (col.column_key === 'department') { w = '15%'; minW = '145px'; }
                     else if (col.column_key === 'link') { w = '18%'; minW = '160px'; }
                     else if (col.column_key === 'title') { w = '26%'; minW = '190px'; }
-                    return `<th class="col-${escapeHtml(col.column_key)}" style="width: ${w}; min-width: ${minW};">${escapeHtml(col.column_label)}</th>`;
+                    const isPostLock = isLocked && (col.editable_after_lock === 1 || col.editable_after_lock === '1');
+                    const headerBadge = isPostLock ? ' <span style="font-size: 10px; color: var(--success); font-weight: 700;">(Editable)</span>' : '';
+                    return `<th class="col-${escapeHtml(col.column_key)}" style="width: ${w}; min-width: ${minW};">${escapeHtml(col.column_label)}${headerBadge}</th>`;
                 }).join('')}
                 <th class="col-action" style="width: 4%; min-width: 45px; text-align: center;">Action</th>
             </tr>
@@ -499,7 +518,7 @@ function renderWorksheetTable(entries, canEdit) {
     const colCount = visibleCols.length + 1;
 
     if (!entries || entries.length === 0) {
-        if (canEdit) {
+        if (canEdit && !isLocked) {
             addTableRow({}, canEdit);
             addTableRow({}, canEdit);
             addTableRow({}, canEdit);
@@ -557,7 +576,8 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
     row.className = 'sheet-entry-row';
 
     const visibleCols = getVisibleWorksheetColumns();
-    const disabledAttr = canEdit ? '' : 'disabled';
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
+    const isLocked = !!(AppState.isLocked && !isAdmin);
     const customData = data.custom_data || {};
 
     let cellsHtml = '';
@@ -566,6 +586,13 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
         const key = col.column_key;
         const type = col.column_type;
         const label = col.column_label;
+
+        // Check if this column is permitted to be edited after checkout
+        const isPostLockEditable = isLocked && (col.editable_after_lock === 1 || col.editable_after_lock === '1');
+        const isColEditable = canEdit || isPostLockEditable;
+        const disabledAttr = isColEditable ? '' : 'disabled';
+        const postLockStyle = isPostLockEditable ? 'border-color: rgba(16, 185, 129, 0.6); box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.15);' : '';
+        const postLockTitle = isPostLockEditable ? ' title="Editable after checkout (post-duty update permitted)"' : (isLocked ? ' title="Locked (Duty checkout finalized)"' : '');
 
         // Extract value
         let val = '';
@@ -584,7 +611,7 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
         if (key === 'time_slot' || type === 'time') {
             cellsHtml += `
                 <td class="col-time-slot" data-col="${escapeHtml(key)}">
-                    <input type="text" class="input-time input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="e.g. 5:00 to 6:00 AM" value="${escapeHtml(val)}" style="width: 100%; font-weight: 600;" ${disabledAttr}>
+                    <input type="text" class="input-time input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="e.g. 5:00 to 6:00 AM" value="${escapeHtml(val)}" style="width: 100%; font-weight: 600; ${postLockStyle}" ${disabledAttr}${postLockTitle}>
                 </td>
             `;
         } else if (key === 'content_type') {
@@ -601,7 +628,7 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
             }
             cellsHtml += `
                 <td class="col-content-type" data-col="${escapeHtml(key)}">
-                    <select class="select-content-type input-control input-sheet-field" data-key="${escapeHtml(key)}" style="width: 100%;" ${disabledAttr}>
+                    <select class="select-content-type input-control input-sheet-field" data-key="${escapeHtml(key)}" style="width: 100%; ${postLockStyle}" ${disabledAttr}${postLockTitle}>
                         ${typeOptions}
                     </select>
                 </td>
@@ -620,7 +647,7 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
             }
             cellsHtml += `
                 <td class="col-department" data-col="${escapeHtml(key)}">
-                    <select class="select-dept input-control input-sheet-field" data-key="${escapeHtml(key)}" style="width: 100%;" ${disabledAttr}>
+                    <select class="select-dept input-control input-sheet-field" data-key="${escapeHtml(key)}" style="width: 100%; ${postLockStyle}" ${disabledAttr}${postLockTitle}>
                         ${deptOptions}
                     </select>
                 </td>
@@ -637,7 +664,7 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
             }
             cellsHtml += `
                 <td class="col-custom-select" data-col="${escapeHtml(key)}">
-                    <select class="input-control input-sheet-field" data-key="${escapeHtml(key)}" style="width: 100%;" ${disabledAttr}>
+                    <select class="input-control input-sheet-field" data-key="${escapeHtml(key)}" style="width: 100%; ${postLockStyle}" ${disabledAttr}${postLockTitle}>
                         ${optHtml}
                     </select>
                 </td>
@@ -645,20 +672,20 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
         } else if (type === 'link' || key === 'link') {
             cellsHtml += `
                 <td class="col-link" data-col="${escapeHtml(key)}">
-                    <input type="text" class="input-link input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="Paste link or drive URL..." value="${escapeHtml(val)}" style="width: 100%;" ${disabledAttr}>
+                    <input type="text" class="input-link input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="Paste link or drive URL..." value="${escapeHtml(val)}" style="width: 100%; ${postLockStyle}" ${disabledAttr}${postLockTitle}>
                 </td>
             `;
         } else if (type === 'number') {
             cellsHtml += `
                 <td class="col-number" data-col="${escapeHtml(key)}">
-                    <input type="number" class="input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="0" value="${escapeHtml(val)}" style="width: 100%; font-weight: 600;" ${disabledAttr}>
+                    <input type="number" class="input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="0" value="${escapeHtml(val)}" style="width: 100%; font-weight: 600; ${postLockStyle}" ${disabledAttr}${postLockTitle}>
                 </td>
             `;
         } else {
             // Default text input
             cellsHtml += `
                 <td class="col-description" data-col="${escapeHtml(key)}">
-                    <input type="text" class="input-title input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="${escapeHtml(label)}..." value="${escapeHtml(val)}" style="width: 100%;" ${disabledAttr}>
+                    <input type="text" class="input-title input-control input-sheet-field" data-key="${escapeHtml(key)}" placeholder="${escapeHtml(label)}..." value="${escapeHtml(val)}" style="width: 100%; ${postLockStyle}" ${disabledAttr}${postLockTitle}>
                 </td>
             `;
         }
@@ -667,7 +694,7 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
     // Action column
     cellsHtml += `
         <td class="col-action" style="text-align: center;">
-            ${canEdit ? '<button type="button" class="btn-icon-del" onclick="removeTableRow(this)" title="Delete Row">🗑️</button>' : ''}
+            ${(canEdit && !isLocked) ? '<button type="button" class="btn-icon-del" onclick="removeTableRow(this)" title="Delete Row">🗑️</button>' : (isLocked ? '<span style="color: var(--text-dim); font-size: 11px;" title="Rows cannot be deleted after shift checkout">🔒</span>' : '')}
         </td>
     `;
 
@@ -694,7 +721,7 @@ function addNewRowBelow() {
     const canEdit = isAdmin || !AppState.isLocked;
 
     if (!canEdit) {
-        showToast("Worksheet is locked. Admin can unlock it.", "error");
+        showToast("Worksheet is locked after checkout. Adding new rows is disabled.", "warning");
         return;
     }
 

@@ -1488,7 +1488,7 @@
                     <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-md); font-size: 12px; line-height: 1.5; color: var(--text-main);">
                         <span style="font-size: 16px; line-height: 1;">💡</span>
                         <div>
-                            <strong>Custom Worksheet Layout:</strong> You can rename any column header, reorder columns (move <strong>◀ Left</strong> or <strong>▶ Right</strong>), change visibility, or add custom columns (Text, Dropdown Selection, Link, Number) specifically for your department's daily workflow.
+                            <strong>Worksheet Columns & Post-Checkout Rules:</strong> Customize worksheet column headers, reorder columns (<strong>◀ Left</strong> / <strong>▶ Right</strong>), or toggle visibility. You can also specify which fields employees can edit <strong>after shift checkout</strong> (e.g. <strong>Link / Upload</strong> is editable by default so employees can paste URLs when stories are published, while duty time and task titles remain safely locked).
                         </div>
                     </div>
 
@@ -1520,6 +1520,13 @@
                                         ➕ Add Column
                                     </button>
                                 </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer;">
+                                    <input type="checkbox" id="new-col-editable-after-lock">
+                                    <span>Allow employees to edit this column after shift checkout (e.g. links or updates)</span>
+                                </label>
                             </div>
 
                             <!-- Additional options input when 'select' type is chosen -->

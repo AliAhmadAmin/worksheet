@@ -604,6 +604,7 @@ function ensureDepartmentAndTeamsSchema($pdo) {
             sort_order INT DEFAULT 0,
             is_visible TINYINT DEFAULT 1,
             is_core TINYINT DEFAULT 0,
+            editable_after_lock TINYINT DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_dept_cols (department_id, is_visible, sort_order)
@@ -613,6 +614,14 @@ function ensureDepartmentAndTeamsSchema($pdo) {
             $checkCD = $pdo->query("SHOW COLUMNS FROM sheet_entries LIKE 'custom_data'")->fetch();
             if (!$checkCD) {
                 $pdo->exec("ALTER TABLE sheet_entries ADD COLUMN custom_data LONGTEXT NULL AFTER title");
+            }
+        } catch (Exception $e) {}
+
+        try {
+            $checkEAL = $pdo->query("SHOW COLUMNS FROM department_worksheet_columns LIKE 'editable_after_lock'")->fetch();
+            if (!$checkEAL) {
+                $pdo->exec("ALTER TABLE department_worksheet_columns ADD COLUMN editable_after_lock TINYINT DEFAULT 0 AFTER is_core");
+                $pdo->exec("UPDATE department_worksheet_columns SET editable_after_lock = 1 WHERE column_key = 'link'");
             }
         } catch (Exception $e) {}
 
