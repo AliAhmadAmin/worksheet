@@ -274,7 +274,31 @@ function renderWorksheetHero(sheet, empData) {
         if (teamEl) teamEl.textContent = empData.team_name || 'General';
         if (inEl) inEl.textContent = sheet?.check_in_time || '--:--';
         if (outEl) outEl.textContent = sheet?.check_out_time || '--:--';
-        if (dutyHoursEl) dutyHoursEl.textContent = sheet?.total_duty_hours || '0:00:00';
+
+        const checkIn = sheet ? sheet.check_in_time : null;
+        const checkOut = sheet ? sheet.check_out_time : null;
+        const isLocked = sheet ? (parseInt(sheet.is_locked) === 1) : false;
+
+        const todayStr = getLocalDateString();
+        const prevDayStr = (typeof getPrevDayString === 'function') ? getPrevDayString(todayStr) : null;
+        const isToday = (AppState.selectedDate === todayStr);
+        const isYesterday = (AppState.selectedDate === prevDayStr);
+        const isFuture = (AppState.selectedDate > todayStr);
+        const isOvernightActive = isYesterday && checkIn && !checkOut && !isLocked;
+
+        // Active duty live counter for inspected employee (Today or Overnight Shift)
+        if ((isToday || isOvernightActive) && checkIn && !checkOut && !isLocked && !isFuture) {
+            const inDate = parseDateTime(AppState.selectedDate, checkIn);
+            const now = new Date();
+            const diffSecs = (inDate && !isNaN(inDate.getTime())) ? Math.max(0, Math.floor((now - inDate) / 1000)) : 0;
+            startLiveTimer(diffSecs, checkIn, AppState.selectedDate);
+        } else {
+            stopLiveTimer();
+            if (dutyHoursEl) {
+                dutyHoursEl.textContent = sheet?.total_duty_hours || '0:00:00';
+            }
+        }
+
         if (select && AppState.adminSelectedEmpId) {
             select.value = AppState.adminSelectedEmpId;
         }
@@ -287,8 +311,6 @@ function renderWorksheetHero(sheet, empData) {
         // Update Admin Check-in / Check-out button states
         const btnAdminCheckIn = document.getElementById('admin-btn-check-in');
         const btnAdminCheckOut = document.getElementById('admin-btn-check-out');
-        const checkIn = sheet ? sheet.check_in_time : null;
-        const checkOut = sheet ? sheet.check_out_time : null;
 
         if (btnAdminCheckIn) {
             if (checkIn) {

@@ -1106,9 +1106,14 @@ function startLiveTimer(initialSeconds = 0, checkInTimeStr = null, shiftDateStr 
         const now = Date.now();
         const elapsed = Math.max(0, Math.floor((now - AppState.timerStartTimestamp) / 1000));
         AppState.elapsedSeconds = elapsed;
+        const formatted = formatDuration(elapsed);
         const timerElem = document.getElementById('duty-timer-digits');
         if (timerElem) {
-            timerElem.textContent = formatDuration(elapsed);
+            timerElem.textContent = formatted;
+        }
+        const adminTimerElem = document.getElementById('admin-emp-duty-hours');
+        if (adminTimerElem) {
+            adminTimerElem.textContent = formatted;
         }
     };
 
@@ -1130,9 +1135,14 @@ document.addEventListener('visibilitychange', () => {
         const now = Date.now();
         const elapsed = Math.max(0, Math.floor((now - AppState.timerStartTimestamp) / 1000));
         AppState.elapsedSeconds = elapsed;
+        const formatted = formatDuration(elapsed);
         const timerElem = document.getElementById('duty-timer-digits');
         if (timerElem) {
-            timerElem.textContent = formatDuration(elapsed);
+            timerElem.textContent = formatted;
+        }
+        const adminTimerElem = document.getElementById('admin-emp-duty-hours');
+        if (adminTimerElem) {
+            adminTimerElem.textContent = formatted;
         }
     }
 });
@@ -1142,9 +1152,14 @@ window.addEventListener('focus', () => {
         const now = Date.now();
         const elapsed = Math.max(0, Math.floor((now - AppState.timerStartTimestamp) / 1000));
         AppState.elapsedSeconds = elapsed;
+        const formatted = formatDuration(elapsed);
         const timerElem = document.getElementById('duty-timer-digits');
         if (timerElem) {
-            timerElem.textContent = formatDuration(elapsed);
+            timerElem.textContent = formatted;
+        }
+        const adminTimerElem = document.getElementById('admin-emp-duty-hours');
+        if (adminTimerElem) {
+            adminTimerElem.textContent = formatted;
         }
     }
 });
