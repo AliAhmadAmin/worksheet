@@ -166,10 +166,20 @@ body {
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(3px);
     z-index: 1040;
     opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
     transition: opacity 0.25s ease;
+}
+
+body.sidebar-open .sidebar-backdrop {
+    display: block;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
 }
 
 /* Main Application Sidebar */
@@ -189,6 +199,8 @@ body {
     flex-direction: column;
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 2px 0 16px rgba(0, 0, 0, 0.03);
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 /* Sidebar Top Brand & Switcher Header */
@@ -410,12 +422,17 @@ body {
 .sidebar-nav {
     flex: 1;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior-y: contain;
     padding: 12px 10px 18px;
     display: flex;
     flex-direction: column;
     gap: 16px;
     scrollbar-width: thin;
     scrollbar-color: var(--border-color) transparent;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .sidebar-nav::-webkit-scrollbar {
@@ -431,6 +448,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 3px;
+    contain: layout paint;
 }
 
 .sidebar-nav-title {
@@ -455,11 +473,13 @@ body {
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
     text-align: left;
     width: 100%;
     text-decoration: none;
     box-sizing: border-box;
+    backface-visibility: hidden;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .nav-btn .nav-icon {
@@ -478,10 +498,16 @@ body {
     text-overflow: ellipsis;
 }
 
-.nav-btn:hover {
+@media (hover: hover) and (pointer: fine) {
+    .nav-btn:hover {
+        background: var(--bg-card-elevated);
+        color: var(--text-main);
+        transform: translateX(2px);
+    }
+}
+
+.nav-btn:active {
     background: var(--bg-card-elevated);
-    color: var(--text-main);
-    transform: translateX(2px);
 }
 
 .nav-btn.active {
@@ -745,22 +771,24 @@ body {
     padding: 24px 32px 48px;
     box-sizing: border-box;
     max-width: none;
-    overflow-x: hidden;
+    overflow-x: clip;
+    position: relative;
+    contain: layout;
 }
 
 /* Sections */
 .tab-section {
     display: none;
-    animation: fadeIn 0.3s ease forwards;
 }
 
 .tab-section.active {
     display: block;
+    animation: fadeIn 0.18s ease-out;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 /* Attendance Shift Bar */
@@ -1588,22 +1616,32 @@ body {
     width: 100vw;
     height: 100vh;
     background: rgba(0, 0, 0, 0.72);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    display: flex;
+    display: none !important;
     align-items: center;
     justify-content: center;
     z-index: 9999;
     opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease, visibility 0.2s ease;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     padding: 16px;
     box-sizing: border-box;
 }
 
 .modal-overlay.active {
+    display: flex !important;
     opacity: 1;
-    pointer-events: auto;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: modalOverlayFadeIn 0.18s ease;
+}
+
+@keyframes modalOverlayFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 /* Nested & Child Dialogs Stack on Top of Parent Overlays */

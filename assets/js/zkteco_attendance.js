@@ -428,11 +428,15 @@ const ZKTecoAtt = {
 };
 
 // Global helper for opening/closing modals safely
-function openModal(id) {
-    const el = document.getElementById(id);
-    if (el) el.classList.add('active');
+if (typeof window.openModal !== 'function') {
+    window.openModal = function(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('active');
+    };
 }
-function closeModal(id) {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('active');
+if (typeof window.closeModal !== 'function') {
+    window.closeModal = function(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+    };
 }
