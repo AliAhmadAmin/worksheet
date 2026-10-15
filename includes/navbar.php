@@ -212,7 +212,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </button>
             <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon">📝</span>
-                <span class="nav-label">Digital Sheet</span>
+                <span class="nav-label">Hourly Sheet</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon">🎯</span>
@@ -249,7 +249,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </button>
             <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon">📝</span>
-                <span class="nav-label">Digital Sheet</span>
+                <span class="nav-label">Hourly Sheet</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon">🎯</span>
