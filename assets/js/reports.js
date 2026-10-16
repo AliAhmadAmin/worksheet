@@ -214,15 +214,15 @@ async function loadLiveAttendance() {
         }
 
         const isSuperOrHr = AppState.currentUser && (
-            AppState.currentUser.role === 'super_admin' || 
-            AppState.currentUser.role === 'admin' || 
-            AppState.currentUser.role === 'hr' || 
+            AppState.currentUser.role === 'super_admin' ||
+            AppState.currentUser.role === 'admin' ||
+            AppState.currentUser.role === 'hr' ||
             (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr')
         );
 
         data.employees.forEach(emp => {
             const tr = document.createElement('tr');
-            
+
             let statusBadge = '';
             if (emp.status === 'holiday') {
                 statusBadge = '<span class="attendance-status-pill holiday" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 700; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🏖️ Day Off</span>';
@@ -234,7 +234,7 @@ async function loadLiveAttendance() {
                 statusBadge = '<span class="attendance-status-pill absent">⚪ Absent / Off Duty</span>';
             }
 
-            const avatarHtml = emp.avatar 
+            const avatarHtml = emp.avatar
                 ? `<img src="${escapeHtml(emp.avatar)}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 30px; height: 30px; font-size: 11px;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
                 : `<div class="user-avatar" style="width: 30px; height: 30px; font-size: 11px; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
 
@@ -286,7 +286,7 @@ async function populateAttendanceDepartments() {
                 depts = data.departments;
                 if (typeof AppState !== 'undefined') AppState.departments = depts;
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
@@ -371,7 +371,7 @@ function renderRepAttEmpDropdownList(list) {
     if (list && list.length > 0) {
         list.forEach(emp => {
             const isSelected = currentVal == emp.id;
-            const avatarHtml = emp.avatar 
+            const avatarHtml = emp.avatar
                 ? `<img src="${escapeHtml(emp.avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 28px; height: 28px; font-size: 11px;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
                 : `<div class="user-avatar" style="width: 28px; height: 28px; font-size: 11px; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
 
@@ -418,7 +418,7 @@ function filterRepAttEmpDropdown(query) {
         return;
     }
 
-    const filtered = (AppState.employees || []).filter(e => 
+    const filtered = (AppState.employees || []).filter(e =>
         (e.name || '').toLowerCase().includes(q) ||
         (e.designation || '').toLowerCase().includes(q) ||
         (e.department_name || '').toLowerCase().includes(q) ||
@@ -547,7 +547,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
     const sum = item.summary;
     const records = item.daily_records;
 
-    const avatarHtml = emp.avatar 
+    const avatarHtml = emp.avatar
         ? `<img src="${escapeHtml(emp.avatar)}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color); flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 40px; height: 40px; font-size: 15px; font-weight: 800;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
         : `<div class="user-avatar" style="width: 40px; height: 40px; font-size: 15px; font-weight: 800; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
 
@@ -761,7 +761,7 @@ function renderMultiEmployeeAttendanceMatrix(data) {
         const emp = item.employee;
         const sum = item.summary;
 
-        const avatarHtml = emp.avatar 
+        const avatarHtml = emp.avatar
             ? `<img src="${escapeHtml(emp.avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 28px; height: 28px; font-size: 11px;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
             : `<div class="user-avatar" style="width: 28px; height: 28px; font-size: 11px; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
 
@@ -909,7 +909,7 @@ function exportAttendanceReportCsv() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", hasDailyRecords 
+    link.setAttribute("download", hasDailyRecords
         ? `attendance_timesheet_${data.start_date}_to_${data.end_date}.csv`
         : `attendance_summary_${data.start_date}_to_${data.end_date}.csv`);
     document.body.appendChild(link);
@@ -927,9 +927,9 @@ function printAttendanceReport() {
     }
 
     const isSingleEmployee = data.report_data.length === 1;
-    const nowStr = new Date().toLocaleString('en-US', { 
-        year: 'numeric', month: 'short', day: 'numeric', 
-        hour: '2-digit', minute: '2-digit', hour12: true 
+    const nowStr = new Date().toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true
     });
 
     const logoSvg = `
@@ -1414,7 +1414,7 @@ function printAttendanceReport() {
                 <div class="doc-meta">
                     <span class="doc-badge">Official HR Report</span>
                     <div style="font-size: 10.5px; color: #475569; font-weight: 600; margin-top: 2px;">
-                        Generated: <strong>${nowStr}</strong>
+                       <strong>${nowStr}</strong>
                     </div>
                 </div>
             </div>
@@ -1525,7 +1525,7 @@ async function openTrackingOptionsModal(deptId = null) {
     if (isAdmin && adminPickerRow && adminDeptSelect) {
         adminPickerRow.style.display = 'flex';
         if (AppState.departments && AppState.departments.length > 0) {
-            adminDeptSelect.innerHTML = AppState.departments.map(d => 
+            adminDeptSelect.innerHTML = AppState.departments.map(d =>
                 `<option value="${d.id}" ${parseInt(d.id) === currentTrackingModalDeptId ? 'selected' : ''}>${escapeHtml(d.name)}</option>`
             ).join('');
         }

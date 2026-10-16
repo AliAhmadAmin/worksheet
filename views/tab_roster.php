@@ -87,16 +87,21 @@ $currentMonth = date('Y-m');
     <!-- Roster Grid / Printable Document Container -->
     <div id="roster-document-container" class="worksheet-card" style="padding: 24px; position: relative;">
         <!-- Printable Header (Visible on print and on-screen header) -->
-        <div id="roster-printable-header" style="text-align: center; margin-bottom: 22px; border-bottom: 2px solid var(--border-color); padding-bottom: 16px;">
-            <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
-                <img src="assets/img/logo.svg" alt="Discover Pakistan UHD TV" class="roster-brand-logo" style="height: 54px; width: auto; max-width: 240px; object-fit: contain; display: inline-block;">
+        <div id="roster-printable-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 14px;">
+            <div class="roster-header-logo" style="flex: 0 0 180px; text-align: left;">
+                <img src="assets/img/logo.svg" alt="Discover Pakistan UHD TV" class="roster-brand-logo" style="height: 48px; width: auto; max-width: 180px; object-fit: contain; display: block;">
             </div>
-            <h2 id="roster-document-title" style="font-size: 17px; font-weight: 800; color: #10b981; margin: 0; text-transform: uppercase; letter-spacing: 0.8px;">
-                DIGITAL MEDIA DUTY ROSTER (<?= strtoupper(date('M Y')) ?>)
-            </h2>
-            <p id="roster-meta-subtitle" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0;">
-                Official Shift Allocation & Weekly Rest Days
-            </p>
+            <div class="roster-header-center" style="flex: 1; text-align: center; padding: 0 10px;">
+                <h2 id="roster-document-title" style="font-size: 18px; font-weight: 800; color: #10b981; margin: 0; text-transform: uppercase; letter-spacing: 0.8px;">
+                    DIGITAL DUTY ROSTER (<?= strtoupper(date('M Y')) ?>)
+                </h2>
+                <p id="roster-meta-subtitle" style="font-size: 12px; color: var(--text-muted); margin: 4px 0 0; font-weight: 600;">
+                    Official Monthly Shift Timings & Weekly Off Allocations • 0 Team Members
+                </p>
+            </div>
+            <div class="roster-header-spacer" style="flex: 0 0 180px;">
+                <!-- Equal width spacer to keep title centered -->
+            </div>
         </div>
 
         <!-- Dynamic Content rendered by JS -->

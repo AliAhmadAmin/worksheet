@@ -2734,27 +2734,54 @@ body.dark-theme .login-card-fresh {
     }
 
     #roster-printable-header {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
         border-bottom: 2px solid #000000 !important;
         padding-bottom: 12px !important;
         margin-bottom: 20px !important;
         text-align: center !important;
     }
 
+    .roster-header-logo {
+        flex: 0 0 180px !important;
+        text-align: left !important;
+    }
+
+    .roster-header-center {
+        flex: 1 !important;
+        text-align: center !important;
+    }
+
+    .roster-header-spacer {
+        flex: 0 0 180px !important;
+        display: block !important;
+    }
+
     .roster-brand-logo {
-        display: inline-block !important;
+        display: block !important;
         visibility: visible !important;
-        height: 56px !important;
+        height: 50px !important;
         width: auto !important;
-        max-width: 240px !important;
-        margin-bottom: 8px !important;
+        max-width: 180px !important;
+        margin-bottom: 0 !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
 
     #roster-printable-header h2 {
         color: #059669 !important;
+        margin: 0 !important;
+        font-size: 16pt !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+    }
+
+    #roster-meta-subtitle {
+        color: #334155 !important;
+        font-size: 9.5pt !important;
+        margin-top: 3px !important;
+        font-weight: 600 !important;
     }
 
     .roster-team-block {

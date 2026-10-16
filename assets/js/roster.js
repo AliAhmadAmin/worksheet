@@ -58,7 +58,8 @@ function renderDutyRoster(data) {
         ? monthDate.toLocaleString('en-US', { month: 'short' }).toUpperCase() 
         : data.month;
     
-    const deptNameUpper = (data.department_name || 'DIGITAL MEDIA').toUpperCase();
+    let deptNameUpper = (data.department_name || 'DIGITAL').toUpperCase();
+    if (deptNameUpper === 'DIGITAL MEDIA') deptNameUpper = 'DIGITAL';
 
     if (docTitle) {
         docTitle.textContent = `${deptNameUpper} DUTY ROSTER (${monthName} ${year})`;
@@ -151,11 +152,10 @@ function renderDutyRoster(data) {
                         <thead>
                             <tr style="background: var(--bg-card-elevated); border-bottom: 2px solid var(--border-color);">
                                 <th style="width: 45px; text-align: center; padding: 10px 8px;">Sr.</th>
-                                <th style="min-width: 170px; padding: 10px 12px; text-align: left;">Name</th>
-                                <th style="min-width: 150px; padding: 10px 12px; text-align: left;">Designation</th>
-                                <th style="min-width: 200px; padding: 10px 12px; text-align: left;">Shift Timing</th>
-                                <th style="min-width: 160px; padding: 10px 12px; text-align: left;">Weekly Off</th>
-                                <th style="min-width: 140px; padding: 10px 12px; text-align: left;">Notes / Special</th>
+                                <th style="min-width: 180px; padding: 10px 12px; text-align: left;">Name</th>
+                                <th style="min-width: 160px; padding: 10px 12px; text-align: left;">Designation</th>
+                                <th style="min-width: 220px; padding: 10px 12px; text-align: left;">Shift Timing</th>
+                                <th style="min-width: 180px; padding: 10px 12px; text-align: left;">Weekly Off</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -166,7 +166,7 @@ function renderDutyRoster(data) {
             const currentOff = emp.weekly_off || 'Sunday';
 
             html += `
-                <tr class="roster-row" data-emp-id="${emp.employee_id}" data-team-id="${emp.team_id || 0}" style="border-bottom: 1px solid var(--border-color);">
+                <tr class="roster-row" data-emp-id="${emp.employee_id}" data-team-id="${emp.team_id || 0}" data-notes="${escapeHtml(emp.notes || '')}" style="border-bottom: 1px solid var(--border-color);">
                     <td style="text-align: center; font-weight: 700; color: var(--text-muted); padding: 8px;">
                         ${overallSr++}
                     </td>
@@ -209,13 +209,6 @@ function renderDutyRoster(data) {
                             </span>
                         `}
                     </td>
-                    <td style="padding: 8px 12px;">
-                        ${canEdit ? `
-                            <input type="text" class="input-control roster-notes-input" value="${escapeHtml(emp.notes || '')}" style="padding: 5px 8px; font-size: 12px; width: 100%;" placeholder="Remarks / Dates">
-                        ` : `
-                            <span style="font-size: 12px; color: var(--text-muted);">${escapeHtml(emp.notes || '-')}</span>
-                        `}
-                    </td>
                 </tr>
             `;
         });
@@ -256,14 +249,13 @@ async function saveDutyRoster() {
         const desigInput = row.querySelector('.roster-desig-input');
         const shiftInput = row.querySelector('.roster-shift-input');
         const offSelect = row.querySelector('.roster-off-select');
-        const notesInput = row.querySelector('.roster-notes-input');
 
         items.push({
             employee_id: empId,
             designation: desigInput ? desigInput.value.trim() : '',
             shift_timing: shiftInput ? shiftInput.value.trim() : '10:00 AM TO 6:00 PM',
             weekly_off: offSelect ? offSelect.value.trim() : 'Sunday',
-            notes: notesInput ? notesInput.value.trim() : ''
+            notes: row.getAttribute('data-notes') || ''
         });
     });
 
