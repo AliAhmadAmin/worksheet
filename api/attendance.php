@@ -385,6 +385,8 @@ switch ($action) {
                 s.total_duty_hours,
                 s.total_duty_seconds,
                 s.is_locked,
+                s.day_type,
+                s.holiday_reason,
                 (SELECT COUNT(*) FROM sheet_entries se WHERE se.sheet_id = s.id) as total_entries
             FROM employees e
             LEFT JOIN departments d ON e.department_id = d.id
@@ -411,11 +413,15 @@ switch ($action) {
             'total_employees' => count($rows),
             'checked_in' => 0,
             'checked_out' => 0,
+            'day_off' => 0,
             'not_arrived' => 0
         ];
 
         foreach ($rows as &$r) {
-            if (!empty($r['check_in_time'])) {
+            if (($r['day_type'] ?? '') === 'holiday') {
+                $r['status'] = 'holiday';
+                $stats['day_off']++;
+            } else if (!empty($r['check_in_time'])) {
                 if (!empty($r['check_out_time'])) {
                     $r['status'] = 'checked_out';
                     $stats['checked_out']++;
@@ -468,7 +474,7 @@ switch ($action) {
             $whereSql = "WHERE " . implode(' AND ', $whereClauses);
 
             $empStmt = $pdo->prepare("
-                SELECT e.id, e.name, e.email, e.designation, e.role, e.avatar, e.department_id,
+                SELECT e.id, e.name, e.email, e.designation, e.role, e.avatar, e.department_id, e.weekly_off,
                        COALESCE(p.expected_hours, 8.0) as expected_hours,
                        COALESCE(p.shift_policy, 'standard_8h') as shift_policy,
                        d.name as department_name, t.name as team_name
@@ -495,10 +501,37 @@ switch ($action) {
             $isSingleEmployee = ($empIdFilter !== null);
             $needDetails = ($isSingleEmployee || $includeDetails);
 
+            // Fetch duty rosters for months in the report period to respect employee scheduled weekly off
+            $startMonth = date('Y-m', strtotime($startDate));
+            $endMonth = date('Y-m', strtotime($endDate));
+            $periodMonths = array_unique([$startMonth, $endMonth]);
+            $inRosterPlaceholders = implode(',', array_fill(0, count($periodMonths), '?'));
+            $rosterParams = $periodMonths;
+            $rosterSql = "
+                SELECT employee_id, roster_month, weekly_off, shift_timing, off_dates_json 
+                FROM duty_rosters 
+                WHERE roster_month IN ($inRosterPlaceholders)
+            ";
+            if ($empIdFilter) {
+                $rosterSql .= " AND employee_id = ?";
+                $rosterParams[] = $empIdFilter;
+            }
+            $rostersByEmpAndMonth = [];
+            try {
+                $rosterStmt = $pdo->prepare($rosterSql);
+                $rosterStmt->execute($rosterParams);
+                while ($rost = $rosterStmt->fetch(PDO::FETCH_ASSOC)) {
+                    $rostersByEmpAndMonth[$rost['employee_id']][$rost['roster_month']] = $rost;
+                }
+            } catch (Exception $e) {
+                $rostersByEmpAndMonth = [];
+            }
+
             // Fetch daily sheets for this date range with lean columns (avoid heavy subquery)
             $sheetSql = "
                 SELECT ds.id, ds.employee_id, ds.sheet_date, ds.check_in_time, ds.check_out_time, 
-                       ds.total_duty_seconds, ds.is_locked, ds.work_summary, ds.remarks
+                       ds.total_duty_seconds, ds.is_locked, ds.work_summary, ds.remarks,
+                       ds.day_type, ds.holiday_reason
                 FROM daily_sheets ds
                 WHERE ds.sheet_date BETWEEN ? AND ?
             ";
@@ -547,9 +580,8 @@ switch ($action) {
             while (strtotime($currDate) <= strtotime($endDate)) {
                 $periodDates[] = [
                     'date' => $currDate,
-                    'day' => date('D', strtotime($currDate)),
+                    'day' => date('l', strtotime($currDate)),
                     'day_num' => (int)date('d', strtotime($currDate)),
-                    'is_weekend' => (date('N', strtotime($currDate)) >= 7),
                     'is_future' => ($currDate > $today)
                 ];
                 $currDate = date('Y-m-d', strtotime($currDate . ' +1 day'));
@@ -598,7 +630,25 @@ switch ($action) {
 
                 foreach ($periodDates as $d) {
                     $dt = $d['date'];
+                    $monthPrefix = substr($dt, 0, 7);
                     $sheet = $sheetsByEmp[$empId][$dt] ?? null;
+
+                    // Resolve employee weekly off from duty roster or employee profile
+                    $empRoster = $rostersByEmpAndMonth[$empId][$monthPrefix] ?? null;
+                    $scheduledWeeklyOff = !empty($empRoster['weekly_off']) 
+                        ? trim($empRoster['weekly_off']) 
+                        : (!empty($emp['weekly_off']) ? trim($emp['weekly_off']) : 'Sunday');
+                    $empOffDates = !empty($empRoster['off_dates_json']) 
+                        ? (json_decode($empRoster['off_dates_json'], true) ?: []) 
+                        : [];
+
+                    $dayOfWeek = $d['day'];
+                    $isEmpWeeklyOff = false;
+                    if (strcasecmp($dayOfWeek, $scheduledWeeklyOff) === 0) {
+                        $isEmpWeeklyOff = true;
+                    } elseif (stripos($scheduledWeeklyOff, 'Once in Month') !== false && in_array($dt, $empOffDates, true)) {
+                        $isEmpWeeklyOff = true;
+                    }
                     
                     // Check if on approved leave (O(1) list of only this employee's leaves)
                     $isOnLeave = false;
@@ -624,12 +674,15 @@ switch ($action) {
                     $dutyHours = round($dutySeconds / 3600, 2);
                     $weekNum = min(6, (int)ceil($d['day_num'] / 7));
 
+                    $isDayOff = ($sheet && ($sheet['day_type'] ?? '') === 'holiday');
+                    $isRestDay = ($isEmpWeeklyOff || $isDayOff);
+
                     if (!$d['is_future']) {
                         $empSummary['working_days_count']++;
                         $empSummary['total_duty_seconds'] += $dutySeconds;
                         $empSummary['total_duty_hours'] += $dutyHours;
                         $empSummary['weekly_hours'][$weekNum] += $dutyHours;
-                        if (!$isOpenFlexible && !$d['is_weekend']) {
+                        if (!$isOpenFlexible && !$isRestDay && !$isOnLeave) {
                             $empSummary['expected_duty_hours'] += $shiftHours;
                         }
                     }
@@ -645,17 +698,25 @@ switch ($action) {
                         $badgeClass = 'badge-leave';
                         $empSummary['approved_leaves']++;
                         $grandTotals['total_approved_leaves']++;
+                    } elseif ($isDayOff) {
+                        $status = 'day_off';
+                        $statusLabel = '🏖️ Day Off';
+                        $badgeClass = 'badge-holiday';
+                        if (!isset($empSummary['day_offs'])) $empSummary['day_offs'] = 0;
+                        $empSummary['day_offs']++;
+                        if (!isset($grandTotals['total_day_offs'])) $grandTotals['total_day_offs'] = 0;
+                        $grandTotals['total_day_offs']++;
                     } elseif ($isOpenFlexible) {
                         // Open / Flexible Shift (No fixed threshold)
                         if ($dutyHours > 0) {
                             $status = 'full_day';
-                            $statusLabel = '🟢 Shift Logged (' . formatDutyTime($dutySeconds) . ')';
+                            $statusLabel = '🟢 Shift Logged';
                             $badgeClass = 'badge-present';
                             $empSummary['full_days']++;
                             $grandTotals['total_present_full']++;
-                        } elseif ($d['is_weekend']) {
+                        } elseif ($isEmpWeeklyOff) {
                             $status = 'weekend';
-                            $statusLabel = 'Weekend';
+                            $statusLabel = 'Weekly Off';
                             $badgeClass = 'badge-weekend';
                         } else {
                             $status = 'absent';
@@ -670,19 +731,19 @@ switch ($action) {
 
                         if ($dutyHours >= $fullThreshold) {
                             $status = 'full_day';
-                            $statusLabel = '🟢 Full Day (' . formatDutyTime($dutySeconds) . ')';
+                            $statusLabel = '🟢 Full Day';
                             $badgeClass = 'badge-present';
                             $empSummary['full_days']++;
                             $grandTotals['total_present_full']++;
                         } elseif ($dutyHours >= $shortThreshold) {
                             $status = 'short_leave';
-                            $statusLabel = '🟡 Short Leave (~' . round($shiftHours * 0.75, 1) . 'h)';
+                            $statusLabel = '🟡 Short Leave';
                             $badgeClass = 'badge-short-leave';
                             $empSummary['short_leaves']++;
                             $grandTotals['total_short_leaves']++;
                         } elseif ($dutyHours >= $halfThreshold) {
                             $status = 'half_leave';
-                            $statusLabel = '🟠 Half Day (~' . round($shiftHours * 0.5, 1) . 'h)';
+                            $statusLabel = '🟠 Half Day';
                             $badgeClass = 'badge-half-leave';
                             $empSummary['half_leaves']++;
                             $grandTotals['total_half_leaves']++;
@@ -692,9 +753,9 @@ switch ($action) {
                             $badgeClass = 'badge-incomplete';
                             $empSummary['incomplete']++;
                             $grandTotals['total_absences']++;
-                        } elseif ($d['is_weekend']) {
+                        } elseif ($isEmpWeeklyOff) {
                             $status = 'weekend';
-                            $statusLabel = 'Weekend';
+                            $statusLabel = 'Weekly Off';
                             $badgeClass = 'badge-weekend';
                         } else {
                             $status = 'absent';
@@ -710,7 +771,8 @@ switch ($action) {
                             'date' => $dt,
                             'day' => $d['day'],
                             'day_num' => $d['day_num'],
-                            'is_weekend' => $d['is_weekend'],
+                            'is_weekend' => $isEmpWeeklyOff,
+                            'scheduled_weekly_off' => $scheduledWeeklyOff,
                             'is_future' => $d['is_future'],
                             'check_in' => $sheet['check_in_time'] ?? null,
                             'check_out' => $sheet['check_out_time'] ?? null,

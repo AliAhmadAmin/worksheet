@@ -1261,6 +1261,12 @@ function openAddEmployeeModal() {
     const sickInput = document.getElementById('add-emp-sick-quota');
     if (sickInput) sickInput.value = '8';
 
+    const timingInput = document.getElementById('add-emp-shift-timing');
+    if (timingInput) timingInput.value = '10:00 AM TO 6:00 PM';
+
+    const offSelect = document.getElementById('add-emp-weekly-off');
+    if (offSelect) offSelect.value = 'Sunday';
+
     openModal('add-employee-modal');
 }
 
@@ -1281,6 +1287,9 @@ async function handleAddEmployeeSubmit(e) {
     }
     const teamId = document.getElementById('add-emp-team')?.value;
     const avatar = document.getElementById('add-emp-avatar-base64')?.value || '';
+
+    const shiftTiming = document.getElementById('add-emp-shift-timing')?.value.trim() || '10:00 AM TO 6:00 PM';
+    const weeklyOff = document.getElementById('add-emp-weekly-off')?.value || 'Sunday';
 
     const empCode = document.getElementById('add-emp-code')?.value.trim();
     const phone = document.getElementById('add-emp-phone')?.value.trim();
@@ -1329,6 +1338,8 @@ async function handleAddEmployeeSubmit(e) {
             department_id: deptId,
             team_id: teamId || null,
             avatar,
+            shift_timing: shiftTiming,
+            weekly_off: weeklyOff,
             expected_hours: expectedHours,
             joining_date: joiningDate,
             annual_leave_quota: annualQuota,
@@ -1467,6 +1478,12 @@ function openEditEmployeeModal(empId) {
     const sickInput = document.getElementById('edit-emp-sick-quota');
     if (sickInput) sickInput.value = emp.sick_leave_quota !== undefined ? emp.sick_leave_quota : 8;
 
+    const timingInput = document.getElementById('edit-emp-shift-timing');
+    if (timingInput) timingInput.value = emp.shift_timing || '10:00 AM TO 6:00 PM';
+
+    const offSelect = document.getElementById('edit-emp-weekly-off');
+    if (offSelect) offSelect.value = emp.weekly_off || 'Sunday';
+
     const statusSelect = document.getElementById('edit-emp-status');
     if (statusSelect) {
         statusSelect.value = (emp.is_active != 0 && emp.is_active !== '0') ? '1' : '0';
@@ -1515,6 +1532,9 @@ async function handleEditEmployeeSubmit(e) {
     const avatar = document.getElementById('edit-emp-avatar-base64')?.value || '';
     const isActive = parseInt(document.getElementById('edit-emp-status')?.value || '1', 10);
 
+    const shiftTiming = document.getElementById('edit-emp-shift-timing')?.value.trim() || '10:00 AM TO 6:00 PM';
+    const weeklyOff = document.getElementById('edit-emp-weekly-off')?.value || 'Sunday';
+
     const empCode = document.getElementById('edit-emp-code')?.value.trim();
     const phone = document.getElementById('edit-emp-phone')?.value.trim();
     const fatherName = document.getElementById('edit-emp-father-name')?.value.trim();
@@ -1561,6 +1581,8 @@ async function handleEditEmployeeSubmit(e) {
             designation,
             department_id: deptId,
             team_id: teamId || null,
+            shift_timing: shiftTiming,
+            weekly_off: weeklyOff,
             expected_hours: expectedHours,
             joining_date: joiningDate,
             annual_leave_quota: annualQuota,

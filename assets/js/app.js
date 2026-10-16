@@ -838,15 +838,15 @@ function renderUserBar() {
     const canAssign = user.role === 'admin' || hasPermission('can_assign_tasks');
 
     if (user.role === 'admin' || user.role === 'super_admin' || canInspect) {
-        if (mainNavIcon) mainNavIcon.textContent = '🏠';
-        if (navTabLabel) navTabLabel.textContent = 'Dashboard';
+        if (mainNavIcon) mainNavIcon.textContent = '📝';
+        if (navTabLabel) navTabLabel.textContent = 'WorkSheets';
         if (wsHeading) wsHeading.textContent = 'Employee Worksheet Inspector & Live Editor';
         if (wsDesc) wsDesc.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
         if (sideHeading) sideHeading.textContent = '🎯 Team Tasks & Quick Actions';
         if (sideDesc) sideDesc.textContent = 'Monitor team tasks or assign new tasks to creators.';
     } else {
         if (mainNavIcon) mainNavIcon.textContent = '📝';
-        if (navTabLabel) navTabLabel.textContent = 'Hourly Sheet';
+        if (navTabLabel) navTabLabel.textContent = 'WorkSheets';
         if (wsHeading) wsHeading.textContent = 'Hourly Work Log Sheet';
         if (wsDesc) wsDesc.textContent = 'Record your work batches, content types, departments, and links.';
         if (sideHeading) sideHeading.textContent = '🎯 My Assigned Tasks';
@@ -855,8 +855,8 @@ function renderUserBar() {
 
     if (canAssign) {
         if (tasksNavIcon) tasksNavIcon.textContent = '🎯';
-        if (tasksNavLabel) tasksNavLabel.textContent = 'Task Assigner';
-        if (tasksPageTitle) tasksPageTitle.textContent = '🎯 Task Assignment Command Center';
+        if (tasksNavLabel) tasksNavLabel.textContent = 'Assign Task';
+        if (tasksPageTitle) tasksPageTitle.textContent = '🎯 Assign Task Command Center';
         if (tasksPageDesc) tasksPageDesc.textContent = 'Assign specific tasks to individual team members, filter by status, and monitor real-time completion.';
     } else {
         if (tasksNavIcon) tasksNavIcon.textContent = '🎯';
@@ -962,6 +962,8 @@ function navigateToTab(tabId, updateHash = true) {
 
     if (tabId === 'tab-reports') {
         loadReports();
+    } else if (tabId === 'tab-roster') {
+        if (typeof loadDutyRoster === 'function') loadDutyRoster();
     } else if (tabId === 'tab-attendance') {
         loadLiveAttendance();
     } else if (tabId === 'tab-hr') {

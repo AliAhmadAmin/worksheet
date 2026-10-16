@@ -136,24 +136,24 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <div class="sidebar-nav-title">WORKSPACE</div>
             <button type="button" class="nav-btn active" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
-                <span class="nav-label" id="main-nav-tab-label">Hourly Sheet</span>
+                <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
-                <span class="nav-label" id="tasks-nav-tab-label">Assigned Tasks</span>
+                <span class="nav-label" id="tasks-nav-tab-label">Assign Task</span>
                 <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
             </button>
             <?php if ($canViewNewsHandover): ?>
             <button type="button" class="nav-btn" data-tab="tab-newsroom" data-route="newsroom">
                 <span class="nav-icon">📺</span>
-                <span class="nav-label">News Handover</span>
+                <span class="nav-label">Newsroom</span>
                 <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
             </button>
             <?php endif; ?>
             <?php if ($canViewProgHandover): ?>
             <button type="button" class="nav-btn" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
-                <span class="nav-label">Program Handover</span>
+                <span class="nav-label">Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </button>
             <?php endif; ?>
@@ -187,6 +187,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- Department Management Category -->
         <div class="sidebar-nav-group admin-only" style="<?= $canViewManagement ? '' : 'display: none;' ?>">
             <div class="sidebar-nav-title">MANAGEMENT</div>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">Duty Roster</span>
+            </button>
             <button type="button" class="nav-btn admin-only" data-tab="tab-reports" data-route="reports">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Matrix Reports</span>
@@ -207,12 +211,12 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <div class="sidebar-nav-title">NEWS PIPELINE</div>
             <button type="button" class="nav-btn active" data-tab="tab-newsroom" data-route="newsroom">
                 <span class="nav-icon">📺</span>
-                <span class="nav-label">News Handover</span>
+                <span class="nav-label">Newsroom</span>
                 <span id="pending-news-badge-nr" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon">📝</span>
-                <span class="nav-label">Hourly Sheet</span>
+                <span class="nav-label">WorkSheets</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon">🎯</span>
@@ -224,6 +228,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- Operations & Staff Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">STAFF & SERVICES</div>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">Duty Roster</span>
+            </button>
             <button type="button" class="nav-btn" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Live Attendance</span>
@@ -244,12 +252,12 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <div class="sidebar-nav-title">HANDOVER PIPELINE</div>
             <button type="button" class="nav-btn active" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
-                <span class="nav-label">Handover Board</span>
+                <span class="nav-label">Programming</span>
                 <span id="pending-prog-badge-pg" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon">📝</span>
-                <span class="nav-label">Hourly Sheet</span>
+                <span class="nav-label">WorkSheets</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon">🎯</span>
@@ -261,6 +269,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- Operations & Staff Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">STAFF & SERVICES</div>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">Duty Roster</span>
+            </button>
             <button type="button" class="nav-btn" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Live Attendance</span>
@@ -282,6 +294,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <button type="button" class="nav-btn active" data-tab="tab-hr" data-route="hr">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">HR Dashboard</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-roster" data-route="roster">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">Duty Roster</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>

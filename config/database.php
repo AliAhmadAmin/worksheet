@@ -151,6 +151,35 @@ function migratePermissionsSchema($pdo) {
             $pdo->exec("ALTER TABLE tasks ADD COLUMN link TEXT AFTER description");
         }
 
+        // Add day_type & holiday tracking to daily_sheets for flexible rotational rest days
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN day_type VARCHAR(50) DEFAULT 'working' AFTER is_locked"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN holiday_reason VARCHAR(255) NULL AFTER day_type"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN holiday_marked_by INT NULL AFTER holiday_reason"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees ADD COLUMN monthly_off_days INT DEFAULT 4"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees ADD COLUMN shift_timing VARCHAR(100) NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees ADD COLUMN weekly_off VARCHAR(50) NULL"); } catch (Exception $e) {}
+
+        // Duty Rosters Table for Monthly Scheduled Shifts & Weekly Offs
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS duty_rosters (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            department_id INT NOT NULL,
+            roster_month VARCHAR(7) NOT NULL,
+            employee_id INT NOT NULL,
+            designation VARCHAR(150) NULL,
+            shift_timing VARCHAR(100) NOT NULL,
+            weekly_off VARCHAR(50) NOT NULL,
+            off_dates_json TEXT NULL,
+            notes TEXT NULL,
+            created_by INT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_emp_month (employee_id, roster_month),
+            INDEX idx_dept_month (department_id, roster_month),
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+            FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         // Ensure all admin accounts have full permissions enabled (1)
         $pdo->exec("
             UPDATE employees 

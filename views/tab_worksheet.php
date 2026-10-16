@@ -20,9 +20,10 @@
                             <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; border-radius: 12px; font-weight: 700;" onclick="openMyProfileModal()" title="Edit My Profile & Photo">✏️ Edit Profile</button>
                         </div>
                         <p id="hero-emp-meta"><?= htmlspecialchars(($authUser['designation'] ?? 'Staff') . ' • ' . ($authUser['department_name'] ?? 'Digital') . ' • ' . ($authUser['team_name'] ?? 'Team')) ?></p>
-                        <div style="display: flex; gap: 14px; margin-top: 6px; font-size: 12.5px;">
+                        <div style="display: flex; gap: 14px; margin-top: 6px; font-size: 12.5px; align-items: center; flex-wrap: wrap;">
                             <span>In: <strong id="hero-checkin-time" style="color: #38bdf8;">--:--</strong></span>
                             <span>Out: <strong id="hero-checkout-time" style="color: #fbbf24;">--:--</strong></span>
+                            <span id="hero-roster-pill" style="display: none; background: rgba(168, 85, 247, 0.12); color: #c084fc; padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 11.5px;">📅 Shift: <span id="hero-roster-shift-text">--</span></span>
                         </div>
                     </div>
                 </div>
@@ -34,6 +35,9 @@
                 </div>
 
                 <div class="shift-actions">
+                    <button type="button" id="btn-self-holiday" class="btn btn-outline" style="border-color: #8b5cf6; color: #8b5cf6; font-weight: 700;" onclick="handleToggleHoliday()" title="Self-Check: Mark this date as your scheduled Day Off / Holiday">
+                        🏖️ Day Off
+                    </button>
                     <button type="button" id="btn-check-in" class="btn btn-success" onclick="handleCheckIn()">
                         🟢 Check In
                     </button>
@@ -126,6 +130,9 @@
 
                             <!-- Group 4: Sheet Actions -->
                             <div class="admin-ctrl-group admin-ctrl-actions">
+                                <button type="button" id="admin-btn-toggle-holiday" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px; border-color: #8b5cf6; color: #8b5cf6; font-weight: 700;" onclick="handleToggleHoliday()" title="Mark this date as employee's rotational Day Off / Holiday">
+                                    🏖️ Day Off
+                                </button>
                                 <button type="button" id="admin-unlock-btn" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="toggleSheetLock()">
                                     🔒 Lock Sheet
                                 </button>
@@ -197,46 +204,82 @@
                     </div>
                 </div>
 
-                <!-- Worksheet Table -->
-                <div class="table-responsive">
-                    <table class="interactive-table">
-                        <thead id="worksheet-table-head">
-                            <tr>
-                                <th class="col-time-slot" style="width: 18%; min-width: 160px;">Time Slot</th>
-                                <th class="col-content-type" style="width: 15%; min-width: 150px;">Content Type</th>
-                                <th class="col-department" style="width: 15%; min-width: 150px;">Department</th>
-                                <th class="col-link" style="width: 20%; min-width: 170px;">Link / Upload</th>
-                                <th class="col-description" style="width: 28%; min-width: 210px;">Work Description / Title</th>
-                                <th class="col-action" style="width: 4%; min-width: 45px; text-align: center;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="worksheet-table-body">
-                            <!-- Dynamic rows rendered here -->
-                        </tbody>
-                    </table>
-                </div>
+                <!-- Dedicated Holiday & Approved Leave Rest Day View -->
+                <div id="worksheet-holiday-card" style="display: none; padding: 28px 20px; text-align: center; background: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.08), transparent 70%), var(--bg-card-elevated); border: 1.5px dashed rgba(139, 92, 246, 0.35); border-radius: var(--radius-xl); margin: 16px 0 22px;">
+                    <div style="width: 58px; height: 58px; margin: 0 auto 12px; background: rgba(139, 92, 246, 0.12); border: 2px solid rgba(139, 92, 246, 0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px;">
+                        <span id="holiday-card-icon">🏖️</span>
+                    </div>
+                    <div id="holiday-card-badge" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 14px; border-radius: 20px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; background: rgba(139, 92, 246, 0.15); color: #8b5cf6; margin-bottom: 8px;">
+                        🏖️ Day Off
+                    </div>
+                    <h2 id="holiday-card-title" style="font-size: 20px; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">
+                        Day Off
+                    </h2>
+                    <p id="holiday-card-subtitle" style="font-size: 13.5px; color: var(--text-muted); max-width: 500px; margin: 0 auto 16px; line-height: 1.5;">
+                        Scheduled rest day. No worksheet required today.
+                    </p>
 
-                <!-- Action Bar Below Last Row: Prominent + Add Row & Auto-Save status -->
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                    <button type="button" id="btn-add-row-bottom" class="btn btn-outline" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; border-style: dashed; border-width: 1.5px; padding: 8px 20px; border-color: var(--primary); color: var(--primary); background: rgba(59, 130, 246, 0.05); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s ease;" onclick="addNewRowBelow()" title="Add a new row at the bottom">
-                        ➕ Add Row
-                    </button>
+                    <!-- Simple Date & Off Tag -->
+                    <div style="display: inline-flex; align-items: center; gap: 10px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 18px; box-shadow: var(--shadow-sm); flex-wrap: wrap; justify-content: center;">
+                        <span id="holiday-card-date-label">Today</span>
+                        <span style="color: var(--border-color);">•</span>
+                        <span id="holiday-card-detail-label" style="color: #8b5cf6; font-weight: 700;">Weekly Off</span>
+                    </div>
 
-                    <div id="worksheet-save-indicator" style="display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); background: var(--bg-card-elevated); padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border-color);">
-                        <span id="save-indicator-icon" style="font-size: 14px;">☁️</span>
-                        <span id="save-indicator-text">Auto-save ready</span>
+                    <!-- Action Controls -->
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-outline" style="border-color: #8b5cf6; color: #8b5cf6; font-weight: 700; padding: 7px 18px; font-size: 12.5px;" onclick="handleToggleHoliday('working')">
+                            ↩️ Switch to Work Day
+                        </button>
+                        <button type="button" class="btn btn-primary" style="padding: 7px 18px; font-weight: 700; font-size: 12.5px;" onclick="handleShowOvertimeTable()">
+                            📝 Log Work Anyway
+                        </button>
                     </div>
                 </div>
 
-                <!-- Summary & Remarks Grid -->
-                <div class="form-split-grid">
-                    <div class="form-group">
-                        <label class="form-label">Work Summary</label>
-                        <textarea id="worksheet-work-summary" class="form-textarea" placeholder="Overall summary of the day's completed tasks..."></textarea>
+                <!-- Regular Worksheet Content Wrapper (Table, Add Row, Summary) -->
+                <div id="worksheet-content-wrapper">
+                    <!-- Worksheet Table -->
+                    <div class="table-responsive">
+                        <table class="interactive-table">
+                            <thead id="worksheet-table-head">
+                                <tr>
+                                    <th class="col-time-slot" style="width: 18%; min-width: 160px;">Time Slot</th>
+                                    <th class="col-content-type" style="width: 15%; min-width: 150px;">Content Type</th>
+                                    <th class="col-department" style="width: 15%; min-width: 150px;">Department</th>
+                                    <th class="col-link" style="width: 20%; min-width: 170px;">Link / Upload</th>
+                                    <th class="col-description" style="width: 28%; min-width: 210px;">Work Description / Title</th>
+                                    <th class="col-action" style="width: 4%; min-width: 45px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="worksheet-table-body">
+                                <!-- Dynamic rows rendered here -->
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Remarks</label>
-                        <textarea id="worksheet-remarks" class="form-textarea" placeholder="Any special remarks or blockers..."></textarea>
+
+                    <!-- Action Bar Below Last Row: Prominent + Add Row & Auto-Save status -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                        <button type="button" id="btn-add-row-bottom" class="btn btn-outline" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px; border-style: dashed; border-width: 1.5px; padding: 8px 20px; border-color: var(--primary); color: var(--primary); background: rgba(59, 130, 246, 0.05); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s ease;" onclick="addNewRowBelow()" title="Add a new row at the bottom">
+                            ➕ Add Row
+                        </button>
+
+                        <div id="worksheet-save-indicator" style="display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); background: var(--bg-card-elevated); padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border-color);">
+                            <span id="save-indicator-icon" style="font-size: 14px;">☁️</span>
+                            <span id="save-indicator-text">Auto-save ready</span>
+                        </div>
+                    </div>
+
+                    <!-- Summary & Remarks Grid -->
+                    <div class="form-split-grid">
+                        <div class="form-group">
+                            <label class="form-label">Work Summary</label>
+                            <textarea id="worksheet-work-summary" class="form-textarea" placeholder="Overall summary of the day's completed tasks..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Remarks</label>
+                            <textarea id="worksheet-remarks" class="form-textarea" placeholder="Any special remarks or blockers..."></textarea>
+                        </div>
                     </div>
                 </div>
             </div>

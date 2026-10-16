@@ -114,7 +114,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                 </div>
                 <button type="button" class="btn-modal-close" onclick="closeModal('hod-whatsapp-modal')">✕</button>
             </div>
-            <form id="hod-whatsapp-form" onsubmit="handleHodWhatsAppSettingsSubmit(event)">
+            <form id="hod-whatsapp-form" autocomplete="off" onsubmit="handleHodWhatsAppSettingsSubmit(event)">
                 <div class="modal-body" style="gap: 16px;">
                     <!-- Section 1: OrbitSend WhatsApp Credentials -->
                     <div class="modal-section">
@@ -124,12 +124,12 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         </p>
                         <div class="form-group">
                             <label class="form-label">OrbitSend API URL</label>
-                            <input type="text" id="hod-wa-api-url" class="input-control" value="https://app.orbitsend.com/api/send/whatsapp" style="font-family: monospace; font-size: 12px;">
+                            <input type="text" id="hod-wa-api-url" class="input-control" value="https://app.orbitsend.com/api/send/whatsapp" style="font-family: monospace; font-size: 12px;" autocomplete="off">
                         </div>
                         <div class="form-grid-2">
                             <div class="form-group">
                                 <label class="form-label">OrbitSend Secret Key *</label>
-                                <input type="password" id="hod-wa-api-secret" class="input-control" placeholder="Enter OrbitSend Secret Key" style="font-family: monospace;">
+                                <input type="password" id="hod-wa-api-secret" class="input-control" placeholder="Enter OrbitSend Secret Key" style="font-family: monospace;" autocomplete="new-password">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Account / Unique ID *</label>
@@ -161,7 +161,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                             </div>
                             <div class="form-group">
                                 <label class="form-label">AI API Key</label>
-                                <input type="password" id="hod-ai-api-key" class="input-control" placeholder="AI API Key (or leave empty for company key)" style="font-family: monospace;">
+                                <input type="password" id="hod-ai-api-key" class="input-control" placeholder="AI API Key (or leave empty for company key)" style="font-family: monospace;" autocomplete="new-password">
                             </div>
                         </div>
                     </div>
@@ -481,6 +481,30 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 </select>
                             </div>
                         </div>
+
+                        <div class="form-grid-2" style="margin-top: 10px;">
+                            <div class="form-group">
+                                <label class="form-label">⏱️ Shift Timing (Roster Hours)</label>
+                                <input type="text" id="add-emp-shift-timing" class="input-control" placeholder="e.g. 12:00 PM TO 8:00 PM" style="font-weight: 600;" value="10:00 AM TO 6:00 PM">
+                                <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">🏖️ Weekly Off Day</label>
+                                <select id="add-emp-weekly-off" class="input-control" style="font-weight: 600;">
+                                    <option value="Sunday" selected>Sunday</option>
+                                    <option value="Monday">Monday</option>
+                                    <option value="Tuesday">Tuesday</option>
+                                    <option value="Wednesday">Wednesday</option>
+                                    <option value="Thursday">Thursday</option>
+                                    <option value="Friday">Friday</option>
+                                    <option value="Saturday">Saturday</option>
+                                    <option value="Once in Month">Once in Month (Rotational)</option>
+                                    <option value="Friday & Saturday">Friday & Saturday</option>
+                                    <option value="Saturday & Sunday">Saturday & Sunday</option>
+                                </select>
+                                <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Section 4: Salary, Bank & Entitlements (Confidential - HR & Super Admin Only) -->
@@ -699,6 +723,30 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                     <option value="12.0">⏱️ 12.0 Hours / Day</option>
                                     <option value="0.0">🌐 Flexible / Open Shift (No fixed hours)</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2" style="margin-top: 10px;">
+                            <div class="form-group">
+                                <label class="form-label">⏱️ Shift Timing (Roster Hours)</label>
+                                <input type="text" id="edit-emp-shift-timing" class="input-control" placeholder="e.g. 12:00 PM TO 8:00 PM" style="font-weight: 600;">
+                                <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">🏖️ Weekly Off Day</label>
+                                <select id="edit-emp-weekly-off" class="input-control" style="font-weight: 600;">
+                                    <option value="Sunday">Sunday</option>
+                                    <option value="Monday">Monday</option>
+                                    <option value="Tuesday">Tuesday</option>
+                                    <option value="Wednesday">Wednesday</option>
+                                    <option value="Thursday">Thursday</option>
+                                    <option value="Friday">Friday</option>
+                                    <option value="Saturday">Saturday</option>
+                                    <option value="Once in Month">Once in Month (Rotational)</option>
+                                    <option value="Friday & Saturday">Friday & Saturday</option>
+                                    <option value="Saturday & Sunday">Saturday & Sunday</option>
+                                </select>
+                                <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
                             </div>
                         </div>
                     </div>
@@ -1032,17 +1080,17 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
 
                     <div class="form-group">
                         <label class="form-label">Official Email Address *</label>
-                        <input type="email" id="my-profile-email" class="input-control" required placeholder="your.email@discoverpakistan.tv">
+                        <input type="email" id="my-profile-email" class="input-control" required placeholder="your.email@discoverpakistan.tv" autocomplete="username">
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                         <div class="form-group">
                             <label class="form-label">Designation / Title</label>
-                            <input type="text" id="my-profile-designation" class="input-control" placeholder="e.g. Social Lead, Video Editor">
+                            <input type="text" id="my-profile-designation" class="input-control" placeholder="e.g. Social Lead, Video Editor" autocomplete="organization-title">
                         </div>
                         <div class="form-group">
                             <label class="form-label">Department & Team</label>
-                            <input type="text" id="my-profile-dept-team" class="input-control" readonly disabled style="background: var(--bg-hover); opacity: 0.85; font-size: 12px;">
+                            <input type="text" id="my-profile-dept-team" class="input-control" readonly disabled style="background: var(--bg-hover); opacity: 0.85; font-size: 12px;" autocomplete="off">
                         </div>
                     </div>
 
@@ -1053,10 +1101,10 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                             <div class="form-group" style="margin-bottom: 0;">
-                                <input type="password" id="my-profile-new-password" class="input-control" placeholder="New Password">
+                                <input type="password" id="my-profile-new-password" class="input-control" placeholder="New Password" autocomplete="new-password">
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
-                                <input type="password" id="my-profile-confirm-password" class="input-control" placeholder="Confirm Password">
+                                <input type="password" id="my-profile-confirm-password" class="input-control" placeholder="Confirm Password" autocomplete="new-password">
                             </div>
                         </div>
                         <small style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 4px;">Leave blank to keep your existing password.</small>

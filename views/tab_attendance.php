@@ -401,7 +401,7 @@ try {
                     </h3>
                     <button type="button" class="modal-close" onclick="closeModal('wa-settings-modal')">&times;</button>
                 </div>
-                <form id="wa-settings-form" onsubmit="WhatsAppAtt.saveSettings(event)">
+                <form id="wa-settings-form" autocomplete="off" onsubmit="WhatsAppAtt.saveSettings(event)">
                     <div class="modal-body" style="gap: 14px;">
                         
                         <!-- Webhook URL Box -->
@@ -410,7 +410,7 @@ try {
                                 🔗 OrbitSend Webhook URL (Copy & paste into OrbitSend Webhooks)
                             </label>
                             <div style="display: flex; gap: 6px;">
-                                <input type="text" id="wa-webhook-url" class="input-control" readonly style="flex: 1; font-family: monospace; font-size: 11.5px; background: #fff; font-weight: 600;">
+                                <input type="text" id="wa-webhook-url" class="input-control" readonly style="flex: 1; font-family: monospace; font-size: 11.5px; background: #fff; font-weight: 600;" autocomplete="off">
                                 <button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 11.5px;" onclick="WhatsAppAtt.copyWebhookUrl()">📋 Copy</button>
                             </div>
                         </div>
@@ -423,31 +423,31 @@ try {
 
                             <div class="form-group" style="margin-bottom: 0;">
                                 <label class="form-label" style="font-size: 11px;">OrbitSend API URL</label>
-                                <input type="text" id="wa-api-url" class="input-control" placeholder="https://app.orbitsend.com/api/send/whatsapp" style="width: 100%; font-family: monospace; font-size: 12px;">
+                                <input type="text" id="wa-api-url" class="input-control" placeholder="https://app.orbitsend.com/api/send/whatsapp" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="off">
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label class="form-label" style="font-size: 11px;">OrbitSend Secret Key</label>
-                                    <input type="password" id="wa-api-secret" class="input-control" placeholder="Enter API Secret" style="width: 100%; font-family: monospace; font-size: 12px;">
+                                    <input type="password" id="wa-api-secret" class="input-control" placeholder="Enter API Secret" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="new-password">
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label class="form-label" style="font-size: 11px;">Webhook Secret Token</label>
-                                    <input type="password" id="wa-webhook-secret" class="input-control" placeholder="Enter Webhook Secret" style="width: 100%; font-family: monospace; font-size: 12px;">
+                                    <input type="password" id="wa-webhook-secret" class="input-control" placeholder="Enter Webhook Secret" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="new-password">
                                 </div>
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label class="form-label" style="font-size: 11px;">OrbitSend Account / Unique ID</label>
-                                    <input type="text" id="wa-unique-id" class="input-control" placeholder="e.g. WHATSAPP_ACCOUNT_UNIQUE_ID" style="width: 100%; font-family: monospace; font-size: 12px;">
+                                    <input type="text" id="wa-unique-id" class="input-control" placeholder="e.g. WHATSAPP_ACCOUNT_UNIQUE_ID" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="off">
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                                         <label class="form-label" style="font-size: 11px; margin-bottom: 0;">Target WhatsApp Group JID</label>
                                         <button type="button" class="btn btn-outline" style="font-size: 10px; padding: 1px 6px; line-height: 1.2;" onclick="WhatsAppAtt.fetchGroupsFromOrbitSend()" title="Auto-load groups from OrbitSend">🔄 Fetch Groups</button>
                                     </div>
-                                    <input type="text" id="wa-group-jid" class="input-control" placeholder="e.g. 12036304... or leave empty for all" style="width: 100%; font-family: monospace; font-size: 12px;">
+                                    <input type="text" id="wa-group-jid" class="input-control" placeholder="e.g. 12036304... or leave empty for all" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="off">
                                 </div>
                             </div>
                         </div>
@@ -468,7 +468,7 @@ try {
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label class="form-label" style="font-size: 11px;">AI API Key</label>
-                                    <input type="password" id="wa-ai-api-key" class="input-control" placeholder="Enter Gemini or OpenAI API Key" style="width: 100%; font-family: monospace; font-size: 12px;">
+                                    <input type="password" id="wa-ai-api-key" class="input-control" placeholder="Enter Gemini or OpenAI API Key" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="new-password">
                                 </div>
                             </div>
                             <small style="font-size: 10.5px; color: var(--text-muted);">Auto-NLP runs instantly locally. Adding an AI key enables deep Roman Urdu/conversational text understanding.</small>

@@ -215,10 +215,11 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
         }
         await loadTrackingOptions(deptId);
 
-        renderWorksheetHero(data.sheet, data.employee);
+        renderWorksheetHero(data.sheet, data.employee, data);
         renderWorksheetTable(data.entries, data.can_edit);
         renderWorksheetSummary(data.sheet);
         updateLockBadge(data.is_locked, data.can_edit);
+        renderHolidayView(data);
 
         // Draft Recovery Banner
         const draftBanner = document.getElementById('worksheet-draft-banner');
@@ -247,7 +248,7 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
     }
 }
 
-function renderWorksheetHero(sheet, empData) {
+function renderWorksheetHero(sheet, empData, data = null) {
     const isElevated = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
 
     if (isElevated && empData) {
@@ -272,7 +273,15 @@ function renderWorksheetHero(sheet, empData) {
         if (desigEl) desigEl.textContent = empData.designation || 'Staff';
         if (deptEl) deptEl.textContent = empData.department_name || 'Digital';
         if (teamEl) teamEl.textContent = empData.team_name || 'General';
-        if (inEl) inEl.textContent = sheet?.check_in_time || '--:--';
+
+        // Display scheduled roster timing alongside actual in/out
+        const schedShift = data?.scheduled_shift || null;
+        if (inEl) {
+            inEl.textContent = sheet?.check_in_time || '--:--';
+            if (schedShift) {
+                inEl.title = `Scheduled Shift: ${schedShift}. Actual Punch-In: ${sheet?.check_in_time || 'Pending arrival'}`;
+            }
+        }
         if (outEl) outEl.textContent = sheet?.check_out_time || '--:--';
 
         const checkIn = sheet ? sheet.check_in_time : null;
@@ -358,6 +367,20 @@ function renderWorksheetHero(sheet, empData) {
 
         if (checkInTimeEl) checkInTimeEl.textContent = checkIn || '--:--';
         if (checkOutTimeEl) checkOutTimeEl.textContent = checkOut || '--:--';
+
+        // Scheduled Shift from Duty Roster (Informational only: timer starts ONLY upon actual check-in)
+        const schedShift = data?.scheduled_shift || null;
+        const heroRosterPill = document.getElementById('hero-roster-pill');
+        const heroRosterShiftText = document.getElementById('hero-roster-shift-text');
+        if (heroRosterPill && heroRosterShiftText) {
+            if (schedShift) {
+                heroRosterPill.style.display = 'inline-flex';
+                heroRosterShiftText.textContent = schedShift;
+                heroRosterPill.title = `Your scheduled shift is ${schedShift}. Duty timer starts when you actually punch in.`;
+            } else {
+                heroRosterPill.style.display = 'none';
+            }
+        }
 
         // Date status calculation
         const todayStr = getLocalDateString();
@@ -1474,4 +1497,178 @@ function escapeHtml(str) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+/**
+ * Flexible Rotational Holiday & Day Off Management
+ */
+function renderHolidayView(data) {
+    const holidayCard = document.getElementById('worksheet-holiday-card');
+    const contentWrapper = document.getElementById('worksheet-content-wrapper');
+    const btnSelfHoliday = document.getElementById('btn-self-holiday');
+    const btnAdminHoliday = document.getElementById('admin-btn-toggle-holiday');
+
+    if (!holidayCard || !contentWrapper) return;
+
+    const sheet = data.sheet || {};
+    const isHoliday = (data.effective_day_type === 'holiday' || (sheet.day_type === 'holiday'));
+    const approvedLeave = data.approved_leave;
+
+    const cardIcon = document.getElementById('holiday-card-icon');
+    const cardBadge = document.getElementById('holiday-card-badge');
+    const cardTitle = document.getElementById('holiday-card-title');
+    const cardSubtitle = document.getElementById('holiday-card-subtitle');
+    const cardDateLabel = document.getElementById('holiday-card-date-label');
+    const cardDetailLabel = document.getElementById('holiday-card-detail-label');
+
+    // Date display string
+    const selectedDateObj = new Date(AppState.selectedDate + 'T00:00:00');
+    const dateFormatted = !isNaN(selectedDateObj.getTime())
+        ? selectedDateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+        : AppState.selectedDate;
+
+    if (cardDateLabel) cardDateLabel.textContent = dateFormatted;
+
+    if (isHoliday) {
+        // Scheduled Rest Day
+        holidayCard.style.display = 'block';
+        contentWrapper.style.display = 'none';
+
+        if (cardIcon) cardIcon.textContent = '🏖️';
+        if (cardBadge) {
+            cardBadge.textContent = '🏖️ Day Off';
+            cardBadge.style.background = 'rgba(139, 92, 246, 0.15)';
+            cardBadge.style.color = '#8b5cf6';
+        }
+        if (cardTitle) cardTitle.textContent = `${data.employee?.name || 'Employee'} is on Day Off`;
+        if (cardSubtitle) cardSubtitle.textContent = 'Scheduled rest day. No worksheet required today.';
+
+        if (cardDetailLabel) {
+            cardDetailLabel.textContent = data.scheduled_weekly_off ? `Weekly Off (${data.scheduled_weekly_off})` : 'Weekly Off';
+            cardDetailLabel.style.color = '#8b5cf6';
+        }
+
+        // Update button text
+        if (btnSelfHoliday) {
+            btnSelfHoliday.innerHTML = '↩️ Work Day';
+            btnSelfHoliday.className = 'btn btn-outline';
+            btnSelfHoliday.title = 'Switch back to regular working day';
+        }
+        if (btnAdminHoliday) {
+            btnAdminHoliday.innerHTML = '↩️ Work Day';
+            btnAdminHoliday.className = 'btn btn-outline';
+            btnAdminHoliday.title = 'Switch back to regular working day';
+        }
+    } else if (approvedLeave) {
+        // Approved Official HR Leave (Sick, Casual, Annual)
+        holidayCard.style.display = 'block';
+        contentWrapper.style.display = 'none';
+
+        if (cardIcon) cardIcon.textContent = '🌴';
+        const leaveTypeName = (approvedLeave.leave_type || 'Leave').toUpperCase();
+        if (cardBadge) {
+            cardBadge.textContent = `🏖️ ${leaveTypeName} Leave`;
+            cardBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+            cardBadge.style.color = '#10b981';
+        }
+        if (cardTitle) cardTitle.textContent = `${data.employee?.name || 'Employee'} is on Leave`;
+        if (cardSubtitle) cardSubtitle.textContent = `HR Approved (${approvedLeave.days_count || 1} day). No worksheet required today.`;
+        if (cardDetailLabel) {
+            cardDetailLabel.textContent = `Approved Leave (${approvedLeave.start_date || ''} - ${approvedLeave.end_date || ''})`;
+            cardDetailLabel.style.color = '#10b981';
+        }
+
+        if (btnSelfHoliday) {
+            btnSelfHoliday.innerHTML = '🏖️ On Leave';
+            btnSelfHoliday.disabled = true;
+        }
+        if (btnAdminHoliday) {
+            btnAdminHoliday.innerHTML = '🏖️ On Leave';
+            btnAdminHoliday.disabled = true;
+        }
+    } else {
+        // Normal Working Day
+        holidayCard.style.display = 'none';
+        contentWrapper.style.display = 'block';
+
+        if (btnSelfHoliday) {
+            btnSelfHoliday.innerHTML = '🏖️ Day Off';
+            btnSelfHoliday.disabled = false;
+            btnSelfHoliday.className = 'btn btn-outline';
+            btnSelfHoliday.title = 'Self-Check: Mark this date as your scheduled Day Off / Holiday';
+        }
+        if (btnAdminHoliday) {
+            btnAdminHoliday.innerHTML = '🏖️ Day Off';
+            btnAdminHoliday.disabled = false;
+            btnAdminHoliday.className = 'btn btn-outline';
+            btnAdminHoliday.title = 'Mark this date as employee\'s rotational Day Off / Holiday';
+        }
+    }
+}
+
+function handleShowOvertimeTable() {
+    const contentWrapper = document.getElementById('worksheet-content-wrapper');
+    if (contentWrapper) {
+        contentWrapper.style.display = 'block';
+        contentWrapper.scrollIntoView({ behavior: 'smooth' });
+        showToast('Worksheet opened for overtime / extra work entry.', 'info');
+    }
+}
+
+async function handleToggleHoliday(forcedState = null) {
+    const empId = getActiveWorksheetEmpId();
+    const date = AppState.selectedDate;
+    const currentSheet = AppState.currentSheet || {};
+    const isCurrentlyHoliday = (currentSheet.day_type === 'holiday');
+
+    let targetType = 'holiday';
+    if (forcedState === 'working' || (forcedState === null && isCurrentlyHoliday)) {
+        targetType = 'working';
+    }
+
+    const empName = (AppState.currentUser && AppState.currentUser.id === empId) 
+        ? 'your schedule' 
+        : (document.getElementById('admin-emp-dropdown-selected-name')?.textContent || 'this employee');
+
+    const actionText = targetType === 'holiday' 
+        ? `Mark ${empName} as on Day Off / Holiday for ${date}?`
+        : `Switch ${empName} back to a regular working day for ${date}?`;
+
+    const confirmed = await showConfirmDialog({
+        title: targetType === 'holiday' ? '🏖️ Confirm Day Off / Holiday' : '💼 Switch to Working Day',
+        message: actionText,
+        detail: targetType === 'holiday' 
+            ? 'This will register as an official rest day in attendance without penalizing duty hours or deducting from HR leaves.'
+            : 'The worksheet table will be restored for normal hourly task logging and shift check-in.',
+        confirmText: targetType === 'holiday' ? 'Mark Day Off' : 'Switch to Work Day',
+        type: targetType === 'holiday' ? 'primary' : 'warning',
+        icon: targetType === 'holiday' ? '🏖️' : '💼'
+    });
+
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch('api/sheets.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'toggle_day_type',
+                employee_id: empId,
+                date: date,
+                day_type: targetType,
+                reason: targetType === 'holiday' ? 'Scheduled Rotational Day Off' : ''
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+            await loadDailyWorksheet();
+        } else {
+            showToast(data.message || 'Failed to update rest day status.', 'error');
+        }
+    } catch (err) {
+        console.error('Failed to toggle holiday:', err);
+        showToast('Error updating holiday status.', 'error');
+    }
 }

@@ -2,6 +2,9 @@
 /**
  * Hourly Sheet API: Entries CRUD, Lock/Unlock, Print Data
  */
+ini_set('display_errors', '0');
+error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -131,6 +134,81 @@ switch ($action) {
         $isAdminOrHod = $isSuperAdmin || ($isHod && in_array((int)$employee['department_id'], $managedDeptIds, true));
         $canEditAll = $isAdminOrHod || ($isLocked === 0);
 
+        // Calculate monthly off-days taken by this employee in the month of the selected date
+        $monthPrefix = date('Y-m', strtotime($date));
+        $stmtOffCount = $pdo->prepare("SELECT COUNT(*) FROM daily_sheets WHERE employee_id = ? AND sheet_date LIKE ? AND day_type = 'holiday'");
+        $stmtOffCount->execute([$empId, "$monthPrefix%"]);
+        $monthlyOffDaysTaken = (int)$stmtOffCount->fetchColumn();
+
+        // Standard monthly off-days quota (default 4 for 24/7 rotational shifts)
+        $monthlyOffDaysAllowed = isset($employee['monthly_off_days']) && (int)$employee['monthly_off_days'] > 0 
+            ? (int)$employee['monthly_off_days'] 
+            : 4;
+
+        // Check if there is an approved HR leave for this date
+        $approvedLeave = null;
+        try {
+            $stmtLeave = $pdo->prepare("
+                SELECT id, leave_type, start_date, end_date, days_count, reason 
+                FROM hr_leaves 
+                WHERE employee_id = ? 
+                  AND status = 'approved' 
+                  AND ? BETWEEN start_date AND end_date 
+                LIMIT 1
+            ");
+            $stmtLeave->execute([$empId, $date]);
+            $approvedLeave = $stmtLeave->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Exception $e) {
+            $approvedLeave = null;
+        }
+
+        // Query Duty Roster for this employee and month
+        $rosterStmt = $pdo->prepare("
+            SELECT * FROM duty_rosters 
+            WHERE employee_id = ? AND roster_month = ?
+            LIMIT 1
+        ");
+        $rosterStmt->execute([$empId, $monthPrefix]);
+        $rosterEntry = $rosterStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        $scheduledShift = $rosterEntry['shift_timing'] ?? null;
+        $scheduledWeeklyOff = $rosterEntry['weekly_off'] ?? null;
+        $isScheduledOff = false;
+
+        if ($scheduledWeeklyOff) {
+            $dayOfWeek = date('l', strtotime($date)); // e.g. 'Sunday', 'Saturday', 'Monday'
+            if (strcasecmp($dayOfWeek, $scheduledWeeklyOff) === 0) {
+                $isScheduledOff = true;
+            } elseif (stripos($scheduledWeeklyOff, 'Once in Month') !== false && !empty($rosterEntry['off_dates_json'])) {
+                $offDates = json_decode($rosterEntry['off_dates_json'], true) ?: [];
+                if (in_array($date, $offDates, true)) {
+                    $isScheduledOff = true;
+                }
+            }
+        }
+
+        // Determine effective day type:
+        // If daily_sheets has an explicit day_type: use it.
+        // Else if isScheduledOff and no active check-in exists: automatically default to holiday (rest day).
+        $effectiveDayType = 'working';
+        if ($sheet && !empty($sheet['day_type'])) {
+            $effectiveDayType = $sheet['day_type'];
+        } elseif ($isScheduledOff && (!$sheet || empty($sheet['check_in_time']))) {
+            $effectiveDayType = 'holiday';
+        }
+
+        // Look up holiday marker employee name if set
+        $holidayMarkerName = null;
+        if ($sheet && !empty($sheet['holiday_marked_by'])) {
+            try {
+                $mStmt = $pdo->prepare("SELECT name FROM employees WHERE id = ?");
+                $mStmt->execute([(int)$sheet['holiday_marked_by']]);
+                $holidayMarkerName = $mStmt->fetchColumn() ?: null;
+            } catch (Exception $e) {
+                $holidayMarkerName = null;
+            }
+        }
+
         echo json_encode([
             'success' => true,
             'employee' => $employee,
@@ -140,7 +218,16 @@ switch ($action) {
             'is_locked' => $isLocked,
             'active_overnight_sheet' => $activeOvernightSheet,
             'can_edit' => $canEditAll,
-            'can_edit_after_lock' => $isLocked === 1 && ($empId === (int)$currentUserId || $isAdminOrHod)
+            'can_edit_after_lock' => $isLocked === 1 && ($empId === (int)$currentUserId || $isAdminOrHod),
+            'monthly_off_days_taken' => $monthlyOffDaysTaken,
+            'monthly_off_days_allowed' => $monthlyOffDaysAllowed,
+            'approved_leave' => $approvedLeave,
+            'holiday_marker_name' => $holidayMarkerName,
+            'roster_entry' => $rosterEntry,
+            'scheduled_shift' => $scheduledShift,
+            'scheduled_weekly_off' => $scheduledWeeklyOff,
+            'is_scheduled_off' => $isScheduledOff,
+            'effective_day_type' => $effectiveDayType
         ]);
         break;
     case 'save_entries':
@@ -377,6 +464,99 @@ switch ($action) {
             'success' => true, 
             'is_locked' => $lockState,
             'message' => $lockState ? 'Sheet locked successfully' : 'Sheet unlocked successfully. Employee can now edit.'
+        ]);
+        break;
+
+    case 'toggle_day_type':
+        $empId = (int)($data['employee_id'] ?? $currentUserId);
+        $date = $data['date'] ?? date('Y-m-d');
+        $targetType = ($data['day_type'] ?? '') === 'holiday' ? 'holiday' : 'working';
+        $reason = trim($data['reason'] ?? '');
+
+        // Permission: User can mark their own sheet, or Super Admin, or HOD for their department
+        $empCheck = $pdo->prepare("SELECT id, name, department_id FROM employees WHERE id = ?");
+        $empCheck->execute([$empId]);
+        $targetEmp = $empCheck->fetch();
+        if (!$targetEmp) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Employee not found']);
+            exit;
+        }
+
+        $canToggle = ($empId === (int)$currentUserId) || $isSuperAdmin;
+        if (!$canToggle && $isHod) {
+            $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+            $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
+            $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
+            $stmtManaged->execute([$currentUserId]);
+            $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($extra)) {
+                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
+            }
+            if (in_array((int)$targetEmp['department_id'], $managedDeptIds, true)) {
+                $canToggle = true;
+            }
+        }
+
+        if (!$canToggle) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized to update rest day status for this employee.']);
+            exit;
+        }
+
+        // Fetch or create sheet
+        $sheetStmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
+        $sheetStmt->execute([$empId, $date]);
+        $sheet = $sheetStmt->fetch();
+
+        $defaultHolidayReason = 'Scheduled Rotational Day Off';
+
+        if (!$sheet) {
+            $ins = $pdo->prepare("
+                INSERT INTO daily_sheets 
+                    (employee_id, sheet_date, day_type, holiday_reason, holiday_marked_by, remarks, work_summary, is_locked)
+                VALUES 
+                    (?, ?, ?, ?, ?, '', '', 0)
+            ");
+            $ins->execute([
+                $empId, 
+                $date, 
+                $targetType, 
+                ($targetType === 'holiday' ? ($reason ?: $defaultHolidayReason) : null), 
+                $currentUserId
+            ]);
+            $sheetId = $pdo->lastInsertId();
+        } else {
+            $sheetId = $sheet['id'];
+            $upd = $pdo->prepare("
+                UPDATE daily_sheets 
+                SET day_type = ?, 
+                    holiday_reason = ?, 
+                    holiday_marked_by = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ");
+            $upd->execute([
+                $targetType,
+                ($targetType === 'holiday' ? ($reason ?: ($sheet['holiday_reason'] ?: $defaultHolidayReason)) : null),
+                $currentUserId,
+                $sheetId
+            ]);
+        }
+
+        // Return updated off-day count for the month
+        $monthPrefix = date('Y-m', strtotime($date));
+        $stmtOffCount = $pdo->prepare("SELECT COUNT(*) FROM daily_sheets WHERE employee_id = ? AND sheet_date LIKE ? AND day_type = 'holiday'");
+        $stmtOffCount->execute([$empId, "$monthPrefix%"]);
+        $monthlyOffDaysTaken = (int)$stmtOffCount->fetchColumn();
+
+        echo json_encode([
+            'success' => true,
+            'message' => $targetType === 'holiday' 
+                ? 'Date marked as Scheduled Day Off / Holiday.' 
+                : 'Date reverted to regular working sheet.',
+            'day_type' => $targetType,
+            'monthly_off_days_taken' => $monthlyOffDaysTaken
         ]);
         break;
 

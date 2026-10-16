@@ -46,6 +46,7 @@ if (in_array($action, ['list', 'get'])) {
 
 switch ($action) {
     case 'list':
+    case 'get_all':
         $requestedDeptId = isset($_GET['department_id']) ? (int)$_GET['department_id'] : null;
         $statusFilter = $_GET['status'] ?? null;
         $includeInactive = isset($_GET['include_inactive']) && ($_GET['include_inactive'] === '1' || $_GET['include_inactive'] === 'true');
@@ -350,9 +351,12 @@ switch ($action) {
             }
         }
 
+        $shiftTiming = trim($data['shift_timing'] ?? '10:00 AM TO 6:00 PM');
+        $weeklyOff = trim($data['weekly_off'] ?? 'Sunday');
+
         $passwordHash = $canLogin ? password_hash($password, PASSWORD_DEFAULT) : null;
-        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, can_login, is_active, phone, whatsapp_number, emp_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)");
-        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $phone, $phone, $empCode]);
+        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, can_login, is_active, phone, whatsapp_number, emp_code, shift_timing, weekly_off) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $phone, $phone, $empCode, $shiftTiming, $weeklyOff]);
         $newEmpId = $pdo->lastInsertId();
 
         // Default employee code if empty
@@ -367,6 +371,21 @@ switch ($action) {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmtProf->execute([$newEmpId, $empCode, $phone, $phone, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
+
+        // Auto-sync into active monthly duty roster
+        if ($deptId) {
+            $currMonth = date('Y-m');
+            $syncRoster = $pdo->prepare("
+                INSERT INTO duty_rosters (department_id, roster_month, employee_id, designation, shift_timing, weekly_off, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    department_id = VALUES(department_id),
+                    designation = VALUES(designation),
+                    shift_timing = VALUES(shift_timing),
+                    weekly_off = VALUES(weekly_off)
+            ");
+            $syncRoster->execute([$deptId, $currMonth, $newEmpId, $designation, $shiftTiming, $weeklyOff, $currentUserId]);
+        }
 
         $loginMsg = $canLogin ? "with portal login enabled" : "as profile/roster only (no login)";
         echo json_encode(['success' => true, 'message' => "Employee {$name} ({$empCode}) added successfully {$loginMsg}!", 'id' => $newEmpId]);
@@ -580,15 +599,33 @@ switch ($action) {
             $isActive = 1;
         }
 
+        $shiftTiming = trim($data['shift_timing'] ?? '');
+        $weeklyOff = trim($data['weekly_off'] ?? '');
+
         if ($avatar === '__REMOVE__') {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = NULL, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = NULL, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off) WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $id]);
         } elseif (!empty($avatar)) {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $phone, $phone, $empCode, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off) WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off) WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $id]);
+        }
+
+        // Auto-sync into active monthly duty roster
+        if ($deptId && (!empty($shiftTiming) || !empty($weeklyOff) || !empty($designation))) {
+            $currMonth = date('Y-m');
+            $syncRoster = $pdo->prepare("
+                INSERT INTO duty_rosters (department_id, roster_month, employee_id, designation, shift_timing, weekly_off, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    department_id = VALUES(department_id),
+                    designation = VALUES(designation),
+                    shift_timing = VALUES(shift_timing),
+                    weekly_off = VALUES(weekly_off)
+            ");
+            $syncRoster->execute([$deptId, $currMonth, $id, $designation, $shiftTiming ?: '10:00 AM TO 6:00 PM', $weeklyOff ?: 'Sunday', $currentUserId]);
         }
 
         // Update / Insert into hr_employee_profiles

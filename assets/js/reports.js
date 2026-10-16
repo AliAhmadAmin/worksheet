@@ -224,7 +224,9 @@ async function loadLiveAttendance() {
             const tr = document.createElement('tr');
             
             let statusBadge = '';
-            if (emp.status === 'working') {
+            if (emp.status === 'holiday') {
+                statusBadge = '<span class="attendance-status-pill holiday" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 700; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🏖️ Day Off</span>';
+            } else if (emp.status === 'working') {
                 statusBadge = '<span class="attendance-status-pill working">🟢 On Duty</span>';
             } else if (emp.status === 'checked_out') {
                 statusBadge = '<span class="attendance-status-pill checked_out">🔵 Checked Out</span>';
@@ -327,8 +329,13 @@ function populateAttendanceReportEmployees() {
     const currentVal = select.value || 'all';
     select.innerHTML = '<option value="all">👥 All Employees Summary</option>';
 
-    if (AppState.employees && AppState.employees.length > 0) {
-        AppState.employees.forEach(emp => {
+    const allKnown = (AppState.employees && AppState.employees.length > 0)
+        ? AppState.employees
+        : ((currentAttReportData && currentAttReportData.report_data) ? currentAttReportData.report_data.map(r => r.employee) : []);
+
+    if (allKnown && allKnown.length > 0) {
+        allKnown.forEach(emp => {
+            if (!emp) return;
             const opt = document.createElement('option');
             opt.value = emp.id;
             opt.textContent = `${emp.name} (${emp.designation || 'Staff'} • ${emp.department_name || 'Digital'})`;
@@ -336,11 +343,11 @@ function populateAttendanceReportEmployees() {
         });
     }
 
-    if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+    if (currentVal && Array.from(select.options).some(o => o.value == currentVal)) {
         select.value = currentVal;
     }
 
-    renderRepAttEmpDropdownList(AppState.employees || []);
+    renderRepAttEmpDropdownList(allKnown || []);
 }
 
 function renderRepAttEmpDropdownList(list) {
@@ -425,31 +432,53 @@ function selectRepAttEmpFromDropdown(empId) {
     if (menu) menu.style.display = 'none';
 
     const select = document.getElementById('rep-att-emp-select');
-    if (select) select.value = empId;
+    if (select) {
+        if (empId !== 'all') {
+            let opt = Array.from(select.options).find(o => o.value == empId);
+            if (!opt) {
+                opt = document.createElement('option');
+                opt.value = empId;
+                opt.textContent = `Employee #${empId}`;
+                select.appendChild(opt);
+            }
+            select.value = empId;
+        } else {
+            select.value = 'all';
+        }
+    }
+
+    const allKnown = [
+        ...(AppState.employees || []),
+        ...((currentAttReportData && currentAttReportData.report_data) ? currentAttReportData.report_data.map(r => r.employee) : [])
+    ];
+    const currentSelectedEmp = allKnown.find(e => e && e.id == empId);
 
     const btnLabel = document.getElementById('rep-att-emp-dropdown-selected-name');
     if (btnLabel) {
         if (empId === 'all') {
             btnLabel.textContent = '👥 All Employees Summary';
+        } else if (currentSelectedEmp) {
+            btnLabel.textContent = `👤 ${currentSelectedEmp.name} (${currentSelectedEmp.designation || 'Staff'})`;
+            const opt = select?.querySelector(`option[value="${empId}"]`);
+            if (opt) opt.textContent = `${currentSelectedEmp.name} (${currentSelectedEmp.designation || 'Staff'})`;
         } else {
-            const currentSelectedEmp = (AppState.employees || []).find(e => e.id == empId);
-            if (currentSelectedEmp) {
-                btnLabel.textContent = `👤 ${currentSelectedEmp.name} (${currentSelectedEmp.designation || 'Staff'})`;
-            }
+            btnLabel.textContent = `👤 Employee #${empId}`;
         }
     }
 
     renderRepAttEmpDropdownList(AppState.employees || []);
-    loadAttendanceReport();
+    loadAttendanceReport(empId);
 }
 
 // Generate Detailed Attendance Timesheet & Reports
-async function loadAttendanceReport() {
+async function loadAttendanceReport(targetEmpId = null) {
     const container = document.getElementById('rep-att-table-container');
     const kpisGrid = document.getElementById('rep-att-kpis-grid');
     if (!container) return;
 
-    const empSelect = document.getElementById('rep-att-emp-select')?.value || 'all';
+    let empSelect = targetEmpId !== null ? targetEmpId : (document.getElementById('rep-att-emp-select')?.value || 'all');
+    if (!empSelect || empSelect === '') empSelect = 'all';
+
     const deptSelect = document.getElementById('rep-att-dept-select')?.value || 'all';
     const monthSelect = document.getElementById('rep-att-month-select')?.value || new Date().toISOString().slice(0, 7);
     const standardHours = document.getElementById('rep-att-standard-hours')?.value || '8';
@@ -462,8 +491,11 @@ async function loadAttendanceReport() {
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);"><div class="spinner" style="margin: 0 auto 10px;"></div>Loading attendance timesheet...</div>';
 
     let url = `api/attendance.php?action=attendance_report&month=${encodeURIComponent(monthSelect)}&standard_hours=${encodeURIComponent(standardHours)}`;
-    if (empSelect !== 'all') url += `&employee_id=${encodeURIComponent(empSelect)}`;
-    if (deptSelect !== 'all') url += `&department_id=${encodeURIComponent(deptSelect)}`;
+    if (empSelect !== 'all') {
+        url += `&employee_id=${encodeURIComponent(empSelect)}`;
+    } else if (deptSelect !== 'all') {
+        url += `&department_id=${encodeURIComponent(deptSelect)}`;
+    }
 
     try {
         const res = await fetch(url);
@@ -485,8 +517,17 @@ async function loadAttendanceReport() {
         currentAttReportData = data;
 
         // Render Detailed View: Single Employee or Multi-Employee Summary Matrix
-        if (empSelect !== 'all' && data.report_data.length === 1) {
-            renderSingleEmployeeTimesheet(data.report_data[0], data);
+        if (empSelect !== 'all') {
+            if (data.report_data && data.report_data.length > 0) {
+                renderSingleEmployeeTimesheet(data.report_data[0], data);
+            } else {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted); background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--border-color); margin-top: 10px;">
+                        <p style="font-size: 14px; margin-bottom: 12px; font-weight: 600;">No attendance records found for this employee in the selected month.</p>
+                        <button type="button" class="btn btn-outline" onclick="resetToAllStaffReport()">← Back to All Staff</button>
+                    </div>
+                `;
+            }
         } else {
             renderMultiEmployeeAttendanceMatrix(data);
         }
@@ -522,8 +563,18 @@ function renderSingleEmployeeTimesheet(item, globalData) {
         `;
     }
 
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     let rowsHtml = '';
     records.forEach(r => {
+        let fullDay = r.day;
+        if (r.date) {
+            const parts = r.date.split('-');
+            if (parts.length === 3) {
+                const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                fullDay = dayNames[d.getDay()];
+            }
+        }
+
         let badgeStyle = 'background: rgba(148, 163, 184, 0.12); color: #64748b; border: 1px solid rgba(148, 163, 184, 0.25);';
         if (r.status === 'full_day') {
             badgeStyle = 'background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700;';
@@ -539,55 +590,69 @@ function renderSingleEmployeeTimesheet(item, globalData) {
 
         const rowBg = r.is_weekend ? 'style="background: rgba(0,0,0,0.015);"' : '';
 
-        let reasonRemarkHtml = '';
-        if (r.status === 'approved_leave') {
-            const lType = r.leave_type ? r.leave_type.toUpperCase() : 'APPROVED';
-            const lReason = r.leave_reason ? ` • ${escapeHtml(r.leave_reason)}` : '';
-            reasonRemarkHtml = `<span style="color: #2563eb; font-weight: 700; font-size: 11.5px;">🌴 ${escapeHtml(lType)} LEAVE</span><span style="color: var(--text-main); font-size: 11.5px;">${lReason}</span>`;
-        } else if (r.remarks) {
-            reasonRemarkHtml = `<span style="font-size: 11.5px; color: var(--text-main); font-weight: 600;">📝 ${escapeHtml(r.remarks)}</span>`;
-        } else if (r.status === 'short_leave') {
-            reasonRemarkHtml = `<span style="color: #d97706; font-size: 11.5px; font-weight: 600;">Short Shift (~6h)</span>`;
-        } else if (r.status === 'half_leave') {
-            reasonRemarkHtml = `<span style="color: #ea580c; font-size: 11.5px; font-weight: 600;">Half Day (~4h)</span>`;
-        } else if (r.status === 'full_day') {
-            reasonRemarkHtml = `<span style="color: var(--text-dim); font-size: 11px;">Standard Shift</span>`;
-        } else if (r.is_weekend) {
-            reasonRemarkHtml = `<span style="color: #f59e0b; font-size: 11px; font-weight: 600;">Weekend</span>`;
-        } else if (r.status === 'absent') {
-            reasonRemarkHtml = `<span style="color: #dc2626; font-size: 11px; font-weight: 600;">Absent / No Check-In</span>`;
-        } else if (r.is_future) {
-            reasonRemarkHtml = `<span style="color: var(--text-dim); font-size: 11px;">Scheduled</span>`;
-        } else {
-            reasonRemarkHtml = `<span style="color: var(--text-dim); font-size: 11px;">-</span>`;
-        }
+        const isLeaveDay = (r.status === 'approved_leave' || !!r.leave_type);
+        const isDayOff = (r.status === 'day_off' || r.status === 'holiday');
+        const isWeekendOff = (r.is_weekend && !r.check_in && !r.check_out);
+        const isMergedDay = (isLeaveDay || isDayOff || isWeekendOff);
 
-        rowsHtml += `
-            <tr ${rowBg}>
-                <td style="white-space: nowrap;">
-                    <strong style="font-size: 12.5px;">${r.date}</strong> 
-                    <span style="font-size: 11px; color: ${r.is_weekend ? '#f59e0b' : 'var(--text-muted)'}; font-weight: 600; margin-left: 3px;">(${r.day})</span>
-                </td>
-                <td><code style="font-size: 12px; color: ${r.check_in ? '#10b981' : 'var(--text-dim)'}; font-weight: 700;">${r.check_in || '-'}</code></td>
-                <td><code style="font-size: 12px; color: ${r.check_out ? '#3b82f6' : 'var(--text-dim)'}; font-weight: 700;">${r.check_out || '-'}</code></td>
-                <td><strong style="font-size: 13px; color: ${r.duty_seconds > 0 ? 'var(--text-main)' : 'var(--text-dim)'}; font-family: monospace;">${r.duty_formatted}</strong></td>
-                <td>
-                    <span style="padding: 3px 8px; border-radius: 6px; font-size: 11px; display: inline-block; ${badgeStyle}">
-                        ${escapeHtml(r.status_label)}
-                    </span>
-                </td>
-                <td>
-                    <div style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        ${reasonRemarkHtml}
-                    </div>
-                </td>
-                <td style="text-align: right;">
-                    <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600;" onclick="openAdminShiftModal(${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0})" title="Adjust or Add Remarks to Shift Record">
-                        ⏱️ Adjust
-                    </button>
-                </td>
-            </tr>
-        `;
+        if (isMergedDay) {
+            let mergedContentHtml = '';
+            if (isLeaveDay) {
+                const lType = (r.leave_type || 'Leave').toUpperCase();
+                const reasonStr = r.leave_reason ? ` • ${escapeHtml(r.leave_reason)}` : ' (HR Approved)';
+                mergedContentHtml = `<span style="background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 700; padding: 4px 14px; border-radius: 6px; font-size: 11.5px; display: inline-block;">🌴 ${lType} LEAVE${reasonStr}</span>`;
+            } else if (isDayOff) {
+                mergedContentHtml = `<span style="background: rgba(139, 92, 246, 0.12); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 700; padding: 4px 14px; border-radius: 6px; font-size: 11.5px; display: inline-block;">🏖️ Scheduled Day Off (Duty Roster)</span>`;
+            } else if (isWeekendOff) {
+                mergedContentHtml = `<span style="color: #d97706; font-weight: 700; font-size: 11.5px;">Weekly Off</span>`;
+            }
+
+            rowsHtml += `
+                <tr ${rowBg}>
+                    <td style="white-space: nowrap;">
+                        <strong style="font-size: 12.5px;">${r.date}</strong> 
+                        <span style="font-size: 11px; color: ${r.is_weekend ? '#f59e0b' : 'var(--text-muted)'}; font-weight: 600; margin-left: 3px;">(${escapeHtml(fullDay)})</span>
+                    </td>
+                    <td colspan="4" style="text-align: center; padding: 8px;">
+                        ${mergedContentHtml}
+                    </td>
+                    <td style="text-align: right;">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600;" onclick="openAdminShiftModal(${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0})" title="Adjust or Add Remarks to Shift Record">
+                            ⏱️ Adjust
+                        </button>
+                    </td>
+                </tr>
+            `;
+        } else {
+            let cleanStatusText = (r.status_label || 'Scheduled').replace(/\s*\([^)]*\)/g, '').trim();
+            if (r.status === 'full_day') cleanStatusText = '🟢 Full Day';
+            else if (r.status === 'short_leave') cleanStatusText = '🟡 Short Leave';
+            else if (r.status === 'half_leave') cleanStatusText = '🟠 Half Day';
+            else if (r.status === 'incomplete') cleanStatusText = '🔴 Incomplete';
+            else if (r.status === 'absent') cleanStatusText = '🔴 Absent';
+
+            rowsHtml += `
+                <tr ${rowBg}>
+                    <td style="white-space: nowrap;">
+                        <strong style="font-size: 12.5px;">${r.date}</strong> 
+                        <span style="font-size: 11px; color: ${r.is_weekend ? '#f59e0b' : 'var(--text-muted)'}; font-weight: 600; margin-left: 3px;">(${escapeHtml(fullDay)})</span>
+                    </td>
+                    <td><code style="font-size: 12px; color: ${r.check_in ? '#10b981' : 'var(--text-dim)'}; font-weight: 700;">${r.check_in || '-'}</code></td>
+                    <td><code style="font-size: 12px; color: ${r.check_out ? '#3b82f6' : 'var(--text-dim)'}; font-weight: 700;">${r.check_out || '-'}</code></td>
+                    <td><strong style="font-size: 13px; color: ${r.duty_seconds > 0 ? 'var(--text-main)' : 'var(--text-dim)'}; font-family: monospace;">${r.duty_formatted}</strong></td>
+                    <td>
+                        <span style="padding: 3px 8px; border-radius: 6px; font-size: 11px; display: inline-block; ${badgeStyle}">
+                            ${escapeHtml(cleanStatusText)}
+                        </span>
+                    </td>
+                    <td style="text-align: right;">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600;" onclick="openAdminShiftModal(${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0})" title="Adjust or Add Remarks to Shift Record">
+                            ⏱️ Adjust
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
     });
 
     const isOvertime = sum.hour_balance >= 0;
@@ -595,7 +660,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
     const balanceColor = isOvertime ? '#10b981' : '#ef4444';
     const balanceBg = isOvertime ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
     const balanceBorder = isOvertime ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)';
-    const balanceText = `${balanceSign}${sum.hour_balance}h (${isOvertime ? 'Overtime' : 'Deficit'})`;
+    const balanceText = `${balanceSign}${sum.hour_balance}h`;
 
     container.innerHTML = `
         <div style="background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--border-color); overflow: hidden; margin-bottom: 20px; box-shadow: var(--shadow-sm);">
@@ -668,8 +733,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                             <th>Check In</th>
                             <th>Check Out</th>
                             <th>Duty Hours</th>
-                            <th>Status</th>
-                            <th>Leave Reason / Remarks</th>
+                            <th>Shift Status</th>
                             <th style="text-align: right;">Action</th>
                         </tr>
                     </thead>
@@ -725,6 +789,11 @@ function renderMultiEmployeeAttendanceMatrix(data) {
                         ${sum.hour_balance >= 0 ? '+' + sum.hour_balance : sum.hour_balance}h
                     </strong>
                 </td>
+                <td style="text-align: right;">
+                    <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; white-space: nowrap;" onclick="event.stopPropagation(); selectEmployeeForReport(${emp.id})">
+                        👁️ View
+                    </button>
+                </td>
             </tr>
         `;
     });
@@ -735,7 +804,7 @@ function renderMultiEmployeeAttendanceMatrix(data) {
                 <h4 style="margin: 0; font-size: 14px; font-weight: 800; color: var(--text-main);">
                     🏢 Company-Wide Staff Attendance & Duty Summary (${data.report_data.length} Employees)
                 </h4>
-                <small style="color: var(--primary); font-size: 11.5px; font-weight: 600;">👆 Click any employee row to open their full monthly timesheet</small>
+                <small style="color: var(--primary); font-size: 11.5px; font-weight: 600;">👆 Click any employee row or "View" to open their full monthly timesheet</small>
             </div>
             <div class="table-responsive">
                 <table class="interactive-table" style="margin-bottom: 0;">
@@ -751,6 +820,7 @@ function renderMultiEmployeeAttendanceMatrix(data) {
                             <th>Duty Hours</th>
                             <th>Expected</th>
                             <th>Balance</th>
+                            <th style="text-align: right;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -872,88 +942,115 @@ function printAttendanceReport() {
     `;
 
     let reportBodyHtml = '';
+    let centerHeading = 'Staff Attendance & Duty Report';
 
     if (isSingleEmployee) {
         const item = data.report_data[0];
         const emp = item.employee;
         const sum = item.summary;
         const records = item.daily_records || [];
+        centerHeading = `${emp.name} - Attendance Report`;
 
         const isOvertime = sum.hour_balance >= 0;
         const balanceColor = isOvertime ? '#059669' : '#dc2626';
-        const balanceText = `${isOvertime ? '+' : ''}${sum.hour_balance} hrs (${isOvertime ? 'Overtime' : 'Deficit'})`;
+        const balanceText = `${isOvertime ? '+' : ''}${sum.hour_balance} hrs`;
 
         let rowsHtml = '';
         records.forEach((r, idx) => {
-            let statusText = r.status_label || 'Scheduled';
-            let statusClass = 'text-muted';
-            if (r.status === 'full_day') {
-                statusClass = 'badge-full';
-            } else if (r.status === 'short_leave') {
-                statusClass = 'badge-short';
-            } else if (r.status === 'half_leave') {
-                statusClass = 'badge-half';
-            } else if (r.status === 'approved_leave') {
-                statusClass = 'badge-leave';
-            } else if (r.status === 'absent') {
-                statusClass = 'badge-absent';
-            }
-
-            let reasonRemark = '-';
-            if (r.status === 'approved_leave') {
-                const lType = r.leave_type ? r.leave_type.toUpperCase() : 'LEAVE';
-                reasonRemark = `[${lType}] ${escapeHtml(r.leave_reason || 'Approved Leave')}`;
-            } else if (r.remarks) {
-                reasonRemark = escapeHtml(r.remarks);
-            } else if (r.status === 'short_leave') {
-                reasonRemark = 'Short Duty Shift (~6h)';
-            } else if (r.status === 'half_leave') {
-                reasonRemark = 'Half Day Shift (~4h)';
-            } else if (r.status === 'full_day') {
-                reasonRemark = 'Standard Shift Completed';
-            } else if (r.is_weekend) {
-                reasonRemark = 'Weekend Off';
-            } else if (r.status === 'absent') {
-                reasonRemark = 'Absent / No Check-In';
-            }
-
             const rowClass = r.is_weekend ? 'weekend-row' : (idx % 2 === 0 ? 'even-row' : 'odd-row');
 
-            rowsHtml += `
-                <tr class="${rowClass}">
-                    <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
-                    <td style="white-space: nowrap; font-weight: 700;">${r.date}</td>
-                    <td style="text-align: center; color: ${r.is_weekend ? '#d97706' : '#475569'}; font-weight: 600;">${r.day}</td>
-                    <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${r.check_in ? '#059669' : '#94a3b8'};">${r.check_in || '-'}</td>
-                    <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${r.check_out ? '#2563eb' : '#94a3b8'};">${r.check_out || '-'}</td>
-                    <td style="text-align: center; font-family: monospace; font-weight: 700;">${r.duty_formatted || '0:00:00'}</td>
-                    <td style="text-align: center;"><span class="status-badge ${statusClass}">${escapeHtml(statusText)}</span></td>
-                    <td style="font-size: 11px;">${reasonRemark}</td>
-                </tr>
-            `;
+            // Ensure full weekday name (e.g. Monday, Tuesday)
+            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            let fullDay = r.day;
+            if (r.date) {
+                const parts = r.date.split('-');
+                if (parts.length === 3) {
+                    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+                    fullDay = dayNames[d.getDay()];
+                }
+            }
+
+            const isLeaveDay = (r.status === 'approved_leave' || !!r.leave_type);
+            const isDayOff = (r.status === 'day_off' || r.status === 'holiday');
+            const isWeekendOff = (r.is_weekend && !r.check_in && !r.check_out);
+            const isMergedDay = (isLeaveDay || isDayOff || isWeekendOff);
+
+            if (isMergedDay) {
+                let mergedContentHtml = '';
+                let mergedStyle = '';
+                if (isLeaveDay) {
+                    const lType = (r.leave_type || 'Leave').toUpperCase();
+                    const reasonStr = r.leave_reason ? ` • ${escapeHtml(r.leave_reason)}` : ' (HR Approved)';
+                    mergedContentHtml = `<span class="status-badge badge-leave" style="font-size: 11px; padding: 3px 12px;">🌴 ${lType} LEAVE${reasonStr}</span>`;
+                    mergedStyle = 'background: #eff6ff;';
+                } else if (isDayOff) {
+                    mergedContentHtml = `<span class="status-badge badge-holiday" style="font-size: 11px; padding: 3px 12px;">🏖️ Scheduled Day Off (Duty Roster)</span>`;
+                    mergedStyle = 'background: #faf5ff;';
+                } else if (isWeekendOff) {
+                    mergedContentHtml = `<span style="color: #d97706; font-weight: 700; font-size: 11px;">Weekly Off</span>`;
+                    mergedStyle = 'background: #fffbeb;';
+                }
+
+                rowsHtml += `
+                    <tr class="${rowClass}">
+                        <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
+                        <td style="white-space: nowrap; font-weight: 700;">${r.date}</td>
+                        <td style="text-align: center; color: ${r.is_weekend ? '#d97706' : '#475569'}; font-weight: 600;">${escapeHtml(fullDay)}</td>
+                        <td colspan="4" style="text-align: center; ${mergedStyle}">
+                            ${mergedContentHtml}
+                        </td>
+                    </tr>
+                `;
+            } else {
+                let cleanStatusText = (r.status_label || 'Scheduled').replace(/\s*\([^)]*\)/g, '').trim();
+                let statusClass = 'text-muted';
+                if (r.status === 'full_day') {
+                    cleanStatusText = '● Full Day';
+                    statusClass = 'badge-full';
+                } else if (r.status === 'short_leave') {
+                    cleanStatusText = '● Short Leave';
+                    statusClass = 'badge-short';
+                } else if (r.status === 'half_leave') {
+                    cleanStatusText = '● Half Day';
+                    statusClass = 'badge-half';
+                } else if (r.status === 'incomplete') {
+                    cleanStatusText = '● Incomplete';
+                    statusClass = 'badge-absent';
+                } else if (r.status === 'absent') {
+                    cleanStatusText = '● Absent';
+                    statusClass = 'badge-absent';
+                }
+
+                rowsHtml += `
+                    <tr class="${rowClass}">
+                        <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
+                        <td style="white-space: nowrap; font-weight: 700;">${r.date}</td>
+                        <td style="text-align: center; color: ${r.is_weekend ? '#d97706' : '#475569'}; font-weight: 600;">${escapeHtml(fullDay)}</td>
+                        <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${r.check_in ? '#059669' : '#94a3b8'};">${r.check_in || '-'}</td>
+                        <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${r.check_out ? '#2563eb' : '#94a3b8'};">${r.check_out || '-'}</td>
+                        <td style="text-align: center; font-family: monospace; font-weight: 700;">${r.duty_formatted || '0:00:00'}</td>
+                        <td style="text-align: center;"><span class="status-badge ${statusClass}">${escapeHtml(cleanStatusText)}</span></td>
+                    </tr>
+                `;
+            }
         });
 
+        const totalDutyHoursNum = (typeof sum.total_duty_hours === 'number')
+            ? (Number.isInteger(sum.total_duty_hours) ? sum.total_duty_hours : sum.total_duty_hours.toFixed(1))
+            : (parseFloat(sum.total_duty_hours || 0).toFixed(1));
+        const totalDutyHoursStr = `${totalDutyHoursNum} hrs`;
+
         reportBodyHtml = `
-            <!-- Employee Info Header Card -->
+            <!-- Employee Info Header Card (Single Row) -->
             <div class="meta-card">
                 <table class="meta-table">
                     <tr>
-                        <td class="meta-label">Employee Name:</td>
-                        <td class="meta-value"><strong>${escapeHtml(emp.name)}</strong></td>
                         <td class="meta-label">Designation:</td>
-                        <td class="meta-value">${escapeHtml(emp.designation || 'Staff')}</td>
-                    </tr>
-                    <tr>
+                        <td class="meta-value"><strong>${escapeHtml(emp.designation || 'Staff')}</strong></td>
                         <td class="meta-label">Department:</td>
-                        <td class="meta-value">${escapeHtml(emp.department_name || 'Digital')}</td>
-                        <td class="meta-label">Email Address:</td>
-                        <td class="meta-value">${escapeHtml(emp.email)}</td>
-                    </tr>
-                    <tr>
+                        <td class="meta-value"><strong>${escapeHtml(emp.department_name || 'Digital')}</strong></td>
                         <td class="meta-label">Report Period:</td>
-                        <td class="meta-value">${escapeHtml(data.start_date)} to ${escapeHtml(data.end_date)}</td>
-                        <td class="meta-label">Standard Shift:</td>
-                        <td class="meta-value">${data.standard_hours} Hours / Day</td>
+                        <td class="meta-value" style="white-space: nowrap;"><strong>${escapeHtml(data.start_date)} to ${escapeHtml(data.end_date)}</strong></td>
                     </tr>
                 </table>
             </div>
@@ -962,40 +1059,24 @@ function printAttendanceReport() {
             <div class="kpi-container">
                 <div class="kpi-box">
                     <div class="kpi-title">TOTAL DUTY HOURS</div>
-                    <div class="kpi-val" style="color: #00b300;">${sum.duty_formatted}</div>
-                    <div class="kpi-sub">Expected: ${sum.expected_duty_hours} hrs</div>
+                    <div class="kpi-val" style="color: #00b300;">${totalDutyHoursStr}</div>
                 </div>
                 <div class="kpi-box">
                     <div class="kpi-title">FULL SHIFTS</div>
                     <div class="kpi-val" style="color: #059669;">${sum.full_days}</div>
-                    <div class="kpi-sub">&ge; 7.5h standard shifts</div>
                 </div>
                 <div class="kpi-box">
                     <div class="kpi-title">SHORT / HALF LEAVES</div>
                     <div class="kpi-val" style="color: #d97706;">${sum.short_leaves} / ${sum.half_leaves}</div>
-                    <div class="kpi-sub">Short: ~6h | Half: ~4h</div>
                 </div>
                 <div class="kpi-box">
                     <div class="kpi-title">APPROVED LEAVES</div>
                     <div class="kpi-val" style="color: #2563eb;">${sum.approved_leaves}</div>
-                    <div class="kpi-sub">Official HR leaves</div>
                 </div>
                 <div class="kpi-box">
                     <div class="kpi-title">HOURLY BALANCE</div>
                     <div class="kpi-val" style="color: ${balanceColor};">${balanceText}</div>
-                    <div class="kpi-sub">Against standard shift</div>
                 </div>
-            </div>
-
-            <!-- Weekly Summary Ribbon -->
-            <div class="weekly-bar">
-                <span style="font-weight: 800; text-transform: uppercase; font-size: 10.5px; color: #475569;">Weekly Duty Accumulation:</span>
-                <span class="weekly-chip">Week 1: <b>${(sum.weekly_hours[1] || 0).toFixed(1)}h</b></span>
-                <span class="weekly-chip">Week 2: <b>${(sum.weekly_hours[2] || 0).toFixed(1)}h</b></span>
-                <span class="weekly-chip">Week 3: <b>${(sum.weekly_hours[3] || 0).toFixed(1)}h</b></span>
-                <span class="weekly-chip">Week 4: <b>${(sum.weekly_hours[4] || 0).toFixed(1)}h</b></span>
-                <span class="weekly-chip">Week 5: <b>${(sum.weekly_hours[5] || 0).toFixed(1)}h</b></span>
-                <span style="margin-left: 6px; font-weight: 700; color: #00b300; font-size: 11px;">(Weekly Avg: ${sum.avg_weekly_hours} hrs/week)</span>
             </div>
 
             <!-- Day-by-Day Detailed Log -->
@@ -1003,14 +1084,13 @@ function printAttendanceReport() {
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th style="width: 35px; text-align: center;">#</th>
+                        <th style="width: 32px; text-align: center;">#</th>
                         <th style="width: 95px;">Date</th>
-                        <th style="width: 50px; text-align: center;">Day</th>
-                        <th style="width: 75px; text-align: center;">Check In</th>
-                        <th style="width: 75px; text-align: center;">Check Out</th>
-                        <th style="width: 80px; text-align: center;">Duty Hours</th>
-                        <th style="width: 105px; text-align: center;">Shift Status</th>
-                        <th>Leave Reason / HR Remarks</th>
+                        <th style="width: 105px; text-align: center;">Day</th>
+                        <th style="width: 85px; text-align: center;">Check In</th>
+                        <th style="width: 85px; text-align: center;">Check Out</th>
+                        <th style="width: 90px; text-align: center;">Duty Hours</th>
+                        <th style="width: 110px; text-align: center;">Shift Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1119,25 +1199,28 @@ function printAttendanceReport() {
                 .report-header {
                     display: flex;
                     justify-content: space-between;
-                    align-items: flex-start;
-                    padding-bottom: 12px;
+                    align-items: center;
+                    padding-bottom: 8px;
                     border-bottom: 3px solid #00b300;
-                    margin-bottom: 14px;
+                    margin-bottom: 12px;
                 }
-                .brand-title {
-                    margin: 4px 0 2px;
+                .header-logo-col {
+                    flex: 0 0 170px;
+                }
+                .header-center-col {
+                    flex: 1;
+                    text-align: center;
+                    padding: 0 10px;
+                }
+                .report-center-heading {
+                    margin: 0;
                     font-size: 17px;
                     font-weight: 900;
                     color: #0f172a;
-                    letter-spacing: -0.3px;
-                }
-                .brand-subtitle {
-                    margin: 0;
-                    font-size: 11px;
-                    color: #64748b;
-                    font-weight: 600;
+                    letter-spacing: -0.2px;
                 }
                 .doc-meta {
+                    flex: 0 0 170px;
                     text-align: right;
                 }
                 .doc-badge {
@@ -1156,8 +1239,8 @@ function printAttendanceReport() {
                     background: #f8fafc;
                     border: 1px solid #e2e8f0;
                     border-radius: 6px;
-                    padding: 8px 12px;
-                    margin-bottom: 14px;
+                    padding: 7px 12px;
+                    margin-bottom: 12px;
                 }
                 .meta-table {
                     width: 100%;
@@ -1169,25 +1252,30 @@ function printAttendanceReport() {
                 }
                 .meta-label {
                     color: #64748b;
-                    font-weight: 600;
-                    width: 16%;
+                    font-weight: 700;
+                    white-space: nowrap;
+                    width: 1%;
                 }
                 .meta-value {
                     color: #0f172a;
-                    width: 34%;
+                    padding-right: 20px;
                 }
                 .kpi-container {
                     display: grid;
                     grid-template-columns: repeat(5, 1fr);
                     gap: 8px;
-                    margin-bottom: 14px;
+                    margin-bottom: 12px;
                 }
                 .kpi-box {
                     background: #f8fafc;
                     border: 1px solid #e2e8f0;
                     border-radius: 6px;
-                    padding: 8px 10px;
+                    padding: 8px 6px;
                     text-align: center;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    align-items: center;
                 }
                 .kpi-title {
                     font-size: 9px;
@@ -1195,11 +1283,12 @@ function printAttendanceReport() {
                     color: #64748b;
                     text-transform: uppercase;
                     letter-spacing: 0.3px;
+                    margin-bottom: 3px;
                 }
                 .kpi-val {
-                    font-size: 16px;
+                    font-size: 15.5px;
                     font-weight: 900;
-                    margin: 3px 0 1px;
+                    margin: 0;
                 }
                 .kpi-sub {
                     font-size: 9.5px;
@@ -1270,6 +1359,7 @@ function printAttendanceReport() {
                 .badge-short { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
                 .badge-half { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
                 .badge-leave { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+                .badge-holiday { background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; }
                 .badge-absent { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
                 .text-muted { color: #64748b; }
                 
@@ -1315,18 +1405,16 @@ function printAttendanceReport() {
         <body>
             <!-- Official Header -->
             <div class="report-header">
-                <div>
+                <div class="header-logo-col">
                     ${logoSvg}
-                    <h2 class="brand-title">DISCOVER PAKISTAN TV NETWORK</h2>
-                    <p class="brand-subtitle">Staff Attendance, Duty Timesheet & Leave Evaluation Report</p>
+                </div>
+                <div class="header-center-col">
+                    <h2 class="report-center-heading">${escapeHtml(centerHeading)}</h2>
                 </div>
                 <div class="doc-meta">
                     <span class="doc-badge">Official HR Report</span>
-                    <div style="font-size: 11px; color: #475569; font-weight: 600; margin-top: 2px;">
+                    <div style="font-size: 10.5px; color: #475569; font-weight: 600; margin-top: 2px;">
                         Generated: <strong>${nowStr}</strong>
-                    </div>
-                    <div style="font-size: 10.5px; color: #64748b;">
-                        Evaluated Shift Standard: <strong>${data.standard_hours} Hours/Day</strong>
                     </div>
                 </div>
             </div>

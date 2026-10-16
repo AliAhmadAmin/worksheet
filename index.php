@@ -36,6 +36,7 @@ require_once __DIR__ . '/includes/navbar.php';
     <?php
     // Modular Feature Views
     require_once __DIR__ . '/views/tab_worksheet.php';
+    require_once __DIR__ . '/views/tab_roster.php';
     require_once __DIR__ . '/views/tab_tasks.php';
     require_once __DIR__ . '/views/tab_newsroom.php';
     require_once __DIR__ . '/views/tab_programming.php';

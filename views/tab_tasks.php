@@ -1,9 +1,9 @@
-        <!-- TAB 2: DEDICATED FULL-PAGE TASK ASSIGNER COMMAND CENTER -->
+        <!-- TAB 2: DEDICATED FULL-PAGE ASSIGN TASK COMMAND CENTER -->
         <section id="tab-tasks" class="tab-section">
             <div class="worksheet-card">
                 <div class="card-header-flex">
                     <div class="card-title-group">
-                        <h3 id="tasks-page-title">🎯 Task Assignment Command Center</h3>
+                        <h3 id="tasks-page-title">🎯 Assign Task Command Center</h3>
                         <p id="tasks-page-desc">Assign specific tasks to individual team members, filter by status, and monitor real-time completion.</p>
                     </div>
                     <div class="controls-group">

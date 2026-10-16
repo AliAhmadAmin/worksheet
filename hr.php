@@ -31,7 +31,8 @@ require_once __DIR__ . '/includes/navbar.php';
     <?php
     // Core HR Management View (HR Dashboard, Leave Center, Monthly Payroll)
     require_once __DIR__ . '/views/tab_hr.php';
-    // Supporting Views (Integrated Staff Attendance & Employee Directory)
+    // Supporting Views (Integrated Staff Attendance, Duty Roster & Employee Directory)
+    require_once __DIR__ . '/views/tab_roster.php';
     require_once __DIR__ . '/views/tab_attendance.php';
     require_once __DIR__ . '/views/tab_employees.php';
     ?>
