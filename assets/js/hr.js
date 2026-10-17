@@ -156,43 +156,31 @@ function renderDashboardPendingQueue(pendingList) {
         if (l.status === 'approved_by_hod') {
             if (isAdmin) {
                 actionBtnHtml = `
-                    <div style="display: flex; gap: 6px;">
-                        <button type="button" class="btn btn-success" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Final HR Approval">
-                            ✓ Final Approve (HR)
-                        </button>
-                        <button type="button" class="btn btn-danger" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">
-                            ✕ Reject
-                        </button>
+                    <div style="display: inline-flex; gap: 6px; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Final HR Approval">✓ HR</button>
+                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
                     </div>
                 `;
             } else {
-                actionBtnHtml = `<span style="font-size: 11px; color: #0284c7; font-weight: 700;">🟡 Approved by HOD (Awaiting HR)</span>`;
+                actionBtnHtml = `<span style="font-size: 11px; color: #0284c7; font-weight: 700; white-space: nowrap;">🟡 Approved by HOD (Awaiting HR)</span>`;
             }
         } else if (l.status === 'pending') {
             if (isHodForDept) {
                 actionBtnHtml = `
-                    <div style="display: flex; gap: 6px;">
-                        <button type="button" class="btn btn-success" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'approved_by_hod')" title="Endorse Leave (HOD)">
-                            ✓ Approve (HOD)
-                        </button>
-                        <button type="button" class="btn btn-danger" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">
-                            ✕ Reject
-                        </button>
+                    <div style="display: inline-flex; gap: 6px; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved_by_hod')" title="Endorse Leave (Forward to HR)">✓ Approve</button>
+                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
                     </div>
                 `;
             } else if (isAdmin) {
                 actionBtnHtml = `
-                    <div style="display: flex; gap: 6px;">
-                        <button type="button" class="btn btn-success" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Direct HR Approval">
-                            ✓ Approve (HR)
-                        </button>
-                        <button type="button" class="btn btn-danger" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">
-                            ✕ Reject
-                        </button>
+                    <div style="display: inline-flex; gap: 6px; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Direct HR Approval">✓ HR</button>
+                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
                     </div>
                 `;
             } else {
-                actionBtnHtml = `<span style="font-size: 11px; color: #f59e0b; font-weight: 700;">⏳ In Review by HOD</span>`;
+                actionBtnHtml = `<span style="font-size: 11px; color: #f59e0b; font-weight: 700; white-space: nowrap;">⏳ In Review by HOD</span>`;
             }
         }
 
@@ -644,6 +632,23 @@ async function loadHrLeaves() {
         if (data.success) {
             HrState.leaves = data.leaves || [];
             HrState.currentUser = data.current_user || {};
+
+            // Adjust dropdown filter labels based on role
+            const u = HrState.currentUser || {};
+            const isHodUser = u.is_hod === true || u.role === 'hod' || (u.designation && (u.designation.includes('HOD') || u.designation.includes('Director')));
+            const isAdminUser = (u.role === 'admin' || u.role === 'super_admin' || (u.can_manage_hr && u.role !== 'hod'));
+            const statusSelect = document.getElementById('hr-leave-status-filter');
+            if (statusSelect) {
+                const pendingOpt = statusSelect.querySelector('option[value="pending"]');
+                const hodOpt = statusSelect.querySelector('option[value="approved_by_hod"]');
+                if (pendingOpt) {
+                    pendingOpt.textContent = (isHodUser && !isAdminUser) ? '⏳ Pending' : '⏳ Pending HOD';
+                }
+                if (hodOpt) {
+                    hodOpt.textContent = (isHodUser && !isAdminUser) ? '🟡 Sent to HR' : '🟡 Approved by HOD';
+                }
+            }
+
             applyLeavesClientFilters();
         } else {
             tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading leaves')}</td></tr>`;
@@ -735,9 +740,9 @@ function renderLeavesTable(leaves) {
     };
 
     const statusBadges = {
-        pending: { label: '⏳ Pending HOD', bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)' },
-        approved_by_hod: { label: '🟡 Approved by HOD', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7', border: 'rgba(14, 165, 233, 0.35)' },
-        approved: { label: '✅ Approved by HR', bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.35)' },
+        pending: { label: (isHod && !isAdmin) ? '⏳ Pending' : '⏳ Pending HOD', bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)' },
+        approved_by_hod: { label: (isHod && !isAdmin) ? '🟡 Sent to HR' : '🟡 Approved by HOD', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7', border: 'rgba(14, 165, 233, 0.35)' },
+        approved: { label: (isHod && !isAdmin) ? '✅ Approved' : '✅ Approved by HR', bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.35)' },
         rejected: { label: '❌ Rejected', bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.35)' },
         cancelled: { label: '🚫 Cancelled', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280', border: 'rgba(107, 114, 128, 0.35)' }
     };
@@ -758,63 +763,51 @@ function renderLeavesTable(leaves) {
         if (isAdmin) {
             if (l.status === 'approved_by_hod') {
                 actionHtml = `
-                    <div style="display: flex; gap: 4px; justify-content: center;">
-                        <button type="button" class="btn btn-success" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Grant Final HR Approval">
-                            ✓ Final Approve
-                        </button>
-                        <button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">
-                            ✕ Reject
-                        </button>
+                    <div style="display: inline-flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Grant Final HR Approval">✓ HR</button>
+                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
                     </div>
                 `;
             } else if (l.status === 'pending') {
                 actionHtml = `
-                    <div style="display: flex; gap: 4px; justify-content: center;">
-                        <button type="button" class="btn btn-success" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Direct HR Approval">
-                            ✓ Approve (HR)
-                        </button>
-                        <button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">
-                            ✕ Reject
-                        </button>
+                    <div style="display: inline-flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Direct HR Approval">✓ HR</button>
+                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
                     </div>
                 `;
             } else {
                 actionHtml = `
-                    <div style="display: flex; gap: 4px; justify-content: center;">
-                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="handleLeaveAction(${l.id}, '${l.status === 'approved' ? 'rejected' : 'approved'}')" title="Toggle Approval">
+                    <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; white-space: nowrap;" onclick="handleLeaveAction(${l.id}, '${l.status === 'approved' ? 'rejected' : 'approved'}')" title="Toggle Approval">
                             Toggle
                         </button>
-                        <button type="button" class="btn-icon-del" style="padding: 3px 6px;" onclick="handleDeleteLeave(${l.id})" title="Delete record">🗑️</button>
+                        <button type="button" class="btn-icon-del" style="padding: 3px 6px; white-space: nowrap;" onclick="handleDeleteLeave(${l.id})" title="Delete record">🗑️</button>
                     </div>
                 `;
             }
         } else if (isHod && isDeptStaff && l.employee_id != currentUserId) {
             if (l.status === 'pending') {
                 actionHtml = `
-                    <div style="display: flex; gap: 4px; justify-content: center;">
-                        <button type="button" class="btn btn-success" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'approved_by_hod')" title="Approve Leave (Forward to HR)">
-                            ✓ Approve (HOD)
-                        </button>
-                        <button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; font-weight: 700;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">
-                            ✕ Reject
-                        </button>
+                    <div style="display: inline-flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved_by_hod')" title="Approve Leave (Forward to HR)">✓ Approve</button>
+                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
                     </div>
                 `;
             } else if (l.status === 'approved_by_hod') {
-                actionHtml = `<span style="color: #0284c7; font-size: 11px; font-weight: 700;">✓ Approved by HOD (Sent to HR)</span>`;
+                actionHtml = `<span style="color: #0284c7; font-size: 11px; font-weight: 700; white-space: nowrap;">✓ Approved by HOD (Sent to HR)</span>`;
             } else if (l.status === 'approved') {
-                actionHtml = `<span style="color: #10b981; font-size: 11px; font-weight: 700;">✅ Final Approved</span>`;
+                actionHtml = `<span style="color: #10b981; font-size: 11px; font-weight: 700; white-space: nowrap;">✅ Final Approved</span>`;
             } else {
-                actionHtml = `<span style="color: var(--text-muted); font-size: 11px;">Completed</span>`;
+                actionHtml = `<span style="color: var(--text-muted); font-size: 11px; white-space: nowrap;">Completed</span>`;
             }
         } else if (l.employee_id == currentUserId && (l.status === 'pending' || l.status === 'approved_by_hod')) {
             actionHtml = `
-                <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; color: #ef4444; border-color: #ef4444;" onclick="handleDeleteLeave(${l.id})" title="Cancel Application">
+                <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; color: #ef4444; border-color: #ef4444; white-space: nowrap;" onclick="handleDeleteLeave(${l.id})" title="Cancel Application">
                     Cancel
                 </button>
             `;
         } else {
-            actionHtml = `<span style="color: var(--text-muted); font-size: 11px;">Completed</span>`;
+            actionHtml = `<span style="color: var(--text-muted); font-size: 11px; white-space: nowrap;">Completed</span>`;
         }
 
         html += `
@@ -829,12 +822,12 @@ function renderLeavesTable(leaves) {
                     </div>
                 </td>
                 <td>
-                    <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11.5px; font-weight: 700; background: ${typeBadge.bg}; color: ${typeBadge.color}; border: 1px solid ${typeBadge.border};">
+                    <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 12px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: ${typeBadge.bg}; color: ${typeBadge.color}; border: 1px solid ${typeBadge.border};">
                         ${typeBadge.label}
                     </span>
                 </td>
                 <td>
-                    <div style="font-weight: 600; font-size: 12.5px;">${escapeHtml(l.start_date)} ${l.end_date !== l.start_date ? 'to ' + escapeHtml(l.end_date) : ''}</div>
+                    <div style="font-weight: 600; font-size: 12.5px; white-space: nowrap;">${escapeHtml(l.start_date)} ${l.end_date !== l.start_date ? 'to ' + escapeHtml(l.end_date) : ''}</div>
                 </td>
                 <td style="text-align: center; font-weight: 700; font-size: 13px;">
                     ${l.days_count}
@@ -844,12 +837,12 @@ function renderLeavesTable(leaves) {
                     ${l.hod_name ? `<div style="font-size: 11px; color: #0284c7; margin-top: 3px;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name)} ${l.hod_notes ? '— "' + escapeHtml(l.hod_notes) + '"' : ''}</div>` : ''}
                     ${l.admin_notes ? `<div style="font-size: 11px; color: #6366f1; margin-top: 2px;"><b>HR note:</b> ${escapeHtml(l.admin_notes)}</div>` : ''}
                 </td>
-                <td style="text-align: center;">
-                    <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11.5px; font-weight: 700; background: ${statBadge.bg}; color: ${statBadge.color}; border: 1px solid ${statBadge.border};" title="${l.status === 'approved_by_hod' ? 'Endorsed by HOD (' + (l.hod_name || 'HOD') + ') - Pending HR Final Approval' : ''}">
+                <td style="text-align: center; white-space: nowrap;">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: ${statBadge.bg}; color: ${statBadge.color}; border: 1px solid ${statBadge.border};" title="${l.status === 'approved_by_hod' ? 'Endorsed by HOD (' + (l.hod_name || 'HOD') + ') - Pending HR Final Approval' : ''}">
                         ${statBadge.label}
                     </span>
                 </td>
-                <td style="text-align: center;">
+                <td style="text-align: center; white-space: nowrap;">
                     ${actionHtml}
                 </td>
             </tr>

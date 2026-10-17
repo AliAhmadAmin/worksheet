@@ -329,9 +329,9 @@
 
                     <select id="hr-leave-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLeaves()">
                         <option value="all">All Statuses</option>
-                        <option value="pending" selected>⏳ Pending HOD Approval</option>
+                        <option value="pending" selected>⏳ Pending</option>
                         <option value="approved_by_hod">🟡 Approved by HOD</option>
-                        <option value="approved">✅ Approved by HR</option>
+                        <option value="approved">✅ Approved</option>
                         <option value="rejected">❌ Rejected</option>
                         <option value="cancelled">🚫 Cancelled</option>
                     </select>
@@ -364,13 +364,13 @@
                 <table class="interactive-table">
                     <thead>
                         <tr>
-                            <th style="width: 22%; min-width: 180px;">Employee</th>
-                            <th style="width: 12%; min-width: 110px;">Leave Type</th>
-                            <th style="width: 18%; min-width: 160px;">Date Range</th>
-                            <th style="width: 8%; min-width: 70px; text-align: center;">Days</th>
-                            <th style="width: 24%; min-width: 180px;">Reason & Notes</th>
-                            <th style="width: 10%; min-width: 100px; text-align: center;">Status</th>
-                            <th style="width: 6%; min-width: 90px; text-align: center;">Actions</th>
+                            <th style="width: 20%; min-width: 170px;">Employee</th>
+                            <th style="width: 11%; min-width: 100px;">Leave Type</th>
+                            <th style="width: 16%; min-width: 130px;">Date Range</th>
+                            <th style="width: 6%; min-width: 55px; text-align: center;">Days</th>
+                            <th style="width: 23%; min-width: 160px;">Reason & Notes</th>
+                            <th style="width: 12%; min-width: 130px; text-align: center; white-space: nowrap;">Status</th>
+                            <th style="width: 12%; min-width: 140px; text-align: center; white-space: nowrap;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="hr-leaves-table-body">

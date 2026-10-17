@@ -892,6 +892,8 @@ body.sidebar-open .sidebar-backdrop {
 .btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    white-space: nowrap;
     gap: 8px;
     padding: 10px 18px;
     border-radius: var(--radius-md);
