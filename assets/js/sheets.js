@@ -1190,7 +1190,7 @@ async function handleAdminCheckOut() {
 }
 
 // Open Detailed Shift & Duty Modal for Admin / HR
-function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime, isLocked) {
+function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime, isLocked, dayType, holidayReason, isSwappedOff, swappedWithDate) {
     if (!empId) empId = getActiveWorksheetEmpId();
     if (!date) date = AppState.selectedDate || new Date().toISOString().split('T')[0];
     if (!empName) empName = document.getElementById('admin-emp-dropdown-selected-name')?.textContent || 'Employee';
@@ -1212,7 +1212,6 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
 
     const currentIn = inTime !== undefined ? inTime : (AppState.currentSheet ? (AppState.currentSheet.check_in_time || '') : '');
     const currentOut = outTime !== undefined ? outTime : (AppState.currentSheet ? (AppState.currentSheet.check_out_time || '') : '');
-    const isLockedVal = isLocked !== undefined ? !!isLocked : (AppState.currentSheet ? (parseInt(AppState.currentSheet.is_locked) === 1) : false);
 
     const inInput = document.getElementById('admin-shift-in-time');
     const outInput = document.getElementById('admin-shift-out-time');
@@ -1220,11 +1219,52 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
     if (inInput) inInput.value = currentIn;
     if (outInput) outInput.value = currentOut;
 
+    // Day schedule type & notes
+    const dayTypeSelect = document.getElementById('admin-shift-day-type');
+    const reasonInput = document.getElementById('admin-shift-holiday-reason');
+
+    let effectiveType = 'working';
+    if (dayType && (dayType === 'swapped_off' || dayType === 'alt_off' || dayType === 'holiday')) {
+        effectiveType = dayType;
+    } else if (isSwappedOff) {
+        effectiveType = 'swapped_off';
+    }
+
+    if (dayTypeSelect) {
+        dayTypeSelect.value = effectiveType;
+    }
+
+    let defaultReason = holidayReason || '';
+    if (!defaultReason && isSwappedOff && swappedWithDate) {
+        defaultReason = `Swapped with ${swappedWithDate} (HOD approved)`;
+    }
+    if (reasonInput) {
+        reasonInput.value = defaultReason;
+    }
+
+    handleAdminShiftDayTypeChange();
+
     if (avatarEl) {
         avatarEl.textContent = empName ? empName.charAt(0).toUpperCase() : '👤';
     }
 
     openModal('admin-shift-modal');
+}
+
+// Day Type Selector Handler in Admin Shift Modal
+function handleAdminShiftDayTypeChange() {
+    const dayType = document.getElementById('admin-shift-day-type')?.value || 'working';
+    const reasonGroup = document.getElementById('admin-shift-reason-group');
+    const timesSection = document.getElementById('admin-shift-times-section');
+
+    const isOffType = (dayType === 'swapped_off' || dayType === 'alt_off' || dayType === 'holiday');
+    if (reasonGroup) {
+        reasonGroup.style.display = isOffType ? 'block' : 'none';
+    }
+
+    if (timesSection) {
+        timesSection.style.opacity = isOffType ? '0.65' : '1.0';
+    }
 }
 
 // Preset helper for shift time inputs in modal
@@ -1252,6 +1292,8 @@ async function handleAdminSaveShiftSubmit(e) {
     const date = document.getElementById('admin-shift-date')?.value || AppState.selectedDate;
     const inTime = document.getElementById('admin-shift-in-time')?.value.trim() || '';
     const outTime = document.getElementById('admin-shift-out-time')?.value.trim() || '';
+    const dayType = document.getElementById('admin-shift-day-type')?.value || 'working';
+    const holidayReason = document.getElementById('admin-shift-holiday-reason')?.value.trim() || '';
 
     try {
         const res = await fetch('api/attendance.php', {
@@ -1262,15 +1304,21 @@ async function handleAdminSaveShiftSubmit(e) {
                 employee_id: empId,
                 date: date,
                 check_in_time: inTime,
-                check_out_time: outTime
+                check_out_time: outTime,
+                day_type: dayType,
+                holiday_reason: holidayReason
             })
         });
         const data = await res.json();
         if (data.success) {
-            showToast(data.message || "Shift attendance saved successfully.", "success");
+            showToast(data.message || "Shift schedule and attendance saved successfully.", "success");
             closeModal('admin-shift-modal');
             await loadDailyWorksheet();
             if (typeof loadLiveAttendance === 'function') loadLiveAttendance();
+            if (typeof loadAttendanceReport === 'function') {
+                const repEmpId = document.getElementById('rep-att-emp-select')?.value || empId;
+                loadAttendanceReport(repEmpId);
+            }
         } else {
             showToast(data.message, "error");
         }

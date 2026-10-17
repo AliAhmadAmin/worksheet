@@ -551,7 +551,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
         ? `<img src="${escapeHtml(emp.avatar)}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color); flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 40px; height: 40px; font-size: 15px; font-weight: 800;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
         : `<div class="user-avatar" style="width: 40px; height: 40px; font-size: 15px; font-weight: 800; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
 
-    // Compact Weekly Pills
+    // Compact Weekly Pills + Comp-Off Bank Pills
     let weeklyPillsHtml = '';
     for (let w = 1; w <= 5; w++) {
         const hrs = sum.weekly_hours[w] || 0;
@@ -559,6 +559,20 @@ function renderSingleEmployeeTimesheet(item, globalData) {
             <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; font-size: 11.5px;">
                 <span style="color: var(--text-muted); font-weight: 700;">W${w}:</span>
                 <strong style="color: ${hrs > 0 ? 'var(--primary)' : 'var(--text-dim)'};">${hrs.toFixed(1)}h</strong>
+            </span>
+        `;
+    }
+
+    if (sum.off_days_worked > 0 || sum.alt_days_taken > 0) {
+        weeklyPillsHtml += `
+            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; font-size: 11.5px; font-weight: 700;" title="Days worked on scheduled weekly off / rest days">
+                ⭐ Off Days Worked: <strong>${sum.off_days_worked}</strong>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; background: rgba(139, 92, 246, 0.12); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px; font-size: 11.5px; font-weight: 700;" title="Rotated weekly days off or compensatory days taken">
+                🔄 Swapped / Alt Off: <strong>${sum.alt_days_taken}</strong>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; background: ${(sum.comp_off_balance || 0) >= 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)'}; color: ${(sum.comp_off_balance || 0) >= 0 ? '#059669' : '#dc2626'}; border: 1px solid ${(sum.comp_off_balance || 0) >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}; border-radius: 6px; font-size: 11.5px; font-weight: 700;" title="Extra off-days worked minus alternate days taken">
+                🎯 Comp-Off Bank: <strong>${(sum.comp_off_balance || 0) >= 0 ? '+' : ''}${sum.comp_off_balance || 0}</strong>
             </span>
         `;
     }
@@ -591,9 +605,13 @@ function renderSingleEmployeeTimesheet(item, globalData) {
         const rowBg = r.is_weekend ? 'style="background: rgba(0,0,0,0.015);"' : '';
 
         const isLeaveDay = (r.status === 'approved_leave' || !!r.leave_type);
-        const isDayOff = (r.status === 'day_off' || r.status === 'holiday');
-        const isWeekendOff = (r.is_weekend && !r.check_in && !r.check_out);
+        const isSwappedOff = (r.status === 'swapped_off' || r.is_swapped_off);
+        const isAltOff = (r.status === 'alt_off' || r.is_alt_off);
+        const isDayOff = (r.status === 'day_off' || r.status === 'holiday' || isSwappedOff || isAltOff);
+        const isWeekendOff = (r.is_weekend && !r.check_in && !r.check_out && !isSwappedOff && !isAltOff);
         const isMergedDay = (isLeaveDay || isDayOff || isWeekendOff);
+
+        const adjustArgs = `${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0}, '${r.day_type || (isSwappedOff ? 'swapped_off' : (isAltOff ? 'alt_off' : ''))}', '${escapeHtml(r.holiday_reason || r.swapped_note || '')}', ${isSwappedOff ? 1 : 0}, '${escapeHtml(r.swapped_with_date || '')}'`;
 
         if (isMergedDay) {
             let mergedContentHtml = '';
@@ -601,7 +619,13 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                 const lType = (r.leave_type || 'Leave').toUpperCase();
                 const reasonStr = r.leave_reason ? ` • ${escapeHtml(r.leave_reason)}` : ' (HR Approved)';
                 mergedContentHtml = `<span style="background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 700; padding: 4px 14px; border-radius: 6px; font-size: 11.5px; display: inline-block;">🌴 ${lType} LEAVE${reasonStr}</span>`;
-            } else if (isDayOff) {
+            } else if (isSwappedOff) {
+                const noteText = r.swapped_note ? ` • ${escapeHtml(r.swapped_note)}` : '';
+                mergedContentHtml = `<span style="background: rgba(139, 92, 246, 0.12); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.35); font-weight: 700; padding: 4px 14px; border-radius: 6px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px;">🔄 Swapped Weekly Off${noteText}</span>`;
+            } else if (isAltOff) {
+                const noteText = r.swapped_note ? ` • ${escapeHtml(r.swapped_note)}` : '';
+                mergedContentHtml = `<span style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; padding: 4px 14px; border-radius: 6px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px;">⭐ Alternate Day Off (Comp Off)${noteText}</span>`;
+            } else if (r.status === 'day_off' || r.status === 'holiday') {
                 mergedContentHtml = `<span style="background: rgba(139, 92, 246, 0.12); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 700; padding: 4px 14px; border-radius: 6px; font-size: 11.5px; display: inline-block;">🏖️ Scheduled Day Off (Duty Roster)</span>`;
             } else if (isWeekendOff) {
                 mergedContentHtml = `<span style="color: #d97706; font-weight: 700; font-size: 11.5px;">Weekly Off</span>`;
@@ -617,7 +641,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                         ${mergedContentHtml}
                     </td>
                     <td style="text-align: right;">
-                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600;" onclick="openAdminShiftModal(${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0})" title="Adjust or Add Remarks to Shift Record">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600;" onclick="openAdminShiftModal(${adjustArgs})" title="Adjust or Add Remarks to Shift Record">
                             ⏱️ Adjust
                         </button>
                     </td>
@@ -631,6 +655,10 @@ function renderSingleEmployeeTimesheet(item, globalData) {
             else if (r.status === 'incomplete') cleanStatusText = '🔴 Incomplete';
             else if (r.status === 'absent') cleanStatusText = '🔴 Absent';
 
+            const offWorkedPill = r.is_off_day_worked
+                ? `<span style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 4px; white-space: nowrap;" title="Worked on scheduled weekly off / rest day (Earned compensatory day off credit)">⭐ Off Worked</span>`
+                : '';
+
             rowsHtml += `
                 <tr ${rowBg}>
                     <td style="white-space: nowrap;">
@@ -640,13 +668,14 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                     <td><code style="font-size: 12px; color: ${r.check_in ? '#10b981' : 'var(--text-dim)'}; font-weight: 700;">${r.check_in || '-'}</code></td>
                     <td><code style="font-size: 12px; color: ${r.check_out ? '#3b82f6' : 'var(--text-dim)'}; font-weight: 700;">${r.check_out || '-'}</code></td>
                     <td><strong style="font-size: 13px; color: ${r.duty_seconds > 0 ? 'var(--text-main)' : 'var(--text-dim)'}; font-family: monospace;">${r.duty_formatted}</strong></td>
-                    <td>
-                        <span style="padding: 3px 8px; border-radius: 6px; font-size: 11px; display: inline-block; ${badgeStyle}">
+                    <td style="white-space: nowrap;">
+                        <span style="padding: 3px 8px; border-radius: 6px; font-size: 11px; display: inline-flex; align-items: center; ${badgeStyle}">
                             ${escapeHtml(cleanStatusText)}
                         </span>
+                        ${offWorkedPill}
                     </td>
                     <td style="text-align: right;">
-                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600;" onclick="openAdminShiftModal(${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0})" title="Adjust or Add Remarks to Shift Record">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600;" onclick="openAdminShiftModal(${adjustArgs})" title="Adjust or Add Remarks to Shift Record">
                             ⏱️ Adjust
                         </button>
                     </td>

@@ -1259,9 +1259,26 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                            <label class="form-label" style="margin: 0;">Check-In Time</label>
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label" style="font-weight: 700;">Day Schedule & Status</label>
+                        <select id="admin-shift-day-type" class="input-control" onchange="handleAdminShiftDayTypeChange()" style="font-weight: 600;">
+                            <option value="working">💼 Normal Working Shift</option>
+                            <option value="swapped_off">🔄 Swapped Weekly Off (Rotated Day Off)</option>
+                            <option value="alt_off">⭐ Alternate Day Off (Comp Off for Extra Day Worked)</option>
+                            <option value="holiday">🏖️ Scheduled Day Off / Rest Day</option>
+                        </select>
+                    </div>
+
+                    <div id="admin-shift-reason-group" class="form-group" style="display: none; margin-bottom: 14px;">
+                        <label class="form-label" style="font-weight: 700;">Swap / Day Off Notes & Reference</label>
+                        <input type="text" id="admin-shift-holiday-reason" class="input-control" placeholder="e.g. Swapped with Saturday (HOD approved)">
+                        <small style="font-size: 11px; color: var(--text-dim);">Reference date worked or HOD rotation approval reason.</small>
+                    </div>
+
+                    <div id="admin-shift-times-section">
+                        <div class="form-group">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                <label class="form-label" style="margin: 0;">Check-In Time</label>
                             <div style="display: flex; gap: 4px;">
                                 <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 10.5px;" onclick="setShiftTimePreset('in', 'now')">Now</button>
                                 <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 10.5px;" onclick="setShiftTimePreset('in', '09:00 AM')">09:00 AM</button>
@@ -1285,6 +1302,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         <input type="text" id="admin-shift-out-time" class="input-control" placeholder="e.g. 06:00 PM (Leave empty if currently on duty)" autocomplete="off">
                         <small style="font-size: 11px; color: var(--text-dim);">Leave empty if employee is still currently on duty.</small>
                     </div>
+                </div>
                 </div>
                 <div class="modal-footer" style="padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
                     <button type="button" class="btn btn-outline" style="color: #ef4444; border-color: rgba(239, 68, 68, 0.4);" onclick="handleAdminClearShift()" title="Completely remove check-in and check-out records for this date">

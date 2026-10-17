@@ -264,6 +264,10 @@ switch ($action) {
         $date = $data['date'] ?? date('Y-m-d');
         $inTime = trim($data['check_in_time'] ?? '');
         $outTime = trim($data['check_out_time'] ?? '');
+        $dayType = isset($data['day_type']) && in_array($data['day_type'], ['working', 'swapped_off', 'alt_off', 'holiday'], true)
+            ? $data['day_type'] 
+            : null;
+        $holidayReason = isset($data['holiday_reason']) ? trim($data['holiday_reason']) : null;
 
         if (!$empId) {
             http_response_code(400);
@@ -306,10 +310,15 @@ switch ($action) {
 
         $isLocked = isset($data['is_locked']) ? (int)$data['is_locked'] : ($sheet ? (int)$sheet['is_locked'] : 0);
 
+        // Effective day type logic
+        $effectiveDayType = $dayType !== null ? $dayType : ($sheet['day_type'] ?? 'working');
+        $effectiveReason = $holidayReason !== null ? $holidayReason : ($sheet['holiday_reason'] ?? null);
+
         if ($sheet) {
             $update = $pdo->prepare("
                 UPDATE daily_sheets 
-                SET check_in_time = ?, check_out_time = ?, total_duty_hours = ?, total_duty_seconds = ?, is_locked = ?, updated_at = CURRENT_TIMESTAMP 
+                SET check_in_time = ?, check_out_time = ?, total_duty_hours = ?, total_duty_seconds = ?, 
+                    day_type = ?, holiday_reason = ?, holiday_marked_by = ?, is_locked = ?, updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ?
             ");
             $update->execute([
@@ -317,14 +326,17 @@ switch ($action) {
                 !empty($outTime) ? $outTime : null,
                 $dutyFormatted,
                 $dutySeconds,
+                $effectiveDayType,
+                !empty($effectiveReason) ? $effectiveReason : null,
+                $currentUserId,
                 $isLocked,
                 $sheet['id']
             ]);
             $sheetId = $sheet['id'];
         } else {
             $insert = $pdo->prepare("
-                INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, check_out_time, total_duty_hours, total_duty_seconds, is_locked) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, check_out_time, total_duty_hours, total_duty_seconds, day_type, holiday_reason, holiday_marked_by, is_locked) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $insert->execute([
                 $empId,
@@ -333,6 +345,9 @@ switch ($action) {
                 !empty($outTime) ? $outTime : null,
                 $dutyFormatted,
                 $dutySeconds,
+                $effectiveDayType,
+                !empty($effectiveReason) ? $effectiveReason : null,
+                $currentUserId,
                 $isLocked
             ]);
             $sheetId = $pdo->lastInsertId();
@@ -345,6 +360,8 @@ switch ($action) {
             'check_in_time' => $inTime,
             'check_out_time' => $outTime,
             'total_duty_hours' => $dutyFormatted,
+            'day_type' => $effectiveDayType,
+            'holiday_reason' => $effectiveReason,
             'is_locked' => $isLocked
         ]);
         break;
@@ -623,10 +640,18 @@ switch ($action) {
                     'working_days_count' => 0,
                     'is_flexible' => $isOpenFlexible,
                     'shift_hours' => $shiftHours,
-                    'weekly_hours' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0]
+                    'weekly_hours' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0],
+                    'off_days_worked' => 0,
+                    'alt_days_taken' => 0,
+                    'comp_off_balance' => 0
                 ];
 
                 $empLeaves = $leavesByEmp[$empId] ?? [];
+
+                // Step 1: Pre-analyze all days in period to detect worked weekly off days and candidate rotation days
+                $dayMetaMap = [];
+                $workedOffDays = [];
+                $unclockedDays = [];
 
                 foreach ($periodDates as $d) {
                     $dt = $d['date'];
@@ -649,8 +674,8 @@ switch ($action) {
                     } elseif (stripos($scheduledWeeklyOff, 'Once in Month') !== false && in_array($dt, $empOffDates, true)) {
                         $isEmpWeeklyOff = true;
                     }
-                    
-                    // Check if on approved leave (O(1) list of only this employee's leaves)
+
+                    // Check if on approved leave
                     $isOnLeave = false;
                     $leaveType = '';
                     $leaveReason = '';
@@ -670,12 +695,111 @@ switch ($action) {
                         $inTs = strtotime($dt . ' ' . $sheet['check_in_time']);
                         if ($inTs) $dutySeconds = max(0, time() - $inTs);
                     }
-
                     $dutyHours = round($dutySeconds / 3600, 2);
-                    $weekNum = min(6, (int)ceil($d['day_num'] / 7));
 
-                    $isDayOff = ($sheet && ($sheet['day_type'] ?? '') === 'holiday');
+                    $explicitDayType = $sheet ? ($sheet['day_type'] ?? '') : '';
+                    $holidayReason = $sheet ? ($sheet['holiday_reason'] ?? '') : '';
+                    $isExplicitRest = in_array($explicitDayType, ['holiday', 'swapped_off', 'alt_off', 'day_off'], true);
+
+                    if (!$d['is_future']) {
+                        if ($isEmpWeeklyOff && $dutyHours >= 1.0) {
+                            $workedOffDays[] = [
+                                'date' => $dt,
+                                'duty_hours' => $dutyHours,
+                                'day' => $dayOfWeek,
+                                'ts' => strtotime($dt)
+                            ];
+                        } elseif (!$isEmpWeeklyOff && !$isExplicitRest && !$isOnLeave && $dutySeconds == 0 && empty($sheet['check_in_time'])) {
+                            $unclockedDays[] = [
+                                'date' => $dt,
+                                'day' => $dayOfWeek,
+                                'ts' => strtotime($dt)
+                            ];
+                        }
+                    }
+
+                    $dayMetaMap[$dt] = [
+                        'sheet' => $sheet,
+                        'is_weekly_off' => $isEmpWeeklyOff,
+                        'scheduled_weekly_off' => $scheduledWeeklyOff,
+                        'is_on_leave' => $isOnLeave,
+                        'leave_type' => $leaveType,
+                        'leave_reason' => $leaveReason,
+                        'duty_seconds' => $dutySeconds,
+                        'duty_hours' => $dutyHours,
+                        'explicit_day_type' => $explicitDayType,
+                        'holiday_reason' => $holidayReason
+                    ];
+                }
+
+                // Step 2: Auto-pair unclocked days with worked weekly off days within +/- 6 days (same weekly rotation)
+                $autoSwappedMap = [];
+                $pairedWorkedOffMap = [];
+
+                foreach ($workedOffDays as $wItem) {
+                    $wDate = $wItem['date'];
+                    $wDay = $wItem['day'];
+                    $wTs = $wItem['ts'];
+
+                    $bestUDate = null;
+                    $bestUDay = null;
+                    $minDiff = 999999;
+                    foreach ($unclockedDays as $uItem) {
+                        $uDate = $uItem['date'];
+                        if (isset($autoSwappedMap[$uDate])) continue;
+                        $diff = abs(($uItem['ts'] - $wTs) / 86400);
+                        if ($diff <= 6 && $diff < $minDiff) {
+                            $minDiff = $diff;
+                            $bestUDate = $uDate;
+                            $bestUDay = $uItem['day'];
+                        }
+                    }
+
+                    if ($bestUDate) {
+                        $autoSwappedMap[$bestUDate] = [
+                            'swapped_with_date' => $wDate,
+                            'swapped_with_day' => $wDay,
+                            'note' => "Rotated weekly off with {$wDay} ({$wDate})"
+                        ];
+                        $pairedWorkedOffMap[$wDate] = [
+                            'swapped_with_date' => $bestUDate,
+                            'swapped_with_day' => $bestUDay,
+                            'note' => "Rotated with {$bestUDay} ({$bestUDate})"
+                        ];
+                    }
+                }
+
+                // Step 3: Evaluate each day with awareness of rotated off days and comp off
+                foreach ($periodDates as $d) {
+                    $dt = $d['date'];
+                    $meta = $dayMetaMap[$dt];
+                    $sheet = $meta['sheet'];
+                    $isEmpWeeklyOff = $meta['is_weekly_off'];
+                    $scheduledWeeklyOff = $meta['scheduled_weekly_off'];
+                    $isOnLeave = $meta['is_on_leave'];
+                    $leaveType = $meta['leave_type'];
+                    $leaveReason = $meta['leave_reason'];
+                    $dutySeconds = $meta['duty_seconds'];
+                    $dutyHours = $meta['duty_hours'];
+                    $explicitDayType = $meta['explicit_day_type'];
+                    $holidayReason = $meta['holiday_reason'];
+
+                    $isSwappedOff = ($explicitDayType === 'swapped_off') || isset($autoSwappedMap[$dt]);
+                    $isAltOff = ($explicitDayType === 'alt_off');
+                    $isExplicitHoliday = ($explicitDayType === 'holiday' || $explicitDayType === 'day_off');
+
+                    $isDayOff = ($isExplicitHoliday || $isSwappedOff || $isAltOff);
                     $isRestDay = ($isEmpWeeklyOff || $isDayOff);
+
+                    $isOffDayWorked = ($isEmpWeeklyOff && $dutyHours >= 1.0);
+                    if ($isOffDayWorked && !$d['is_future']) {
+                        $empSummary['off_days_worked']++;
+                    }
+                    if (($isSwappedOff || $isAltOff) && !$d['is_future']) {
+                        $empSummary['alt_days_taken']++;
+                    }
+
+                    $weekNum = min(6, (int)ceil($d['day_num'] / 7));
 
                     if (!$d['is_future']) {
                         $empSummary['working_days_count']++;
@@ -685,6 +809,13 @@ switch ($action) {
                         if (!$isOpenFlexible && !$isRestDay && !$isOnLeave) {
                             $empSummary['expected_duty_hours'] += $shiftHours;
                         }
+                    }
+
+                    $swappedNote = '';
+                    if ($isSwappedOff) {
+                        $swappedNote = $holidayReason ?: (isset($autoSwappedMap[$dt]) ? $autoSwappedMap[$dt]['note'] : 'Rotated Weekly Off');
+                    } elseif ($isAltOff) {
+                        $swappedNote = $holidayReason ?: 'Alternate Day Off (Comp Off)';
                     }
 
                     // Dynamic Classification Rules
@@ -698,6 +829,14 @@ switch ($action) {
                         $badgeClass = 'badge-leave';
                         $empSummary['approved_leaves']++;
                         $grandTotals['total_approved_leaves']++;
+                    } elseif ($isSwappedOff) {
+                        $status = 'swapped_off';
+                        $statusLabel = '🔄 Swapped Weekly Off';
+                        $badgeClass = 'badge-swapped-off';
+                    } elseif ($isAltOff) {
+                        $status = 'alt_off';
+                        $statusLabel = '⭐ Alternate Day Off';
+                        $badgeClass = 'badge-alt-off';
                     } elseif ($isDayOff) {
                         $status = 'day_off';
                         $statusLabel = '🏖️ Day Off';
@@ -710,7 +849,7 @@ switch ($action) {
                         // Open / Flexible Shift (No fixed threshold)
                         if ($dutyHours > 0) {
                             $status = 'full_day';
-                            $statusLabel = '🟢 Shift Logged';
+                            $statusLabel = $isOffDayWorked ? '🟢 Shift Logged (Off Worked ⭐)' : '🟢 Shift Logged';
                             $badgeClass = 'badge-present';
                             $empSummary['full_days']++;
                             $grandTotals['total_present_full']++;
@@ -785,6 +924,13 @@ switch ($action) {
                             'is_locked' => $sheet ? (int)$sheet['is_locked'] : 0,
                             'leave_type' => $leaveType,
                             'leave_reason' => $leaveReason,
+                            'day_type' => $explicitDayType,
+                            'holiday_reason' => $holidayReason,
+                            'is_off_day_worked' => $isOffDayWorked,
+                            'is_swapped_off' => $isSwappedOff,
+                            'is_alt_off' => $isAltOff,
+                            'swapped_note' => $swappedNote,
+                            'swapped_with_date' => $autoSwappedMap[$dt]['swapped_with_date'] ?? ($pairedWorkedOffMap[$dt]['swapped_with_date'] ?? null),
                             'work_summary' => $sheet['work_summary'] ?? '',
                             'remarks' => $sheet['remarks'] ?? ''
                         ];
@@ -798,6 +944,7 @@ switch ($action) {
                     : 0;
                 $empSummary['duty_formatted'] = formatDutyTime($empSummary['total_duty_seconds']);
                 $empSummary['hour_balance'] = round($empSummary['total_duty_hours'] - $empSummary['expected_duty_hours'], 1);
+                $empSummary['comp_off_balance'] = $empSummary['off_days_worked'] - $empSummary['alt_days_taken'];
 
                 $grandTotals['total_duty_seconds'] += $empSummary['total_duty_seconds'];
                 $grandTotals['total_duty_hours'] += $empSummary['total_duty_hours'];
