@@ -5,7 +5,9 @@
         ?>
         <section id="tab-worksheet" class="tab-section <?= ($currentPortal === 'digital') ? 'active' : '' ?>">
             <!-- EMPLOYEE PERSONAL SHIFT HERO (Hidden for Admin) -->
+            <!-- EMPLOYEE PERSONAL SHIFT HERO (Hidden for Admin) -->
             <div id="hero-employee-container" class="shift-hero-card employee-only" style="<?= $canInspectWs ? 'display: none;' : '' ?>">
+                <!-- Left: Profile Info, Shift Meta & Status Chips -->
                 <div class="shift-left-meta">
                     <div id="hero-profile-avatar" class="meta-profile-circle" onclick="openMyProfileModal()" style="cursor: pointer; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;" title="Click to edit profile & photo">
                         <?php if (!empty($authUser['avatar'])): ?>
@@ -15,48 +17,61 @@
                         <?php endif; ?>
                     </div>
                     <div class="shift-details">
-                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                            <h2 id="hero-emp-name" style="margin: 0;"><?= htmlspecialchars($authUser['name'] ?? 'Employee Name') ?></h2>
-                            <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 11px; border-radius: 12px; font-weight: 700;" onclick="openMyProfileModal()" title="Edit My Profile & Photo">✏️ Edit Profile</button>
+                        <div class="shift-details-top">
+                            <h2 id="hero-emp-name"><?= htmlspecialchars($authUser['name'] ?? 'Employee Name') ?></h2>
+                            <span class="hero-dot-separator">•</span>
+                            <span id="hero-emp-meta" class="hero-meta-subtitle"><?= htmlspecialchars(($authUser['designation'] ?? 'Staff') . ' • ' . ($authUser['department_name'] ?? 'Digital') . ' • ' . ($authUser['team_name'] ?? 'Team')) ?></span>
                         </div>
-                        <p id="hero-emp-meta"><?= htmlspecialchars(($authUser['designation'] ?? 'Staff') . ' • ' . ($authUser['department_name'] ?? 'Digital') . ' • ' . ($authUser['team_name'] ?? 'Team')) ?></p>
-                        <div style="display: flex; gap: 14px; margin-top: 6px; font-size: 12.5px; align-items: center; flex-wrap: wrap;">
-                            <span>In: <strong id="hero-checkin-time" style="color: #38bdf8;">--:--</strong></span>
-                            <span>Out: <strong id="hero-checkout-time" style="color: #fbbf24;">--:--</strong></span>
-                            <span id="hero-roster-pill" style="display: none; background: rgba(168, 85, 247, 0.12); color: #c084fc; padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 11.5px;">📅 Shift: <span id="hero-roster-shift-text">--</span></span>
+                        <div class="shift-meta-chips-row">
+                            <span class="shift-chip shift-chip-punch">
+                                🕒 In: <strong id="hero-checkin-time" style="color: #0284c7;">--:--</strong> • Out: <strong id="hero-checkout-time" style="color: #ea580c;">--:--</strong>
+                            </span>
+                            <span id="hero-roster-pill" class="shift-chip" style="display: none; background: rgba(168, 85, 247, 0.12); color: #c084fc; border-color: rgba(168, 85, 247, 0.25);">
+                                📅 Shift: <span id="hero-roster-shift-text">--</span>
+                            </span>
+                            <span id="employee-sheet-lock-badge" class="badge-lock unlocked">🔓 Active</span>
+                            <span id="employee-hod-check-badge" class="badge" style="display: none;"></span>
                         </div>
                     </div>
                 </div>
 
-                <div class="shift-center-timer">
-                    <span class="timer-label">My Live Duty Hours</span>
-                    <span id="duty-timer-digits" class="timer-digits">0:00:00</span>
-                    <span id="employee-sheet-lock-badge" class="badge-lock unlocked" style="margin-top: 4px;">🔓 Active / Unlocked</span>
-                </div>
+                <!-- Right: Duty Hours Timer + Action Buttons Toolbar -->
+                <div class="shift-right-controls">
+                    <div class="shift-compact-timer" title="My Live Duty Hours for today's shift">
+                        <span class="timer-indicator"></span>
+                        <div class="timer-text-group">
+                            <span class="timer-label">Duty Hours</span>
+                            <span id="duty-timer-digits" class="timer-digits">0:00:00</span>
+                        </div>
+                    </div>
 
-                <div class="shift-actions">
-                    <button type="button" id="btn-self-holiday" class="btn btn-outline" style="border-color: #8b5cf6; color: #8b5cf6; font-weight: 700;" onclick="handleToggleHoliday()" title="Self-Check: Mark this date as your scheduled Day Off / Holiday">
-                        🏖️ Day Off
-                    </button>
-                    <button type="button" id="btn-check-in" class="btn btn-success" onclick="handleCheckIn()">
-                        🟢 Check In
-                    </button>
-                    <button type="button" id="btn-check-out" class="btn btn-danger" onclick="handleCheckOut()">
-                        🔴 Check Out & Lock
-                    </button>
-                    <button type="button" class="btn btn-primary" onclick="triggerPrintSheet()">
-                        🖨️ Print Sheet
-                    </button>
+                    <div class="shift-actions">
+                        <span id="hero-shift-completed-chip" class="shift-chip shift-chip-completed" style="display: none;">
+                            ✓ Shift Completed
+                        </span>
+                        <button type="button" id="btn-self-holiday" class="btn btn-outline" style="border-color: #8b5cf6; color: #8b5cf6; font-weight: 700;" onclick="handleToggleHoliday()" title="Self-Check: Mark this date as your scheduled Day Off / Holiday">
+                            🏖️ Day Off
+                        </button>
+                        <button type="button" id="btn-check-in" class="btn btn-success" onclick="handleCheckIn()">
+                            🟢 Check In
+                        </button>
+                        <button type="button" id="btn-check-out" class="btn btn-danger" style="display: none;" onclick="handleCheckOut()">
+                            🔴 Check Out
+                        </button>
+                        <button type="button" id="btn-employee-print-sheet" class="btn btn-primary" onclick="triggerPrintSheet()">
+                            🖨️ Print Sheet
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Next Day Check-In Transition Banner (Shows when current date is checked out) -->
-                <div id="hero-next-day-bar" style="display: none; width: 100%; margin-top: 14px; padding: 12px 16px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); align-items: center; justify-content: space-between; font-size: 13px; flex-wrap: wrap; gap: 10px;">
+                <div id="hero-next-day-bar" style="display: none; width: 100%; margin-top: 10px; padding: 10px 14px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); align-items: center; justify-content: space-between; font-size: 12.5px; flex-wrap: wrap; gap: 8px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 16px;">✅</span>
-                        <span><strong>Shift completed & locked for <span id="hero-shift-date-label">Today</span>.</strong> Next day check-in will automatically be ready for tomorrow.</span>
+                        <span style="font-size: 15px;">✅</span>
+                        <span><strong>Shift completed & locked for <span id="hero-shift-date-label">Today</span>.</strong> Ready for next day check-in.</span>
                     </div>
-                    <button type="button" class="btn btn-outline" style="padding: 6px 14px; font-size: 12px; font-weight: 700; border-color: var(--primary);" onclick="goToNextDay()">
-                        ⏭️ Advance to Next Day Check-In
+                    <button type="button" class="btn btn-outline" style="padding: 4px 12px; font-size: 11.5px; font-weight: 700; border-color: var(--primary);" onclick="goToNextDay()">
+                        ⏭️ Advance to Next Day
                     </button>
                 </div>
             </div>
@@ -64,22 +79,27 @@
             <!-- Main Worksheet Area (Full Width) -->
             <div class="worksheet-card">
                 <!-- ADMIN INTEGRATED INSPECTOR & CONTROLLER HEADER -->
-                <div class="admin-only" style="<?= $canInspectWs ? '' : 'display: none;' ?>; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 18px;">
+                <div class="admin-only" id="admin-inspector-header-container" style="<?= $canInspectWs ? '' : 'display: none;' ?>; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; margin-bottom: 18px; transition: all 0.3s ease;">
                     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 14px;">
                         <div>
-                            <h3 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 2px;">Employee Worksheet Inspector & Live Editor</h3>
-                            <p style="font-size: 12.5px; color: var(--text-muted);">Reviewing, editing, and managing daily work entries for team members.</p>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <h3 id="admin-inspector-title" style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 0;">Employee Worksheet Inspector & Live Editor</h3>
+                                <span id="admin-verified-header-badge" class="badge badge-hod-checked" style="display: none; font-size: 11px; padding: 3px 10px; border-radius: 20px;">🛡️ Verified by HOD</span>
+                            </div>
+                            <p id="admin-inspector-subtitle" style="font-size: 12.5px; color: var(--text-muted); margin-top: 3px;">Reviewing, editing, and managing daily work entries for team members.</p>
                         </div>
 
                         <div class="shift-center-timer" style="padding: 6px 16px; min-width: 170px;">
                             <span class="timer-label" style="font-size: 10px;">Employee Duty Hours</span>
                             <span id="admin-emp-duty-hours" class="timer-digits" style="font-size: 20px;">0:00:00</span>
-                            <span id="sheet-lock-badge" class="badge-lock unlocked" style="margin-top: 2px; font-size: 10.5px; padding: 2px 8px;">🔓 Active / Unlocked</span>
+                            <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; margin-top: 2px;">
+                                <span id="sheet-lock-badge" class="badge-lock unlocked" style="font-size: 10.5px; padding: 2px 8px;">🔓 Active / Unlocked</span>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Center-Aligned Inspector Showcase Box -->
-                    <div class="admin-inspector-box">
+                    <div id="admin-inspector-box" class="admin-inspector-box">
                         <!-- Top Row: Clustered Responsive Groups (Seamless single row on 90%/desktop, elegant wrapping on 100%/laptops/mobile) -->
                         <div class="admin-inspector-controls-row">
                             <!-- Group 1: Avatar & Employee Selector -->
@@ -136,6 +156,9 @@
                                 <button type="button" id="admin-unlock-btn" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="toggleSheetLock()">
                                     🔒 Lock Sheet
                                 </button>
+                                <button type="button" id="admin-btn-hod-check" class="btn btn-success" style="padding: 6px 13px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;" onclick="handleToggleHodCheckSheet()" title="Mark this worksheet as Checked & Verified by HOD">
+                                    <span>✅</span> <span id="admin-btn-hod-check-text">Mark Checked</span>
+                                </button>
                                 <button type="button" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="openTrackingOptionsModal()" title="Customize Content Types & Tracking Departments">
                                     ⚙️ Options
                                 </button>
@@ -153,7 +176,7 @@
                             <span class="meta-separator" style="color: var(--border-color);">|</span>
                             <span class="admin-inspector-meta-item">👥 <span><strong>Team:</strong> <span id="admin-meta-team" style="color: var(--text-main); font-weight: 600;">Team</span></span></span>
                             <span class="meta-separator" style="color: var(--border-color);">|</span>
-                            <span class="admin-inspector-meta-item">🕒 <span><strong>Shift:</strong> In: <strong id="admin-meta-in" style="color: #38bdf8;">--:--</strong> • Out: <strong id="admin-meta-out" style="color: #fbbf24;">--:--</strong></span> <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 10.5px; border-radius: 12px; margin-left: 6px; font-weight: 600;" onclick="openAdminShiftModal()" title="Manually edit or backdate shift check-in and check-out times">✏️ Edit Shift</button></span>
+                            <span class="admin-inspector-meta-item">🕒 <span><strong>Shift:</strong> In: <strong id="admin-meta-in" style="color: #0284c7;">--:--</strong> • Out: <strong id="admin-meta-out" style="color: #ea580c;">--:--</strong></span> <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 10.5px; border-radius: 12px; margin-left: 6px; font-weight: 600;" onclick="openAdminShiftModal()" title="Manually edit or backdate shift check-in and check-out times">✏️ Edit Shift</button></span>
                         </div>
                     </div>
                 </div>

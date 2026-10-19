@@ -209,6 +209,38 @@ switch ($action) {
             }
         }
 
+        // Look up HOD checker name if sheet is checked
+        $hodCheckedByName = null;
+        if (!empty($sheet['hod_checked_by'])) {
+            try {
+                $stName = $pdo->prepare("SELECT name FROM employees WHERE id = ?");
+                $stName->execute([(int)$sheet['hod_checked_by']]);
+                $hodCheckedByName = $stName->fetchColumn() ?: null;
+            } catch (Exception $e) {
+                $hodCheckedByName = null;
+            }
+        }
+
+        // Fetch department HOD verification & print settings
+        $deptRequireCheck = 0;
+        $deptBlockPrint = 0;
+        try {
+            $deptSettingsStmt = $pdo->prepare("
+                SELECT require_hod_sheet_check, block_print_before_hod_check 
+                FROM departments 
+                WHERE id = ?
+            ");
+            $deptSettingsStmt->execute([$empDeptId]);
+            $deptSettings = $deptSettingsStmt->fetch(PDO::FETCH_ASSOC);
+            if ($deptSettings) {
+                $deptRequireCheck = (int)($deptSettings['require_hod_sheet_check'] ?? 0);
+                $deptBlockPrint = (int)($deptSettings['block_print_before_hod_check'] ?? 0);
+            }
+        } catch (Exception $e) {}
+
+        $isHodChecked = !empty($sheet['is_hod_checked']) ? 1 : 0;
+        $canPrint = ($isHodChecked === 1) || ($deptBlockPrint === 0) || $isAdminOrHod;
+
         echo json_encode([
             'success' => true,
             'employee' => $employee,
@@ -216,6 +248,15 @@ switch ($action) {
             'entries' => $entries,
             'columns' => $columns,
             'is_locked' => $isLocked,
+            'is_hod_checked' => $isHodChecked,
+            'hod_checked_by' => $sheet['hod_checked_by'] ?? null,
+            'hod_checked_by_name' => $hodCheckedByName,
+            'hod_checked_at' => !empty($sheet['hod_checked_at']) ? date('d-M-Y h:i A', strtotime($sheet['hod_checked_at'])) : null,
+            'department_settings' => [
+                'require_hod_sheet_check' => $deptRequireCheck,
+                'block_print_before_hod_check' => $deptBlockPrint
+            ],
+            'can_print' => $canPrint,
             'active_overnight_sheet' => $activeOvernightSheet,
             'can_edit' => $canEditAll,
             'can_edit_after_lock' => $isLocked === 1 && ($empId === (int)$currentUserId || $isAdminOrHod),
@@ -464,6 +505,95 @@ switch ($action) {
             'success' => true, 
             'is_locked' => $lockState,
             'message' => $lockState ? 'Sheet locked successfully' : 'Sheet unlocked successfully. Employee can now edit.'
+        ]);
+        break;
+
+    case 'toggle_hod_check':
+        if (!$canInspect && !$canUnlock) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'You do not have permission to verify worksheets.']);
+            exit;
+        }
+
+        $sheetId = (int)($data['sheet_id'] ?? 0);
+        $empId = (int)($data['employee_id'] ?? 0);
+        $date = $data['date'] ?? date('Y-m-d');
+        $checkState = isset($data['is_checked']) ? (int)$data['is_checked'] : 1;
+        $notes = trim($data['notes'] ?? '');
+
+        // Verify target employee department for HODs
+        $targetEmpId = $empId;
+        if (!$targetEmpId && $sheetId) {
+            $targetEmpId = (int)$pdo->query("SELECT employee_id FROM daily_sheets WHERE id = {$sheetId}")->fetchColumn();
+        }
+
+        if ($isHod && !$isSuperAdmin && $targetEmpId) {
+            $empCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $empCheck->execute([$targetEmpId]);
+            $targetDeptId = (int)$empCheck->fetchColumn();
+
+            $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+            $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
+            $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
+            $stmtManaged->execute([$currentUserId]);
+            $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($extra)) {
+                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
+            }
+
+            if (!in_array($targetDeptId, $managedDeptIds, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'HODs can only verify worksheets for employees in their own department.']);
+                exit;
+            }
+        }
+
+        // Find or create sheet if it doesn't exist yet
+        if (!$sheetId && $empId && $date) {
+            $sCheck = $pdo->prepare("SELECT id FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
+            $sCheck->execute([$empId, $date]);
+            $sheetId = (int)$sCheck->fetchColumn();
+
+            if (!$sheetId) {
+                $sCreate = $pdo->prepare("INSERT INTO daily_sheets (employee_id, sheet_date, created_at) VALUES (?, ?, NOW())");
+                $sCreate->execute([$empId, $date]);
+                $sheetId = (int)$pdo->lastInsertId();
+            }
+        }
+
+        if (!$sheetId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Missing sheet identifier']);
+            exit;
+        }
+
+        $checkerName = $currentUserObj['name'] ?? 'HOD';
+
+        if ($checkState === 1) {
+            $stmt = $pdo->prepare("
+                UPDATE daily_sheets 
+                SET is_hod_checked = 1, hod_checked_by = ?, hod_checked_at = NOW(), hod_checked_notes = ?, updated_at = NOW() 
+                WHERE id = ?
+            ");
+            $stmt->execute([$currentUserId, $notes, $sheetId]);
+            $msg = 'Worksheet successfully marked as Checked and Verified by HOD.';
+        } else {
+            $stmt = $pdo->prepare("
+                UPDATE daily_sheets 
+                SET is_hod_checked = 0, hod_checked_by = NULL, hod_checked_at = NULL, hod_checked_notes = NULL, updated_at = NOW() 
+                WHERE id = ?
+            ");
+            $stmt->execute([$sheetId]);
+            $msg = 'Worksheet verification removed / reopened.';
+        }
+
+        echo json_encode([
+            'success' => true,
+            'is_hod_checked' => $checkState,
+            'hod_checked_by' => ($checkState ? (int)$currentUserId : null),
+            'hod_checked_by_name' => ($checkState ? $checkerName : null),
+            'hod_checked_at' => ($checkState ? date('d-M-Y h:i A') : null),
+            'message' => $msg
         ]);
         break;
 

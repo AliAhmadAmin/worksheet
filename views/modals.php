@@ -1559,6 +1559,9 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                     <button type="button" id="tab-btn-tracking-depts" class="btn btn-outline tracking-modal-tab-btn" style="padding: 6px 14px; font-size: 12.5px; font-weight: 600;" onclick="switchTrackingModalTab('tracking_depts')">
                         🏢 Tracking Desks / Depts
                     </button>
+                    <button type="button" id="tab-btn-hod-settings" class="btn btn-outline tracking-modal-tab-btn" style="padding: 6px 14px; font-size: 12.5px; font-weight: 600;" onclick="switchTrackingModalTab('hod_settings')">
+                        ✍️ HOD Verification & Print Rules
+                    </button>
                 </div>
 
                 <!-- ================= TAB 1: WORKSHEET COLUMNS BUILDER ================= -->
@@ -1693,6 +1696,79 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         </div>
                         <div id="tracking-depts-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto; padding-right: 4px;">
                             <div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 12px;">Loading options...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= TAB 4: HOD VERIFICATION & PRINT RESTRICTION SETTINGS ================= -->
+                <div id="tracking-tab-section-hod-settings" class="tracking-tab-section" style="display: none; flex-direction: column; gap: 16px;">
+                    <!-- Informational Tip Banner -->
+                    <div style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: var(--radius-md); font-size: 12.5px; line-height: 1.55; color: var(--text-main);">
+                        <span style="font-size: 20px; line-height: 1;">🛡️</span>
+                        <div>
+                            <strong>Department-Specific HOD Verification Workflow:</strong> Customize how worksheets in this department are reviewed and printed. Each HOD has full autonomy to choose if they want to verify sheets on the system, restrict employees from printing until approved, and automatically embed an official <strong>Digital Verification & Approval Seal</strong> on the printed sheet!
+                        </div>
+                    </div>
+
+                    <!-- Configuration Card -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px 20px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 18px;">
+                        <h4 style="margin: 0; font-size: 14.5px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; justify-content: space-between;">
+                            <span>⚙️ Verification & Print Policy for <span id="hod-settings-dept-label" style="color: var(--primary);">This Department</span></span>
+                            <span id="hod-settings-assigned-hod" class="badge" style="font-size: 11px; background: var(--bg-hover);">HOD: --</span>
+                        </h4>
+
+                        <!-- Policy 1: Enable HOD Sheet Verification -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                            <div style="flex: 1;">
+                                <label for="setting-require-hod-check" style="font-size: 13.5px; font-weight: 700; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                    <span>✅ Enable HOD Digital Verification & Approval</span>
+                                </label>
+                                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.45;">
+                                    Allows HOD to inspect daily sheets on the system and click <strong>"Mark as Checked"</strong>. When marked checked, an official corporate verification stamp with HOD name & timestamp will automatically print on the sheet.
+                                </p>
+                            </div>
+                            <label class="switch-toggle" style="margin-top: 4px; cursor: pointer;">
+                                <input type="checkbox" id="setting-require-hod-check" onchange="handleHodCheckSettingChange(this)">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <!-- Policy 2: Block Printing until Checked -->
+                        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+                            <div style="flex: 1;">
+                                <label for="setting-block-print-before-check" style="font-size: 13.5px; font-weight: 700; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                    <span>🔒 Restrict Employee Printing (Must be Checked by HOD First)</span>
+                                </label>
+                                <p style="margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.45;">
+                                    Employees in this department <strong>cannot print</strong> their worksheet until their HOD inspects and marks it checked on the system. If turned off, employees can print anytime, and the sheet will show the digital stamp if already checked or physical signing line if not yet checked.
+                                </p>
+                            </div>
+                            <label class="switch-toggle" style="margin-top: 4px; cursor: pointer;">
+                                <input type="checkbox" id="setting-block-print-before-check">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <!-- Official Printout Seal Preview Card -->
+                        <div style="border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 14px 18px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(59, 130, 246, 0.04));">
+                            <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; display: block; margin-bottom: 8px;">Printout Preview (HOD Signature Section)</span>
+                            <div style="display: flex; align-items: center; justify-content: space-between; max-width: 380px; padding: 10px 14px; background: #fff; color: #0f172a; border: 1.5px solid #10b981; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.06);">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: #10b981; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px;">✓</div>
+                                    <div>
+                                        <div style="font-size: 11.5px; font-weight: 800; color: #065f46; letter-spacing: 0.3px;">DIGITALLY VERIFIED & APPROVED</div>
+                                        <div style="font-size: 10px; color: #475569; font-weight: 600;">Verified by: <span id="preview-hod-name" style="font-weight: 700;">HOD Name</span></div>
+                                        <div style="font-size: 9px; color: #64748b;">Automated Time-Stamped System Audit</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save Button -->
+                        <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+                            <button type="button" class="btn btn-primary" style="padding: 8px 22px; font-weight: 700; font-size: 13px;" onclick="saveHodVerificationSettings()">
+                                💾 Save Department Verification Rules
+                            </button>
                         </div>
                     </div>
                 </div>

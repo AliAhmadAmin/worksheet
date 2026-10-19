@@ -159,6 +159,17 @@ function migratePermissionsSchema($pdo) {
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN shift_timing VARCHAR(100) NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN weekly_off VARCHAR(50) NULL"); } catch (Exception $e) {}
 
+        // HOD Verification and Digital Sign-off Schema for Daily Sheets
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN is_hod_checked TINYINT DEFAULT 0 AFTER is_locked"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN hod_checked_by INT NULL AFTER is_hod_checked"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN hod_checked_at DATETIME NULL AFTER hod_checked_by"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN hod_checked_notes VARCHAR(255) NULL AFTER hod_checked_at"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD INDEX idx_sheet_hod_checked (is_hod_checked)"); } catch (Exception $e) {}
+
+        // Department-level HOD verification & print restriction settings
+        try { $pdo->exec("ALTER TABLE departments ADD COLUMN require_hod_sheet_check TINYINT DEFAULT 0"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE departments ADD COLUMN block_print_before_hod_check TINYINT DEFAULT 0"); } catch (Exception $e) {}
+
         // Duty Rosters Table for Monthly Scheduled Shifts & Weekly Offs
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS duty_rosters (
@@ -592,6 +603,8 @@ function ensureDepartmentAndTeamsSchema($pdo) {
         try { $pdo->exec("ALTER TABLE departments ADD COLUMN description TEXT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE departments ADD COLUMN hod_id INT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE departments ADD COLUMN is_active TINYINT DEFAULT 1"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE departments ADD COLUMN require_hod_sheet_check TINYINT DEFAULT 0"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE departments ADD COLUMN block_print_before_hod_check TINYINT DEFAULT 0"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE departments ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (Exception $e) {}
 
         $pdo->exec("

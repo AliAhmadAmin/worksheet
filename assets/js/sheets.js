@@ -205,6 +205,11 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
         AppState.currentSheet = data.sheet;
         AppState.currentEntries = data.entries || [];
         AppState.isLocked = data.is_locked;
+        AppState.departmentSettings = data.department_settings || {};
+        AppState.isHodChecked = data.is_hod_checked || 0;
+        AppState.hodCheckedByName = data.hod_checked_by_name || null;
+        AppState.hodCheckedAt = data.hod_checked_at || null;
+        AppState.canPrint = data.can_print;
 
         const deptId = (data.employee && data.employee.department_id) ? data.employee.department_id : (AppState.currentUser?.department_id || 2);
         if (data.columns && data.columns.length > 0) {
@@ -317,35 +322,94 @@ function renderWorksheetHero(sheet, empData, data = null) {
             selectedNameSpan.textContent = empData.name;
         }
 
-        // Update Admin Check-in / Check-out button states
+        // Update Admin Check-in / Check-out button states (Conditional & Single Source of Truth)
         const btnAdminCheckIn = document.getElementById('admin-btn-check-in');
         const btnAdminCheckOut = document.getElementById('admin-btn-check-out');
+        const adminAttendanceGroup = btnAdminCheckIn ? btnAdminCheckIn.closest('.admin-ctrl-attendance') : null;
 
-        if (btnAdminCheckIn) {
-            if (checkIn) {
-                btnAdminCheckIn.textContent = `🟢 In (${checkIn})`;
-                btnAdminCheckIn.title = `Employee checked in at ${checkIn}. Click to re-record or adjust.`;
-                btnAdminCheckIn.className = 'btn btn-success';
-            } else {
+        if (checkIn && checkOut) {
+            // Shift is completed: hide attendance punch buttons from top controls.
+            // In & Out times are displayed exclusively in the Shift Info Bar below.
+            if (btnAdminCheckIn) btnAdminCheckIn.style.display = 'none';
+            if (btnAdminCheckOut) btnAdminCheckOut.style.display = 'none';
+            if (adminAttendanceGroup) adminAttendanceGroup.style.display = 'none';
+        } else if (checkIn && !checkOut) {
+            // Shift in progress: hide Check In, show Check Out
+            if (adminAttendanceGroup) adminAttendanceGroup.style.display = 'inline-flex';
+            if (btnAdminCheckIn) btnAdminCheckIn.style.display = 'none';
+            if (btnAdminCheckOut) {
+                btnAdminCheckOut.style.display = 'inline-flex';
+                btnAdminCheckOut.textContent = '🔴 Check Out';
+                btnAdminCheckOut.title = 'Record Check-Out and lock sheet for this employee';
+                btnAdminCheckOut.className = 'btn btn-danger';
+            }
+        } else {
+            // Fresh day: not checked in -> show Check In, hide Check Out
+            if (adminAttendanceGroup) adminAttendanceGroup.style.display = 'inline-flex';
+            if (btnAdminCheckIn) {
+                btnAdminCheckIn.style.display = 'inline-flex';
                 btnAdminCheckIn.textContent = '🟢 Check In';
                 btnAdminCheckIn.title = 'Record Check-In for this employee';
                 btnAdminCheckIn.className = 'btn btn-success';
             }
+            if (btnAdminCheckOut) btnAdminCheckOut.style.display = 'none';
         }
 
-        if (btnAdminCheckOut) {
-            if (checkOut) {
-                btnAdminCheckOut.textContent = `🔴 Out (${checkOut})`;
-                btnAdminCheckOut.title = `Employee checked out at ${checkOut}. Click to re-record or adjust.`;
-                btnAdminCheckOut.className = 'btn btn-outline';
-            } else if (checkIn) {
-                btnAdminCheckOut.textContent = '🔴 Check Out';
-                btnAdminCheckOut.title = 'Record Check-Out and lock sheet for this employee';
-                btnAdminCheckOut.className = 'btn btn-danger';
+        // Update HOD Verification Button and Header Appearance in Inspector
+        const btnHodCheck = document.getElementById('admin-btn-hod-check');
+        const btnHodCheckText = document.getElementById('admin-btn-hod-check-text');
+        const verifiedHeaderBadge = document.getElementById('admin-verified-header-badge');
+        const inspectorSubtitle = document.getElementById('admin-inspector-subtitle');
+        const inspectorBox = document.getElementById('admin-inspector-box');
+
+        const isHodChecked = parseInt(sheet?.is_hod_checked || data?.is_hod_checked) === 1;
+        const deptSettings = data?.department_settings || {};
+        const requireCheck = parseInt(deptSettings.require_hod_sheet_check) === 1;
+        const checkerName = data?.hod_checked_by_name || 'HOD';
+        const checkedAt = data?.hod_checked_at || '';
+
+        if (btnHodCheck && btnHodCheckText) {
+            if (requireCheck || isHodChecked) {
+                btnHodCheck.style.display = 'inline-flex';
+                if (isHodChecked) {
+                    btnHodCheck.className = 'btn btn-outline';
+                    btnHodCheck.style.borderColor = '#10b981';
+                    btnHodCheck.style.color = '#10b981';
+                    btnHodCheck.innerHTML = '<span>↩️</span> <span id="admin-btn-hod-check-text">Reopen Review</span>';
+                    btnHodCheck.title = `Worksheet verified by ${checkerName} on ${checkedAt}. Click to reopen review.`;
+                } else {
+                    btnHodCheck.className = 'btn btn-success';
+                    btnHodCheck.style.borderColor = '';
+                    btnHodCheck.style.color = '';
+                    btnHodCheck.innerHTML = '<span>✅</span> <span id="admin-btn-hod-check-text">Mark Checked</span>';
+                    btnHodCheck.title = 'Review entries and mark sheet as Checked & Verified by HOD';
+                }
             } else {
-                btnAdminCheckOut.textContent = '🔴 Check Out';
-                btnAdminCheckOut.title = 'Record Check-Out for this employee';
-                btnAdminCheckOut.className = 'btn btn-outline';
+                btnHodCheck.style.display = 'none';
+            }
+        }
+
+        // Visual header confirmation when marked checked
+        if (isHodChecked) {
+            if (verifiedHeaderBadge) {
+                verifiedHeaderBadge.style.display = 'inline-flex';
+                verifiedHeaderBadge.title = `Verified by ${checkerName} on ${checkedAt}`;
+            }
+            if (inspectorSubtitle) {
+                inspectorSubtitle.innerHTML = `🛡️ <strong style="color: #10b981;">Verified & Approved</strong> by ${escapeHtml(checkerName)}${checkedAt ? ` on ${escapeHtml(checkedAt)}` : ''}. Ready for printing with official seal.`;
+            }
+            if (inspectorBox) {
+                inspectorBox.classList.add('is-verified');
+            }
+        } else {
+            if (verifiedHeaderBadge) {
+                verifiedHeaderBadge.style.display = 'none';
+            }
+            if (inspectorSubtitle) {
+                inspectorSubtitle.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
+            }
+            if (inspectorBox) {
+                inspectorBox.classList.remove('is-verified');
             }
         }
 
@@ -355,6 +419,8 @@ function renderWorksheetHero(sheet, empData, data = null) {
         const checkOutTimeEl = document.getElementById('hero-checkout-time');
         const btnCheckIn = document.getElementById('btn-check-in');
         const btnCheckOut = document.getElementById('btn-check-out');
+        const btnSelfHoliday = document.getElementById('btn-self-holiday');
+        const completedChip = document.getElementById('hero-shift-completed-chip');
         const nextDayBanner = document.getElementById('hero-next-day-bar');
         const shiftDateLabel = document.getElementById('hero-shift-date-label');
 
@@ -367,6 +433,45 @@ function renderWorksheetHero(sheet, empData, data = null) {
 
         if (checkInTimeEl) checkInTimeEl.textContent = checkIn || '--:--';
         if (checkOutTimeEl) checkOutTimeEl.textContent = checkOut || '--:--';
+
+        // Update Employee HOD Verification Badge & Print Button State
+        const empHodBadge = document.getElementById('employee-hod-check-badge');
+        const empPrintBtn = document.getElementById('btn-employee-print-sheet');
+
+        const isHodChecked = parseInt(sheet?.is_hod_checked || data?.is_hod_checked) === 1;
+        const deptSettings = data?.department_settings || {};
+        const requireCheck = parseInt(deptSettings.require_hod_sheet_check) === 1;
+        const blockPrint = parseInt(deptSettings.block_print_before_hod_check) === 1;
+
+        if (empHodBadge) {
+            if (isHodChecked) {
+                empHodBadge.style.display = 'inline-block';
+                empHodBadge.className = 'badge badge-hod-checked';
+                empHodBadge.textContent = `✓ HOD Verified`;
+                empHodBadge.title = `Verified by ${data?.hod_checked_by_name || 'HOD'} on ${data?.hod_checked_at || ''}`;
+            } else if (requireCheck) {
+                empHodBadge.style.display = 'inline-block';
+                empHodBadge.className = 'badge badge-hod-pending';
+                empHodBadge.textContent = '⏳ Awaiting HOD';
+                empHodBadge.title = 'Awaiting review and verification by Head of Department';
+            } else {
+                empHodBadge.style.display = 'none';
+            }
+        }
+
+        if (empPrintBtn) {
+            if (blockPrint && !isHodChecked) {
+                empPrintBtn.innerHTML = '🔒 Print Sheet';
+                empPrintBtn.className = 'btn btn-outline';
+                empPrintBtn.style.opacity = '0.85';
+                empPrintBtn.title = 'Print Restricted: Your worksheet must be verified and marked checked by your HOD before printing.';
+            } else {
+                empPrintBtn.innerHTML = '🖨️ Print Sheet';
+                empPrintBtn.className = 'btn btn-primary';
+                empPrintBtn.style.opacity = '1';
+                empPrintBtn.title = 'Print official hourly worksheet';
+            }
+        }
 
         // Scheduled Shift from Duty Roster (Informational only: timer starts ONLY upon actual check-in)
         const schedShift = data?.scheduled_shift || null;
@@ -399,70 +504,94 @@ function renderWorksheetHero(sheet, empData, data = null) {
             stopLiveTimer();
             if (timerElem) timerElem.textContent = '0:00:00';
             if (btnCheckIn) {
+                btnCheckIn.style.display = 'none';
                 btnCheckIn.disabled = true;
                 btnCheckIn.title = "Live check-in is not allowed for future dates.";
             }
             if (btnCheckOut) {
+                btnCheckOut.style.display = 'none';
                 btnCheckOut.disabled = true;
                 btnCheckOut.title = "";
             }
+            if (btnSelfHoliday) btnSelfHoliday.style.display = 'none';
+            if (completedChip) completedChip.style.display = 'none';
             if (nextDayBanner) nextDayBanner.style.display = 'none';
         } else if (isPast && !isOvernightActive && !isAdmin) {
             // Past dates with completed shift: show completed duty time
             stopLiveTimer();
             if (timerElem) timerElem.textContent = sheet ? (sheet.total_duty_hours || '0:00:00') : '0:00:00';
             if (btnCheckIn) {
+                btnCheckIn.style.display = 'none';
                 btnCheckIn.disabled = true;
                 btnCheckIn.title = "Past date live check-in is closed.";
             }
             if (btnCheckOut) {
+                btnCheckOut.style.display = 'none';
                 btnCheckOut.disabled = true;
                 btnCheckOut.title = "";
+            }
+            if (btnSelfHoliday) btnSelfHoliday.style.display = 'none';
+            if (checkIn && checkOut) {
+                if (completedChip) completedChip.style.display = 'inline-flex';
+            } else {
+                if (completedChip) completedChip.style.display = 'none';
             }
             if (nextDayBanner) nextDayBanner.style.display = 'none';
         } else {
             // Today OR Active Overnight Shift from yesterday (or Admin override)
             if (checkIn && !checkOut) {
-                // Active duty (Today or Overnight Shift from yesterday)
+                // Active duty: user checked in -> Check-in disappears, Check-out comes!
                 const inDate = parseDateTime(AppState.selectedDate, checkIn);
                 const now = new Date();
                 const diffSecs = (inDate && !isNaN(inDate.getTime())) ? Math.max(0, Math.floor((now - inDate) / 1000)) : 0;
                 startLiveTimer(diffSecs, checkIn, AppState.selectedDate);
 
                 if (btnCheckIn) {
+                    btnCheckIn.style.display = 'none';
                     btnCheckIn.disabled = true;
                     btnCheckIn.title = isPast ? "Active Night Shift in progress." : "Currently active on duty.";
                 }
                 if (btnCheckOut) {
+                    btnCheckOut.style.display = 'inline-flex';
                     btnCheckOut.disabled = false;
                     btnCheckOut.title = isPast ? "Click to finish your night shift and lock sheet" : "Click to finish shift and submit sheet";
                 }
+                if (btnSelfHoliday) btnSelfHoliday.style.display = 'none';
+                if (completedChip) completedChip.style.display = 'none';
                 if (nextDayBanner) nextDayBanner.style.display = 'none';
             } else if (checkIn && checkOut) {
-                // Completed duty
+                // Completed duty: after checkout, both Check-In and Check-Out disappear!
                 stopLiveTimer();
                 if (timerElem) timerElem.textContent = sheet.total_duty_hours || '0:00:00';
 
                 if (btnCheckIn) {
+                    btnCheckIn.style.display = 'none';
                     btnCheckIn.disabled = true;
                     btnCheckIn.title = "Shift completed.";
                 }
                 if (btnCheckOut) {
+                    btnCheckOut.style.display = 'none';
                     btnCheckOut.disabled = true;
                 }
-                if (nextDayBanner) nextDayBanner.style.display = 'flex';
+                if (btnSelfHoliday) btnSelfHoliday.style.display = 'none';
+                if (completedChip) completedChip.style.display = 'inline-flex';
+                if (nextDayBanner) nextDayBanner.style.display = isToday ? 'flex' : 'none';
             } else {
-                // Fresh day today: Ready to check in
+                // Fresh day today: user did not check in -> Check-in button shows, Check-out disappears!
                 stopLiveTimer();
                 if (timerElem) timerElem.textContent = '0:00:00';
 
                 if (btnCheckIn) {
+                    btnCheckIn.style.display = 'inline-flex';
                     btnCheckIn.disabled = false;
                     btnCheckIn.title = "Click to Check In for today";
                 }
                 if (btnCheckOut) {
+                    btnCheckOut.style.display = 'none';
                     btnCheckOut.disabled = true;
                 }
+                if (btnSelfHoliday) btnSelfHoliday.style.display = 'inline-flex';
+                if (completedChip) completedChip.style.display = 'none';
                 if (nextDayBanner) nextDayBanner.style.display = 'none';
             }
         }
@@ -474,7 +603,7 @@ function updateLockBadge(isLocked, canEdit) {
     const empLockBadge = document.getElementById('employee-sheet-lock-badge');
     const adminLockCtrl = document.getElementById('admin-unlock-btn');
 
-    const badgeText = isLocked ? '🔒 Locked (Checked Out)' : '🔓 Active / Unlocked';
+    const badgeText = isLocked ? '🔒 Locked' : '🔓 Active';
     const badgeClass = isLocked ? 'badge-lock locked' : 'badge-lock unlocked';
 
     const allowedCols = (AppState.worksheetColumns || []).filter(c => c.is_visible && (c.editable_after_lock === 1 || c.editable_after_lock === '1')).map(c => c.column_label);
@@ -1046,7 +1175,7 @@ async function handleCheckOut() {
         title: "Confirm Duty Shift Check-Out",
         message: "Are you sure you want to check out now?",
         detail: "<strong>Notice:</strong> Your duty hours and logged entries will be finalized for this shift, and the worksheet will be <strong>LOCKED</strong>.",
-        confirmText: "Check Out & Lock",
+        confirmText: "Check Out",
         cancelText: "Keep Working",
         type: "danger",
         icon: "⏱️"
@@ -1158,7 +1287,7 @@ async function handleAdminCheckOut() {
         title: "Confirm Admin Check-Out",
         message: `Check out ${empName} for ${date} at ${nowTime}?`,
         detail: "This will calculate total duty hours and lock the worksheet for this shift.",
-        confirmText: "Check Out & Lock",
+        confirmText: "Check Out",
         cancelText: "Cancel",
         type: "danger",
         icon: "⏱️"
@@ -1501,6 +1630,33 @@ let isPrintingSheet = false;
 
 function triggerPrintSheet() {
     if (isPrintingSheet) return;
+
+    // Check if department enforces HOD check before printing
+    const isAdminOrHod = AppState.currentUser && (
+        AppState.currentUser.role === 'admin' || 
+        AppState.currentUser.role === 'super_admin' || 
+        AppState.currentUser.role === 'hod' || 
+        hasPermission('can_inspect_sheets')
+    );
+    const isHodChecked = parseInt(AppState.currentSheet?.is_hod_checked) === 1;
+    const blockPrint = parseInt(AppState.departmentSettings?.block_print_before_hod_check) === 1;
+
+    if (!isAdminOrHod && blockPrint && !isHodChecked) {
+        showToast("⚠️ Sheet must be checked by your HOD before printing.", "error");
+        if (typeof openConfirmDialog === 'function') {
+            openConfirmDialog({
+                title: 'HOD Verification Required',
+                message: 'Your department has enabled pre-print verification.\n\nPlease request your Head of Department (HOD) to inspect and mark your worksheet as "Checked" on the system. Once marked, your sheet will automatically be enabled for printing with the digital verification seal.',
+                icon: '🔒',
+                confirmText: 'Understood',
+                confirmClass: 'btn-primary',
+                showCancel: false,
+                onConfirm: () => {}
+            });
+        }
+        return;
+    }
+
     isPrintingSheet = true;
     setTimeout(() => { isPrintingSheet = false; }, 2000);
 
@@ -1536,6 +1692,44 @@ function triggerPrintSheet() {
 
     document.body.appendChild(printIframe);
     printIframe.src = printUrl;
+}
+
+async function handleToggleHodCheckSheet() {
+    const empId = getActiveWorksheetEmpId();
+    const date = AppState.selectedDate;
+    const sheetId = AppState.currentSheet?.id || 0;
+    const currentChecked = parseInt(AppState.currentSheet?.is_hod_checked || 0) === 1;
+    const nextState = currentChecked ? 0 : 1;
+
+    const btn = document.getElementById('admin-btn-hod-check');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('api/sheets.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'toggle_hod_check',
+                sheet_id: sheetId,
+                employee_id: empId,
+                date: date,
+                is_checked: nextState
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message, 'success');
+            await loadDailyWorksheet(false);
+        } else {
+            showToast(data.message || 'Failed to update check status', 'error');
+        }
+    } catch (err) {
+        console.error('Error toggling HOD check:', err);
+        showToast('Error communicating with server.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 
 function escapeHtml(str) {
@@ -1598,6 +1792,7 @@ function renderHolidayView(data) {
 
         // Update button text
         if (btnSelfHoliday) {
+            btnSelfHoliday.style.display = 'inline-flex';
             btnSelfHoliday.innerHTML = '↩️ Work Day';
             btnSelfHoliday.className = 'btn btn-outline';
             btnSelfHoliday.title = 'Switch back to regular working day';
@@ -1607,6 +1802,12 @@ function renderHolidayView(data) {
             btnAdminHoliday.className = 'btn btn-outline';
             btnAdminHoliday.title = 'Switch back to regular working day';
         }
+        const heroCheckIn = document.getElementById('btn-check-in');
+        const heroCheckOut = document.getElementById('btn-check-out');
+        const heroCompleted = document.getElementById('hero-shift-completed-chip');
+        if (heroCheckIn) heroCheckIn.style.display = 'none';
+        if (heroCheckOut) heroCheckOut.style.display = 'none';
+        if (heroCompleted) heroCompleted.style.display = 'none';
     } else if (approvedLeave) {
         // Approved Official HR Leave (Sick, Casual, Annual)
         holidayCard.style.display = 'block';
@@ -1627,6 +1828,7 @@ function renderHolidayView(data) {
         }
 
         if (btnSelfHoliday) {
+            btnSelfHoliday.style.display = 'inline-flex';
             btnSelfHoliday.innerHTML = '🏖️ On Leave';
             btnSelfHoliday.disabled = true;
         }
@@ -1634,6 +1836,12 @@ function renderHolidayView(data) {
             btnAdminHoliday.innerHTML = '🏖️ On Leave';
             btnAdminHoliday.disabled = true;
         }
+        const heroCheckIn = document.getElementById('btn-check-in');
+        const heroCheckOut = document.getElementById('btn-check-out');
+        const heroCompleted = document.getElementById('hero-shift-completed-chip');
+        if (heroCheckIn) heroCheckIn.style.display = 'none';
+        if (heroCheckOut) heroCheckOut.style.display = 'none';
+        if (heroCompleted) heroCompleted.style.display = 'none';
     } else {
         // Normal Working Day
         holidayCard.style.display = 'none';

@@ -1574,13 +1574,15 @@ function switchTrackingModalTab(tabKey) {
     const btnCols = document.getElementById('tab-btn-worksheet-cols');
     const btnTypes = document.getElementById('tab-btn-content-types');
     const btnDepts = document.getElementById('tab-btn-tracking-depts');
+    const btnHodSettings = document.getElementById('tab-btn-hod-settings');
 
     const secCols = document.getElementById('tracking-tab-section-cols');
     const secTypes = document.getElementById('tracking-tab-section-content-types');
     const secDepts = document.getElementById('tracking-tab-section-tracking-depts');
+    const secHodSettings = document.getElementById('tracking-tab-section-hod-settings');
 
     // Reset button states
-    [btnCols, btnTypes, btnDepts].forEach(b => {
+    [btnCols, btnTypes, btnDepts, btnHodSettings].forEach(b => {
         if (b) {
             b.className = 'btn btn-outline tracking-modal-tab-btn';
             b.style.fontWeight = '600';
@@ -1591,6 +1593,7 @@ function switchTrackingModalTab(tabKey) {
     if (secCols) secCols.style.display = 'none';
     if (secTypes) secTypes.style.display = 'none';
     if (secDepts) secDepts.style.display = 'none';
+    if (secHodSettings) secHodSettings.style.display = 'none';
 
     if (tabKey === 'cols') {
         if (btnCols) { btnCols.className = 'btn btn-primary tracking-modal-tab-btn'; btnCols.style.fontWeight = '700'; }
@@ -1604,6 +1607,10 @@ function switchTrackingModalTab(tabKey) {
         if (btnDepts) { btnDepts.className = 'btn btn-primary tracking-modal-tab-btn'; btnDepts.style.fontWeight = '700'; }
         if (secDepts) secDepts.style.display = 'flex';
         loadTrackingOptionsModalData(currentTrackingModalDeptId);
+    } else if (tabKey === 'hod_settings') {
+        if (btnHodSettings) { btnHodSettings.className = 'btn btn-primary tracking-modal-tab-btn'; btnHodSettings.style.fontWeight = '700'; }
+        if (secHodSettings) secHodSettings.style.display = 'flex';
+        loadHodSettingsModalData(currentTrackingModalDeptId);
     }
 }
 
@@ -1618,6 +1625,79 @@ async function handleTrackingDeptSwitch(deptId) {
     currentTrackingModalDeptId = parseInt(deptId) || 2;
     await loadWorksheetColumnsModalData(currentTrackingModalDeptId);
     await loadTrackingOptionsModalData(currentTrackingModalDeptId);
+    await loadHodSettingsModalData(currentTrackingModalDeptId);
+}
+
+async function loadHodSettingsModalData(deptId) {
+    const deptLabel = document.getElementById('hod-settings-dept-label');
+    const hodLabel = document.getElementById('hod-settings-assigned-hod');
+    const previewHodName = document.getElementById('preview-hod-name');
+    const chkRequire = document.getElementById('setting-require-hod-check');
+    const chkBlock = document.getElementById('setting-block-print-before-check');
+
+    try {
+        const res = await fetch(`api/tracking_options.php?action=get&department_id=${deptId}`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        if (deptLabel) deptLabel.textContent = data.department_name || 'Department';
+        const hodSettings = data.hod_settings || {};
+        const hodName = hodSettings.hod_name || 'HOD';
+
+        if (hodLabel) hodLabel.textContent = `HOD: ${hodName}`;
+        if (previewHodName) previewHodName.textContent = hodName;
+
+        if (chkRequire) chkRequire.checked = (parseInt(hodSettings.require_hod_sheet_check) === 1);
+        if (chkBlock) chkBlock.checked = (parseInt(hodSettings.block_print_before_hod_check) === 1);
+
+    } catch (err) {
+        console.error('Error loading HOD settings:', err);
+    }
+}
+
+function handleHodCheckSettingChange(chk) {
+    const chkBlock = document.getElementById('setting-block-print-before-check');
+    if (!chk.checked && chkBlock) {
+        chkBlock.checked = false;
+    }
+}
+
+async function saveHodVerificationSettings() {
+    const deptId = currentTrackingModalDeptId || (AppState.currentUser?.department_id || 2);
+    const chkRequire = document.getElementById('setting-require-hod-check');
+    const chkBlock = document.getElementById('setting-block-print-before-check');
+
+    const requireCheck = chkRequire && chkRequire.checked ? 1 : 0;
+    const blockPrint = chkBlock && chkBlock.checked ? 1 : 0;
+
+    try {
+        const res = await fetch('api/tracking_options.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'save_hod_settings',
+                department_id: deptId,
+                require_hod_sheet_check: requireCheck,
+                block_print_before_hod_check: blockPrint
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast('Department verification & print rules saved successfully!', 'success');
+            // Refresh active sheet so any print block / badges update immediately
+            if (typeof loadSheetData === 'function') {
+                const curEmpId = getActiveWorksheetEmpId();
+                const curDate = AppState.selectedDate;
+                loadSheetData(curEmpId, curDate);
+            }
+        } else {
+            showToast(data.message || 'Failed to save settings', 'error');
+        }
+    } catch (err) {
+        console.error('Error saving HOD settings:', err);
+        showToast('Error communicating with server.', 'error');
+    }
 }
 
 // ---------------------------------------------------------------------

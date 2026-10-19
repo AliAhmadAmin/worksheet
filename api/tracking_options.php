@@ -99,8 +99,13 @@ switch ($action) {
         $stmtTD->execute([$deptId]);
         $trackingDepts = $stmtTD->fetchAll(PDO::FETCH_ASSOC);
 
-        // Fetch department metadata
-        $stmtDeptMeta = $pdo->prepare("SELECT id, name FROM departments WHERE id = ?");
+        // Fetch department metadata including HOD verification settings
+        $stmtDeptMeta = $pdo->prepare("
+            SELECT d.id, d.name, d.require_hod_sheet_check, d.block_print_before_hod_check, d.hod_id, e.name as hod_name 
+            FROM departments d
+            LEFT JOIN employees e ON d.hod_id = e.id
+            WHERE d.id = ?
+        ");
         $stmtDeptMeta->execute([$deptId]);
         $deptInfo = $stmtDeptMeta->fetch(PDO::FETCH_ASSOC) ?: ['id' => $deptId, 'name' => 'Department'];
 
@@ -112,7 +117,12 @@ switch ($action) {
             'department_name' => $deptInfo['name'],
             'can_manage' => $canManage,
             'content_types' => $contentTypes,
-            'tracking_departments' => $trackingDepts
+            'tracking_departments' => $trackingDepts,
+            'hod_settings' => [
+                'require_hod_sheet_check' => (int)($deptInfo['require_hod_sheet_check'] ?? 0),
+                'block_print_before_hod_check' => (int)($deptInfo['block_print_before_hod_check'] ?? 0),
+                'hod_name' => $deptInfo['hod_name'] ?: 'Not assigned'
+            ]
         ]);
         break;
 
@@ -291,6 +301,40 @@ switch ($action) {
         ensureDepartmentDefaults($pdo, $deptId, true);
 
         echo json_encode(['success' => true, 'message' => 'Reset to default tracking options successfully.']);
+        break;
+
+    case 'save_hod_settings':
+        $deptId = isset($data['department_id']) ? (int)$data['department_id'] : $userDeptId;
+        if ($deptId <= 0) $deptId = 2;
+
+        if (!$isSuperAdmin && !($isHod && in_array($deptId, $managedDeptIds))) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access denied: You can only configure settings for your own department.']);
+            exit;
+        }
+
+        $requireCheck = !empty($data['require_hod_sheet_check']) ? 1 : 0;
+        $blockPrint = !empty($data['block_print_before_hod_check']) ? 1 : 0;
+
+        // If block_print is 1, require_hod_sheet_check is automatically enabled
+        if ($blockPrint) {
+            $requireCheck = 1;
+        }
+
+        $stmtSave = $pdo->prepare("
+            UPDATE departments 
+            SET require_hod_sheet_check = ?, block_print_before_hod_check = ? 
+            WHERE id = ?
+        ");
+        $stmtSave->execute([$requireCheck, $blockPrint, $deptId]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'HOD verification & print rules updated successfully.',
+            'department_id' => $deptId,
+            'require_hod_sheet_check' => $requireCheck,
+            'block_print_before_hod_check' => $blockPrint
+        ]);
         break;
 
     default:

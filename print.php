@@ -38,9 +38,57 @@ if ($sheet) {
     $entries = $entriesStmt->fetchAll();
 }
 
-// Fetch dynamic columns for this department
+// Fetch dynamic columns and HOD verification policy for this department
 $empDeptId = (int)($employee['department_id'] ?? 2);
 if ($empDeptId <= 0) $empDeptId = 2;
+
+$deptStmt = $pdo->prepare("SELECT * FROM departments WHERE id = ?");
+$deptStmt->execute([$empDeptId]);
+$department = $deptStmt->fetch() ?: [];
+
+$blockPrintBeforeHodCheck = (int)($department['block_print_before_hod_check'] ?? 0);
+$isHodChecked = !empty($sheet['is_hod_checked']) ? 1 : 0;
+
+// Security check if printing is restricted for employees until checked
+$sessionUserId = $_SESSION['user_id'] ?? 0;
+$sessionUserRole = strtolower($_SESSION['role'] ?? 'employee');
+$isElevatedUser = in_array($sessionUserRole, ['super_admin', 'admin', 'hod']);
+
+if ($blockPrintBeforeHodCheck && !$isHodChecked && !$isElevatedUser && $sessionUserId == $empId) {
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Print Restricted - HOD Check Required</title>
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+    </head>
+    <body style="font-family: 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #f8fafc; margin: 0;">
+        <div style="background: white; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 36px 32px; max-width: 480px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.06);">
+            <div style="width: 58px; height: 58px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 16px;">🔒</div>
+            <h2 style="font-size: 19px; font-weight: 800; color: #0f172a; margin: 0 0 10px 0;">HOD Verification Required</h2>
+            <p style="font-size: 13.5px; color: #64748b; line-height: 1.55; margin: 0 0 22px 0;">
+                Your department requires worksheets to be inspected and marked as <strong>"Checked"</strong> by your Head of Department on the system before physical printing is enabled.
+            </p>
+            <button onclick="window.close()" style="background: #2563eb; color: white; border: none; padding: 9px 24px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">Close Window</button>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// Fetch HOD checker details
+$hodCheckerName = null;
+if ($isHodChecked && !empty($sheet['hod_checked_by'])) {
+    $hodStmt = $pdo->prepare("SELECT name, designation FROM employees WHERE id = ?");
+    $hodStmt->execute([(int)$sheet['hod_checked_by']]);
+    $hodData = $hodStmt->fetch();
+    if ($hodData) {
+        $hodCheckerName = $hodData['name'];
+    }
+}
+$hodCheckedFormatted = !empty($sheet['hod_checked_at']) ? date('d-M-Y h:i A', strtotime($sheet['hod_checked_at'])) : date('d-M-Y');
 
 $stmtCols = $pdo->prepare("
     SELECT column_key, column_label, column_type 
@@ -392,12 +440,22 @@ $emptyRowsNeeded = $entryCount < 8 ? (8 - $entryCount) : 0;
 
         /* Signatures Footer */
         .doc-footer {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
             margin-top: 4px;
             padding-top: 6px;
             page-break-inside: avoid;
+        }
+
+        .doc-footer.manual-mode {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .doc-footer.verified-mode {
+            display: flex;
+            justify-content: flex-end;
+            padding-right: 18px;
+            margin-top: 6px;
         }
 
         .sig-card {
@@ -425,6 +483,102 @@ $emptyRowsNeeded = $entryCount < 8 ? (8 - $entryCount) : 0;
         .sig-sub {
             font-size: 6.8pt;
             color: #64748b;
+        }
+
+        /* Professional Official Approval Stamp */
+        .official-approval-stamp {
+            display: inline-block;
+            border: 2.2px solid #047857;
+            border-radius: 6px;
+            padding: 3px;
+            background: #f0fdf4;
+            box-shadow: 0 0 0 1px #047857;
+            transform: rotate(-1.5deg);
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            page-break-inside: avoid;
+        }
+
+        .stamp-inner {
+            border: 1.2px dashed #047857;
+            border-radius: 4px;
+            padding: 4px 14px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5px;
+        }
+
+        .stamp-top-ribbon {
+            font-size: 5.8pt;
+            font-weight: 800;
+            color: #065f46;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stamp-star {
+            color: #059669;
+            font-size: 6pt;
+        }
+
+        .stamp-main-badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin: 1px 0;
+        }
+
+        .stamp-check {
+            font-size: 11pt;
+            line-height: 1;
+            font-weight: 900;
+            color: #047857;
+        }
+
+        .stamp-title {
+            font-size: 9.5pt;
+            font-weight: 900;
+            color: #047857;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            font-family: 'Arial Black', Impact, 'Segoe UI Black', sans-serif;
+            border-top: 1.5px solid #047857;
+            border-bottom: 1.5px solid #047857;
+            padding: 1px 6px;
+        }
+
+        .stamp-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 6.2pt;
+            color: #064e3b;
+            margin-top: 2px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+
+        .stamp-meta strong {
+            color: #047857;
+        }
+
+        .stamp-dot {
+            color: #059669;
+        }
+
+        .stamp-bottom-seal {
+            font-size: 5pt;
+            color: #059669;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            font-weight: 800;
+            margin-top: 1px;
         }
 
         @media print {
@@ -564,17 +718,39 @@ $emptyRowsNeeded = $entryCount < 8 ? (8 - $entryCount) : 0;
         </section>
 
         <!-- Corporate Authorization / Signatures Footer -->
-        <footer class="doc-footer">
-            <div class="sig-card">
-                <div class="sig-line-box"></div>
-                <span class="sig-title">Employee Signature & Date</span>
-                <span class="sig-sub"><?= htmlspecialchars($employee['name']) ?></span>
-            </div>
-            <div class="sig-card">
-                <div class="sig-line-box"></div>
-                <span class="sig-title">HOD / Supervisor Approval</span>
-                <span class="sig-sub"><?= htmlspecialchars($employee['department_name'] ?: 'Digital Media') ?> Department</span>
-            </div>
+        <footer class="doc-footer <?= $isHodChecked ? 'verified-mode' : 'manual-mode' ?>">
+            <?php if ($isHodChecked): ?>
+                <div class="official-approval-stamp">
+                    <div class="stamp-inner">
+                        <div class="stamp-top-ribbon">
+                            <span class="stamp-star">★</span>
+                            <span>DISCOVER PAKISTAN UHD TV</span>
+                            <span class="stamp-star">★</span>
+                        </div>
+                        <div class="stamp-main-badge">
+                            <span class="stamp-check">✓</span>
+                            <span class="stamp-title">DIGITALLY APPROVED</span>
+                        </div>
+                        <div class="stamp-meta">
+                            <span><strong>BY:</strong> <?= strtoupper(htmlspecialchars($hodCheckerName ?: 'HEAD OF DEPARTMENT')) ?></span>
+                            <span class="stamp-dot">•</span>
+                            <span><strong>DATE:</strong> <?= htmlspecialchars($hodCheckedFormatted) ?></span>
+                        </div>
+                        <div class="stamp-bottom-seal">OFFICIAL HOD VERIFICATION SEAL</div>
+                    </div>
+                </div>
+            <?php else: ?>
+                <div class="sig-card">
+                    <div class="sig-line-box"></div>
+                    <span class="sig-title">Employee Signature & Date</span>
+                    <span class="sig-sub"><?= htmlspecialchars($employee['name']) ?></span>
+                </div>
+                <div class="sig-card">
+                    <div class="sig-line-box"></div>
+                    <span class="sig-title">HOD / Supervisor Approval</span>
+                    <span class="sig-sub"><?= htmlspecialchars($employee['department_name'] ?: 'Digital Media') ?> Department</span>
+                </div>
+            <?php endif; ?>
         </footer>
     </div>
 
