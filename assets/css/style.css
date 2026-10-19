@@ -2018,7 +2018,6 @@ body.sidebar-open .sidebar-backdrop {
     margin-top: 4px;
     transition: all 0.3s ease;
     position: relative;
-    overflow: hidden;
 }
 
 .admin-inspector-box.is-verified {
@@ -2035,6 +2034,7 @@ body.sidebar-open .sidebar-backdrop {
     width: 100%;
     height: 3.5px;
     background: linear-gradient(90deg, #10b981, #059669, #34d399);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
 .admin-inspector-box.is-verified .admin-inspector-meta-bar {
