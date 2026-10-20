@@ -1453,10 +1453,10 @@
 
 <!-- Modal A: Issue Show Cause Notice Modal -->
 <div id="hr-issue-showcause-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 540px;">
+    <div class="modal-card" style="max-width: 560px;">
         <div class="modal-header">
-            <h3 class="modal-title">📜 Issue Formal Show Cause Notice</h3>
-            <button type="button" class="modal-close" onclick="closeModal('hr-issue-showcause-modal')">&times;</button>
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">📜 Issue Formal Show Cause Notice</h3>
+            <button type="button" class="btn-modal-close" onclick="closeModal('hr-issue-showcause-modal')">&times;</button>
         </div>
         <form id="hr-issue-showcause-form" onsubmit="handleIssueShowCauseSubmit(event)">
             <div class="modal-body">
@@ -1504,6 +1504,7 @@
                 <div class="form-group" style="margin-bottom: 14px;">
                     <label class="form-label">Allegation & Incident Details (Fact Finding)</label>
                     <textarea id="hr-sc-form-details" class="input-control" rows="4" placeholder="Detail the specific incident, negligence, time of breach, or failure to perform duties. Ask the employee to submit their written justification before the deadline..." style="width: 100%; resize: vertical;" required></textarea>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">💡 Spaces, line breaks, and paragraphs are preserved. Use <b>**bold text**</b> for emphasis.</div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1516,10 +1517,10 @@
 
 <!-- Modal B: Submit Employee Response / Explanation Modal -->
 <div id="hr-reply-showcause-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 560px;">
+    <div class="modal-card" style="max-width: 580px;">
         <div class="modal-header">
-            <h3 class="modal-title">✍️ Submit Response to Show Cause Notice</h3>
-            <button type="button" class="modal-close" onclick="closeModal('hr-reply-showcause-modal')">&times;</button>
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">✍️ Submit Response to Show Cause Notice</h3>
+            <button type="button" class="btn-modal-close" onclick="closeModal('hr-reply-showcause-modal')">&times;</button>
         </div>
         <form id="hr-reply-showcause-form" onsubmit="handleSubmitShowCauseReply(event)">
             <input type="hidden" id="hr-reply-sc-notice-id" value="">
@@ -1531,7 +1532,8 @@
 
                 <div class="form-group" style="margin-bottom: 14px;">
                     <label class="form-label" style="font-weight: 700;">Employee Explanation / Justification *</label>
-                    <textarea id="hr-reply-sc-text" class="input-control" rows="5" placeholder="State your detailed clarification, circumstances, evidence, reasons for absence/delay, or defense..." style="width: 100%; resize: vertical;" required></textarea>
+                    <textarea id="hr-reply-sc-text" class="input-control" rows="6" placeholder="State your detailed clarification, circumstances, evidence, reasons for absence/delay, or defense..." style="width: 100%; resize: vertical;" required></textarea>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">💡 Spaces, line breaks, and paragraphs are preserved. Use <b>**bold text**</b> for emphasis.</div>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 14px;">
@@ -1550,10 +1552,10 @@
 
 <!-- Modal C: Review & Disciplinary Decision Modal -->
 <div id="hr-decide-showcause-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 580px;">
+    <div class="modal-card" style="max-width: 600px;">
         <div class="modal-header">
-            <h3 class="modal-title">⚖️ Review & Disciplinary Decision</h3>
-            <button type="button" class="modal-close" onclick="closeModal('hr-decide-showcause-modal')">&times;</button>
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">⚖️ Review & Disciplinary Decision</h3>
+            <button type="button" class="btn-modal-close" onclick="closeModal('hr-decide-showcause-modal')">&times;</button>
         </div>
         <form id="hr-decide-showcause-form" onsubmit="handleShowCauseDecisionSubmit(event)">
             <input type="hidden" id="hr-decide-sc-notice-id" value="">
@@ -1617,6 +1619,7 @@
                 <div class="form-group" style="margin-bottom: 14px;">
                     <label class="form-label">Official Decision Remarks / Findings</label>
                     <textarea id="hr-decide-sc-remarks" class="input-control" rows="3" placeholder="State management findings, verbal counseling, warning issued, or grounds for fine imposition..." style="width: 100%; resize: vertical;"></textarea>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 5px;">💡 Spaces, line breaks, and paragraphs are preserved. Use <b>**bold text**</b> for emphasis.</div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1631,12 +1634,12 @@
 
 <!-- Modal D: View Full Show Cause Inquiry Record -->
 <div id="hr-view-showcause-modal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 620px;">
+    <div class="modal-card modal-card-lg" style="max-width: 680px;">
         <div class="modal-header">
-            <h3 class="modal-title">📜 Show Cause Notice & Inquiry Record</h3>
-            <button type="button" class="modal-close" onclick="closeModal('hr-view-showcause-modal')">&times;</button>
+            <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">📜 Show Cause Notice & Inquiry Record</h3>
+            <button type="button" class="btn-modal-close" onclick="closeModal('hr-view-showcause-modal')">&times;</button>
         </div>
-        <div class="modal-body" id="hr-view-showcause-content" style="padding: 18px 20px;">
+        <div class="modal-body" id="hr-view-showcause-content" style="padding: 20px 22px;">
             <!-- Rendered Dynamically -->
         </div>
         <div class="modal-footer">

@@ -1037,12 +1037,18 @@ function openModal(id) {
     const m = document.getElementById(id);
     if (!m) return;
 
+    // Teleport modal to document.body so it is never trapped inside transformed or contained parent containers
+    if (m.parentElement !== document.body) {
+        document.body.appendChild(m);
+    }
+
     currentModalZIndex += 10;
     m.style.zIndex = currentModalZIndex;
     m.classList.add('active');
     if (!activeModalStack.includes(id)) {
         activeModalStack.push(id);
     }
+    document.body.classList.add('modal-open');
 }
 
 function closeModal(id) {
@@ -1056,6 +1062,7 @@ function closeModal(id) {
     }
     if (activeModalStack.length === 0) {
         currentModalZIndex = 10000;
+        document.body.classList.remove('modal-open');
     }
     setTimeout(() => {
         if (!m.classList.contains('active')) {

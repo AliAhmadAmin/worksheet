@@ -2148,6 +2148,19 @@ function resetShowCauseFilters() {
     loadHrShowCauseNotices();
 }
 
+function formatInquiryContent(text) {
+    if (!text) return '';
+    let str = String(text);
+    // Escape HTML first to prevent XSS
+    str = escapeHtml(str);
+    // Markdown bold: **bold** or __bold__
+    str = str.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight: 700; color: inherit;">$1</strong>');
+    str = str.replace(/__(.*?)__/g, '<strong style="font-weight: 700; color: inherit;">$1</strong>');
+    // Markdown italics: *italic* or _italic_
+    str = str.replace(/(^|[^\*])\*([^\*\n]+)\*([^\*]|$)/g, '$1<em>$2</em>$3');
+    return str;
+}
+
 function renderShowCauseTable(notices) {
     const tbody = document.getElementById('hr-sc-table-body');
     const countLabel = document.getElementById('hr-sc-count-label');
@@ -2207,21 +2220,21 @@ function renderShowCauseTable(notices) {
         let replyHtml = '';
         if (n.employee_reply) {
             replyHtml = `
-                <div style="font-size: 11.5px; color: var(--text-main); line-height: 1.35; max-height: 48px; overflow: hidden; text-overflow: ellipsis;">
-                    ${escapeHtml(n.employee_reply)}
+                <div style="font-size: 11.5px; color: var(--text-main); line-height: 1.45; white-space: pre-line; word-break: break-word; max-height: 56px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;" title="${escapeHtml(n.employee_reply)}">
+                    ${formatInquiryContent(n.employee_reply)}
                 </div>
             `;
             if (n.reply_attachment_path) {
                 replyHtml += `
-                    <div style="margin-top: 4px;">
-                        <a href="${escapeHtml(n.reply_attachment_path)}" target="_blank" download style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #2563eb; text-decoration: none; background: rgba(37, 99, 235, 0.08); padding: 2px 6px; border-radius: 4px;">
-                            📎 ${escapeHtml(n.reply_attachment_name || 'Proof Attachment')}
+                    <div style="margin-top: 5px;">
+                        <a href="${escapeHtml(n.reply_attachment_path)}" target="_blank" download style="display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #2563eb; text-decoration: none; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); padding: 2px 7px; border-radius: 4px;">
+                            📎 ${escapeHtml(n.reply_attachment_name || 'Proof Attached')}
                         </a>
                     </div>
                 `;
             }
         } else {
-            replyHtml = `<span style="color: #d97706; font-size: 11.5px; font-weight: 600;">⏳ Awaiting response</span>`;
+            replyHtml = `<span style="display: inline-flex; align-items: center; gap: 4px; color: #d97706; font-size: 11.5px; font-weight: 600; background: rgba(217, 119, 6, 0.08); padding: 2px 7px; border-radius: 4px;">⏳ Awaiting response</span>`;
         }
 
         // Deadline
@@ -2296,11 +2309,11 @@ function renderShowCauseTable(notices) {
                     </span>
                     <div style="font-size: 12px; font-weight: 700; color: var(--text-main); line-height: 1.3;">${escapeHtml(n.title)}</div>
                 </td>
-                <td>
-                    <div style="font-size: 12px; color: var(--text-main); line-height: 1.4; max-height: 54px; overflow: hidden; text-overflow: ellipsis;">
-                        ${escapeHtml(n.allegation_details)}
+                <td style="max-width: 280px; vertical-align: top;">
+                    <div style="font-size: 12px; color: var(--text-main); line-height: 1.45; white-space: pre-line; word-break: break-word; max-height: 56px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;" title="${escapeHtml(n.allegation_details)}">
+                        ${formatInquiryContent(n.allegation_details)}
                     </div>
-                    <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px;">Issued by ${escapeHtml(n.issued_by_name || 'HR')}</div>
+                    <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 4px;">Issued by <b>${escapeHtml(n.issued_by_name || 'HR')}</b></div>
                 </td>
                 <td>
                     ${deadlineHtml}
@@ -2425,8 +2438,9 @@ function openShowCauseReplyModal(noticeId) {
                     <span style="font-weight: 800; color: #dc2626;">Deadline: ${escapeHtml(notice.deadline_date || 'Open')}</span>
                 </div>
             </div>
-            <div style="font-size: 12px; color: var(--text-main); background: rgba(255,255,255,0.7); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(217, 119, 6, 0.2); line-height: 1.4;">
-                <b>Allegations:</b> ${escapeHtml(notice.allegation_details)}
+            <div style="font-size: 12.5px; color: var(--text-main); background: rgba(255,255,255,0.7); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(217, 119, 6, 0.25); border-left: 3px solid #d97706; line-height: 1.55; white-space: pre-wrap; word-break: break-word;">
+                <b style="color: #92400e;">Allegations & Charge:</b>
+                <div style="margin-top: 4px;">${formatInquiryContent(notice.allegation_details)}</div>
             </div>
         `;
     }
@@ -2513,14 +2527,16 @@ function openShowCauseDecideModal(noticeId) {
                     <b>Employee:</b> ${escapeHtml(notice.employee_name)} (${escapeHtml(notice.department_name || 'General')}) • <b>Incident Date:</b> ${escapeHtml(notice.incident_date)}
                 </div>
             </div>
-            <div style="font-size: 12px; color: var(--text-main); background: var(--bg-card); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; line-height: 1.4;">
-                <b style="color: #d97706;">Allegation:</b> ${escapeHtml(notice.allegation_details)}
+            <div style="font-size: 12px; color: var(--text-main); background: var(--bg-card); padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); border-left: 3px solid #d97706; margin-bottom: 10px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;">
+                <b style="color: #d97706;">Allegation:</b>
+                <div style="margin-top: 4px;">${formatInquiryContent(notice.allegation_details)}</div>
             </div>
-            <div style="font-size: 12px; color: var(--text-main); background: rgba(37, 99, 235, 0.05); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(37, 99, 235, 0.2); line-height: 1.4;">
-                <b style="color: #2563eb;">Employee Explanation:</b> ${escapeHtml(notice.employee_reply || 'No written explanation provided.')}
+            <div style="font-size: 12px; color: var(--text-main); background: rgba(37, 99, 235, 0.05); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(37, 99, 235, 0.2); border-left: 3px solid #2563eb; line-height: 1.55; white-space: pre-wrap; word-break: break-word;">
+                <b style="color: #2563eb;">Employee Explanation:</b>
+                <div style="margin-top: 4px;">${notice.employee_reply ? formatInquiryContent(notice.employee_reply) : '<i style="color: var(--text-muted);">No written explanation provided.</i>'}</div>
                 ${notice.reply_attachment_path ? `
-                    <div style="margin-top: 6px;">
-                        <a href="${escapeHtml(notice.reply_attachment_path)}" target="_blank" download style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #2563eb; text-decoration: none;">
+                    <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(37, 99, 235, 0.3);">
+                        <a href="${escapeHtml(notice.reply_attachment_path)}" target="_blank" download style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #2563eb; text-decoration: none;">
                             📎 View / Download Submitted Proof: ${escapeHtml(notice.reply_attachment_name || 'Attachment')}
                         </a>
                     </div>
@@ -2655,32 +2671,36 @@ function viewShowCauseDetails(noticeId) {
             </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 12px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 12.5px;">
             <div><b>Staff Member:</b> ${escapeHtml(notice.employee_name)}</div>
             <div><b>Department:</b> ${escapeHtml(notice.department_name || 'General')}</div>
             <div><b>Issued By:</b> ${escapeHtml(notice.issued_by_name || 'HR')}</div>
             <div><b>Explanation Deadline:</b> ${escapeHtml(notice.deadline_date || 'N/A')}</div>
         </div>
 
-        <div style="margin-bottom: 16px;">
-            <div style="font-size: 12px; font-weight: 800; color: #d97706; text-transform: uppercase; margin-bottom: 4px;">
-                ⚠️ Allegation & Charge Details
+        <div style="margin-bottom: 18px;">
+            <div style="font-size: 11.5px; font-weight: 800; color: #b45309; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                <span>⚠️</span>
+                <span>Allegation & Charge Details</span>
             </div>
-            <div style="padding: 12px; background: rgba(217, 119, 6, 0.06); border: 1px solid rgba(217, 119, 6, 0.2); border-radius: var(--radius-sm); font-size: 12.5px; line-height: 1.5; color: var(--text-main);">
-                ${escapeHtml(notice.allegation_details)}
+            <div style="padding: 14px 16px; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.25); border-left: 4px solid #f59e0b; border-radius: 8px; font-size: 13px; line-height: 1.65; color: var(--text-main); white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; font-family: inherit;">
+                ${formatInquiryContent(notice.allegation_details)}
             </div>
         </div>
 
-        <div style="margin-bottom: 16px;">
-            <div style="font-size: 12px; font-weight: 800; color: #2563eb; text-transform: uppercase; margin-bottom: 4px; display: flex; justify-content: space-between;">
-                <span>✍️ Employee Explanation & Defense</span>
+        <div style="margin-bottom: 18px;">
+            <div style="font-size: 11.5px; font-weight: 800; color: #1d4ed8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="display: flex; align-items: center; gap: 6px;">
+                    <span>✍️</span>
+                    <span>Employee Explanation & Defense</span>
+                </span>
                 <span style="font-weight: 600; font-size: 11px; text-transform: none; color: var(--text-muted);">${notice.reply_submitted_at ? 'Submitted: ' + escapeHtml(notice.reply_submitted_at) : ''}</span>
             </div>
-            <div style="padding: 12px; background: rgba(37, 99, 235, 0.06); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: var(--radius-sm); font-size: 12.5px; line-height: 1.5; color: var(--text-main);">
-                ${notice.employee_reply ? escapeHtml(notice.employee_reply) : '<i style="color: var(--text-muted);">No response submitted yet.</i>'}
+            <div style="padding: 14px 16px; background: rgba(37, 99, 235, 0.05); border: 1px solid rgba(37, 99, 235, 0.25); border-left: 4px solid #2563eb; border-radius: 8px; font-size: 13px; line-height: 1.65; color: var(--text-main); white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; font-family: inherit;">
+                ${notice.employee_reply ? formatInquiryContent(notice.employee_reply) : '<span style="color: var(--text-muted); font-style: italic;">No response submitted yet.</span>'}
                 ${notice.reply_attachment_path ? `
-                    <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(37, 99, 235, 0.3);">
-                        <a href="${escapeHtml(notice.reply_attachment_path)}" target="_blank" download style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #2563eb; text-decoration: none;">
+                    <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed rgba(37, 99, 235, 0.3);">
+                        <a href="${escapeHtml(notice.reply_attachment_path)}" target="_blank" download style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #2563eb; text-decoration: none; background: rgba(37, 99, 235, 0.08); border: 1px solid rgba(37, 99, 235, 0.2); padding: 5px 12px; border-radius: 6px;">
                             📎 Attached Verification Document: ${escapeHtml(notice.reply_attachment_name || 'Download Proof')}
                         </a>
                     </div>
@@ -2689,19 +2709,20 @@ function viewShowCauseDetails(noticeId) {
         </div>
 
         ${notice.decision_remarks || notice.action_at ? `
-            <div style="margin-bottom: 12px;">
-                <div style="font-size: 12px; font-weight: 800; color: ${notice.status === 'fine_issued' ? '#ef4444' : '#10b981'}; text-transform: uppercase; margin-bottom: 4px;">
-                    ⚖️ Inquiry Finding & Management Final Decision
+            <div style="margin-bottom: 16px;">
+                <div style="font-size: 11.5px; font-weight: 800; color: ${notice.status === 'fine_issued' ? '#dc2626' : '#059669'}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <span>⚖️</span>
+                    <span>Inquiry Finding & Management Final Decision</span>
                 </div>
-                <div style="padding: 12px; background: ${notice.status === 'fine_issued' ? 'rgba(239, 68, 68, 0.06)' : 'rgba(16, 185, 129, 0.06)'}; border: 1px solid ${notice.status === 'fine_issued' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)'}; border-radius: var(--radius-sm); font-size: 12.5px; line-height: 1.5; color: var(--text-main);">
-                    <div>${escapeHtml(notice.decision_remarks || 'Case reviewed and concluded.')}</div>
+                <div style="padding: 14px 16px; background: ${notice.status === 'fine_issued' ? 'rgba(239, 68, 68, 0.06)' : 'rgba(16, 185, 129, 0.06)'}; border: 1px solid ${notice.status === 'fine_issued' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(16, 185, 129, 0.25)'}; border-left: 4px solid ${notice.status === 'fine_issued' ? '#ef4444' : '#10b981'}; border-radius: 8px; font-size: 13px; line-height: 1.65; color: var(--text-main); white-space: pre-wrap; word-break: break-word; font-family: inherit;">
+                    <div>${formatInquiryContent(notice.decision_remarks || 'Case reviewed and concluded.')}</div>
                     ${notice.fine_amount ? `
-                        <div style="margin-top: 6px; font-weight: 800; color: #ef4444;">
+                        <div style="margin-top: 10px; padding: 8px 12px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; font-weight: 800; color: #dc2626; font-size: 12.5px;">
                             Deduction Applied: PKR ${Math.round(parseFloat(notice.fine_amount)).toLocaleString('en-US')} (Salary Month: ${escapeHtml(notice.fine_salary_month || 'N/A')})
                         </div>
                     ` : ''}
-                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
-                        Decided by ${escapeHtml(notice.action_by_name || 'Management')} on ${escapeHtml(notice.action_at || 'N/A')}
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+                        Decided by <b>${escapeHtml(notice.action_by_name || 'Management')}</b> on ${escapeHtml(notice.action_at || 'N/A')}
                     </div>
                 </div>
             </div>
@@ -2714,22 +2735,23 @@ function viewShowCauseDetails(noticeId) {
 function printShowCauseRecord() {
     const content = document.getElementById('hr-view-showcause-content');
     if (!content) return;
-    const printWindow = window.open('', '', 'width=800,height=600');
+    const printWindow = window.open('', '', 'width=850,height=750');
     printWindow.document.write(`
         <html>
             <head>
                 <title>Show Cause Inquiry Record</title>
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 25px; color: #1e293b; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; padding: 30px; color: #1e293b; line-height: 1.6; }
                     h4 { margin-top: 0; }
+                    div { word-break: break-word; }
                 </style>
             </head>
             <body>
-                <h2 style="margin-top:0; border-bottom: 2px solid #333; padding-bottom: 6px;">Internal Disciplinary Inquiry Summary</h2>
+                <h2 style="margin-top:0; border-bottom: 2px solid #333; padding-bottom: 8px;">Internal Disciplinary Inquiry Summary</h2>
                 ${content.innerHTML}
-                <div style="margin-top: 40px; display: flex; justify-content: space-between; font-size: 12px;">
-                    <div><b>Employee Signature:</b> ___________________</div>
-                    <div><b>HR / Authority Signature:</b> ___________________</div>
+                <div style="margin-top: 50px; display: flex; justify-content: space-between; font-size: 12px; page-break-inside: avoid;">
+                    <div><b>Employee Signature:</b> ___________________________</div>
+                    <div><b>HR / Authority Signature:</b> ___________________________</div>
                 </div>
             </body>
         </html>
