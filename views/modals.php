@@ -9,44 +9,12 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
             <div class="modal-header">
                 <div>
                     <h3 style="display: flex; align-items: center; gap: 8px;">🎯 Assign Task to Employee</h3>
-                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Assign tasks by Employee Code or Name with AI image auto-fill & WhatsApp dispatch.</p>
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Assign tasks directly to departmental staff with instant WhatsApp notification.</p>
                 </div>
                 <button type="button" class="btn-modal-close" onclick="closeModal('assign-task-modal')">✕</button>
             </div>
             <form id="assign-task-form" onsubmit="handleCreateTaskSubmit(event)">
                 <div class="modal-body" style="gap: 14px;">
-                    <!-- AI Image Scanner: Upload or Paste Screenshot (Ctrl+V) -->
-                    <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.08)); border: 1.5px dashed var(--primary); border-radius: var(--radius-md); padding: 10px 14px;">
-                        <div id="ai-task-scanner-dropzone" style="cursor: pointer;" onclick="document.getElementById('ai-task-image-file').click()">
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 20px;">📷</span>
-                                    <div>
-                                        <strong style="font-size: 13px; color: var(--primary);">AI Image Reader & Auto-Fill</strong>
-                                        <span style="font-size: 11px; color: var(--text-muted); display: block;">Paste screenshot (Ctrl+V) or click to upload. AI reads Windows path, employee code & instructions!</span>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; flex-shrink: 0;" onclick="event.stopPropagation(); document.getElementById('ai-task-image-file').click()">
-                                    📁 Browse
-                                </button>
-                            </div>
-                        </div>
-                        <input type="file" id="ai-task-image-file" accept="image/*" style="display: none;" onchange="handleTaskImageSelected(this)">
-                        <input type="hidden" id="ai-task-image-base64">
-
-                        <!-- Image Preview & Scan Action -->
-                        <div id="ai-task-image-preview-wrapper" style="display: none; margin-top: 10px; align-items: center; gap: 12px; background: var(--bg-card); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                            <img id="ai-task-image-preview" src="" style="width: 52px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);">
-                            <div style="flex: 1; min-width: 0;">
-                                <div id="ai-task-image-name" style="font-size: 12px; font-weight: 700; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Screenshot.png</div>
-                                <div id="ai-task-scan-status" style="font-size: 11px; color: var(--text-muted);">Ready to scan with AI</div>
-                            </div>
-                            <button type="button" class="btn btn-primary" id="ai-task-scan-btn" onclick="triggerAiTaskImageScan()" style="font-size: 11.5px; padding: 6px 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
-                                <span>✨</span> <span id="ai-task-scan-btn-text">Read with AI</span>
-                            </button>
-                            <button type="button" class="btn btn-outline" onclick="clearTaskImageScan()" style="font-size: 11px; padding: 4px 8px;" title="Remove image">✕</button>
-                        </div>
-                    </div>
 
                     <!-- Assign to Employee (Searchable with Avatar like Dashboard) -->
                     <div class="form-group">
@@ -683,6 +651,10 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                         👤 Staff Member
                                     </div>
                                 </div>
+                            </div>
+                            <div class="form-group" style="margin-top: 10px;">
+                                <label class="form-label">🔑 Set / Reset Password <small style="color: var(--text-muted); font-weight: 400;">(Leave blank to keep current password)</small></label>
+                                <input type="text" id="edit-emp-password" class="input-control" placeholder="Enter new password (optional)" autocomplete="new-password">
                             </div>
                         </div>
                     </div>

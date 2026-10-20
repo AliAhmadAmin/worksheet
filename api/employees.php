@@ -267,7 +267,7 @@ switch ($action) {
         break;
 
     case 'create_employee':
-        if (!$canManageEmp) {
+        if (!$canManageEmp && !$isHod) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
             exit;
@@ -493,7 +493,7 @@ switch ($action) {
         break;
 
     case 'update_employee':
-        if (!$canManageEmp) {
+        if (!$canManageEmp && !$isHod) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
             exit;
@@ -611,6 +611,13 @@ switch ($action) {
         } else {
             $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off) WHERE id = ?");
             $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $id]);
+        }
+
+        // Update password if specified
+        if (!empty($data['password'])) {
+            $newPwdHash = password_hash(trim($data['password']), PASSWORD_DEFAULT);
+            $stmtPwd = $pdo->prepare("UPDATE employees SET password_hash = ? WHERE id = ?");
+            $stmtPwd->execute([$newPwdHash, $id]);
         }
 
         // Auto-sync into active monthly duty roster
@@ -962,12 +969,6 @@ switch ($action) {
         break;
 
     case 'update_password':
-        if (!$isSuperAdmin) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Super Admin authorization required.']);
-            exit;
-        }
-
         $id = (int)($data['id'] ?? 0);
         $newPassword = trim($data['password'] ?? '');
 
@@ -975,6 +976,23 @@ switch ($action) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Employee ID and new password are required.']);
             exit;
+        }
+
+        if (!$isSuperAdmin && !$isHr) {
+            if (!$isHod) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Super Admin, HR, or HOD authorization required.']);
+                exit;
+            }
+            // If HOD, verify target employee belongs to HOD's managed departments
+            $stmtTarget = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $stmtTarget->execute([$id]);
+            $targetDeptId = (int)$stmtTarget->fetchColumn();
+            if (!$targetDeptId || !in_array($targetDeptId, $managedDeptIds, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: You can only update passwords for employees in your department.']);
+                exit;
+            }
         }
 
         $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);

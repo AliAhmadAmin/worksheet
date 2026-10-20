@@ -719,29 +719,41 @@
             </div>
 
             <!-- Disciplinary Summary Metrics -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 14px;">
-                <div style="padding: 12px 16px; background: rgba(217, 119, 6, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(217, 119, 6, 0.25);">
-                    <div style="font-size: 11px; font-weight: 800; color: #d97706; text-transform: uppercase;">📜 Show Cause Inquiries</div>
-                    <div id="hr-sc-stat-total" style="font-size: 19px; font-weight: 800; color: #d97706; margin-top: 2px;">0 Inquiries</div>
-                    <div id="hr-sc-stat-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">0 pending employee reply</div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 16px;">
+                <div style="padding: 14px 18px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.03) 100%); border-radius: var(--radius-md); border: 1px solid rgba(245, 158, 11, 0.28); box-shadow: 0 1px 3px rgba(0,0,0,0.03); transition: transform 0.2s ease, box-shadow 0.2s ease;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 11px; font-weight: 800; color: #d97706; text-transform: uppercase; letter-spacing: 0.5px;">Show Cause Inquiries</span>
+                        <span style="font-size: 16px;">📜</span>
+                    </div>
+                    <div id="hr-sc-stat-total" style="font-size: 22px; font-weight: 800; color: #b45309; margin-top: 4px; line-height: 1.2;">0 Inquiries</div>
+                    <div id="hr-sc-stat-sub" style="font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 500;">0 pending employee reply</div>
                 </div>
 
-                <div style="padding: 12px 16px; background: rgba(239, 68, 68, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(239, 68, 68, 0.2);">
-                    <div style="font-size: 11px; font-weight: 800; color: #ef4444; text-transform: uppercase;">🔴 Active Fine Deductions</div>
-                    <div id="hr-fines-total-applied-amount" style="font-size: 19px; font-weight: 800; color: #ef4444; margin-top: 2px;">PKR 0</div>
-                    <div id="hr-fines-total-applied-count" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">0 penalties applied to payroll</div>
+                <div style="padding: 14px 18px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(220, 38, 38, 0.03) 100%); border-radius: var(--radius-md); border: 1px solid rgba(239, 68, 68, 0.25); box-shadow: 0 1px 3px rgba(0,0,0,0.03); transition: transform 0.2s ease, box-shadow 0.2s ease;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 11px; font-weight: 800; color: #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">Active Fine Deductions</span>
+                        <span style="font-size: 16px;">🔴</span>
+                    </div>
+                    <div id="hr-fines-total-applied-amount" style="font-size: 22px; font-weight: 800; color: #dc2626; margin-top: 4px; line-height: 1.2;">PKR 0</div>
+                    <div id="hr-fines-total-applied-count" style="font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 500;">0 penalties applied to payroll</div>
                 </div>
 
-                <div style="padding: 12px 16px; background: rgba(16, 185, 129, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.2);">
-                    <div style="font-size: 11px; font-weight: 800; color: #10b981; text-transform: uppercase;">🟢 Waived / Cleared Cases</div>
-                    <div id="hr-fines-total-waived-amount" style="font-size: 19px; font-weight: 800; color: #10b981; margin-top: 2px;">PKR 0</div>
-                    <div id="hr-fines-total-waived-count" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">0 forgiven penalties</div>
+                <div style="padding: 14px 18px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.03) 100%); border-radius: var(--radius-md); border: 1px solid rgba(16, 185, 129, 0.25); box-shadow: 0 1px 3px rgba(0,0,0,0.03); transition: transform 0.2s ease, box-shadow 0.2s ease;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 11px; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.5px;">Waived / Cleared Cases</span>
+                        <span style="font-size: 16px;">🟢</span>
+                    </div>
+                    <div id="hr-fines-total-waived-amount" style="font-size: 22px; font-weight: 800; color: #059669; margin-top: 4px; line-height: 1.2;">PKR 0</div>
+                    <div id="hr-fines-total-waived-count" style="font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 500;">0 forgiven penalties</div>
                 </div>
 
-                <div style="padding: 12px 16px; background: rgba(59, 130, 246, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(59, 130, 246, 0.2);">
-                    <div style="font-size: 11px; font-weight: 800; color: #3b82f6; text-transform: uppercase;">📋 Total Disciplinary Actions</div>
-                    <div id="hr-fines-total-count" style="font-size: 19px; font-weight: 800; color: #3b82f6; margin-top: 2px;">0 Records</div>
-                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Logged incidents & inquiries</div>
+                <div style="padding: 14px 18px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(37, 99, 235, 0.03) 100%); border-radius: var(--radius-md); border: 1px solid rgba(59, 130, 246, 0.25); box-shadow: 0 1px 3px rgba(0,0,0,0.03); transition: transform 0.2s ease, box-shadow 0.2s ease;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 11px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px;">Total Disciplinary Actions</span>
+                        <span style="font-size: 16px;">📋</span>
+                    </div>
+                    <div id="hr-fines-total-count" style="font-size: 22px; font-weight: 800; color: #2563eb; margin-top: 4px; line-height: 1.2;">0 Records</div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; font-weight: 500;">Logged incidents & inquiries</div>
                 </div>
             </div>
         </div>
@@ -749,64 +761,55 @@
         <!-- Disciplinary Center Tabs Card -->
         <div class="worksheet-card">
             <!-- Sub-Navigation View Toggle -->
-            <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border-color); margin-bottom: 16px; padding-bottom: 0;">
-                <button type="button" id="hr-disc-tab-btn-showcause" class="btn" onclick="switchDisciplinarySubView('showcause')" style="font-weight: 800; font-size: 13px; border-radius: 8px 8px 0 0; padding: 10px 18px; border: none; background: #d97706; color: #ffffff; cursor: pointer; transition: all 0.2s;">
-                    📜 Show Cause Notices & Inquiries 
-                    <span id="hr-sc-pending-badge" style="margin-left: 6px; background: rgba(255,255,255,0.28); color: #fff; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 800;">0</span>
-                </button>
-                <button type="button" id="hr-disc-tab-btn-fines" class="btn" onclick="switchDisciplinarySubView('fines')" style="font-weight: 700; font-size: 13px; border-radius: 8px 8px 0 0; padding: 10px 18px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s;">
-                    ⚠️ Disciplinary Fines & Deductions 
-                    <span id="hr-fines-count-badge" style="margin-left: 6px; background: var(--bg-card-elevated); color: var(--text-muted); padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 800;">0</span>
-                </button>
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <div style="display: inline-flex; background: var(--bg-card-elevated); padding: 4px; border-radius: var(--radius-md); border: 1px solid var(--border-color); gap: 6px;">
+                    <button type="button" id="hr-disc-tab-btn-showcause" class="btn btn-primary" onclick="switchDisciplinarySubView('showcause')" style="font-weight: 700; font-size: 12.5px; border-radius: var(--radius-sm); padding: 7px 16px; border: none; background: #d97706; color: #ffffff; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 3px rgba(217, 119, 6, 0.3);">
+                        📜 Show Cause Notices & Inquiries 
+                        <span id="hr-sc-pending-badge" style="background: rgba(255,255,255,0.28); color: #fff; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 800;">0</span>
+                    </button>
+                    <button type="button" id="hr-disc-tab-btn-fines" class="btn btn-outline" onclick="switchDisciplinarySubView('fines')" style="font-weight: 600; font-size: 12.5px; border-radius: var(--radius-sm); padding: 7px 16px; border: 1px solid transparent; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;">
+                        ⚠️ Disciplinary Fines & Deductions 
+                        <span id="hr-fines-count-badge" style="background: rgba(0,0,0,0.06); color: var(--text-muted); padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 700;">0</span>
+                    </button>
+                </div>
             </div>
 
             <!-- SUBVIEW 1: SHOW CAUSE NOTICES & INQUIRIES -->
             <div id="hr-disc-view-showcause">
                 <!-- Unified Filter Toolbar for Show Cause Notices -->
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                    <!-- Search Box -->
-                    <div style="position: relative; flex: 1; min-width: 200px; max-width: 280px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <!-- Search Box (Flex-1 so it contracts gracefully when Reset button appears) -->
+                    <div style="position: relative; flex: 1 1 180px; min-width: 150px;">
                         <input type="text" id="hr-sc-search" class="input-control" placeholder="🔍 Search employee, notice, allegation..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyShowCauseClientFilters()">
                     </div>
 
-                    <!-- Dropdown Filter Pills -->
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                        <input type="month" id="hr-sc-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrShowCauseNotices()">
+                    <input type="month" id="hr-sc-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrShowCauseNotices()">
 
-                        <select id="hr-sc-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyShowCauseClientFilters()">
-                            <option value="">🏢 All Departments</option>
-                        </select>
+                    <select id="hr-sc-dept-filter" class="input-control" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyShowCauseClientFilters()">
+                        <option value="">🏢 All Departments</option>
+                    </select>
 
-                        <select id="hr-sc-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrShowCauseNotices()">
-                            <option value="all">All Inquiry Statuses</option>
-                            <option value="pending_reply" selected>⏳ Awaiting Employee Reply</option>
-                            <option value="under_review">🔍 Response Under Review</option>
-                            <option value="satisfied_closed">🟢 Explanation Accepted (No Fine)</option>
-                            <option value="fine_issued">🔴 Fine Imposed</option>
-                        </select>
+                    <select id="hr-sc-status-filter" class="input-control" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrShowCauseNotices()">
+                        <option value="all" selected>All Inquiry Statuses</option>
+                        <option value="pending_reply">⏳ Awaiting Employee Reply</option>
+                        <option value="under_review">🔍 Response Under Review</option>
+                        <option value="satisfied_closed">🟢 Explanation Accepted (No Fine)</option>
+                        <option value="fine_issued">🔴 Fine Imposed</option>
+                    </select>
 
-                        <select id="hr-sc-cat-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrShowCauseNotices()">
-                            <option value="all">⚠️ All Violations</option>
-                            <option value="late_arrival">⏱️ Late Arrival</option>
-                            <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
-                            <option value="sop_violation">⚠️ SOP / Policy Violation</option>
-                            <option value="negligence">⚠️ Negligence / Damage</option>
-                            <option value="misconduct">🛑 Misconduct</option>
-                            <option value="other">📝 Other Reason</option>
-                        </select>
+                    <select id="hr-sc-cat-filter" class="input-control" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrShowCauseNotices()">
+                        <option value="all">⚠️ All Violations</option>
+                        <option value="late_arrival">⏱️ Late Arrival</option>
+                        <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
+                        <option value="sop_violation">⚠️ SOP / Policy Violation</option>
+                        <option value="negligence">⚠️ Negligence / Damage</option>
+                        <option value="misconduct">🛑 Misconduct</option>
+                        <option value="other">📝 Other Reason</option>
+                    </select>
 
-                        <select id="hr-sc-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrShowCauseNotices()">
-                            <option value="">👤 All Employees</option>
-                        </select>
-
-                        <button type="button" id="hr-sc-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetShowCauseFilters()" title="Reset all filters">
-                            ↺ Reset
-                        </button>
-                        
-                        <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-sc-count-label">
-                            Showing 0 notice(s)
-                        </span>
-                    </div>
+                    <button type="button" id="hr-sc-reset-filters-btn" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted); white-space: nowrap; flex-shrink: 0;" onclick="resetShowCauseFilters()" title="Reset all filters">
+                        ↺ Reset
+                    </button>
                 </div>
 
                 <div class="table-responsive">
@@ -837,48 +840,37 @@
             <!-- SUBVIEW 2: DIRECT FINES & DEDUCTIONS -->
             <div id="hr-disc-view-fines" style="display: none;">
                 <!-- Unified Filter Toolbar for Fines -->
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                    <!-- Search Box -->
-                    <div style="position: relative; flex: 1; min-width: 200px; max-width: 280px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <!-- Search Box (Flex-1 so it contracts gracefully when Reset button appears) -->
+                    <div style="position: relative; flex: 1 1 180px; min-width: 150px;">
                         <input type="text" id="hr-fines-search" class="input-control" placeholder="🔍 Search employee, violation, reason..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyFinesClientFilters()">
                     </div>
 
-                    <!-- Dropdown Filter Pills -->
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                        <input type="month" id="hr-fines-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrFines()">
+                    <input type="month" id="hr-fines-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrFines()">
 
-                        <select id="hr-fines-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyFinesClientFilters()">
-                            <option value="">🏢 All Departments</option>
-                        </select>
+                    <select id="hr-fines-dept-filter" class="input-control" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyFinesClientFilters()">
+                        <option value="">🏢 All Departments</option>
+                    </select>
 
-                        <select id="hr-fines-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
-                            <option value="all">All Fine Statuses</option>
-                            <option value="applied" selected>🔴 Applied</option>
-                            <option value="waived">🟢 Waived</option>
-                        </select>
+                    <select id="hr-fines-status-filter" class="input-control" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
+                        <option value="all" selected>All Fine Statuses</option>
+                        <option value="applied">🔴 Applied</option>
+                        <option value="waived">🟢 Waived</option>
+                    </select>
 
-                        <select id="hr-fines-cat-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
-                            <option value="all">⚠️ All Violations</option>
-                            <option value="late_arrival">⏱️ Late Arrival</option>
-                            <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
-                            <option value="sop_violation">⚠️ SOP / Policy Violation</option>
-                            <option value="negligence">⚠️ Negligence / Damage</option>
-                            <option value="misconduct">🛑 Misconduct</option>
-                            <option value="other">📝 Other Reason</option>
-                        </select>
+                    <select id="hr-fines-cat-filter" class="input-control" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
+                        <option value="all">⚠️ All Violations</option>
+                        <option value="late_arrival">⏱️ Late Arrival</option>
+                        <option value="unauthorized_absence">🚫 Unauthorized Absence</option>
+                        <option value="sop_violation">⚠️ SOP / Policy Violation</option>
+                        <option value="negligence">⚠️ Negligence / Damage</option>
+                        <option value="misconduct">🛑 Misconduct</option>
+                        <option value="other">📝 Other Reason</option>
+                    </select>
 
-                        <select id="hr-fines-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrFines()">
-                            <option value="">👤 All Employees</option>
-                        </select>
-
-                        <button type="button" id="hr-fines-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetFinesFilters()" title="Reset all filters">
-                            ↺ Reset
-                        </button>
-                        
-                        <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-fines-count-label">
-                            Showing 0 record(s)
-                        </span>
-                    </div>
+                    <button type="button" id="hr-fines-reset-filters-btn" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted); white-space: nowrap; flex-shrink: 0;" onclick="resetFinesFilters()" title="Reset all filters">
+                        ↺ Reset
+                    </button>
                 </div>
 
                 <div class="table-responsive">

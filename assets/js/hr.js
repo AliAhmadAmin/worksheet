@@ -2031,10 +2031,12 @@ function switchDisciplinarySubView(view) {
         if (btnSc) {
             btnSc.style.background = 'transparent';
             btnSc.style.color = 'var(--text-muted)';
+            btnSc.style.boxShadow = 'none';
         }
         if (btnFines) {
             btnFines.style.background = 'var(--primary)';
             btnFines.style.color = '#ffffff';
+            btnFines.style.boxShadow = '0 1px 3px rgba(37, 99, 235, 0.3)';
         }
         loadHrFines();
     } else {
@@ -2044,10 +2046,12 @@ function switchDisciplinarySubView(view) {
         if (btnSc) {
             btnSc.style.background = '#d97706';
             btnSc.style.color = '#ffffff';
+            btnSc.style.boxShadow = '0 1px 3px rgba(217, 119, 6, 0.3)';
         }
         if (btnFines) {
             btnFines.style.background = 'transparent';
             btnFines.style.color = 'var(--text-muted)';
+            btnFines.style.boxShadow = 'none';
         }
         loadHrShowCauseNotices();
     }
@@ -2106,7 +2110,7 @@ function applyShowCauseClientFilters() {
     const currentMonth = new Date().toISOString().slice(0, 7);
     const resetBtn = document.getElementById('hr-sc-reset-filters-btn');
     if (resetBtn) {
-        const isFiltered = !!(search || dept || empId || status !== 'pending_reply' || cat !== 'all' || (month && month !== currentMonth));
+        const isFiltered = !!(search || dept || empId || status !== 'all' || cat !== 'all' || (month && month !== currentMonth));
         resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
     }
 

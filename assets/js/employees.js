@@ -1389,6 +1389,8 @@ function openEditEmployeeModal(empId) {
     document.getElementById('edit-emp-id').value = emp.id;
     document.getElementById('edit-emp-name').value = emp.name;
     document.getElementById('edit-emp-email').value = emp.email || '';
+    const pwdInput = document.getElementById('edit-emp-password');
+    if (pwdInput) pwdInput.value = '';
     let editRole = emp.role || 'employee';
     if (editRole === 'admin') editRole = 'super_admin';
 
@@ -1596,6 +1598,11 @@ async function handleEditEmployeeSubmit(e) {
             payload.bank_account_no = bankAccount;
             payload.fixed_allowance = fixedAllowance;
             payload.basic_salary = basicSalary;
+        }
+
+        const newPassword = document.getElementById('edit-emp-password')?.value.trim();
+        if (newPassword) {
+            payload.password = newPassword;
         }
 
         if (avatar) payload.avatar = avatar;
