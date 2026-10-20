@@ -53,14 +53,14 @@ function renderEmployeeViewControls() {
             </button>
         `;
     } else {
-        if (canManage || isHr) {
+        if (isSuperAdmin || isHr) {
             controls.innerHTML += `
                 <button type="button" class="btn btn-primary" onclick="openAddDepartmentModal()" style="background: #2563eb; border-color: #2563eb;">
                     🏢 Add Department
                 </button>
             `;
         }
-        if (canManage || isHr || isHod) {
+        if (isSuperAdmin || isHr || isHod) {
             controls.innerHTML += `
                 <button type="button" class="btn btn-outline" onclick="openAddTeamModal()" style="border-color: #10b981; color: #059669; font-weight: 700;">
                     👥 Add Team
@@ -382,12 +382,13 @@ function renderDepartmentsView() {
     const departments = AppState.departments || [];
 
     if (departments.length === 0) {
+        const canAddDept = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || AppState.currentUser.can_manage_hr);
         container.innerHTML = `
             <div style="grid-column: 1 / -1; text-align: center; padding: 40px; background: var(--bg-card-elevated); border-radius: var(--radius-md); border: 1px dashed var(--border-color);">
                 <div style="font-size: 32px; margin-bottom: 8px;">🏢</div>
                 <h4 style="margin: 0 0 6px 0; color: var(--text-main);">No Departments Created Yet</h4>
                 <p style="margin: 0 0 16px 0; font-size: 13px; color: var(--text-muted);">HR Managers and Super Admins can add organizational departments.</p>
-                <button type="button" class="btn btn-primary" onclick="openAddDepartmentModal()">➕ Create First Department</button>
+                ${canAddDept ? '<button type="button" class="btn btn-primary" onclick="openAddDepartmentModal()">➕ Create First Department</button>' : ''}
             </div>
         `;
         return;
@@ -701,26 +702,326 @@ async function assignEmployeeToTeam(empId, teamId, deptIdToRefresh) {
 // DEPARTMENT CRUD MODALS & HANDLERS
 // ==========================================
 
+// ==========================================
+// SEARCHABLE HOD DROPDOWNS (ADD & EDIT DEPT)
+// ==========================================
+
+function initAddDeptHodDropdown(selectedHodId = '') {
+    const hiddenInput = document.getElementById('add-dept-hod');
+    const labelSpan = document.getElementById('add-dept-hod-selected-name');
+    const avatarBox = document.getElementById('add-dept-hod-avatar');
+
+    if (hiddenInput) hiddenInput.value = selectedHodId || '';
+
+    const emp = (AppState.employees || []).find(e => e.id == selectedHodId);
+    if (labelSpan) {
+        labelSpan.textContent = emp ? `${emp.name} (${emp.designation || emp.department_name || 'Staff'})` : '-- No HOD Appointed Yet --';
+    }
+    if (avatarBox) {
+        if (emp) {
+            const initial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+            avatarBox.innerHTML = emp.avatar 
+                ? `<img src="${escapeHtml(emp.avatar)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<span>${escapeHtml(initial)}</span>';">`
+                : `<span>${escapeHtml(initial)}</span>`;
+        } else {
+            avatarBox.innerHTML = '👤';
+        }
+    }
+
+    renderAddDeptHodDropdownList(AppState.employees || []);
+}
+
+function renderAddDeptHodDropdownList(employees) {
+    const list = document.getElementById('add-dept-hod-dropdown-list');
+    if (!list) return;
+
+    list.innerHTML = '';
+    const currentVal = document.getElementById('add-dept-hod')?.value || '';
+
+    // Option 1: No HOD
+    const noneItem = document.createElement('div');
+    noneItem.className = `searchable-emp-item ${!currentVal ? 'selected' : ''}`;
+    noneItem.style.cssText = `padding: 8px 10px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 12.5px; transition: background 0.15s; ${!currentVal ? 'background: rgba(59, 130, 246, 0.12); font-weight: 700;' : ''}`;
+    noneItem.onclick = () => selectAddDeptHod('');
+    noneItem.innerHTML = `
+        <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-card-elevated); border: 1px dashed var(--border-color); color: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;">—</div>
+        <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <div style="color: var(--text-muted); font-style: italic;">-- No HOD Appointed Yet --</div>
+        </div>
+        ${!currentVal ? '<span style="color: var(--primary); font-size: 13px; font-weight: 800;">✓</span>' : ''}
+    `;
+    list.appendChild(noneItem);
+
+    if (!employees || employees.length === 0) {
+        list.innerHTML += '<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">No matching employee found</div>';
+        return;
+    }
+
+    employees.forEach(emp => {
+        const isSelected = currentVal == emp.id;
+        const item = document.createElement('div');
+        item.className = `searchable-emp-item ${isSelected ? 'selected' : ''}`;
+        item.style.cssText = `padding: 7px 10px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 12.5px; transition: background 0.15s; ${isSelected ? 'background: rgba(59, 130, 246, 0.12); font-weight: 700;' : ''}`;
+        item.onclick = () => selectAddDeptHod(emp.id);
+
+        const avatarInitial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+        const avatarHtml = emp.avatar 
+            ? `<img src="${escapeHtml(emp.avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:28px;height:28px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;\\'>${escapeHtml(avatarInitial)}</div>';">`
+            : `<div style="width: 28px; height: 28px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
+
+        item.innerHTML = `
+            ${avatarHtml}
+            <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <div style="color: var(--text-main); line-height: 1.25; font-weight: ${isSelected ? '700' : '600'};">${escapeHtml(emp.name)}</div>
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.designation || 'Staff')} • ${escapeHtml(emp.department_name || 'General')} ${emp.email ? '• ' + escapeHtml(emp.email) : ''}</div>
+            </div>
+            ${isSelected ? '<span style="color: var(--primary); font-size: 13px; font-weight: 800;">✓</span>' : ''}
+        `;
+        list.appendChild(item);
+    });
+}
+
+function filterAddDeptHodDropdown(query) {
+    const q = (query || '').trim().toLowerCase();
+    const list = AppState.employees || [];
+    if (!q) {
+        renderAddDeptHodDropdownList(list);
+        return;
+    }
+    const filtered = list.filter(emp => 
+        (emp.name && emp.name.toLowerCase().includes(q)) || 
+        (emp.email && emp.email.toLowerCase().includes(q)) ||
+        (emp.designation && emp.designation.toLowerCase().includes(q)) ||
+        (emp.department_name && emp.department_name.toLowerCase().includes(q)) ||
+        (emp.employee_code && emp.employee_code.toLowerCase().includes(q))
+    );
+    renderAddDeptHodDropdownList(filtered);
+}
+
+function toggleAddDeptHodDropdown() {
+    const menu = document.getElementById('add-dept-hod-dropdown-menu');
+    const input = document.getElementById('add-dept-hod-search-input');
+    if (!menu) return;
+
+    const isVisible = menu.style.display === 'block';
+    if (isVisible) {
+        menu.style.display = 'none';
+    } else {
+        menu.style.display = 'block';
+        if (input) {
+            input.value = '';
+            filterAddDeptHodDropdown('');
+            setTimeout(() => input.focus(), 60);
+        }
+    }
+}
+
+function selectAddDeptHod(empId) {
+    const menu = document.getElementById('add-dept-hod-dropdown-menu');
+    if (menu) menu.style.display = 'none';
+
+    const hiddenInput = document.getElementById('add-dept-hod');
+    if (hiddenInput) hiddenInput.value = empId;
+
+    const labelSpan = document.getElementById('add-dept-hod-selected-name');
+    const avatarBox = document.getElementById('add-dept-hod-avatar');
+    const emp = (AppState.employees || []).find(e => e.id == empId);
+
+    if (labelSpan) {
+        labelSpan.textContent = emp ? `${emp.name} (${emp.designation || emp.department_name || 'Staff'})` : '-- No HOD Appointed Yet --';
+    }
+    if (avatarBox) {
+        if (emp) {
+            const initial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+            avatarBox.innerHTML = emp.avatar 
+                ? `<img src="${escapeHtml(emp.avatar)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<span>${escapeHtml(initial)}</span>';">`
+                : `<span>${escapeHtml(initial)}</span>`;
+        } else {
+            avatarBox.innerHTML = '👤';
+        }
+    }
+
+    renderAddDeptHodDropdownList(AppState.employees || []);
+}
+
+function initEditDeptHodDropdown(selectedHodId = '') {
+    const hiddenInput = document.getElementById('edit-dept-hod');
+    const labelSpan = document.getElementById('edit-dept-hod-selected-name');
+    const avatarBox = document.getElementById('edit-dept-hod-avatar');
+
+    if (hiddenInput) hiddenInput.value = selectedHodId || '';
+
+    const emp = (AppState.employees || []).find(e => e.id == selectedHodId);
+    if (labelSpan) {
+        labelSpan.textContent = emp ? `${emp.name} (${emp.designation || emp.department_name || 'Staff'})` : '-- No HOD Appointed Yet --';
+    }
+    if (avatarBox) {
+        if (emp) {
+            const initial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+            avatarBox.innerHTML = emp.avatar 
+                ? `<img src="${escapeHtml(emp.avatar)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<span>${escapeHtml(initial)}</span>';">`
+                : `<span>${escapeHtml(initial)}</span>`;
+        } else {
+            avatarBox.innerHTML = '👤';
+        }
+    }
+
+    renderEditDeptHodDropdownList(AppState.employees || []);
+}
+
+function renderEditDeptHodDropdownList(employees) {
+    const list = document.getElementById('edit-dept-hod-dropdown-list');
+    if (!list) return;
+
+    list.innerHTML = '';
+    const currentVal = document.getElementById('edit-dept-hod')?.value || '';
+
+    // Default option: No HOD
+    const noneItem = document.createElement('div');
+    noneItem.className = `searchable-emp-item ${!currentVal ? 'selected' : ''}`;
+    noneItem.style.cssText = `padding: 8px 10px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 12.5px; transition: background 0.15s; ${!currentVal ? 'background: rgba(59, 130, 246, 0.12); font-weight: 700;' : ''}`;
+    noneItem.onclick = () => selectEditDeptHod('');
+    noneItem.innerHTML = `
+        <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-card-elevated); border: 1px dashed var(--border-color); color: var(--text-muted); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0;">—</div>
+        <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <div style="color: var(--text-muted); font-style: italic;">-- No HOD Appointed Yet --</div>
+        </div>
+        ${!currentVal ? '<span style="color: var(--primary); font-size: 13px; font-weight: 800;">✓</span>' : ''}
+    `;
+    list.appendChild(noneItem);
+
+    if (!employees || employees.length === 0) {
+        list.innerHTML += '<div style="padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px;">No matching employee found</div>';
+        return;
+    }
+
+    employees.forEach(emp => {
+        const isSelected = currentVal == emp.id;
+        const item = document.createElement('div');
+        item.className = `searchable-emp-item ${isSelected ? 'selected' : ''}`;
+        item.style.cssText = `padding: 7px 10px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 12.5px; transition: background 0.15s; ${isSelected ? 'background: rgba(59, 130, 246, 0.12); font-weight: 700;' : ''}`;
+        item.onclick = () => selectEditDeptHod(emp.id);
+
+        const avatarInitial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+        const avatarHtml = emp.avatar 
+            ? `<img src="${escapeHtml(emp.avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:28px;height:28px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;\\'>${escapeHtml(avatarInitial)}</div>';">`
+            : `<div style="width: 28px; height: 28px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
+
+        item.innerHTML = `
+            ${avatarHtml}
+            <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <div style="color: var(--text-main); line-height: 1.25; font-weight: ${isSelected ? '700' : '600'};">${escapeHtml(emp.name)}</div>
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.designation || 'Staff')} • ${escapeHtml(emp.department_name || 'General')} ${emp.email ? '• ' + escapeHtml(emp.email) : ''}</div>
+            </div>
+            ${isSelected ? '<span style="color: var(--primary); font-size: 13px; font-weight: 800;">✓</span>' : ''}
+        `;
+        list.appendChild(item);
+    });
+}
+
+function filterEditDeptHodDropdown(query) {
+    const q = (query || '').trim().toLowerCase();
+    const list = AppState.employees || [];
+    if (!q) {
+        renderEditDeptHodDropdownList(list);
+        return;
+    }
+    const filtered = list.filter(emp => 
+        (emp.name && emp.name.toLowerCase().includes(q)) || 
+        (emp.email && emp.email.toLowerCase().includes(q)) ||
+        (emp.designation && emp.designation.toLowerCase().includes(q)) ||
+        (emp.department_name && emp.department_name.toLowerCase().includes(q)) ||
+        (emp.employee_code && emp.employee_code.toLowerCase().includes(q))
+    );
+    renderEditDeptHodDropdownList(filtered);
+}
+
+function toggleEditDeptHodDropdown() {
+    const menu = document.getElementById('edit-dept-hod-dropdown-menu');
+    const input = document.getElementById('edit-dept-hod-search-input');
+    if (!menu) return;
+
+    const isVisible = menu.style.display === 'block';
+    if (isVisible) {
+        menu.style.display = 'none';
+    } else {
+        menu.style.display = 'block';
+        if (input) {
+            input.value = '';
+            filterEditDeptHodDropdown('');
+            setTimeout(() => input.focus(), 60);
+        }
+    }
+}
+
+function selectEditDeptHod(empId) {
+    const menu = document.getElementById('edit-dept-hod-dropdown-menu');
+    if (menu) menu.style.display = 'none';
+
+    const hiddenInput = document.getElementById('edit-dept-hod');
+    if (hiddenInput) hiddenInput.value = empId;
+
+    const labelSpan = document.getElementById('edit-dept-hod-selected-name');
+    const avatarBox = document.getElementById('edit-dept-hod-avatar');
+    const emp = (AppState.employees || []).find(e => e.id == empId);
+
+    if (labelSpan) {
+        labelSpan.textContent = emp ? `${emp.name} (${emp.designation || emp.department_name || 'Staff'})` : '-- No HOD Appointed Yet --';
+    }
+    if (avatarBox) {
+        if (emp) {
+            const initial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+            avatarBox.innerHTML = emp.avatar 
+                ? `<img src="${escapeHtml(emp.avatar)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<span>${escapeHtml(initial)}</span>';">`
+                : `<span>${escapeHtml(initial)}</span>`;
+        } else {
+            avatarBox.innerHTML = '👤';
+        }
+    }
+
+    renderEditDeptHodDropdownList(AppState.employees || []);
+}
+
+// Global click listener to close HOD searchable dropdowns when clicking outside
+document.addEventListener('click', (e) => {
+    const addDeptWrapper = document.getElementById('add-dept-hod-search-wrapper');
+    const addDeptMenu = document.getElementById('add-dept-hod-dropdown-menu');
+    if (addDeptWrapper && addDeptMenu && !addDeptWrapper.contains(e.target)) {
+        addDeptMenu.style.display = 'none';
+    }
+
+    const editDeptWrapper = document.getElementById('edit-dept-hod-search-wrapper');
+    const editDeptMenu = document.getElementById('edit-dept-hod-dropdown-menu');
+    if (editDeptWrapper && editDeptMenu && !editDeptWrapper.contains(e.target)) {
+        editDeptMenu.style.display = 'none';
+    }
+});
+
 function openAddDepartmentModal() {
+    const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+    const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || AppState.currentUser.can_manage_hr);
+    if (!isSuperAdmin && !isHr) {
+        showToast("Access Denied: Only Super Admin and HR can create departments. HODs can only create teams.", "error");
+        return;
+    }
+
     const form = document.getElementById('add-department-form');
     if (form) form.reset();
 
-    const hodSelect = document.getElementById('add-dept-hod');
-    if (hodSelect) {
-        hodSelect.innerHTML = '<option value="">-- No HOD Appointed Yet --</option>';
-        (AppState.employees || []).forEach(e => {
-            const opt = document.createElement('option');
-            opt.value = e.id;
-            opt.textContent = `${e.name} ${e.email ? '(' + e.email + ')' : ''}`;
-            hodSelect.appendChild(opt);
-        });
-    }
+    initAddDeptHodDropdown('');
 
     openModal('add-department-modal');
 }
 
 async function handleSaveDepartmentSubmit(e) {
     if (e) e.preventDefault();
+
+    const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+    const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || AppState.currentUser.can_manage_hr);
+    if (!isSuperAdmin && !isHr) {
+        showToast("Access Denied: Only Super Admin and HR can create departments. HODs can only create teams.", "error");
+        return;
+    }
 
     const name = document.getElementById('add-dept-name')?.value.trim();
     const description = document.getElementById('add-dept-description')?.value.trim();
@@ -765,19 +1066,7 @@ function openEditDepartmentModal(deptId) {
     document.getElementById('edit-dept-name').value = dept.name;
     document.getElementById('edit-dept-description').value = dept.description || '';
 
-    const hodSelect = document.getElementById('edit-dept-hod');
-    if (hodSelect) {
-        hodSelect.innerHTML = '<option value="">-- No HOD Appointed Yet --</option>';
-        (AppState.employees || []).forEach(e => {
-            const opt = document.createElement('option');
-            opt.value = e.id;
-            opt.textContent = `${e.name} ${e.email ? '(' + e.email + ')' : ''}`;
-            if (parseInt(e.id, 10) === parseInt(dept.hod_id, 10)) {
-                opt.selected = true;
-            }
-            hodSelect.appendChild(opt);
-        });
-    }
+    initEditDeptHodDropdown(dept.hod_id || '');
 
     openModal('edit-department-modal');
 }

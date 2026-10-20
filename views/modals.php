@@ -1308,11 +1308,27 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
 
                     <div class="form-group">
                         <label class="form-label">Head of Department (HOD)</label>
-                        <select id="add-dept-hod" class="input-control">
-                            <option value="">-- No HOD Appointed Yet --</option>
-                            <!-- Populated dynamically with employees -->
-                        </select>
-                        <small style="font-size: 11px; color: var(--text-muted);">The assigned HOD will manage teams and staff assignments within this department.</small>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                            <div id="add-dept-hod-avatar" class="admin-inspector-avatar" style="width: 38px; height: 38px; font-size: 15px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700;">👤</div>
+                            <div class="searchable-dropdown-wrapper" id="add-dept-hod-search-wrapper" style="position: relative; flex: 1;">
+                                <button type="button" id="add-dept-hod-dropdown-btn" class="input-control" style="font-weight: 600; font-size: 13px; padding: 8px 12px; width: 100%; border-color: var(--primary); background: var(--bg-card); cursor: pointer; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;" onclick="toggleAddDeptHodDropdown()">
+                                    <span id="add-dept-hod-selected-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-- No HOD Appointed Yet --</span>
+                                    <span style="font-size: 10px; color: var(--text-muted);">▼</span>
+                                </button>
+                                <input type="hidden" id="add-dept-hod" value="">
+
+                                <!-- Floating Search Dropdown Menu -->
+                                <div id="add-dept-hod-dropdown-menu" class="searchable-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 1050; padding: 8px; text-align: left;">
+                                    <div style="padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 6px;">
+                                        <input type="text" id="add-dept-hod-search-input" class="input-control" placeholder="🔍 Search employee by name, designation, email..." style="width: 100%; padding: 6px 10px; font-size: 12.5px;" oninput="filterAddDeptHodDropdown(this.value)" autocomplete="off">
+                                    </div>
+                                    <div id="add-dept-hod-dropdown-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <small style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 5px;">The assigned HOD will manage teams and staff assignments within this department.</small>
                     </div>
 
                     <div class="form-group">
@@ -1348,9 +1364,26 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
 
                     <div class="form-group">
                         <label class="form-label">Head of Department (HOD)</label>
-                        <select id="edit-dept-hod" class="input-control">
-                            <option value="">-- No HOD Appointed Yet --</option>
-                        </select>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+                            <div id="edit-dept-hod-avatar" class="admin-inspector-avatar" style="width: 38px; height: 38px; font-size: 15px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700;">👤</div>
+                            <div class="searchable-dropdown-wrapper" id="edit-dept-hod-search-wrapper" style="position: relative; flex: 1;">
+                                <button type="button" id="edit-dept-hod-dropdown-btn" class="input-control" style="font-weight: 600; font-size: 13px; padding: 8px 12px; width: 100%; border-color: var(--primary); background: var(--bg-card); cursor: pointer; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;" onclick="toggleEditDeptHodDropdown()">
+                                    <span id="edit-dept-hod-selected-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">-- No HOD Appointed Yet --</span>
+                                    <span style="font-size: 10px; color: var(--text-muted);">▼</span>
+                                </button>
+                                <input type="hidden" id="edit-dept-hod" value="">
+
+                                <!-- Floating Search Dropdown Menu -->
+                                <div id="edit-dept-hod-dropdown-menu" class="searchable-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 1050; padding: 8px; text-align: left;">
+                                    <div style="padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 6px;">
+                                        <input type="text" id="edit-dept-hod-search-input" class="input-control" placeholder="🔍 Search employee by name, designation, email..." style="width: 100%; padding: 6px 10px; font-size: 12.5px;" oninput="filterEditDeptHodDropdown(this.value)" autocomplete="off">
+                                    </div>
+                                    <div id="edit-dept-hod-dropdown-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">

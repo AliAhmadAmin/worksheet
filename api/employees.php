@@ -669,8 +669,9 @@ switch ($action) {
         break;
 
     case 'create_department':
-        if (!$canManageEmp && !$isHr && !$isSuperAdmin) {
-            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required to create departments.']);
+        if (!$isSuperAdmin && !$isHr) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required to create departments. HODs can only create teams.']);
             exit;
         }
 
@@ -724,9 +725,9 @@ switch ($action) {
         break;
 
     case 'update_department':
-        if (!$canManageEmp && !$isHr && !$isSuperAdmin) {
+        if (!$isSuperAdmin && !$isHr) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
+            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required to update departments.']);
             exit;
         }
 
