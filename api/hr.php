@@ -310,6 +310,8 @@ switch ($action) {
         $empFilter = $_GET['employee_id'] ?? null;
         $statusFilter = $_GET['status'] ?? null;
         $typeFilter = $_GET['leave_type'] ?? null;
+        $dateFrom = !empty($_GET['date_from']) ? $_GET['date_from'] : null;
+        $dateTo = !empty($_GET['date_to']) ? $_GET['date_to'] : null;
 
         $sql = "
             SELECT l.*, 
@@ -361,6 +363,18 @@ switch ($action) {
         if ($typeFilter && $typeFilter !== 'all') {
             $sql .= " AND l.leave_type = ?";
             $params[] = $typeFilter;
+        }
+
+        if ($dateFrom) {
+            $sql .= " AND (l.end_date >= ? OR l.start_date >= ?)";
+            $params[] = $dateFrom;
+            $params[] = $dateFrom;
+        }
+
+        if ($dateTo) {
+            $sql .= " AND (l.start_date <= ? OR l.end_date <= ?)";
+            $params[] = $dateTo;
+            $params[] = $dateTo;
         }
 
         $sql .= " ORDER BY CASE l.status WHEN 'pending' THEN 1 WHEN 'approved_by_hod' THEN 2 WHEN 'approved' THEN 3 ELSE 4 END, l.start_date DESC";
@@ -682,6 +696,8 @@ switch ($action) {
         $empFilter = $_GET['employee_id'] ?? null;
         $statusFilter = $_GET['status'] ?? null;
         $typeFilter = $_GET['request_type'] ?? null;
+        $dateFrom = !empty($_GET['date_from']) ? $_GET['date_from'] : null;
+        $dateTo = !empty($_GET['date_to']) ? $_GET['date_to'] : null;
 
         $sql = "
             SELECT l.*, 
@@ -732,6 +748,16 @@ switch ($action) {
         if ($typeFilter && $typeFilter !== 'all') {
             $sql .= " AND l.request_type = ?";
             $params[] = $typeFilter;
+        }
+
+        if ($dateFrom) {
+            $sql .= " AND DATE(l.created_at) >= ?";
+            $params[] = $dateFrom;
+        }
+
+        if ($dateTo) {
+            $sql .= " AND DATE(l.created_at) <= ?";
+            $params[] = $dateTo;
         }
 
         $sql .= " ORDER BY CASE l.status WHEN 'pending' THEN 1 WHEN 'approved_by_hod' THEN 2 WHEN 'approved' THEN 3 ELSE 4 END, l.created_at DESC";

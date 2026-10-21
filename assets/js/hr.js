@@ -639,9 +639,13 @@ async function loadHrLeaves() {
     const statusFilter = document.getElementById('hr-leave-status-filter')?.value || 'all';
     const typeFilter = document.getElementById('hr-leave-type-filter')?.value || 'all';
     const empFilter = document.getElementById('hr-leave-emp-filter')?.value || '';
+    const dateFrom = document.getElementById('hr-leave-date-from')?.value || '';
+    const dateTo = document.getElementById('hr-leave-date-to')?.value || '';
 
     let url = `api/hr.php?action=get_leaves&status=${encodeURIComponent(statusFilter)}&leave_type=${encodeURIComponent(typeFilter)}`;
     if (empFilter) url += `&employee_id=${encodeURIComponent(empFilter)}`;
+    if (dateFrom) url += `&date_from=${encodeURIComponent(dateFrom)}`;
+    if (dateTo) url += `&date_to=${encodeURIComponent(dateTo)}`;
 
     try {
         const res = await fetch(url);
@@ -676,17 +680,33 @@ async function loadHrLeaves() {
     }
 }
 
+function clearLeaveDates() {
+    if (document.getElementById('hr-leave-date-from')) document.getElementById('hr-leave-date-from').value = '';
+    if (document.getElementById('hr-leave-date-to')) document.getElementById('hr-leave-date-to').value = '';
+    const clearBtn = document.getElementById('hr-leave-date-clear-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
+    loadHrLeaves();
+}
+
 function applyLeavesClientFilters() {
     const search = (document.getElementById('hr-leave-search')?.value || '').toLowerCase().trim();
     const dept = (document.getElementById('hr-leave-dept-filter')?.value || '').toLowerCase().trim();
     const status = document.getElementById('hr-leave-status-filter')?.value || 'all';
     const type = document.getElementById('hr-leave-type-filter')?.value || 'all';
     const empId = document.getElementById('hr-leave-emp-filter')?.value || '';
+    const dateFrom = document.getElementById('hr-leave-date-from')?.value || '';
+    const dateTo = document.getElementById('hr-leave-date-to')?.value || '';
+
+    // Show/hide date clear button
+    const clearDateBtn = document.getElementById('hr-leave-date-clear-btn');
+    if (clearDateBtn) {
+        clearDateBtn.style.display = (dateFrom || dateTo) ? 'inline-block' : 'none';
+    }
 
     // Show/hide reset button
     const resetBtn = document.getElementById('hr-leave-reset-filters-btn');
     if (resetBtn) {
-        const isFiltered = !!(search || dept || empId || (status !== 'all' && status !== '') || type !== 'all');
+        const isFiltered = !!(search || dept || empId || (status !== 'all' && status !== '') || type !== 'all' || dateFrom || dateTo);
         resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
     }
 
@@ -697,6 +717,14 @@ function applyLeavesClientFilters() {
             const dName = (l.department_name || '').toLowerCase();
             return dName === dept || (l.department_id && String(l.department_id) === dept);
         });
+    }
+
+    if (dateFrom) {
+        list = list.filter(l => (l.end_date >= dateFrom || l.start_date >= dateFrom));
+    }
+
+    if (dateTo) {
+        list = list.filter(l => (l.start_date <= dateTo || l.end_date <= dateTo));
     }
 
     if (search) {
@@ -718,6 +746,10 @@ function resetLeavesFilters() {
     if (document.getElementById('hr-leave-status-filter')) document.getElementById('hr-leave-status-filter').value = 'all';
     if (document.getElementById('hr-leave-type-filter')) document.getElementById('hr-leave-type-filter').value = 'all';
     if (document.getElementById('hr-leave-emp-filter')) document.getElementById('hr-leave-emp-filter').value = '';
+    if (document.getElementById('hr-leave-date-from')) document.getElementById('hr-leave-date-from').value = '';
+    if (document.getElementById('hr-leave-date-to')) document.getElementById('hr-leave-date-to').value = '';
+    const clearBtn = document.getElementById('hr-leave-date-clear-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
     loadHrLeaves();
 }
 
@@ -1072,9 +1104,13 @@ async function loadHrLoans() {
     const statusFilter = document.getElementById('hr-loan-status-filter')?.value || 'all';
     const typeFilter = document.getElementById('hr-loan-type-filter')?.value || 'all';
     const empFilter = document.getElementById('hr-loan-emp-filter')?.value || '';
+    const dateFrom = document.getElementById('hr-loan-date-from')?.value || '';
+    const dateTo = document.getElementById('hr-loan-date-to')?.value || '';
 
     let url = `api/hr.php?action=get_loans&status=${encodeURIComponent(statusFilter)}&request_type=${encodeURIComponent(typeFilter)}`;
     if (empFilter) url += `&employee_id=${encodeURIComponent(empFilter)}`;
+    if (dateFrom) url += `&date_from=${encodeURIComponent(dateFrom)}`;
+    if (dateTo) url += `&date_to=${encodeURIComponent(dateTo)}`;
 
     try {
         const res = await fetch(url);
@@ -1111,16 +1147,31 @@ async function loadHrLoans() {
     }
 }
 
+function clearLoanDates() {
+    if (document.getElementById('hr-loan-date-from')) document.getElementById('hr-loan-date-from').value = '';
+    if (document.getElementById('hr-loan-date-to')) document.getElementById('hr-loan-date-to').value = '';
+    const clearBtn = document.getElementById('hr-loan-date-clear-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
+    loadHrLoans();
+}
+
 function applyLoansClientFilters() {
     const search = (document.getElementById('hr-loan-search')?.value || '').toLowerCase().trim();
     const dept = (document.getElementById('hr-loan-dept-filter')?.value || '').toLowerCase().trim();
     const status = document.getElementById('hr-loan-status-filter')?.value || 'all';
     const type = document.getElementById('hr-loan-type-filter')?.value || 'all';
     const empId = document.getElementById('hr-loan-emp-filter')?.value || '';
+    const dateFrom = document.getElementById('hr-loan-date-from')?.value || '';
+    const dateTo = document.getElementById('hr-loan-date-to')?.value || '';
+
+    const clearDateBtn = document.getElementById('hr-loan-date-clear-btn');
+    if (clearDateBtn) {
+        clearDateBtn.style.display = (dateFrom || dateTo) ? 'inline-block' : 'none';
+    }
 
     const resetBtn = document.getElementById('hr-loan-reset-filters-btn');
     if (resetBtn) {
-        const isFiltered = !!(search || dept || empId || (status !== 'all' && status !== '') || type !== 'all');
+        const isFiltered = !!(search || dept || empId || (status !== 'all' && status !== '') || type !== 'all' || dateFrom || dateTo);
         resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
     }
 
@@ -1130,6 +1181,20 @@ function applyLoansClientFilters() {
         list = list.filter(l => {
             const dName = (l.department_name || '').toLowerCase();
             return dName === dept || (l.department_id && String(l.department_id) === dept);
+        });
+    }
+
+    if (dateFrom) {
+        list = list.filter(l => {
+            const createdDate = (l.created_at || '').slice(0, 10);
+            return createdDate >= dateFrom || (l.deduction_start_month && l.deduction_start_month >= dateFrom.slice(0, 7));
+        });
+    }
+
+    if (dateTo) {
+        list = list.filter(l => {
+            const createdDate = (l.created_at || '').slice(0, 10);
+            return createdDate <= dateTo || (l.deduction_start_month && l.deduction_start_month <= dateTo.slice(0, 7));
         });
     }
 
@@ -1153,6 +1218,10 @@ function resetLoansFilters() {
     if (document.getElementById('hr-loan-status-filter')) document.getElementById('hr-loan-status-filter').value = 'all';
     if (document.getElementById('hr-loan-type-filter')) document.getElementById('hr-loan-type-filter').value = 'all';
     if (document.getElementById('hr-loan-emp-filter')) document.getElementById('hr-loan-emp-filter').value = '';
+    if (document.getElementById('hr-loan-date-from')) document.getElementById('hr-loan-date-from').value = '';
+    if (document.getElementById('hr-loan-date-to')) document.getElementById('hr-loan-date-to').value = '';
+    const clearBtn = document.getElementById('hr-loan-date-clear-btn');
+    if (clearBtn) clearBtn.style.display = 'none';
     loadHrLoans();
 }
 

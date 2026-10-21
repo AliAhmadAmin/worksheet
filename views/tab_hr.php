@@ -314,20 +314,40 @@
         </div>
 
         <div class="worksheet-card">
-            <!-- Unified Filter Toolbar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                <!-- Search Box -->
-                <div style="position: relative; flex: 1; min-width: 200px; max-width: 300px;">
-                    <input type="text" id="hr-leave-search" class="input-control" placeholder="🔍 Search employee, reason, notes..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyLeavesClientFilters()">
+            <!-- Modern Responsive Filter Toolbar -->
+            <div class="modern-filter-toolbar">
+                <!-- Row 1: Search, Date Range & Actions -->
+                <div class="filter-row-primary">
+                    <div class="filter-search-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="hr-leave-search" placeholder="Search employee, reason, notes..." oninput="applyLeavesClientFilters()">
+                    </div>
+
+                    <div class="filter-date-group">
+                        <span class="date-label">📅 Dates:</span>
+                        <input type="date" id="hr-leave-date-from" title="From Date" onchange="loadHrLeaves()" oninput="applyLeavesClientFilters()">
+                        <span class="date-sep">to</span>
+                        <input type="date" id="hr-leave-date-to" title="To Date" onchange="loadHrLeaves()" oninput="applyLeavesClientFilters()">
+                        <button type="button" id="hr-leave-date-clear-btn" class="date-clear-btn" style="display: none;" onclick="clearLeaveDates()" title="Clear dates">✕</button>
+                    </div>
+
+                    <div class="filter-toolbar-actions">
+                        <button type="button" id="hr-leave-reset-filters-btn" class="btn btn-outline" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; border-radius: var(--radius-md); display: none; color: #ef4444; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.05);" onclick="resetLeavesFilters()" title="Reset all filters">
+                            ↺ Reset
+                        </button>
+                        <span id="hr-leaves-count-label" class="filter-count-chip">
+                            Showing 0 request(s)
+                        </span>
+                    </div>
                 </div>
 
-                <!-- Dropdown Filter Pills -->
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                    <select id="hr-leave-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyLeavesClientFilters()">
+                <!-- Row 2: Secondary Dropdown Filters -->
+                <div class="filter-row-secondary">
+                    <select id="hr-leave-dept-filter" onchange="applyLeavesClientFilters()">
                         <option value="">🏢 All Departments</option>
                     </select>
 
-                    <select id="hr-leave-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLeaves()">
+                    <select id="hr-leave-status-filter" onchange="loadHrLeaves()">
                         <option value="all" selected>All Statuses</option>
                         <option value="pending">⏳ Pending</option>
                         <option value="approved_by_hod">🟡 Approved by HOD</option>
@@ -336,7 +356,7 @@
                         <option value="cancelled">🚫 Cancelled</option>
                     </select>
 
-                    <select id="hr-leave-type-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLeaves()">
+                    <select id="hr-leave-type-filter" onchange="loadHrLeaves()">
                         <option value="all">🌴 All Leave Types</option>
                         <option value="casual">🌴 Casual Leave</option>
                         <option value="sick">🩺 Sick Leave</option>
@@ -345,17 +365,9 @@
                         <option value="other">📝 Other</option>
                     </select>
 
-                    <select id="hr-leave-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLeaves()">
+                    <select id="hr-leave-emp-filter" class="admin-only" onchange="loadHrLeaves()">
                         <option value="">👤 All Employees</option>
                     </select>
-
-                    <button type="button" id="hr-leave-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetLeavesFilters()" title="Reset all filters">
-                        ↺ Reset
-                    </button>
-                    
-                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-leaves-count-label">
-                        Showing 0 requests
-                    </span>
                 </div>
             </div>
 
@@ -415,20 +427,40 @@
         </div>
 
         <div class="worksheet-card">
-            <!-- Unified Filter Toolbar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                <!-- Search Box -->
-                <div style="position: relative; flex: 1; min-width: 200px; max-width: 300px;">
-                    <input type="text" id="hr-loan-search" class="input-control" placeholder="🔍 Search employee, reason, amount..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyLoansClientFilters()">
+            <!-- Modern Responsive Filter Toolbar -->
+            <div class="modern-filter-toolbar">
+                <!-- Row 1: Search, Date Range & Actions -->
+                <div class="filter-row-primary">
+                    <div class="filter-search-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="hr-loan-search" placeholder="Search employee, reason, amount..." oninput="applyLoansClientFilters()">
+                    </div>
+
+                    <div class="filter-date-group">
+                        <span class="date-label">📅 Dates:</span>
+                        <input type="date" id="hr-loan-date-from" title="From Date" onchange="loadHrLoans()" oninput="applyLoansClientFilters()">
+                        <span class="date-sep">to</span>
+                        <input type="date" id="hr-loan-date-to" title="To Date" onchange="loadHrLoans()" oninput="applyLoansClientFilters()">
+                        <button type="button" id="hr-loan-date-clear-btn" class="date-clear-btn" style="display: none;" onclick="clearLoanDates()" title="Clear dates">✕</button>
+                    </div>
+
+                    <div class="filter-toolbar-actions">
+                        <button type="button" id="hr-loan-reset-filters-btn" class="btn btn-outline" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; border-radius: var(--radius-md); display: none; color: #ef4444; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.05);" onclick="resetLoansFilters()" title="Reset all filters">
+                            ↺ Reset
+                        </button>
+                        <span id="hr-loans-count-label" class="filter-count-chip">
+                            Showing 0 loan record(s)
+                        </span>
+                    </div>
                 </div>
 
-                <!-- Dropdown Filter Pills -->
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                    <select id="hr-loan-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyLoansClientFilters()">
+                <!-- Row 2: Secondary Dropdown Filters -->
+                <div class="filter-row-secondary">
+                    <select id="hr-loan-dept-filter" onchange="applyLoansClientFilters()">
                         <option value="">🏢 All Departments</option>
                     </select>
 
-                    <select id="hr-loan-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLoans()">
+                    <select id="hr-loan-status-filter" onchange="loadHrLoans()">
                         <option value="all" selected>All Statuses</option>
                         <option value="pending">⏳ Pending Review</option>
                         <option value="approved_by_hod">🟡 Approved by HOD</option>
@@ -438,24 +470,16 @@
                         <option value="cancelled">🚫 Cancelled</option>
                     </select>
 
-                    <select id="hr-loan-type-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLoans()">
+                    <select id="hr-loan-type-filter" onchange="loadHrLoans()">
                         <option value="all">💳 All Request Types</option>
                         <option value="advance_salary">💵 Advance Salary</option>
                         <option value="emergency_loan">🚨 Emergency Loan</option>
                         <option value="medical_aid">🩺 Medical Aid</option>
                     </select>
 
-                    <select id="hr-loan-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLoans()">
+                    <select id="hr-loan-emp-filter" class="admin-only" onchange="loadHrLoans()">
                         <option value="">👤 All Employees</option>
                     </select>
-
-                    <button type="button" id="hr-loan-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetLoansFilters()" title="Reset all filters">
-                        ↺ Reset
-                    </button>
-                    
-                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-loans-count-label">
-                        Showing 0 loan records
-                    </span>
                 </div>
             </div>
 
