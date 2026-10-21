@@ -252,8 +252,10 @@ async function loadLiveAttendance() {
                 statusBadge = '<span class="attendance-status-pill working">🟢 On Duty</span>';
             } else if (emp.status === 'checked_out') {
                 statusBadge = '<span class="attendance-status-pill checked_out">🔵 Checked Out</span>';
+            } else if (emp.status === 'not_arrived') {
+                statusBadge = '<span class="attendance-status-pill not-arrived" style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">⏳ Shift Pending</span>';
             } else {
-                statusBadge = '<span class="attendance-status-pill absent">⚪ Absent / Off Duty</span>';
+                statusBadge = '<span class="attendance-status-pill absent">🔴 Absent</span>';
             }
 
             let sheetBadge = '';
@@ -633,7 +635,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
         }
 
         let badgeStyle = 'background: rgba(148, 163, 184, 0.12); color: #64748b; border: 1px solid rgba(148, 163, 184, 0.25);';
-        if (r.status === 'full_day') {
+        if (r.status === 'full_day' || r.status === 'working') {
             badgeStyle = 'background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700;';
         } else if (r.status === 'short_leave') {
             badgeStyle = 'background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700;';
@@ -641,6 +643,8 @@ function renderSingleEmployeeTimesheet(item, globalData) {
             badgeStyle = 'background: rgba(249, 115, 22, 0.12); color: #ea580c; border: 1px solid rgba(249, 115, 22, 0.3); font-weight: 700;';
         } else if (r.status === 'approved_leave') {
             badgeStyle = 'background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 700;';
+        } else if (r.status === 'today_pending') {
+            badgeStyle = 'background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700;';
         } else if (r.status === 'incomplete' || r.status === 'absent') {
             badgeStyle = 'background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.25); font-weight: 600;';
         }
@@ -693,8 +697,10 @@ function renderSingleEmployeeTimesheet(item, globalData) {
         } else {
             let cleanStatusText = (r.status_label || 'Scheduled').replace(/\s*\([^)]*\)/g, '').trim();
             if (r.status === 'full_day') cleanStatusText = '🟢 Full Day';
+            else if (r.status === 'working') cleanStatusText = r.status_label || '🟢 Working';
             else if (r.status === 'short_leave') cleanStatusText = '🟡 Short Leave';
             else if (r.status === 'half_leave') cleanStatusText = '🟠 Half Day';
+            else if (r.status === 'today_pending') cleanStatusText = '⏳ Shift Pending';
             else if (r.status === 'incomplete') cleanStatusText = '🔴 Incomplete';
             else if (r.status === 'absent') cleanStatusText = '🔴 Absent';
 
@@ -1079,12 +1085,18 @@ function printAttendanceReport() {
                 if (r.status === 'full_day') {
                     cleanStatusText = '● Full Day';
                     statusClass = 'badge-full';
+                } else if (r.status === 'working') {
+                    cleanStatusText = '● Working';
+                    statusClass = 'badge-full';
                 } else if (r.status === 'short_leave') {
                     cleanStatusText = '● Short Leave';
                     statusClass = 'badge-short';
                 } else if (r.status === 'half_leave') {
                     cleanStatusText = '● Half Day';
                     statusClass = 'badge-half';
+                } else if (r.status === 'today_pending') {
+                    cleanStatusText = '⏳ Shift Pending';
+                    statusClass = 'badge-pending';
                 } else if (r.status === 'incomplete') {
                     cleanStatusText = '● Incomplete';
                     statusClass = 'badge-absent';
@@ -1433,6 +1445,7 @@ function printAttendanceReport() {
                 .badge-leave { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
                 .badge-holiday { background: #ede9fe; color: #6d28d9; border: 1px solid #c4b5fd; }
                 .badge-absent { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+                .badge-pending { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
                 .text-muted { color: #64748b; }
                 
                 /* Sign-off Block */

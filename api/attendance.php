@@ -11,7 +11,7 @@ require_once __DIR__ . '/../config/database.php';
 $pdo = getDbConnection();
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $rawInput = file_get_contents('php://input');
     $data = json_decode($rawInput, true) ?? $_POST;
     $action = $data['action'] ?? $action;
@@ -460,7 +460,11 @@ switch ($action) {
                     $stats['checked_in']++;
                 }
             } else {
-                $r['status'] = 'absent';
+                if ($date === date('Y-m-d')) {
+                    $r['status'] = 'not_arrived';
+                } else {
+                    $r['status'] = 'absent';
+                }
                 $stats['not_arrived']++;
             }
 
@@ -657,7 +661,9 @@ switch ($action) {
                     'date' => $currDate,
                     'day' => date('l', strtotime($currDate)),
                     'day_num' => (int)date('d', strtotime($currDate)),
-                    'is_future' => ($currDate > $today)
+                    'is_future' => ($currDate > $today),
+                    'is_today' => ($currDate === $today),
+                    'is_past' => ($currDate < $today)
                 ];
                 $currDate = date('Y-m-d', strtotime($currDate . ' +1 day'));
             }
@@ -759,7 +765,7 @@ switch ($action) {
                     $holidayReason = $sheet ? ($sheet['holiday_reason'] ?? '') : '';
                     $isExplicitRest = in_array($explicitDayType, ['holiday', 'swapped_off', 'alt_off', 'day_off'], true);
 
-                    if (!$d['is_future']) {
+                    if ($d['is_past']) {
                         if ($isEmpWeeklyOff && $dutyHours >= 1.0) {
                             $workedOffDays[] = [
                                 'date' => $dt,
@@ -774,6 +780,13 @@ switch ($action) {
                                 'ts' => strtotime($dt)
                             ];
                         }
+                    } elseif ($d['is_today'] && $isEmpWeeklyOff && $dutyHours >= 1.0) {
+                        $workedOffDays[] = [
+                            'date' => $dt,
+                            'duty_hours' => $dutyHours,
+                            'day' => $dayOfWeek,
+                            'ts' => strtotime($dt)
+                        ];
                     }
 
                     $dayMetaMap[$dt] = [
@@ -858,14 +871,35 @@ switch ($action) {
                     }
 
                     $weekNum = min(6, (int)ceil($d['day_num'] / 7));
+                    $fullThreshold = max(1.0, $shiftHours - 0.5);
+                    $shortThreshold = max(1.0, round($shiftHours * 0.65, 1));
+                    $halfThreshold = max(0.5, round($shiftHours * 0.35, 1));
+
+                    $hasCheckIn = !empty($sheet['check_in_time']);
+                    $hasCheckOut = !empty($sheet['check_out_time']);
 
                     if (!$d['is_future']) {
-                        $empSummary['working_days_count']++;
                         $empSummary['total_duty_seconds'] += $dutySeconds;
                         $empSummary['total_duty_hours'] += $dutyHours;
                         $empSummary['weekly_hours'][$weekNum] += $dutyHours;
-                        if (!$isOpenFlexible && !$isRestDay && !$isOnLeave) {
-                            $empSummary['expected_duty_hours'] += $shiftHours;
+
+                        if ($d['is_past']) {
+                            $empSummary['working_days_count']++;
+                            if (!$isOpenFlexible && !$isRestDay && !$isOnLeave) {
+                                $empSummary['expected_duty_hours'] += $shiftHours;
+                            }
+                        } elseif ($d['is_today']) {
+                            if ($hasCheckOut) {
+                                $empSummary['working_days_count']++;
+                                if (!$isOpenFlexible && !$isRestDay && !$isOnLeave) {
+                                    $empSummary['expected_duty_hours'] += $shiftHours;
+                                }
+                            } elseif ($hasCheckIn) {
+                                $empSummary['working_days_count']++;
+                                if (!$isOpenFlexible && !$isRestDay && !$isOnLeave && $dutyHours >= $fullThreshold) {
+                                    $empSummary['expected_duty_hours'] += $shiftHours;
+                                }
+                            }
                         }
                     }
 
@@ -915,6 +949,10 @@ switch ($action) {
                             $status = 'weekend';
                             $statusLabel = 'Weekly Off';
                             $badgeClass = 'badge-weekend';
+                        } elseif ($d['is_today']) {
+                            $status = 'today_pending';
+                            $statusLabel = '⏳ Shift Pending';
+                            $badgeClass = 'badge-today-pending';
                         } else {
                             $status = 'absent';
                             $statusLabel = '⚪ Off Duty';
@@ -922,10 +960,6 @@ switch ($action) {
                         }
                     } else {
                         // Fixed Shift Evaluation
-                        $fullThreshold = max(1.0, $shiftHours - 0.5);
-                        $shortThreshold = max(1.0, round($shiftHours * 0.65, 1));
-                        $halfThreshold = max(0.5, round($shiftHours * 0.35, 1));
-
                         if ($dutyHours >= $fullThreshold) {
                             $status = 'full_day';
                             $statusLabel = '🟢 Full Day';
@@ -933,27 +967,55 @@ switch ($action) {
                             $empSummary['full_days']++;
                             $grandTotals['total_present_full']++;
                         } elseif ($dutyHours >= $shortThreshold) {
-                            $status = 'short_leave';
-                            $statusLabel = '🟡 Short Leave';
-                            $badgeClass = 'badge-short-leave';
-                            $empSummary['short_leaves']++;
-                            $grandTotals['total_short_leaves']++;
+                            if ($d['is_today'] && !$hasCheckOut) {
+                                $status = 'working';
+                                $statusLabel = '🟢 Working (' . formatDutyTime($dutySeconds) . ')';
+                                $badgeClass = 'badge-present';
+                                $empSummary['full_days']++;
+                                $grandTotals['total_present_full']++;
+                            } else {
+                                $status = 'short_leave';
+                                $statusLabel = '🟡 Short Leave';
+                                $badgeClass = 'badge-short-leave';
+                                $empSummary['short_leaves']++;
+                                $grandTotals['total_short_leaves']++;
+                            }
                         } elseif ($dutyHours >= $halfThreshold) {
-                            $status = 'half_leave';
-                            $statusLabel = '🟠 Half Day';
-                            $badgeClass = 'badge-half-leave';
-                            $empSummary['half_leaves']++;
-                            $grandTotals['total_half_leaves']++;
+                            if ($d['is_today'] && !$hasCheckOut) {
+                                $status = 'working';
+                                $statusLabel = '🟢 Working (' . formatDutyTime($dutySeconds) . ')';
+                                $badgeClass = 'badge-present';
+                                $empSummary['full_days']++;
+                                $grandTotals['total_present_full']++;
+                            } else {
+                                $status = 'half_leave';
+                                $statusLabel = '🟠 Half Day';
+                                $badgeClass = 'badge-half-leave';
+                                $empSummary['half_leaves']++;
+                                $grandTotals['total_half_leaves']++;
+                            }
                         } elseif ($dutyHours > 0) {
-                            $status = 'incomplete';
-                            $statusLabel = '🔴 Incomplete';
-                            $badgeClass = 'badge-incomplete';
-                            $empSummary['incomplete']++;
-                            $grandTotals['total_absences']++;
+                            if ($d['is_today'] && !$hasCheckOut) {
+                                $status = 'working';
+                                $statusLabel = '🟢 Working (' . formatDutyTime($dutySeconds) . ')';
+                                $badgeClass = 'badge-present';
+                                $empSummary['full_days']++;
+                                $grandTotals['total_present_full']++;
+                            } else {
+                                $status = 'incomplete';
+                                $statusLabel = '🔴 Incomplete';
+                                $badgeClass = 'badge-incomplete';
+                                $empSummary['incomplete']++;
+                                $grandTotals['total_absences']++;
+                            }
                         } elseif ($isEmpWeeklyOff) {
                             $status = 'weekend';
                             $statusLabel = 'Weekly Off';
                             $badgeClass = 'badge-weekend';
+                        } elseif ($d['is_today']) {
+                            $status = 'today_pending';
+                            $statusLabel = '⏳ Shift Pending';
+                            $badgeClass = 'badge-today-pending';
                         } else {
                             $status = 'absent';
                             $statusLabel = '🔴 Absent';
@@ -971,6 +1033,7 @@ switch ($action) {
                             'is_weekend' => $isEmpWeeklyOff,
                             'scheduled_weekly_off' => $scheduledWeeklyOff,
                             'is_future' => $d['is_future'],
+                            'is_today' => $d['is_today'],
                             'check_in' => $sheet['check_in_time'] ?? null,
                             'check_out' => $sheet['check_out_time'] ?? null,
                             'duty_seconds' => $dutySeconds,

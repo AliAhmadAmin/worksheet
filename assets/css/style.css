@@ -3309,4 +3309,14 @@ body.dark-theme .login-card-fresh {
     }
 }
 
+/* Attendance status pill & badge for Shift Pending (Today in-progress) */
+.attendance-status-pill.not-arrived,
+.badge-today-pending {
+    background: rgba(245, 158, 11, 0.12) !important;
+    color: #d97706 !important;
+    border: 1px solid rgba(245, 158, 11, 0.35) !important;
+    font-weight: 700;
+}
+
+
 
