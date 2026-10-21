@@ -431,9 +431,11 @@
                     <select id="hr-loan-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLoans()">
                         <option value="all">All Statuses</option>
                         <option value="pending" selected>⏳ Pending Review</option>
+                        <option value="approved_by_hod">🟡 Approved by HOD</option>
                         <option value="approved">✅ Active / Approved</option>
                         <option value="repaid">🎉 Fully Repaid</option>
                         <option value="rejected">❌ Rejected</option>
+                        <option value="cancelled">🚫 Cancelled</option>
                     </select>
 
                     <select id="hr-loan-type-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLoans()">
@@ -1036,7 +1038,7 @@
         </div>
         <form id="hr-apply-leave-form" onsubmit="handleApplyLeaveSubmit(event)">
             <div class="modal-body">
-                <div class="admin-only form-group" style="margin-bottom: 14px;">
+                <div id="hr-leave-form-emp-wrapper" class="form-group" style="margin-bottom: 14px; display: none;">
                     <label class="form-label">Employee</label>
                     <select id="hr-leave-form-emp-id" class="input-control" style="width: 100%;">
                         <!-- Dynamic Employees -->
@@ -1074,7 +1076,7 @@
                     <textarea id="hr-leave-form-reason" class="input-control" rows="3" placeholder="Explain the reason for leave request..." style="width: 100%; resize: vertical;" required></textarea>
                 </div>
 
-                <div class="admin-only form-group" style="margin-bottom: 10px;">
+                <div id="hr-leave-form-auto-approve-wrapper" class="form-group" style="margin-bottom: 10px; display: none;">
                     <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
                         <input type="checkbox" id="hr-leave-form-auto-approve" value="1">
                         <b>Directly approve this leave application</b>
@@ -1098,7 +1100,7 @@
         </div>
         <form id="hr-apply-loan-form" onsubmit="handleApplyLoanSubmit(event)">
             <div class="modal-body">
-                <div class="admin-only form-group" style="margin-bottom: 14px;">
+                <div id="hr-loan-form-emp-wrapper" class="form-group" style="margin-bottom: 14px; display: none;">
                     <label class="form-label">Employee</label>
                     <select id="hr-loan-form-emp-id" class="input-control" style="width: 100%;">
                         <!-- Dynamic Employees -->
@@ -1146,7 +1148,7 @@
                     <textarea id="hr-loan-form-reason" class="input-control" rows="3" placeholder="Explain the purpose for this advance / loan request..." style="width: 100%; resize: vertical;" required></textarea>
                 </div>
 
-                <div class="admin-only form-group" style="margin-bottom: 10px;">
+                <div id="hr-loan-form-auto-approve-wrapper" class="form-group" style="margin-bottom: 10px; display: none;">
                     <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer;">
                         <input type="checkbox" id="hr-loan-form-auto-approve" value="1">
                         <b>Directly approve and activate this loan request</b>

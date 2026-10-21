@@ -180,7 +180,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
-                <span class="nav-label">Advance & Loans</span>
+                <span class="nav-label">Advance Salary</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
@@ -329,7 +329,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
-                <span class="nav-label">Advance & Loans</span>
+                <span class="nav-label">Advance Salary</span>
                 <span id="pending-loans-badge" class="nav-badge badge-info" style="display: none;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">

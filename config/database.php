@@ -308,6 +308,13 @@ function migratePermissionsSchema($pdo) {
             FOREIGN KEY (action_by) REFERENCES employees(id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        try {
+            $pdo->exec("ALTER TABLE hr_loans MODIFY COLUMN status VARCHAR(50) DEFAULT 'pending'");
+            $pdo->exec("ALTER TABLE hr_loans ADD COLUMN hod_id INT NULL");
+            $pdo->exec("ALTER TABLE hr_loans ADD COLUMN hod_action_at DATETIME NULL");
+            $pdo->exec("ALTER TABLE hr_loans ADD COLUMN hod_notes TEXT NULL");
+        } catch (Exception $e) {}
+
         $pdo->exec("
         CREATE TABLE IF NOT EXISTS hr_notices (
             id INT AUTO_INCREMENT PRIMARY KEY,

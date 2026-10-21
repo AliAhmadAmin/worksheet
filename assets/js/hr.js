@@ -138,8 +138,8 @@ function renderDashboardPendingQueue(pendingList) {
     }
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
-    const isAdmin = (currentUser.role === 'admin' || currentUser.role === 'super_admin' || (currentUser.can_manage_hr && currentUser.role !== 'hod'));
-    const isHod = currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director')));
+    const isAdmin = !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
+    const isHodOnly = !isAdmin && (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
     const currentUserId = currentUser.id || 0;
     const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
 
@@ -150,32 +150,23 @@ function renderDashboardPendingQueue(pendingList) {
             ? `<img src="${escapeHtml(l.avatar)}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(l.employee_name)}">`
             : `<div class="user-avatar" style="width: 34px; height: 34px; font-size: 13px; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
 
-        const isHodForDept = (isHod && l.department_id && l.department_id == userDeptId && l.employee_id != currentUserId);
+        const isHodForDept = (isHodOnly && l.department_id && l.department_id == userDeptId && l.employee_id != currentUserId);
 
         let actionBtnHtml = '';
-        if (l.status === 'approved_by_hod') {
-            if (isAdmin) {
-                actionBtnHtml = `
-                    <div style="display: inline-flex; gap: 6px; align-items: center; flex-wrap: nowrap;">
-                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Final HR Approval">✓ HR</button>
-                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
-                    </div>
-                `;
-            } else {
-                actionBtnHtml = `<span style="font-size: 11px; color: #0284c7; font-weight: 700; white-space: nowrap;">🟡 Approved by HOD (Awaiting HR)</span>`;
-            }
+        if (isAdmin) {
+            actionBtnHtml = `
+                <div style="display: inline-flex; gap: 6px; align-items: center; flex-wrap: nowrap;">
+                    <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Direct HR Approval (1-Click)">✓ HR</button>
+                    <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
+                </div>
+            `;
+        } else if (l.status === 'approved_by_hod') {
+            actionBtnHtml = `<span style="font-size: 11px; color: #0284c7; font-weight: 700; white-space: nowrap;">🟡 Approved by HOD (Awaiting HR)</span>`;
         } else if (l.status === 'pending') {
             if (isHodForDept) {
                 actionBtnHtml = `
                     <div style="display: inline-flex; gap: 6px; align-items: center; flex-wrap: nowrap;">
                         <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved_by_hod')" title="Endorse Leave (Forward to HR)">✓ Approve</button>
-                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
-                    </div>
-                `;
-            } else if (isAdmin) {
-                actionBtnHtml = `
-                    <div style="display: inline-flex; gap: 6px; align-items: center; flex-wrap: nowrap;">
-                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Direct HR Approval">✓ HR</button>
                         <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
                     </div>
                 `;
@@ -205,7 +196,10 @@ function renderDashboardPendingQueue(pendingList) {
                     <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         "${escapeHtml(l.reason)}"
                     </div>
-                    ${l.hod_name ? `<div style="font-size: 10.5px; color: #0284c7; margin-top: 2px;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name)}</div>` : ''}
+                    ${l.hod_name 
+                        ? `<div style="font-size: 10.5px; color: #0284c7; margin-top: 2px;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name)}</div>` 
+                        : (l.status === 'pending' ? `<div style="font-size: 10.5px; color: #ea580c; font-weight: 600; margin-top: 2px;">⚠️ Not approved by HOD yet</div>` : `<div style="font-size: 10.5px; color: #dc2626; font-weight: 700; margin-top: 2px;">⚠️ Not approved by HOD</div>`)
+                    }
                 </div>
 
                 ${actionBtnHtml}
@@ -231,7 +225,11 @@ function renderDashboardPendingLoansQueue(loanList) {
         return;
     }
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
+    const currentUser = HrState.currentUser || AppState.currentUser || {};
+    const isAdmin = !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
+    const isHodOnly = !isAdmin && (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const currentUserId = currentUser.id || 0;
+    const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
 
     let html = '';
     loanList.forEach(l => {
@@ -241,6 +239,38 @@ function renderDashboardPendingLoansQueue(loanList) {
             : `<div class="user-avatar" style="width: 34px; height: 34px; font-size: 13px; flex-shrink: 0;">${escapeHtml(avatarInitial)}</div>`;
 
         const typeTitle = l.request_type === 'advance_salary' ? '💵 Advance Salary' : (l.request_type === 'emergency_loan' ? '🚨 Emergency Loan' : '🩺 Medical Aid');
+        const isHodForDept = (isHodOnly && l.department_id && l.department_id == userDeptId && l.employee_id != currentUserId);
+
+        let actionBtnHtml = '';
+        if (isAdmin) {
+            actionBtnHtml = `
+                <div style="display: flex; gap: 6px;">
+                    <button type="button" class="btn btn-success" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLoanAction(${l.id}, 'approved')" title="Direct HR Approval (1-Click)">
+                        ✓ HR
+                    </button>
+                    <button type="button" class="btn btn-danger" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLoanAction(${l.id}, 'rejected')" title="Reject Loan">
+                        ✕ Reject
+                    </button>
+                </div>
+            `;
+        } else if (l.status === 'approved_by_hod') {
+            actionBtnHtml = `<span style="font-size: 11px; color: #0284c7; font-weight: 700;">🟡 Approved by HOD (Awaiting HR)</span>`;
+        } else if (l.status === 'pending') {
+            if (isHodForDept) {
+                actionBtnHtml = `
+                    <div style="display: flex; gap: 6px;">
+                        <button type="button" class="btn btn-success" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLoanAction(${l.id}, 'approved_by_hod')" title="Endorse Loan (Forward to HR)">
+                            ✓ Approve
+                        </button>
+                        <button type="button" class="btn btn-danger" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLoanAction(${l.id}, 'rejected')" title="Reject Loan">
+                            ✕ Reject
+                        </button>
+                    </div>
+                `;
+            } else {
+                actionBtnHtml = `<span style="font-size: 11px; color: #f59e0b; font-weight: 700;">⏳ In Review by HOD</span>`;
+            }
+        }
 
         html += `
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); gap: 12px; flex-wrap: wrap;">
@@ -259,18 +289,12 @@ function renderDashboardPendingLoansQueue(loanList) {
                     <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
                         ${typeTitle} • "${escapeHtml(l.reason)}"
                     </div>
+                    ${l.hod_name 
+                        ? `<div style="font-size: 10.5px; color: #0284c7; margin-top: 2px;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name)}</div>` 
+                        : (l.status === 'pending' ? `<div style="font-size: 10.5px; color: #ea580c; font-weight: 600; margin-top: 2px;">⚠️ Not approved by HOD yet</div>` : `<div style="font-size: 10.5px; color: #dc2626; font-weight: 700; margin-top: 2px;">⚠️ Not approved by HOD</div>`)}
                 </div>
 
-                ${isAdmin ? `
-                <div style="display: flex; gap: 6px;">
-                    <button type="button" class="btn btn-success" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLoanAction(${l.id}, 'approved')">
-                        ✓ Approve
-                    </button>
-                    <button type="button" class="btn btn-danger" style="padding: 5px 10px; font-size: 11px; font-weight: 700;" onclick="handleLoanAction(${l.id}, 'rejected')">
-                        ✕ Reject
-                    </button>
-                </div>
-                ` : `<span style="font-size: 11px; color: #f59e0b; font-weight: 700;">⏳ In Review</span>`}
+                ${actionBtnHtml}
             </div>
         `;
     });
@@ -634,18 +658,18 @@ async function loadHrLeaves() {
             HrState.currentUser = data.current_user || {};
 
             // Adjust dropdown filter labels based on role
-            const u = HrState.currentUser || {};
-            const isHodUser = u.is_hod === true || u.role === 'hod' || (u.designation && (u.designation.includes('HOD') || u.designation.includes('Director')));
-            const isAdminUser = (u.role === 'admin' || u.role === 'super_admin' || (u.can_manage_hr && u.role !== 'hod'));
+            const u = HrState.currentUser || AppState.currentUser || {};
+            const isAdminUser = !!(u.can_manage_hr || u.role === 'admin' || u.role === 'super_admin' || u.role === 'hr');
+            const isHodUser = !isAdminUser && (u.is_hod === true || u.role === 'hod' || (u.designation && (u.designation.includes('HOD') || u.designation.includes('Director'))));
             const statusSelect = document.getElementById('hr-leave-status-filter');
             if (statusSelect) {
                 const pendingOpt = statusSelect.querySelector('option[value="pending"]');
                 const hodOpt = statusSelect.querySelector('option[value="approved_by_hod"]');
                 if (pendingOpt) {
-                    pendingOpt.textContent = (isHodUser && !isAdminUser) ? '⏳ Pending' : '⏳ Pending HOD';
+                    pendingOpt.textContent = isHodUser ? '⏳ Pending' : '⏳ Pending HOD';
                 }
                 if (hodOpt) {
-                    hodOpt.textContent = (isHodUser && !isAdminUser) ? '🟡 Sent to HR' : '🟡 Approved by HOD';
+                    hodOpt.textContent = isHodUser ? '🟡 Sent to HR' : '🟡 Approved by HOD';
                 }
             }
 
@@ -726,8 +750,8 @@ function renderLeavesTable(leaves) {
     }
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
-    const isAdmin = (currentUser.role === 'admin' || currentUser.role === 'super_admin' || (currentUser.can_manage_hr && currentUser.role !== 'hod'));
-    const isHod = currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director')));
+    const isAdmin = !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
+    const isHodOnly = !isAdmin && (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
     const currentUserId = currentUser.id || 0;
     const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
 
@@ -740,9 +764,9 @@ function renderLeavesTable(leaves) {
     };
 
     const statusBadges = {
-        pending: { label: (isHod && !isAdmin) ? '⏳ Pending' : '⏳ Pending HOD', bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)' },
-        approved_by_hod: { label: (isHod && !isAdmin) ? '🟡 Sent to HR' : '🟡 Approved by HOD', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7', border: 'rgba(14, 165, 233, 0.35)' },
-        approved: { label: (isHod && !isAdmin) ? '✅ Approved' : '✅ Approved by HR', bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.35)' },
+        pending: { label: isHodOnly ? '⏳ Pending' : '⏳ Pending HOD', bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)' },
+        approved_by_hod: { label: isHodOnly ? '🟡 Sent to HR' : '🟡 Approved by HOD', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7', border: 'rgba(14, 165, 233, 0.35)' },
+        approved: { label: isHodOnly ? '✅ Approved' : '✅ Approved by HR', bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.35)' },
         rejected: { label: '❌ Rejected', bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.35)' },
         cancelled: { label: '🚫 Cancelled', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280', border: 'rgba(107, 114, 128, 0.35)' }
     };
@@ -771,7 +795,7 @@ function renderLeavesTable(leaves) {
             } else if (l.status === 'pending') {
                 actionHtml = `
                     <div style="display: inline-flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: nowrap;">
-                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Direct HR Approval">✓ HR</button>
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'approved')" title="Direct HR Approval (1-Click)">✓ HR</button>
                         <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLeaveAction(${l.id}, 'rejected')" title="Reject Leave">✕ Reject</button>
                     </div>
                 `;
@@ -785,7 +809,7 @@ function renderLeavesTable(leaves) {
                     </div>
                 `;
             }
-        } else if (isHod && isDeptStaff && l.employee_id != currentUserId) {
+        } else if (isHodOnly && isDeptStaff && l.employee_id != currentUserId) {
             if (l.status === 'pending') {
                 actionHtml = `
                     <div style="display: inline-flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: nowrap;">
@@ -808,6 +832,19 @@ function renderLeavesTable(leaves) {
             `;
         } else {
             actionHtml = `<span style="color: var(--text-muted); font-size: 11px; white-space: nowrap;">Completed</span>`;
+        }
+
+        let hodLeaveInfoHtml = '';
+        if (l.status === 'approved' || l.status === 'rejected') {
+            if (l.hod_name) {
+                hodLeaveInfoHtml = `<div style="font-size: 11px; color: #0284c7; margin-top: 3px; font-weight: 600;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name)} ${l.hod_notes ? '— "' + escapeHtml(l.hod_notes) + '"' : ''}</div>`;
+            } else {
+                hodLeaveInfoHtml = `<div style="font-size: 11px; color: #dc2626; margin-top: 3px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">⚠️ Not approved by HOD <span style="font-size: 10px; color: var(--text-muted); font-weight: 500;">(Direct HR Approval)</span></div>`;
+            }
+        } else if (l.status === 'approved_by_hod') {
+            hodLeaveInfoHtml = `<div style="font-size: 11px; color: #0284c7; margin-top: 3px; font-weight: 600;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name || 'HOD')} ${l.hod_notes ? '— "' + escapeHtml(l.hod_notes) + '"' : ''} <span style="color: #f59e0b; font-weight: 700;">(Pending HR)</span></div>`;
+        } else if (l.status === 'pending') {
+            hodLeaveInfoHtml = `<div style="font-size: 11px; color: #f59e0b; margin-top: 3px; font-weight: 600;">⏳ Awaiting HOD Endorsement</div>`;
         }
 
         html += `
@@ -834,13 +871,15 @@ function renderLeavesTable(leaves) {
                 </td>
                 <td>
                     <div style="font-size: 12.5px; color: var(--text-main);">${escapeHtml(l.reason)}</div>
-                    ${l.hod_name ? `<div style="font-size: 11px; color: #0284c7; margin-top: 3px;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name)} ${l.hod_notes ? '— "' + escapeHtml(l.hod_notes) + '"' : ''}</div>` : ''}
+                    ${hodLeaveInfoHtml}
                     ${l.admin_notes ? `<div style="font-size: 11px; color: #6366f1; margin-top: 2px;"><b>HR note:</b> ${escapeHtml(l.admin_notes)}</div>` : ''}
                 </td>
                 <td style="text-align: center; white-space: nowrap;">
                     <span style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: ${statBadge.bg}; color: ${statBadge.color}; border: 1px solid ${statBadge.border};" title="${l.status === 'approved_by_hod' ? 'Endorsed by HOD (' + (l.hod_name || 'HOD') + ') - Pending HR Final Approval' : ''}">
                         ${statBadge.label}
                     </span>
+                    ${l.status === 'approved' && !l.hod_name ? `<div style="font-size: 10.5px; color: #dc2626; font-weight: 800; margin-top: 3px;">⚠️ Not approved by HOD</div>` : ''}
+                    ${l.status === 'approved' && l.hod_name ? `<div style="font-size: 10px; color: #0284c7; font-weight: 700; margin-top: 2px;">✓ HOD Endorsed</div>` : ''}
                 </td>
                 <td style="text-align: center; white-space: nowrap;">
                     ${actionHtml}
@@ -858,10 +897,29 @@ async function openApplyLeaveModal() {
     const startInput = document.getElementById('hr-leave-form-start-date');
     const endInput = document.getElementById('hr-leave-form-end-date');
     const reasonInput = document.getElementById('hr-leave-form-reason');
+    const autoApproveInput = document.getElementById('hr-leave-form-auto-approve');
+    const autoApproveWrapper = document.getElementById('hr-leave-form-auto-approve-wrapper');
+    const empWrapper = document.getElementById('hr-leave-form-emp-wrapper');
+    const empSelect = document.getElementById('hr-leave-form-emp-id');
 
     if (startInput) startInput.value = today;
     if (endInput) endInput.value = today;
     if (reasonInput) reasonInput.value = '';
+    if (autoApproveInput) autoApproveInput.checked = false;
+
+    // Strict HR Admin check: ONLY main HR / Super Admin (NOT HOD, NOT regular Employee)
+    const currentUser = AppState.currentUser || {};
+    const isMainHrAdmin = (currentUser.role === 'super_admin' || currentUser.role === 'admin' || (currentUser.can_manage_hr && currentUser.role !== 'hod')) && currentUser.role !== 'hod';
+
+    if (autoApproveWrapper) {
+        autoApproveWrapper.style.display = isMainHrAdmin ? 'block' : 'none';
+    }
+    if (empWrapper) {
+        empWrapper.style.display = isMainHrAdmin ? 'block' : 'none';
+    }
+    if (empSelect && !isMainHrAdmin && currentUser.id) {
+        empSelect.value = currentUser.id;
+    }
 
     calculateLeaveFormDays();
     openModal('hr-apply-leave-modal');
@@ -1032,6 +1090,26 @@ async function loadHrLoans() {
 
         if (data.success) {
             HrState.loans = data.loans || [];
+            if (data.current_user) {
+                HrState.currentUser = data.current_user;
+            }
+
+            // Adjust dropdown filter labels based on role
+            const u = HrState.currentUser || AppState.currentUser || {};
+            const isAdminUser = !!(u.can_manage_hr || u.role === 'admin' || u.role === 'super_admin' || u.role === 'hr');
+            const isHodUser = !isAdminUser && (u.is_hod === true || u.role === 'hod' || (u.designation && (u.designation.includes('HOD') || u.designation.includes('Director'))));
+            const statusSelect = document.getElementById('hr-loan-status-filter');
+            if (statusSelect) {
+                const pendingOpt = statusSelect.querySelector('option[value="pending"]');
+                const hodOpt = statusSelect.querySelector('option[value="approved_by_hod"]');
+                if (pendingOpt) {
+                    pendingOpt.textContent = isHodUser ? '⏳ Pending' : '⏳ Pending HOD';
+                }
+                if (hodOpt) {
+                    hodOpt.textContent = isHodUser ? '🟡 Sent to HR' : '🟡 Approved by HOD';
+                }
+            }
+
             applyLoansClientFilters();
         } else {
             tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading loan records')}</td></tr>`;
@@ -1108,21 +1186,25 @@ function renderLoansTable(loans) {
         return;
     }
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
-    const currentUserId = AppState.currentUser ? AppState.currentUser.id : 0;
+    const currentUser = HrState.currentUser || AppState.currentUser || {};
+    const isAdmin = !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
+    const isHodOnly = !isAdmin && (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const currentUserId = currentUser.id || 0;
+    const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
 
     const loanTypeBadges = {
-        advance_salary: { label: '💵 Advance Salary', bg: 'rgba(14, 165, 233, 0.1)', color: '#0ea5e9' },
-        emergency_loan: { label: '🚨 Emergency Loan', bg: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' },
-        medical_aid: { label: '🩺 Medical Aid', bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }
+        advance_salary: { label: '💵 Advance Salary', bg: 'rgba(14, 165, 233, 0.1)', color: '#0ea5e9', border: 'rgba(14, 165, 233, 0.3)' },
+        emergency_loan: { label: '🚨 Emergency Loan', bg: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6', border: 'rgba(139, 92, 246, 0.3)' },
+        medical_aid: { label: '🩺 Medical Aid', bg: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'rgba(16, 185, 129, 0.3)' }
     };
 
     const statusBadges = {
-        pending: { label: '⏳ Pending', bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b' },
-        approved: { label: '✅ Active / Approved', bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981' },
-        repaid: { label: '🎉 Fully Repaid', bg: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' },
-        rejected: { label: '❌ Rejected', bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' },
-        cancelled: { label: '🚫 Cancelled', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280' }
+        pending: { label: isHodOnly ? '⏳ Pending' : '⏳ Pending HOD', bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)' },
+        approved_by_hod: { label: isHodOnly ? '🟡 Sent to HR' : '🟡 Approved by HOD', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7', border: 'rgba(14, 165, 233, 0.35)' },
+        approved: { label: isHodOnly ? '✅ Approved' : '✅ Active / Approved', bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.35)' },
+        repaid: { label: '🎉 Fully Repaid', bg: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', border: 'rgba(59, 130, 246, 0.35)' },
+        rejected: { label: '❌ Rejected', bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.35)' },
+        cancelled: { label: '🚫 Cancelled', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280', border: 'rgba(107, 114, 128, 0.35)' }
     };
 
     let html = '';
@@ -1135,39 +1217,74 @@ function renderLoansTable(loans) {
             ? `<img src="${escapeHtml(l.employee_avatar)}" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover;" alt="${escapeHtml(l.employee_name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width:28px;height:28px;font-size:12px;\\'>${escapeHtml(avatarInitial)}</div>';">`
             : `<div class="user-avatar" style="width: 28px; height: 28px; font-size: 12px;">${escapeHtml(avatarInitial)}</div>`;
 
+        const isDeptStaff = (l.department_id && l.department_id == userDeptId);
+
         let actionHtml = '';
-        if (isAdmin && l.status === 'pending') {
+        if (isAdmin) {
+            if (l.status === 'approved_by_hod') {
+                actionHtml = `
+                    <div style="display: inline-flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLoanAction(${l.id}, 'approved')" title="Grant Final HR Approval">✓ HR</button>
+                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLoanAction(${l.id}, 'rejected')" title="Reject Loan">✕ Reject</button>
+                    </div>
+                `;
+            } else if (l.status === 'pending') {
+                actionHtml = `
+                    <div style="display: inline-flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLoanAction(${l.id}, 'approved')" title="Direct HR Approval (1-Click)">✓ HR</button>
+                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLoanAction(${l.id}, 'rejected')" title="Reject Loan">✕ Reject</button>
+                    </div>
+                `;
+            } else if (l.status === 'approved') {
+                actionHtml = `
+                    <div style="display: inline-flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 6px; font-size: 11px; color: #10b981; white-space: nowrap;" onclick="handleLoanAction(${l.id}, 'repaid')" title="Mark as Fully Repaid">
+                            Mark Repaid
+                        </button>
+                        <button type="button" class="btn-icon-del" style="padding: 3px 6px; white-space: nowrap;" onclick="handleDeleteLoan(${l.id})" title="Delete record">🗑️</button>
+                    </div>
+                `;
+            } else {
+                actionHtml = `
+                    <button type="button" class="btn-icon-del" style="padding: 3px 6px; white-space: nowrap;" onclick="handleDeleteLoan(${l.id})" title="Delete record">🗑️</button>
+                `;
+            }
+        } else if (isHodOnly && isDeptStaff && l.employee_id != currentUserId) {
+            if (l.status === 'pending') {
+                actionHtml = `
+                    <div style="display: inline-flex; gap: 5px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                        <button type="button" class="btn btn-success" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLoanAction(${l.id}, 'approved_by_hod')" title="Approve Loan (Forward to HR)">✓ Approve</button>
+                        <button type="button" class="btn btn-danger" style="padding: 4px 9px; font-size: 11px; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" onclick="handleLoanAction(${l.id}, 'rejected')" title="Reject Loan">✕ Reject</button>
+                    </div>
+                `;
+            } else if (l.status === 'approved_by_hod') {
+                actionHtml = `<span style="color: #0284c7; font-size: 11px; font-weight: 700; white-space: nowrap;">✓ Approved by HOD (Sent to HR)</span>`;
+            } else if (l.status === 'approved') {
+                actionHtml = `<span style="color: #10b981; font-size: 11px; font-weight: 700; white-space: nowrap;">✅ Final Approved</span>`;
+            } else {
+                actionHtml = `<span style="color: var(--text-muted); font-size: 11px; white-space: nowrap;">Completed</span>`;
+            }
+        } else if (l.employee_id == currentUserId && (l.status === 'pending' || l.status === 'approved_by_hod')) {
             actionHtml = `
-                <div style="display: flex; gap: 4px; justify-content: center;">
-                    <button type="button" class="btn btn-success" style="padding: 4px 8px; font-size: 11px;" onclick="handleLoanAction(${l.id}, 'approved')" title="Approve Request">
-                        ✓ Approve
-                    </button>
-                    <button type="button" class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;" onclick="handleLoanAction(${l.id}, 'rejected')" title="Reject Request">
-                        ✕ Reject
-                    </button>
-                </div>
-            `;
-        } else if (isAdmin && l.status === 'approved') {
-            actionHtml = `
-                <div style="display: flex; gap: 4px; justify-content: center;">
-                    <button type="button" class="btn btn-outline" style="padding: 3px 6px; font-size: 11px; color: #10b981;" onclick="handleLoanAction(${l.id}, 'repaid')" title="Mark as Fully Repaid">
-                        Mark Repaid
-                    </button>
-                    <button type="button" class="btn-icon-del" style="padding: 3px 6px;" onclick="handleDeleteLoan(${l.id})" title="Delete record">🗑️</button>
-                </div>
-            `;
-        } else if (isAdmin) {
-            actionHtml = `
-                <button type="button" class="btn-icon-del" style="padding: 3px 6px;" onclick="handleDeleteLoan(${l.id})" title="Delete record">🗑️</button>
-            `;
-        } else if (l.employee_id == currentUserId && l.status === 'pending') {
-            actionHtml = `
-                <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; color: #ef4444; border-color: #ef4444;" onclick="handleDeleteLoan(${l.id})" title="Cancel Request">
+                <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; color: #ef4444; border-color: #ef4444; white-space: nowrap;" onclick="handleDeleteLoan(${l.id})" title="Cancel Request">
                     Cancel
                 </button>
             `;
         } else {
-            actionHtml = `<span style="color: var(--text-muted); font-size: 11px;">Completed</span>`;
+            actionHtml = `<span style="color: var(--text-muted); font-size: 11px; white-space: nowrap;">Completed</span>`;
+        }
+
+        let hodLoanInfoHtml = '';
+        if (l.status === 'approved' || l.status === 'repaid' || l.status === 'rejected') {
+            if (l.hod_name) {
+                hodLoanInfoHtml = `<div style="font-size: 10.5px; color: #0284c7; margin-top: 2px; font-weight: 600;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name)} ${l.hod_notes ? '— "' + escapeHtml(l.hod_notes) + '"' : ''}</div>`;
+            } else {
+                hodLoanInfoHtml = `<div style="font-size: 10.5px; color: #dc2626; margin-top: 2px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">⚠️ Not approved by HOD <span style="font-size: 9.5px; color: var(--text-muted); font-weight: 500;">(Direct HR Approval)</span></div>`;
+            }
+        } else if (l.status === 'approved_by_hod') {
+            hodLoanInfoHtml = `<div style="font-size: 10.5px; color: #0284c7; margin-top: 2px; font-weight: 600;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name || 'HOD')} ${l.hod_notes ? '— "' + escapeHtml(l.hod_notes) + '"' : ''} <span style="color: #f59e0b; font-weight: 700;">(Pending HR)</span></div>`;
+        } else if (l.status === 'pending') {
+            hodLoanInfoHtml = `<div style="font-size: 10.5px; color: #f59e0b; margin-top: 2px; font-weight: 600;">⏳ Awaiting HOD Review</div>`;
         }
 
         html += `
@@ -1182,31 +1299,34 @@ function renderLoansTable(loans) {
                     </div>
                 </td>
                 <td>
-                    <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11.5px; font-weight: 700; background: ${typeBadge.bg}; color: ${typeBadge.color};">
+                    <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11.5px; font-weight: 700; white-space: nowrap; background: ${typeBadge.bg}; color: ${typeBadge.color}; border: 1px solid ${typeBadge.border || 'transparent'};">
                         ${typeBadge.label}
                     </span>
                 </td>
-                <td style="font-weight: 800; font-size: 13.5px; color: var(--text-main);">
+                <td style="font-weight: 800; font-size: 13.5px; color: var(--text-main); white-space: nowrap;">
                     PKR ${Math.round(parseFloat(l.amount || 0)).toLocaleString('en-US')}
                 </td>
                 <td>
-                    <div style="font-weight: 600; font-size: 12px;">${l.repayment_months} Mo @ PKR ${Math.round(parseFloat(l.monthly_deduction || 0)).toLocaleString('en-US')}/mo</div>
-                    <div style="font-size: 10.5px; color: var(--primary);">Starts: ${escapeHtml(l.deduction_start_month)}</div>
+                    <div style="font-weight: 600; font-size: 12px; white-space: nowrap;">${l.repayment_months} Mo @ PKR ${Math.round(parseFloat(l.monthly_deduction || 0)).toLocaleString('en-US')}/mo</div>
+                    <div style="font-size: 10.5px; color: var(--primary); white-space: nowrap;">Starts: ${escapeHtml(l.deduction_start_month)}</div>
                 </td>
                 <td>
-                    <div style="font-size: 12px; font-weight: 700; color: #10b981;">Paid: PKR ${Math.round(parseFloat(l.paid_amount || 0)).toLocaleString('en-US')}</div>
-                    <div style="font-size: 11px; font-weight: 700; color: #ef4444;">Rem: PKR ${Math.round(parseFloat(l.remaining_amount || 0)).toLocaleString('en-US')}</div>
+                    <div style="font-size: 12px; font-weight: 700; color: #10b981; white-space: nowrap;">Paid: PKR ${Math.round(parseFloat(l.paid_amount || 0)).toLocaleString('en-US')}</div>
+                    <div style="font-size: 11px; font-weight: 700; color: #ef4444; white-space: nowrap;">Rem: PKR ${Math.round(parseFloat(l.remaining_amount || 0)).toLocaleString('en-US')}</div>
                 </td>
                 <td>
                     <div style="font-size: 12px; color: var(--text-main);">${escapeHtml(l.reason)}</div>
-                    ${l.admin_notes ? `<div style="font-size: 10.5px; color: #6366f1; margin-top: 2px;"><b>Admin note:</b> ${escapeHtml(l.admin_notes)}</div>` : ''}
+                    ${hodLoanInfoHtml}
+                    ${l.admin_notes ? `<div style="font-size: 10.5px; color: #6366f1; margin-top: 2px;"><b>HR note:</b> ${escapeHtml(l.admin_notes)}</div>` : ''}
                 </td>
-                <td style="text-align: center;">
-                    <span style="display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: ${statBadge.bg}; color: ${statBadge.color};">
+                <td style="text-align: center; white-space: nowrap;">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; white-space: nowrap; background: ${statBadge.bg}; color: ${statBadge.color}; border: 1px solid ${statBadge.border || 'transparent'};" title="${l.status === 'approved_by_hod' ? 'Endorsed by HOD (' + (l.hod_name || 'HOD') + ') - Pending HR Final Approval' : ''}">
                         ${statBadge.label}
                     </span>
+                    ${(l.status === 'approved' || l.status === 'repaid') && !l.hod_name ? `<div style="font-size: 10.5px; color: #dc2626; font-weight: 800; margin-top: 3px;">⚠️ Not approved by HOD</div>` : ''}
+                    ${(l.status === 'approved' || l.status === 'repaid') && l.hod_name ? `<div style="font-size: 10px; color: #0284c7; font-weight: 700; margin-top: 2px;">✓ HOD Endorsed</div>` : ''}
                 </td>
-                <td style="text-align: center;">
+                <td style="text-align: center; white-space: nowrap;">
                     ${actionHtml}
                 </td>
             </tr>
@@ -1222,10 +1342,29 @@ async function openApplyLoanModal() {
     const startMonthInput = document.getElementById('hr-loan-form-start-month');
     const amountInput = document.getElementById('hr-loan-form-amount');
     const reasonInput = document.getElementById('hr-loan-form-reason');
+    const autoApproveInput = document.getElementById('hr-loan-form-auto-approve');
+    const autoApproveWrapper = document.getElementById('hr-loan-form-auto-approve-wrapper');
+    const empWrapper = document.getElementById('hr-loan-form-emp-wrapper');
+    const empSelect = document.getElementById('hr-loan-form-emp-id');
 
     if (startMonthInput) startMonthInput.value = currentMonth;
     if (amountInput) amountInput.value = '';
     if (reasonInput) reasonInput.value = '';
+    if (autoApproveInput) autoApproveInput.checked = false;
+
+    // Strict HR Admin check: ONLY main HR / Super Admin (NOT HOD, NOT regular Employee)
+    const currentUser = AppState.currentUser || {};
+    const isMainHrAdmin = (currentUser.role === 'super_admin' || currentUser.role === 'admin' || (currentUser.can_manage_hr && currentUser.role !== 'hod')) && currentUser.role !== 'hod';
+
+    if (autoApproveWrapper) {
+        autoApproveWrapper.style.display = isMainHrAdmin ? 'block' : 'none';
+    }
+    if (empWrapper) {
+        empWrapper.style.display = isMainHrAdmin ? 'block' : 'none';
+    }
+    if (empSelect && !isMainHrAdmin && currentUser.id) {
+        empSelect.value = currentUser.id;
+    }
 
     calculateLoanFormDeduction();
     openModal('hr-apply-loan-modal');
@@ -1301,6 +1440,15 @@ async function handleLoanAction(loanId, status) {
         });
         if (input === null) return;
         adminNotes = input;
+    } else if (status === 'approved_by_hod') {
+        const input = await showPromptDialog({
+            title: "Approve & Endorse Loan Request",
+            message: "Add recommendation notes for HR approval (optional):",
+            placeholder: "e.g. Recommended for approval due to urgent personal need...",
+            confirmText: "Endorse & Forward to HR"
+        });
+        if (input === null) return;
+        adminNotes = input;
     } else if (status === 'repaid') {
         const confirmed = await showConfirmDialog({
             title: "Mark Loan as Fully Repaid",
@@ -1323,13 +1471,14 @@ async function handleLoanAction(loanId, status) {
                 loan_id: loanId,
                 status: status,
                 admin_notes: adminNotes,
+                hod_notes: adminNotes,
                 paid_amount: paidAmount
             })
         });
         const data = await res.json();
 
         if (data.success) {
-            showToast(data.message || `Request ${status}.`, "success");
+            showToast(data.message || `Request updated successfully.`, "success");
             await fetchHrOverview();
             await loadHrLoans();
         } else {

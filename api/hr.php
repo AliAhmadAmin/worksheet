@@ -33,7 +33,7 @@ $currentUserObj = $stmtUserCheck->fetch() ?: [];
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
 $isHod = ($currentUserRole === 'hod' || (stripos($currentUserObj['designation'] ?? '', 'HOD') !== false && !in_array($currentUserRole, ['super_admin', 'admin'])));
 $isAdmin = ($currentUserRole === 'admin' || $currentUserRole === 'super_admin' || $currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr'));
-$canManageHr = ($isAdmin || (!empty($currentUserObj['can_manage_hr']) && !$isHod));
+$canManageHr = ($isAdmin || !empty($currentUserObj['can_manage_hr']));
 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 
 switch ($action) {
@@ -164,8 +164,23 @@ switch ($action) {
         }
 
         // Pending Loan Requests
-        $stmtPendingLoans = $pdo->query("SELECT COUNT(*) FROM hr_loans WHERE status = 'pending'");
-        $pendingLoansCount = (int)$stmtPendingLoans->fetchColumn();
+        if ($canManageHr) {
+            $stmtPendingLoans = $pdo->query("SELECT COUNT(*) FROM hr_loans WHERE status IN ('pending', 'approved_by_hod')");
+            $pendingLoansCount = (int)$stmtPendingLoans->fetchColumn();
+        } elseif ($isHod) {
+            $stmtPendingLoans = $pdo->prepare("
+                SELECT COUNT(*) 
+                FROM hr_loans l 
+                JOIN employees e ON l.employee_id = e.id 
+                WHERE l.status IN ('pending', 'approved_by_hod') AND e.department_id = ?
+            ");
+            $stmtPendingLoans->execute([$userDeptId]);
+            $pendingLoansCount = (int)$stmtPendingLoans->fetchColumn();
+        } else {
+            $stmtPendingLoans = $pdo->prepare("SELECT COUNT(*) FROM hr_loans WHERE status IN ('pending', 'approved_by_hod') AND employee_id = ?");
+            $stmtPendingLoans->execute([$currentUserId]);
+            $pendingLoansCount = (int)$stmtPendingLoans->fetchColumn();
+        }
 
         // Active Approved Loans Total
         $stmtActiveLoans = $pdo->query("SELECT COUNT(*), COALESCE(SUM(amount - paid_amount), 0) as total_balance FROM hr_loans WHERE status = 'approved' AND paid_amount < amount");
@@ -184,16 +199,45 @@ switch ($action) {
         $activeNotices = $stmtNotices->fetchAll();
 
         // Pending Loan Applications Queue (Top 6)
-        $stmtPendingLoansList = $pdo->query("
-            SELECT l.*, e.name as employee_name, e.designation, e.avatar, d.name as department_name
-            FROM hr_loans l
-            JOIN employees e ON l.employee_id = e.id
-            LEFT JOIN departments d ON e.department_id = d.id
-            WHERE l.status = 'pending'
-            ORDER BY l.created_at ASC
-            LIMIT 6
-        ");
-        $pendingLoansList = $stmtPendingLoansList->fetchAll();
+        if ($canManageHr) {
+            $stmtPendingLoansList = $pdo->query("
+                SELECT l.*, e.name as employee_name, e.designation, e.avatar, d.name as department_name, h.name as hod_name
+                FROM hr_loans l
+                JOIN employees e ON l.employee_id = e.id
+                LEFT JOIN departments d ON e.department_id = d.id
+                LEFT JOIN employees h ON l.hod_id = h.id
+                WHERE l.status IN ('pending', 'approved_by_hod')
+                ORDER BY CASE l.status WHEN 'approved_by_hod' THEN 1 WHEN 'pending' THEN 2 ELSE 3 END, l.created_at ASC
+                LIMIT 6
+            ");
+            $pendingLoansList = $stmtPendingLoansList->fetchAll();
+        } elseif ($isHod) {
+            $stmtPendingLoansList = $pdo->prepare("
+                SELECT l.*, e.name as employee_name, e.designation, e.avatar, d.name as department_name, h.name as hod_name
+                FROM hr_loans l
+                JOIN employees e ON l.employee_id = e.id
+                LEFT JOIN departments d ON e.department_id = d.id
+                LEFT JOIN employees h ON l.hod_id = h.id
+                WHERE l.status IN ('pending', 'approved_by_hod') AND e.department_id = ?
+                ORDER BY CASE l.status WHEN 'pending' THEN 1 WHEN 'approved_by_hod' THEN 2 ELSE 3 END, l.created_at ASC
+                LIMIT 6
+            ");
+            $stmtPendingLoansList->execute([$userDeptId]);
+            $pendingLoansList = $stmtPendingLoansList->fetchAll();
+        } else {
+            $stmtPendingLoansList = $pdo->prepare("
+                SELECT l.*, e.name as employee_name, e.designation, e.avatar, d.name as department_name, h.name as hod_name
+                FROM hr_loans l
+                JOIN employees e ON l.employee_id = e.id
+                LEFT JOIN departments d ON e.department_id = d.id
+                LEFT JOIN employees h ON l.hod_id = h.id
+                WHERE l.status IN ('pending', 'approved_by_hod') AND l.employee_id = ?
+                ORDER BY l.created_at ASC
+                LIMIT 6
+            ");
+            $stmtPendingLoansList->execute([$currentUserId]);
+            $pendingLoansList = $stmtPendingLoansList->fetchAll();
+        }
 
         // Department Attendance Breakdown for Today
         $stmtDeptAtt = $pdo->prepare("
@@ -443,7 +487,7 @@ switch ($action) {
 
             $stmt = $pdo->prepare("
                 UPDATE hr_leaves 
-                SET status = 'approved', action_by = ?, action_at = NOW(), admin_notes = ? 
+                SET status = 'approved', action_by = ?, action_at = NOW(), admin_notes = COALESCE(NULLIF(?, ''), admin_notes) 
                 WHERE id = ?
             ");
             $stmt->execute([$currentUserId, $notes, $leaveId]);
@@ -646,21 +690,38 @@ switch ($action) {
                    e.designation as employee_designation,
                    e.avatar as employee_avatar,
                    d.name as department_name,
-                   a.name as action_by_name
+                   d.id as department_id,
+                   a.name as action_by_name,
+                   h.name as hod_name
             FROM hr_loans l
             JOIN employees e ON l.employee_id = e.id
             LEFT JOIN departments d ON e.department_id = d.id
             LEFT JOIN employees a ON l.action_by = a.id
+            LEFT JOIN employees h ON l.hod_id = h.id
             WHERE 1=1
         ";
         $params = [];
 
-        if (!$canManageHr) {
+        if ($canManageHr) {
+            if ($empFilter) {
+                $sql .= " AND l.employee_id = ?";
+                $params[] = $empFilter;
+            }
+        } elseif ($isHod) {
+            // HOD can see loans from their department members OR their own loans
+            if ($empFilter) {
+                $sql .= " AND l.employee_id = ? AND (e.department_id = ? OR l.employee_id = ?)";
+                $params[] = $empFilter;
+                $params[] = $userDeptId;
+                $params[] = $currentUserId;
+            } else {
+                $sql .= " AND (e.department_id = ? OR l.employee_id = ?)";
+                $params[] = $userDeptId;
+                $params[] = $currentUserId;
+            }
+        } else {
             $sql .= " AND l.employee_id = ?";
             $params[] = $currentUserId;
-        } elseif ($empFilter) {
-            $sql .= " AND l.employee_id = ?";
-            $params[] = $empFilter;
         }
 
         if ($statusFilter && $statusFilter !== 'all') {
@@ -673,17 +734,27 @@ switch ($action) {
             $params[] = $typeFilter;
         }
 
-        $sql .= " ORDER BY CASE l.status WHEN 'pending' THEN 1 WHEN 'approved' THEN 2 ELSE 3 END, l.created_at DESC";
+        $sql .= " ORDER BY CASE l.status WHEN 'pending' THEN 1 WHEN 'approved_by_hod' THEN 2 WHEN 'approved' THEN 3 ELSE 4 END, l.created_at DESC";
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $loans = $stmt->fetchAll();
 
-        echo json_encode(['success' => true, 'loans' => $loans]);
+        echo json_encode([
+            'success' => true, 
+            'loans' => $loans,
+            'current_user' => [
+                'id' => $currentUserId,
+                'role' => $currentUserRole,
+                'is_hod' => $isHod,
+                'can_manage_hr' => $canManageHr,
+                'department_id' => $userDeptId
+            ]
+        ]);
         break;
 
     case 'apply_loan':
-        $empId = $canManageHr ? (int)($data['employee_id'] ?? $currentUserId) : $currentUserId;
+        $empId = ($canManageHr && $currentUserRole !== 'hod') ? (int)($data['employee_id'] ?? $currentUserId) : $currentUserId;
         $requestType = $data['request_type'] ?? 'advance_salary';
         $amount = (float)($data['amount'] ?? 0);
         $repaymentMonths = max(1, (int)($data['repayment_months'] ?? 1));
@@ -700,7 +771,8 @@ switch ($action) {
         }
 
         $monthlyDeduction = round($amount / $repaymentMonths, 2);
-        $initialStatus = $canManageHr && isset($data['auto_approve']) && $data['auto_approve'] ? 'approved' : 'pending';
+        $isMainHrAdmin = ($canManageHr && $currentUserRole !== 'hod');
+        $initialStatus = ($isMainHrAdmin && !empty($data['auto_approve'])) ? 'approved' : 'pending';
         $actionBy = ($initialStatus === 'approved') ? $currentUserId : null;
         $actionAt = ($initialStatus === 'approved') ? date('Y-m-d H:i:s') : null;
 
@@ -713,20 +785,86 @@ switch ($action) {
 
         echo json_encode([
             'success' => true,
-            'message' => ($initialStatus === 'approved') ? 'Loan/Advance recorded and approved successfully.' : 'Loan/Advance request submitted successfully for approval.'
+            'message' => ($initialStatus === 'approved') ? 'Loan/Advance recorded and approved successfully.' : 'Loan/Advance request submitted successfully. Forwarded to HOD for initial endorsement.'
         ]);
         break;
 
     case 'update_loan_status':
-        if (!$canManageHr) {
-            echo json_encode(['success' => false, 'message' => 'Access denied: HR Manager / Admin permission required.']);
+        $loanId = (int)($data['loan_id'] ?? 0);
+        $status = $data['status'] ?? '';
+        $notes = trim($data['admin_notes'] ?? ($data['hod_notes'] ?? ''));
+        $paidAmount = isset($data['paid_amount']) ? (float)$data['paid_amount'] : null;
+
+        if (!$loanId) {
+            echo json_encode(['success' => false, 'message' => 'Loan application ID is required.']);
             exit;
         }
 
-        $loanId = (int)($data['loan_id'] ?? 0);
-        $status = $data['status'] ?? '';
-        $adminNotes = trim($data['admin_notes'] ?? '');
-        $paidAmount = isset($data['paid_amount']) ? (float)$data['paid_amount'] : null;
+        $stmtCheck = $pdo->prepare("
+            SELECT l.*, e.department_id, e.name as employee_name 
+            FROM hr_loans l 
+            JOIN employees e ON l.employee_id = e.id 
+            WHERE l.id = ?
+        ");
+        $stmtCheck->execute([$loanId]);
+        $loan = $stmtCheck->fetch();
+
+        if (!$loan) {
+            echo json_encode(['success' => false, 'message' => 'Loan record not found.']);
+            exit;
+        }
+
+        $isDeptHod = ($isHod && (int)$loan['department_id'] === $userDeptId);
+
+        if (!$canManageHr && !$isDeptHod) {
+            echo json_encode(['success' => false, 'message' => 'Access Denied: You do not have permission to approve/reject this loan request.']);
+            exit;
+        }
+
+        // HOD Approval Workflow
+        if ($status === 'approved_by_hod') {
+            if (!$isDeptHod && !$canManageHr) {
+                echo json_encode(['success' => false, 'message' => 'Only Department HOD can endorse this initial approval.']);
+                exit;
+            }
+
+            $stmt = $pdo->prepare("
+                UPDATE hr_loans 
+                SET status = 'approved_by_hod', hod_id = ?, hod_action_at = NOW(), hod_notes = ? 
+                WHERE id = ?
+            ");
+            $stmt->execute([$currentUserId, $notes, $loanId]);
+
+            echo json_encode([
+                'success' => true, 
+                'message' => "Advance/Loan request approved by HOD. Forwarded to HR for final approval.",
+                'status' => 'approved_by_hod'
+            ]);
+            break;
+        }
+
+        // HOD Rejection Workflow
+        if ($status === 'rejected' && $isDeptHod && !$canManageHr) {
+            $stmt = $pdo->prepare("
+                UPDATE hr_loans 
+                SET status = 'rejected', hod_id = ?, hod_action_at = NOW(), hod_notes = ? 
+                WHERE id = ?
+            ");
+            $stmt->execute([$currentUserId, $notes, $loanId]);
+
+            echo json_encode([
+                'success' => true, 
+                'message' => "Advance/Loan request rejected by HOD.",
+                'status' => 'rejected'
+            ]);
+            break;
+        }
+
+        // HR Final Approval & Management
+        if (!$canManageHr) {
+            echo json_encode(['success' => false, 'message' => 'Access denied: HR Manager / Admin permission required for final loan approval.']);
+            exit;
+        }
 
         if (!in_array($status, ['approved', 'rejected', 'repaid', 'pending', 'cancelled'])) {
             echo json_encode(['success' => false, 'message' => 'Invalid status provided.']);
@@ -736,17 +874,17 @@ switch ($action) {
         if ($paidAmount !== null) {
             $stmt = $pdo->prepare("
                 UPDATE hr_loans 
-                SET status = ?, admin_notes = ?, paid_amount = ?, action_by = ?, action_at = NOW() 
+                SET status = ?, admin_notes = COALESCE(NULLIF(?, ''), admin_notes), paid_amount = ?, action_by = ?, action_at = NOW() 
                 WHERE id = ?
             ");
-            $stmt->execute([$status, $adminNotes, $paidAmount, $currentUserId, $loanId]);
+            $stmt->execute([$status, $notes, $paidAmount, $currentUserId, $loanId]);
         } else {
             $stmt = $pdo->prepare("
                 UPDATE hr_loans 
-                SET status = ?, admin_notes = ?, action_by = ?, action_at = NOW() 
+                SET status = ?, admin_notes = COALESCE(NULLIF(?, ''), admin_notes), action_by = ?, action_at = NOW() 
                 WHERE id = ?
             ");
-            $stmt->execute([$status, $adminNotes, $currentUserId, $loanId]);
+            $stmt->execute([$status, $notes, $currentUserId, $loanId]);
         }
 
         echo json_encode(['success' => true, 'message' => "Request marked as {$status}."]);
