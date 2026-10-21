@@ -69,26 +69,20 @@ async function fetchHrOverview() {
             if (pendingLeavesEl) pendingLeavesEl.textContent = ov.pending_leaves || 0;
             if (pendingLoansEl) pendingLoansEl.textContent = ov.pending_loans || 0;
 
-            // Update pending badge in navbar
-            const navLeavesBadge = document.getElementById('pending-leaves-badge');
-            if (navLeavesBadge) {
-                if (ov.pending_leaves > 0) {
-                    navLeavesBadge.textContent = ov.pending_leaves;
-                    navLeavesBadge.style.display = 'inline-block';
-                } else {
-                    navLeavesBadge.style.display = 'none';
-                }
-            }
+            // Update pending badge in navbar for both main portal and HR portal
+            const navLeavesBadges = Array.from(document.querySelectorAll('.pending-leaves-badge, #pending-leaves-badge'));
+            const leaveCount = parseInt(ov.pending_leaves) || 0;
+            navLeavesBadges.forEach(badge => {
+                badge.textContent = leaveCount;
+                badge.style.display = leaveCount > 0 ? 'inline-block' : 'none';
+            });
 
-            const navLoansBadge = document.getElementById('pending-loans-badge');
-            if (navLoansBadge) {
-                if (ov.pending_loans > 0) {
-                    navLoansBadge.textContent = ov.pending_loans;
-                    navLoansBadge.style.display = 'inline-block';
-                } else {
-                    navLoansBadge.style.display = 'none';
-                }
-            }
+            const navLoansBadges = Array.from(document.querySelectorAll('.pending-loans-badge, #pending-loans-badge'));
+            const loanCount = parseInt(ov.pending_loans) || 0;
+            navLoansBadges.forEach(badge => {
+                badge.textContent = loanCount;
+                badge.style.display = loanCount > 0 ? 'inline-block' : 'none';
+            });
 
             // 2. Company-Wide Monthly Leave Analytics
             const compLeaves = ov.company_leave_stats || {};
@@ -138,8 +132,8 @@ function renderDashboardPendingQueue(pendingList) {
     }
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
-    const isAdmin = !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
-    const isHodOnly = !isAdmin && (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const isHodOnly = (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const isAdmin = !isHodOnly && !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
     const currentUserId = currentUser.id || 0;
     const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
 
@@ -198,7 +192,7 @@ function renderDashboardPendingQueue(pendingList) {
                     </div>
                     ${l.hod_name 
                         ? `<div style="font-size: 10.5px; color: #0284c7; margin-top: 2px;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name)}</div>` 
-                        : (l.status === 'pending' ? `<div style="font-size: 10.5px; color: #ea580c; font-weight: 600; margin-top: 2px;">⚠️ Not approved by HOD yet</div>` : `<div style="font-size: 10.5px; color: #dc2626; font-weight: 700; margin-top: 2px;">⚠️ Not approved by HOD</div>`)
+                        : ''
                     }
                 </div>
 
@@ -226,8 +220,8 @@ function renderDashboardPendingLoansQueue(loanList) {
     }
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
-    const isAdmin = !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
-    const isHodOnly = !isAdmin && (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const isHodOnly = (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const isAdmin = !isHodOnly && !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
     const currentUserId = currentUser.id || 0;
     const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
 
@@ -291,7 +285,7 @@ function renderDashboardPendingLoansQueue(loanList) {
                     </div>
                     ${l.hod_name 
                         ? `<div style="font-size: 10.5px; color: #0284c7; margin-top: 2px;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name)}</div>` 
-                        : (l.status === 'pending' ? `<div style="font-size: 10.5px; color: #ea580c; font-weight: 600; margin-top: 2px;">⚠️ Not approved by HOD yet</div>` : `<div style="font-size: 10.5px; color: #dc2626; font-weight: 700; margin-top: 2px;">⚠️ Not approved by HOD</div>`)}
+                        : ''}
                 </div>
 
                 ${actionBtnHtml}
@@ -642,7 +636,7 @@ async function loadHrLeaves() {
     const tbody = document.getElementById('hr-leaves-table-body');
     if (!tbody) return;
 
-    const statusFilter = document.getElementById('hr-leave-status-filter')?.value || 'pending';
+    const statusFilter = document.getElementById('hr-leave-status-filter')?.value || 'all';
     const typeFilter = document.getElementById('hr-leave-type-filter')?.value || 'all';
     const empFilter = document.getElementById('hr-leave-emp-filter')?.value || '';
 
@@ -659,8 +653,8 @@ async function loadHrLeaves() {
 
             // Adjust dropdown filter labels based on role
             const u = HrState.currentUser || AppState.currentUser || {};
-            const isAdminUser = !!(u.can_manage_hr || u.role === 'admin' || u.role === 'super_admin' || u.role === 'hr');
-            const isHodUser = !isAdminUser && (u.is_hod === true || u.role === 'hod' || (u.designation && (u.designation.includes('HOD') || u.designation.includes('Director'))));
+            const isHodUser = (u.is_hod === true || u.role === 'hod' || (u.designation && (u.designation.includes('HOD') || u.designation.includes('Director'))));
+            const isAdminUser = !isHodUser && !!(u.can_manage_hr || u.role === 'admin' || u.role === 'super_admin' || u.role === 'hr');
             const statusSelect = document.getElementById('hr-leave-status-filter');
             if (statusSelect) {
                 const pendingOpt = statusSelect.querySelector('option[value="pending"]');
@@ -692,7 +686,7 @@ function applyLeavesClientFilters() {
     // Show/hide reset button
     const resetBtn = document.getElementById('hr-leave-reset-filters-btn');
     if (resetBtn) {
-        const isFiltered = !!(search || dept || empId || status !== 'pending' || type !== 'all');
+        const isFiltered = !!(search || dept || empId || (status !== 'all' && status !== '') || type !== 'all');
         resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
     }
 
@@ -721,7 +715,7 @@ function applyLeavesClientFilters() {
 function resetLeavesFilters() {
     if (document.getElementById('hr-leave-search')) document.getElementById('hr-leave-search').value = '';
     if (document.getElementById('hr-leave-dept-filter')) document.getElementById('hr-leave-dept-filter').value = '';
-    if (document.getElementById('hr-leave-status-filter')) document.getElementById('hr-leave-status-filter').value = 'pending';
+    if (document.getElementById('hr-leave-status-filter')) document.getElementById('hr-leave-status-filter').value = 'all';
     if (document.getElementById('hr-leave-type-filter')) document.getElementById('hr-leave-type-filter').value = 'all';
     if (document.getElementById('hr-leave-emp-filter')) document.getElementById('hr-leave-emp-filter').value = '';
     loadHrLeaves();
@@ -750,8 +744,8 @@ function renderLeavesTable(leaves) {
     }
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
-    const isAdmin = !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
-    const isHodOnly = !isAdmin && (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const isHodOnly = (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const isAdmin = !isHodOnly && !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
     const currentUserId = currentUser.id || 0;
     const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
 
@@ -843,8 +837,6 @@ function renderLeavesTable(leaves) {
             }
         } else if (l.status === 'approved_by_hod') {
             hodLeaveInfoHtml = `<div style="font-size: 11px; color: #0284c7; margin-top: 3px; font-weight: 600;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name || 'HOD')} ${l.hod_notes ? '— "' + escapeHtml(l.hod_notes) + '"' : ''} <span style="color: #f59e0b; font-weight: 700;">(Pending HR)</span></div>`;
-        } else if (l.status === 'pending') {
-            hodLeaveInfoHtml = `<div style="font-size: 11px; color: #f59e0b; margin-top: 3px; font-weight: 600;">⏳ Awaiting HOD Endorsement</div>`;
         }
 
         html += `
@@ -1077,7 +1069,7 @@ async function loadHrLoans() {
     const tbody = document.getElementById('hr-loans-table-body');
     if (!tbody) return;
 
-    const statusFilter = document.getElementById('hr-loan-status-filter')?.value || 'pending';
+    const statusFilter = document.getElementById('hr-loan-status-filter')?.value || 'all';
     const typeFilter = document.getElementById('hr-loan-type-filter')?.value || 'all';
     const empFilter = document.getElementById('hr-loan-emp-filter')?.value || '';
 
@@ -1096,8 +1088,8 @@ async function loadHrLoans() {
 
             // Adjust dropdown filter labels based on role
             const u = HrState.currentUser || AppState.currentUser || {};
-            const isAdminUser = !!(u.can_manage_hr || u.role === 'admin' || u.role === 'super_admin' || u.role === 'hr');
-            const isHodUser = !isAdminUser && (u.is_hod === true || u.role === 'hod' || (u.designation && (u.designation.includes('HOD') || u.designation.includes('Director'))));
+            const isHodUser = (u.is_hod === true || u.role === 'hod' || (u.designation && (u.designation.includes('HOD') || u.designation.includes('Director'))));
+            const isAdminUser = !isHodUser && !!(u.can_manage_hr || u.role === 'admin' || u.role === 'super_admin' || u.role === 'hr');
             const statusSelect = document.getElementById('hr-loan-status-filter');
             if (statusSelect) {
                 const pendingOpt = statusSelect.querySelector('option[value="pending"]');
@@ -1128,7 +1120,7 @@ function applyLoansClientFilters() {
 
     const resetBtn = document.getElementById('hr-loan-reset-filters-btn');
     if (resetBtn) {
-        const isFiltered = !!(search || dept || empId || status !== 'pending' || type !== 'all');
+        const isFiltered = !!(search || dept || empId || (status !== 'all' && status !== '') || type !== 'all');
         resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
     }
 
@@ -1158,7 +1150,7 @@ function applyLoansClientFilters() {
 function resetLoansFilters() {
     if (document.getElementById('hr-loan-search')) document.getElementById('hr-loan-search').value = '';
     if (document.getElementById('hr-loan-dept-filter')) document.getElementById('hr-loan-dept-filter').value = '';
-    if (document.getElementById('hr-loan-status-filter')) document.getElementById('hr-loan-status-filter').value = 'pending';
+    if (document.getElementById('hr-loan-status-filter')) document.getElementById('hr-loan-status-filter').value = 'all';
     if (document.getElementById('hr-loan-type-filter')) document.getElementById('hr-loan-type-filter').value = 'all';
     if (document.getElementById('hr-loan-emp-filter')) document.getElementById('hr-loan-emp-filter').value = '';
     loadHrLoans();
@@ -1187,8 +1179,8 @@ function renderLoansTable(loans) {
     }
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
-    const isAdmin = !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
-    const isHodOnly = !isAdmin && (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const isHodOnly = (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
+    const isAdmin = !isHodOnly && !!(currentUser.can_manage_hr || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'hr');
     const currentUserId = currentUser.id || 0;
     const userDeptId = currentUser.department_id || (AppState.currentUser ? AppState.currentUser.department_id : 0);
 
@@ -1283,8 +1275,6 @@ function renderLoansTable(loans) {
             }
         } else if (l.status === 'approved_by_hod') {
             hodLoanInfoHtml = `<div style="font-size: 10.5px; color: #0284c7; margin-top: 2px; font-weight: 600;"><b>HOD Endorsed:</b> ${escapeHtml(l.hod_name || 'HOD')} ${l.hod_notes ? '— "' + escapeHtml(l.hod_notes) + '"' : ''} <span style="color: #f59e0b; font-weight: 700;">(Pending HR)</span></div>`;
-        } else if (l.status === 'pending') {
-            hodLoanInfoHtml = `<div style="font-size: 10.5px; color: #f59e0b; margin-top: 2px; font-weight: 600;">⏳ Awaiting HOD Review</div>`;
         }
 
         html += `
@@ -1312,7 +1302,7 @@ function renderLoansTable(loans) {
                 </td>
                 <td>
                     <div style="font-size: 12px; font-weight: 700; color: #10b981; white-space: nowrap;">Paid: PKR ${Math.round(parseFloat(l.paid_amount || 0)).toLocaleString('en-US')}</div>
-                    <div style="font-size: 11px; font-weight: 700; color: #ef4444; white-space: nowrap;">Rem: PKR ${Math.round(parseFloat(l.remaining_amount || 0)).toLocaleString('en-US')}</div>
+                    <div style="font-size: 11px; font-weight: 700; color: ${(l.status === 'repaid' || parseFloat(l.remaining_amount || 0) <= 0) ? '#10b981' : '#ef4444'}; white-space: nowrap;">${(l.status === 'repaid' || parseFloat(l.remaining_amount || 0) <= 0) ? '🎉 Settled (PKR 0)' : 'Rem: PKR ' + Math.round(parseFloat(l.remaining_amount || 0)).toLocaleString('en-US')}</div>
                 </td>
                 <td>
                     <div style="font-size: 12px; color: var(--text-main);">${escapeHtml(l.reason)}</div>
@@ -1450,6 +1440,10 @@ async function handleLoanAction(loanId, status) {
         if (input === null) return;
         adminNotes = input;
     } else if (status === 'repaid') {
+        const item = (HrState.loans || []).find(x => x.id == loanId);
+        if (item) {
+            paidAmount = parseFloat(item.amount || 0);
+        }
         const confirmed = await showConfirmDialog({
             title: "Mark Loan as Fully Repaid",
             message: "Are you sure you want to mark this loan as fully repaid?",

@@ -177,10 +177,12 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
+                <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
+                <span class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
@@ -257,6 +259,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
+                <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
             </button>
         </div>
 
@@ -298,6 +301,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
+                <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
             </button>
         </div>
 
@@ -325,12 +329,12 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Requests</span>
-                <span id="pending-leaves-badge" class="nav-badge badge-warning" style="display: none;">0</span>
+                <span id="pending-leaves-badge" class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
-                <span id="pending-loans-badge" class="nav-badge badge-info" style="display: none;">0</span>
+                <span id="pending-loans-badge" class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>

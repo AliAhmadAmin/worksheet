@@ -622,6 +622,26 @@ async function updateGlobalSidebarBadges() {
                 });
             }
         }
+
+        // 3. Leaves & Advance Salary Badges (For HOD & HR)
+        const leaveBadges = Array.from(document.querySelectorAll('.pending-leaves-badge, #pending-leaves-badge'));
+        const loanBadges = Array.from(document.querySelectorAll('.pending-loans-badge, #pending-loans-badge'));
+        if (leaveBadges.length > 0 || loanBadges.length > 0) {
+            const hrRes = await fetch('api/hr.php?action=get_overview');
+            const hrData = await hrRes.json();
+            if (hrData.success && hrData.overview) {
+                const leaveCount = parseInt(hrData.overview.pending_leaves) || 0;
+                leaveBadges.forEach(badge => {
+                    badge.textContent = leaveCount;
+                    badge.style.display = leaveCount > 0 ? 'inline-block' : 'none';
+                });
+                const loanCount = parseInt(hrData.overview.pending_loans) || 0;
+                loanBadges.forEach(badge => {
+                    badge.textContent = loanCount;
+                    badge.style.display = loanCount > 0 ? 'inline-block' : 'none';
+                });
+            }
+        }
     } catch (e) {
         // Ignore background badge errors
     }

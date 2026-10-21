@@ -33,7 +33,7 @@ $currentUserObj = $stmtUserCheck->fetch() ?: [];
 $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
 $isHod = ($currentUserRole === 'hod' || (stripos($currentUserObj['designation'] ?? '', 'HOD') !== false && !in_array($currentUserRole, ['super_admin', 'admin'])));
 $isAdmin = ($currentUserRole === 'admin' || $currentUserRole === 'super_admin' || $currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr'));
-$canManageHr = ($isAdmin || !empty($currentUserObj['can_manage_hr']));
+$canManageHr = ($isAdmin || (!empty($currentUserObj['can_manage_hr']) && !$isHod));
 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 
 switch ($action) {
@@ -50,9 +50,9 @@ switch ($action) {
                 SELECT COUNT(*) 
                 FROM hr_leaves l 
                 JOIN employees e ON l.employee_id = e.id 
-                WHERE l.status = 'pending' AND e.department_id = ?
+                WHERE l.status = 'pending' AND e.department_id = ? AND l.employee_id != ?
             ");
-            $stmtPending->execute([$userDeptId]);
+            $stmtPending->execute([$userDeptId, $currentUserId]);
             $pendingLeavesCount = (int)$stmtPending->fetchColumn();
         } else {
             $stmtPending = $pdo->prepare("SELECT COUNT(*) FROM hr_leaves WHERE status IN ('pending', 'approved_by_hod') AND employee_id = ?");
@@ -172,9 +172,9 @@ switch ($action) {
                 SELECT COUNT(*) 
                 FROM hr_loans l 
                 JOIN employees e ON l.employee_id = e.id 
-                WHERE l.status IN ('pending', 'approved_by_hod') AND e.department_id = ?
+                WHERE l.status = 'pending' AND e.department_id = ? AND l.employee_id != ?
             ");
-            $stmtPendingLoans->execute([$userDeptId]);
+            $stmtPendingLoans->execute([$userDeptId, $currentUserId]);
             $pendingLoansCount = (int)$stmtPendingLoans->fetchColumn();
         } else {
             $stmtPendingLoans = $pdo->prepare("SELECT COUNT(*) FROM hr_loans WHERE status IN ('pending', 'approved_by_hod') AND employee_id = ?");
@@ -685,7 +685,7 @@ switch ($action) {
 
         $sql = "
             SELECT l.*, 
-                   (l.amount - l.paid_amount) as remaining_amount,
+                   CASE WHEN l.status = 'repaid' THEN 0.00 ELSE GREATEST(0.00, (l.amount - l.paid_amount)) END as remaining_amount,
                    e.name as employee_name, 
                    e.designation as employee_designation,
                    e.avatar as employee_avatar,
@@ -871,7 +871,15 @@ switch ($action) {
             exit;
         }
 
-        if ($paidAmount !== null) {
+        if ($status === 'repaid') {
+            $newPaid = ($paidAmount !== null && $paidAmount > 0) ? $paidAmount : (float)$loan['amount'];
+            $stmt = $pdo->prepare("
+                UPDATE hr_loans 
+                SET status = 'repaid', paid_amount = ?, admin_notes = COALESCE(NULLIF(?, ''), admin_notes), action_by = ?, action_at = NOW() 
+                WHERE id = ?
+            ");
+            $stmt->execute([$newPaid, $notes, $currentUserId, $loanId]);
+        } elseif ($paidAmount !== null) {
             $stmt = $pdo->prepare("
                 UPDATE hr_loans 
                 SET status = ?, admin_notes = COALESCE(NULLIF(?, ''), admin_notes), paid_amount = ?, action_by = ?, action_at = NOW() 
@@ -1584,6 +1592,8 @@ switch ($action) {
         $whereClauses = ["e.is_active = 1"];
         $params = [
             'month' => $month,
+            'advMonth' => $month,
+            'loanMonth' => $month,
             'firstDay1' => $firstDay,
             'lastDay1' => $lastDay,
             'firstDay2' => $firstDay,
@@ -1624,7 +1634,7 @@ switch ($action) {
                 COALESCE(pay.food_bills, clm.food_claims, 0.00) as food_bills,
                 COALESCE(pay.bonus, clm.bonus_claims, 0.00) as bonus,
                 pay.bonus_reason,
-                COALESCE(pay.advance_salary, 0.00) as advance_salary,
+                COALESCE(pay.advance_salary, adv_ded.advance_salary, 0.00) as advance_salary,
                 COALESCE(pay.loan_deduction, l_ded.loan_deduction, 0.00) as loan_deduction,
                 COALESCE(pay.fines, f_ded.fines, 0.00) as fines,
                 COALESCE(pay.fine_reason, f_ded.fine_reason) as fine_reason,
@@ -1677,9 +1687,19 @@ switch ($action) {
                 GROUP BY employee_id
             ) lv ON e.id = lv.employee_id
             LEFT JOIN (
+                SELECT employee_id, SUM(monthly_deduction) as advance_salary
+                FROM hr_loans
+                WHERE status IN ('approved', 'active') 
+                  AND request_type = 'advance_salary'
+                  AND deduction_start_month <= :advMonth
+                GROUP BY employee_id
+            ) adv_ded ON e.id = adv_ded.employee_id
+            LEFT JOIN (
                 SELECT employee_id, SUM(monthly_deduction) as loan_deduction
                 FROM hr_loans
-                WHERE status IN ('approved', 'active')
+                WHERE status IN ('approved', 'active') 
+                  AND request_type != 'advance_salary'
+                  AND deduction_start_month <= :loanMonth
                 GROUP BY employee_id
             ) l_ded ON e.id = l_ded.employee_id
             LEFT JOIN (
@@ -1862,6 +1882,71 @@ switch ($action) {
                     $formNo, $incrementRemarks, $paymentStatus, $paymentMethod, $paymentDate,
                     $currentUserId
                 ]);
+            }
+
+            // When salary is disbursed / marked as paid, automatically settle advance salary and loan deductions
+            if ($paymentStatus === 'paid') {
+                // 1. Settle Advance Salary
+                if ($advanceSalary > 0) {
+                    $stmtAdv = $pdo->prepare("
+                        SELECT id, amount, paid_amount 
+                        FROM hr_loans 
+                        WHERE employee_id = ? AND request_type = 'advance_salary' AND status IN ('approved', 'active')
+                        ORDER BY id ASC
+                    ");
+                    $stmtAdv->execute([$empId]);
+                    $advLoans = $stmtAdv->fetchAll();
+
+                    $remainingToDeduct = $advanceSalary;
+                    foreach ($advLoans as $al) {
+                        if ($remainingToDeduct <= 0) break;
+                        $loanBal = (float)$al['amount'] - (float)$al['paid_amount'];
+                        if ($loanBal <= 0) continue;
+
+                        $deductFromThis = min($loanBal, $remainingToDeduct);
+                        $newPaidAmount = (float)$al['paid_amount'] + $deductFromThis;
+                        $newStatus = ($newPaidAmount >= (float)$al['amount']) ? 'repaid' : 'approved';
+
+                        $stmtUpd = $pdo->prepare("
+                            UPDATE hr_loans 
+                            SET paid_amount = ?, status = ?, action_at = NOW() 
+                            WHERE id = ?
+                        ");
+                        $stmtUpd->execute([$newPaidAmount, $newStatus, $al['id']]);
+                        $remainingToDeduct -= $deductFromThis;
+                    }
+                }
+
+                // 2. Settle Monthly Loan Installment
+                if ($loanDeduction > 0) {
+                    $stmtLn = $pdo->prepare("
+                        SELECT id, amount, paid_amount, monthly_deduction 
+                        FROM hr_loans 
+                        WHERE employee_id = ? AND request_type != 'advance_salary' AND status IN ('approved', 'active')
+                        ORDER BY id ASC
+                    ");
+                    $stmtLn->execute([$empId]);
+                    $regLoans = $stmtLn->fetchAll();
+
+                    $remainingToDeduct = $loanDeduction;
+                    foreach ($regLoans as $rl) {
+                        if ($remainingToDeduct <= 0) break;
+                        $loanBal = (float)$rl['amount'] - (float)$rl['paid_amount'];
+                        if ($loanBal <= 0) continue;
+
+                        $deductFromThis = min($loanBal, $remainingToDeduct);
+                        $newPaidAmount = (float)$rl['paid_amount'] + $deductFromThis;
+                        $newStatus = ($newPaidAmount >= (float)$rl['amount']) ? 'repaid' : 'approved';
+
+                        $stmtUpd = $pdo->prepare("
+                            UPDATE hr_loans 
+                            SET paid_amount = ?, status = ?, action_at = NOW() 
+                            WHERE id = ?
+                        ");
+                        $stmtUpd->execute([$newPaidAmount, $newStatus, $rl['id']]);
+                        $remainingToDeduct -= $deductFromThis;
+                    }
+                }
             }
 
             echo json_encode(['success' => true, 'message' => 'Payroll adjustments saved successfully.']);

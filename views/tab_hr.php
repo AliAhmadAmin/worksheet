@@ -328,8 +328,8 @@
                     </select>
 
                     <select id="hr-leave-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLeaves()">
-                        <option value="all">All Statuses</option>
-                        <option value="pending" selected>⏳ Pending</option>
+                        <option value="all" selected>All Statuses</option>
+                        <option value="pending">⏳ Pending</option>
                         <option value="approved_by_hod">🟡 Approved by HOD</option>
                         <option value="approved">✅ Approved</option>
                         <option value="rejected">❌ Rejected</option>
@@ -429,8 +429,8 @@
                     </select>
 
                     <select id="hr-loan-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrLoans()">
-                        <option value="all">All Statuses</option>
-                        <option value="pending" selected>⏳ Pending Review</option>
+                        <option value="all" selected>All Statuses</option>
+                        <option value="pending">⏳ Pending Review</option>
                         <option value="approved_by_hod">🟡 Approved by HOD</option>
                         <option value="approved">✅ Active / Approved</option>
                         <option value="repaid">🎉 Fully Repaid</option>
