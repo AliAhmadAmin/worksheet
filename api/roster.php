@@ -121,7 +121,7 @@ switch ($action) {
             ];
         }
 
-        $canEdit = $isSuperAdmin || $isHr || ($isHod && in_array($deptId, $managedDeptIds, true));
+        $canEdit = $isSuperAdmin || $isHr || (($isHod || !empty($currentUserObj['can_manage_roster'])) && in_array($deptId, $managedDeptIds, true));
 
         echo json_encode([
             'success' => true,
@@ -142,7 +142,7 @@ switch ($action) {
         $deptId = (int)($data['department_id'] ?? ($userDeptId ?: 2));
         $items = $data['items'] ?? [];
 
-        $canEdit = $isSuperAdmin || $isHr || ($isHod && in_array($deptId, $managedDeptIds, true));
+        $canEdit = $isSuperAdmin || $isHr || (($isHod || !empty($currentUserObj['can_manage_roster'])) && in_array($deptId, $managedDeptIds, true));
         if (!$canEdit) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Unauthorized to modify duty roster for this department.']);
@@ -205,6 +205,7 @@ switch ($action) {
 
             echo json_encode([
                 'success' => true,
+                'saved_count' => count($items),
                 'message' => "Duty Roster for {$month} saved successfully (" . count($items) . " employee schedules updated)."
             ]);
         } catch (Exception $e) {
@@ -218,7 +219,7 @@ switch ($action) {
         $targetMonth = $data['target_month'] ?? date('Y-m');
         $deptId = (int)($data['department_id'] ?? ($userDeptId ?: 2));
 
-        $canEdit = $isSuperAdmin || $isHr || ($isHod && in_array($deptId, $managedDeptIds, true));
+        $canEdit = $isSuperAdmin || $isHr || (($isHod || !empty($currentUserObj['can_manage_roster'])) && in_array($deptId, $managedDeptIds, true));
         if (!$canEdit) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
@@ -271,6 +272,8 @@ switch ($action) {
 
             echo json_encode([
                 'success' => true,
+                'copied_count' => $copied,
+                'from_month' => $prevMonth,
                 'message' => "Successfully copied {$copied} employee schedules from {$prevMonth} to {$targetMonth}."
             ]);
         } catch (Exception $e) {

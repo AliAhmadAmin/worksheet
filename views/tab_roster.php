@@ -5,8 +5,43 @@
  * Discover Pakistan UHD TV Network
  */
 $userRoleRoster = strtolower($authUser['role'] ?? '');
+$isSuperAdminRoster = in_array($userRoleRoster, ['super_admin', 'admin']);
+$isHrRoster = in_array($userRoleRoster, ['hr']) || (!empty($authUser['can_manage_hr']) && $userRoleRoster !== 'hod');
+$isHodRoster = ($userRoleRoster === 'hod');
 $isHodOrAdminRoster = in_array($userRoleRoster, ['super_admin', 'admin', 'hod', 'hr']) || !empty($authUser['can_manage_roster']);
 $currentMonth = date('Y-m');
+
+$userDeptIdRoster = (int)($authUser['department_id'] ?? 0);
+$rosterDepartments = [];
+
+if ($isSuperAdminRoster || $isHrRoster) {
+    $rosterDeptsStmt = $pdo->query("SELECT id, name FROM departments ORDER BY name ASC");
+    $rosterDepartments = $rosterDeptsStmt->fetchAll(PDO::FETCH_ASSOC);
+} elseif ($isHodRoster) {
+    $rosterDeptsStmt = $pdo->prepare("SELECT id, name FROM departments WHERE id = ? OR hod_id = ? ORDER BY name ASC");
+    $rosterDeptsStmt->execute([$userDeptIdRoster, $authUser['id']]);
+    $rosterDepartments = $rosterDeptsStmt->fetchAll(PDO::FETCH_ASSOC);
+} else {
+    $rosterDeptsStmt = $pdo->prepare("SELECT id, name FROM departments WHERE id = ?");
+    $rosterDeptsStmt->execute([$userDeptIdRoster]);
+    $rosterDepartments = $rosterDeptsStmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+if (empty($rosterDepartments) && $userDeptIdRoster > 0) {
+    $rosterDepartments = [['id' => $userDeptIdRoster, 'name' => $authUser['department_name'] ?? 'My Department']];
+}
+
+$selectedRosterDeptId = $userDeptIdRoster;
+$deptMatchFound = false;
+foreach ($rosterDepartments as $rd) {
+    if ((int)$rd['id'] === $userDeptIdRoster) {
+        $deptMatchFound = true;
+        break;
+    }
+}
+if (!$deptMatchFound && !empty($rosterDepartments)) {
+    $selectedRosterDeptId = (int)$rosterDepartments[0]['id'];
+}
 ?>
 <section id="tab-roster" class="tab-section">
     <!-- Top Action Card / Controls -->
@@ -35,12 +70,14 @@ $currentMonth = date('Y-m');
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <label for="roster-dept-select" style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Dept:</label>
                     <select id="roster-dept-select" class="input-control" style="font-weight: 600; padding: 7px 12px; min-width: 150px;" onchange="loadDutyRoster()">
-                        <option value="2" selected>Digital Media</option>
-                        <option value="1">News Room</option>
-                        <option value="3">Programming</option>
-                        <option value="4">HR / Operations</option>
+                        <?php foreach ($rosterDepartments as $rd): ?>
+                            <option value="<?= (int)$rd['id'] ?>" <?= ((int)$rd['id'] === $selectedRosterDeptId) ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($rd['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
+
 
                 <!-- Action Buttons -->
                 <?php if ($isHodOrAdminRoster): ?>
@@ -116,7 +153,7 @@ $currentMonth = date('Y-m');
         <div id="roster-signature-block" style="margin-top: 45px; padding-top: 30px; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: flex-end; padding-left: 40px; padding-right: 40px;">
             <div style="text-align: center; min-width: 220px;">
                 <div style="border-bottom: 1.5px solid var(--text-main); width: 100%; margin-bottom: 8px;"></div>
-                <div style="font-weight: 800; font-size: 13px; color: var(--text-main);">HOD DIGITAL MEDIA</div>
+                <div id="roster-hod-sig-title" style="font-weight: 800; font-size: 13px; color: var(--text-main);">HOD <?= strtoupper(htmlspecialchars($authUser['department_name'] ?? 'DEPARTMENT')) ?></div>
                 <div style="font-size: 11.5px; color: var(--text-muted);">Discover Pakistan UHD TV</div>
             </div>
 

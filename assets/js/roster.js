@@ -48,6 +48,7 @@ function renderDutyRoster(data) {
     const container = document.getElementById('roster-tables-container');
     const docTitle = document.getElementById('roster-document-title');
     const metaSubtitle = document.getElementById('roster-meta-subtitle');
+    const hodSigTitle = document.getElementById('roster-hod-sig-title');
 
     if (!container) return;
 
@@ -58,7 +59,7 @@ function renderDutyRoster(data) {
         ? monthDate.toLocaleString('en-US', { month: 'short' }).toUpperCase() 
         : data.month;
     
-    let deptNameUpper = (data.department_name || 'DIGITAL').toUpperCase();
+    let deptNameUpper = (data.department_name || 'DEPARTMENT').toUpperCase();
     if (deptNameUpper === 'DIGITAL MEDIA') deptNameUpper = 'DIGITAL';
 
     if (docTitle) {
@@ -66,6 +67,9 @@ function renderDutyRoster(data) {
     }
     if (metaSubtitle) {
         metaSubtitle.textContent = `Official Monthly Shift Timings & Weekly Off Allocations • ${data.items.length} Team Members`;
+    }
+    if (hodSigTitle) {
+        hodSigTitle.textContent = `HOD ${(data.department_name || 'DEPARTMENT').toUpperCase()}`;
     }
 
     // Group items by team
