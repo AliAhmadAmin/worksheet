@@ -132,7 +132,10 @@ switch ($action) {
 
         $isLocked = $sheet ? (int)$sheet['is_locked'] : 0;
         $isAdminOrHod = $isSuperAdmin || ($isHod && in_array((int)$employee['department_id'], $managedDeptIds, true));
-        $canEditAll = $isAdminOrHod || ($isLocked === 0);
+        $isSelf = ($empId === (int)$currentUserId);
+        $canManageOtherSheets = $isAdminOrHod || !empty($currentUserObj['can_unlock_sheets']);
+        $canEditThisSheet = $isSelf ? ($isLocked === 0) : ($canManageOtherSheets && ($isLocked === 0 || $isAdminOrHod));
+        $isReadOnlyInspection = (!$isSelf && !$canManageOtherSheets && $canInspect);
 
         // Calculate monthly off-days taken by this employee in the month of the selected date
         $monthPrefix = date('Y-m', strtotime($date));
@@ -258,8 +261,11 @@ switch ($action) {
             ],
             'can_print' => $canPrint,
             'active_overnight_sheet' => $activeOvernightSheet,
-            'can_edit' => $canEditAll,
-            'can_edit_after_lock' => $isLocked === 1 && ($empId === (int)$currentUserId || $isAdminOrHod),
+            'can_edit' => $canEditThisSheet,
+            'can_edit_after_lock' => $isSelf ? ($isLocked === 0) : $canManageOtherSheets,
+            'is_read_only_inspection' => $isReadOnlyInspection,
+            'can_unlock' => $canUnlock,
+            'can_mark_check' => ($isSuperAdmin || $isHod),
             'monthly_off_days_taken' => $monthlyOffDaysTaken,
             'monthly_off_days_allowed' => $monthlyOffDaysAllowed,
             'approved_leave' => $approvedLeave,
@@ -286,25 +292,36 @@ switch ($action) {
         $targetEmployee = $empCheck->fetch();
         $targetDeptId = $targetEmployee ? (int)$targetEmployee['department_id'] : 2;
 
-        // HOD permission check
-        if ($isHod && $empId !== (int)$currentUserId && !$isSuperAdmin) {
+        $isSelf = ($empId === (int)$currentUserId);
+
+        // HOD permission check and managed department resolution
+        $managedDeptIds = [];
+        if ($isHod || !$isSuperAdmin) {
             $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
-            $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
+            if ($userDeptId > 0) $managedDeptIds[] = $userDeptId;
             $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
             $stmtManaged->execute([$currentUserId]);
             $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
             if (!empty($extra)) {
                 $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
             }
-
-            if (!in_array($targetDeptId, $managedDeptIds, true)) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'HODs can only save worksheets for employees in their own department.']);
-                exit;
-            }
         }
 
         $isAdminOrHod = $isSuperAdmin || ($isHod && in_array($targetDeptId, $managedDeptIds, true));
+        $canManageOtherSheets = $isAdminOrHod || !empty($currentUserObj['can_unlock_sheets']);
+
+        // Inspect Other Sheets is view & print only; saving someone else's sheet requires lock/unlock access or HOD/Admin
+        if (!$isSelf && !$canManageOtherSheets) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Inspection mode is read-only (view & print only). Permission to Lock & Unlock Sheets is required to modify or save entries.']);
+            exit;
+        }
+
+        if ($isHod && !$isSelf && !$isSuperAdmin && !in_array($targetDeptId, $managedDeptIds, true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'HODs can only save worksheets for employees in their own department.']);
+            exit;
+        }
 
         // Check lock status
         $sheetStmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
@@ -509,9 +526,9 @@ switch ($action) {
         break;
 
     case 'toggle_hod_check':
-        if (!$canInspect && !$canUnlock) {
+        if (!$isSuperAdmin && !$isHod) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'You do not have permission to verify worksheets.']);
+            echo json_encode(['success' => false, 'message' => 'Only Department Heads (HOD) and Admins can mark worksheets as checked.']);
             exit;
         }
 

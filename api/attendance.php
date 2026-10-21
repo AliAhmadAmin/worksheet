@@ -416,8 +416,12 @@ switch ($action) {
                     WHEN 'admin' THEN 1 
                     WHEN 'hr' THEN 2 
                     WHEN 'hod' THEN 3 
-                    WHEN 'team_lead' THEN 4 
-                    ELSE 5 
+                    WHEN 'deputy_hod' THEN 4 
+                    WHEN 'shift_supervisor' THEN 5 
+                    WHEN 'team_lead' THEN 6 
+                    WHEN 'coordinator' THEN 7 
+                    WHEN 'quality_auditor' THEN 8 
+                    ELSE 9 
                 END,
                 d.id ASC, t.id ASC, e.name ASC
         ";
@@ -506,8 +510,12 @@ switch ($action) {
                         WHEN 'admin' THEN 1 
                         WHEN 'hr' THEN 2 
                         WHEN 'hod' THEN 3 
-                        WHEN 'team_lead' THEN 4 
-                        ELSE 5 
+                        WHEN 'deputy_hod' THEN 4 
+                        WHEN 'shift_supervisor' THEN 5 
+                        WHEN 'team_lead' THEN 6 
+                        WHEN 'coordinator' THEN 7 
+                        WHEN 'quality_auditor' THEN 8 
+                        ELSE 9 
                     END,
                     d.id ASC, e.name ASC
             ");

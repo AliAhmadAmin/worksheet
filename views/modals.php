@@ -374,26 +374,17 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                     <div class="modal-section">
                         <div class="modal-section-title">👤 System Login Access</div>
                         
-                        <!-- Toggle for Portal Login Access -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 12px;">
-                            <label for="add-emp-can-login" style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0;">
-                                🔑 Enable System Login Access
-                            </label>
-                            <input type="checkbox" id="add-emp-can-login" style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);" onchange="toggleLoginCredentialsSection('add', this.checked)">
-                        </div>
-
-                        <div id="add-emp-login-fields" style="display: none;">
-                            <div class="form-grid-2">
-                                <div class="form-group">
-                                    <label class="form-label">Official Email Address <span id="add-emp-email-required-mark" style="color: #ef4444;">*</span></label>
-                                    <input type="email" id="add-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Initial Password *</label>
-                                    <input type="text" id="add-emp-password" class="input-control" value="DiscoverPakistan123">
+                        <!-- Row 1: Enable System Login Access & System Role & Access -->
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Portal Authentication</label>
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-elevated); padding: 0 14px; height: 38px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-sizing: border-box;">
+                                    <label for="add-emp-can-login" style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; user-select: none;">
+                                        🔑 Enable System Login Access
+                                    </label>
+                                    <input type="checkbox" id="add-emp-can-login" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" onchange="toggleLoginCredentialsSection('add', this.checked)">
                                 </div>
                             </div>
-
                             <div class="form-group" id="add-emp-role-group">
                                 <label class="form-label">System Role & Access</label>
                                 <select id="add-emp-role" class="input-control" style="font-weight: 600;">
@@ -401,11 +392,33 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                     <option value="super_admin">👑 Super Admin</option>
                                     <option value="hr">👥 HR Manager</option>
                                     <option value="hod">🏢 Head of Department (HOD)</option>
+                                    <option value="deputy_hod">📋 Deputy HOD / Asst. Manager</option>
+                                    <option value="shift_supervisor">🛡️ Shift / Floor Supervisor</option>
                                     <option value="team_lead">⭐ Team Lead</option>
                                     <option value="coordinator">🎯 Task Coordinator</option>
+                                    <option value="quality_auditor">🔍 Quality Auditor</option>
                                 </select>
                                 <div id="add-emp-role-badge" style="display: none; height: 38px; align-items: center; padding: 0 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-weight: 600; font-size: 13px; color: var(--text-main); user-select: none;">
                                     👤 Staff Member
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Official Email Address * & Initial Password * -->
+                        <div id="add-emp-login-fields" style="display: none; margin-top: 10px;">
+                            <div class="form-grid-2">
+                                <div class="form-group">
+                                    <label class="form-label">Official Email Address <span id="add-emp-email-required-mark" style="color: #ef4444;">*</span></label>
+                                    <input type="email" id="add-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="add-emp-password">🔑 Initial Password <span style="color: #ef4444;">*</span></label>
+                                    <div class="password-input-wrapper" style="position: relative; width: 100%; display: flex; align-items: center;">
+                                        <input type="password" id="add-emp-password" class="input-control" value="DiscoverPakistan123" placeholder="Enter initial password" autocomplete="new-password" style="width: 100%; padding-right: 38px; box-sizing: border-box;">
+                                        <button type="button" class="btn-eye-toggle" onclick="togglePasswordInputVisibility('add-emp-password', this)" title="Show/Hide Password">
+                                            👁️
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -623,38 +636,52 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                     <div class="modal-section">
                         <div class="modal-section-title">👤 System Login Access</div>
                         
-                        <!-- Toggle for Portal Login Access -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 12px;">
-                            <label for="edit-emp-can-login" style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0;">
-                                🔑 Enable System Login Access
-                            </label>
-                            <input type="checkbox" id="edit-emp-can-login" checked style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);" onchange="toggleLoginCredentialsSection('edit', this.checked)">
+                        <!-- Row 1: Enable System Login Access & System Role & Access -->
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Portal Authentication</label>
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card-elevated); padding: 0 14px; height: 38px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-sizing: border-box;">
+                                    <label for="edit-emp-can-login" style="font-size: 13px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; user-select: none;">
+                                        🔑 Enable System Login Access
+                                    </label>
+                                    <input type="checkbox" id="edit-emp-can-login" checked style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);" onchange="toggleLoginCredentialsSection('edit', this.checked)">
+                                </div>
+                            </div>
+                            <div class="form-group" id="edit-emp-role-group">
+                                <label class="form-label">System Role & Access</label>
+                                <select id="edit-emp-role" class="input-control" style="font-weight: 600;">
+                                    <option value="employee">👤 Staff Member</option>
+                                    <option value="super_admin">👑 Super Admin</option>
+                                    <option value="hr">👥 HR Manager</option>
+                                    <option value="hod">🏢 Head of Department (HOD)</option>
+                                    <option value="deputy_hod">📋 Deputy HOD / Asst. Manager</option>
+                                    <option value="shift_supervisor">🛡️ Shift / Floor Supervisor</option>
+                                    <option value="team_lead">⭐ Team Lead</option>
+                                    <option value="coordinator">🎯 Task Coordinator</option>
+                                    <option value="quality_auditor">🔍 Quality Auditor</option>
+                                </select>
+                                <div id="edit-emp-role-badge" style="display: none; height: 38px; align-items: center; padding: 0 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-weight: 600; font-size: 13px; color: var(--text-main); user-select: none;">
+                                    👤 Staff Member
+                                </div>
+                            </div>
                         </div>
 
-                        <div id="edit-emp-login-fields" style="display: block;">
+                        <!-- Row 2: Official Email Address * & Set / Reset Password -->
+                        <div id="edit-emp-login-fields" style="display: block; margin-top: 10px;">
                             <div class="form-grid-2">
                                 <div class="form-group">
                                     <label class="form-label">Official Email Address <span id="edit-emp-email-required-mark" style="color: #ef4444;">*</span></label>
-                                    <input type="email" id="edit-emp-email" class="input-control">
+                                    <input type="email" id="edit-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv">
                                 </div>
-                                <div class="form-group" id="edit-emp-role-group">
-                                    <label class="form-label">System Role & Access</label>
-                                    <select id="edit-emp-role" class="input-control" style="font-weight: 600;">
-                                        <option value="employee">👤 Staff Member</option>
-                                        <option value="super_admin">👑 Super Admin</option>
-                                        <option value="hr">👥 HR Manager</option>
-                                        <option value="hod">🏢 Head of Department (HOD)</option>
-                                        <option value="team_lead">⭐ Team Lead</option>
-                                        <option value="coordinator">🎯 Task Coordinator</option>
-                                    </select>
-                                    <div id="edit-emp-role-badge" style="display: none; height: 38px; align-items: center; padding: 0 12px; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-weight: 600; font-size: 13px; color: var(--text-main); user-select: none;">
-                                        👤 Staff Member
+                                <div class="form-group">
+                                    <label class="form-label" for="edit-emp-password">🔑 Set / Reset Password <small style="color: var(--text-muted); font-weight: 400;">(Leave blank to keep)</small></label>
+                                    <div class="password-input-wrapper" style="position: relative; width: 100%; display: flex; align-items: center;">
+                                        <input type="password" id="edit-emp-password" class="input-control" placeholder="Enter new password (optional)" autocomplete="new-password" style="width: 100%; padding-right: 38px; box-sizing: border-box;">
+                                        <button type="button" class="btn-eye-toggle" onclick="togglePasswordInputVisibility('edit-emp-password', this)" title="Show/Hide Password">
+                                            👁️
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="form-group" style="margin-top: 10px;">
-                                <label class="form-label">🔑 Set / Reset Password <small style="color: var(--text-muted); font-weight: 400;">(Leave blank to keep current password)</small></label>
-                                <input type="text" id="edit-emp-password" class="input-control" placeholder="Enter new password (optional)" autocomplete="new-password">
                             </div>
                         </div>
                     </div>
@@ -1119,8 +1146,11 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                             <option value="super_admin">👑 Super Admin (Full Company-Wide Control)</option>
                             <option value="hr">👥 HR Manager (Manage HR, Staff Directory & Attendance)</option>
                             <option value="hod">🏢 Head of Department / HOD (Manage Tasks, Sheets & Reports)</option>
+                            <option value="deputy_hod">📋 Deputy HOD / Asst. Manager (Assign Tasks, Unlock Sheets & Reports)</option>
+                            <option value="shift_supervisor">🛡️ Shift Supervisor (Live Roster Ops, Assign Tasks & Unlock Sheets)</option>
                             <option value="team_lead">⭐ Team Lead / Supervisor (Assign Tasks & Unlock Team Sheets)</option>
                             <option value="coordinator">🎯 Task Coordinator (Create & Manage Tasks Across Teams)</option>
+                            <option value="quality_auditor">🔍 Quality Auditor (Inspect Sheets [View & Print] & View Matrix Reports)</option>
                             <option value="employee" selected>👤 Staff Member (Standard Creator / Daily Worksheet)</option>
                         </select>
                         <small style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 3px;">
@@ -1159,7 +1189,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 <input type="checkbox" id="perm-can-unlock-sheets" style="margin-top: 2px; cursor: pointer; transform: scale(1.1);">
                                 <div>
                                     <strong style="font-size: 12.5px; color: var(--text-main); display: block;">🔓 Lock & Unlock Sheets</strong>
-                                    <span style="font-size: 11px; color: var(--text-muted); line-height: 1.3; display: block; margin-top: 2px;">Can lock or reopen locked worksheets for editing and corrections.</span>
+                                    <span style="font-size: 11px; color: var(--text-muted); line-height: 1.3; display: block; margin-top: 2px;">Can lock or reopen locked worksheets and edit team entries (cannot mark HOD check).</span>
                                 </div>
                             </label>
 
@@ -1168,7 +1198,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 <input type="checkbox" id="perm-can-inspect-sheets" style="margin-top: 2px; cursor: pointer; transform: scale(1.1);">
                                 <div>
                                     <strong style="font-size: 12.5px; color: var(--text-main); display: block;">📝 Inspect Other Sheets</strong>
-                                    <span style="font-size: 11px; color: var(--text-muted); line-height: 1.3; display: block; margin-top: 2px;">Can use Employee Inspector to view, add rows, and edit worksheets.</span>
+                                    <span style="font-size: 11px; color: var(--text-muted); line-height: 1.3; display: block; margin-top: 2px;">Can use Employee Inspector to view and print worksheets only (read-only view & printing).</span>
                                 </div>
                             </label>
 

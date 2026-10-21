@@ -801,10 +801,15 @@ function renderUserBar() {
     if (!user) return;
 
     const roleLabels = {
+        super_admin: 'SUPER ADMIN',
         admin: 'SUPER ADMIN',
+        hr: 'HR MANAGER',
         hod: 'HOD / MANAGER',
+        deputy_hod: 'DEPUTY HOD',
+        shift_supervisor: 'SHIFT SUPERVISOR',
         team_lead: 'TEAM LEAD',
         coordinator: 'COORDINATOR',
+        quality_auditor: 'QUALITY AUDITOR',
         employee: 'STAFF MEMBER'
     };
 

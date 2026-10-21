@@ -239,8 +239,11 @@ function renderDirectoryTable(employees) {
             admin: { label: '👑 Super Admin', bg: 'rgba(56, 189, 248, 0.15)', color: '#0284c7' },
             hr: { label: '👥 HR Manager', bg: 'rgba(236, 72, 153, 0.15)', color: '#db2777' },
             hod: { label: '🏢 HOD / Manager', bg: 'rgba(245, 158, 11, 0.15)', color: '#d97706' },
+            deputy_hod: { label: '📋 Deputy HOD', bg: 'rgba(217, 119, 6, 0.15)', color: '#b45309' },
+            shift_supervisor: { label: '🛡️ Supervisor', bg: 'rgba(14, 165, 233, 0.15)', color: '#0284c7' },
             team_lead: { label: '⭐ Team Lead', bg: 'rgba(16, 185, 129, 0.15)', color: '#059669' },
             coordinator: { label: '🎯 Coordinator', bg: 'rgba(59, 130, 246, 0.15)', color: '#2563eb' },
+            quality_auditor: { label: '🔍 Quality Auditor', bg: 'rgba(139, 92, 246, 0.15)', color: '#7c3aed' },
             employee: { label: '👤 Staff Member', bg: 'rgba(148, 163, 184, 0.15)', color: '#64748b' }
         };
 
@@ -1393,13 +1396,37 @@ function toggleLoginCredentialsSection(prefix, isEnabled) {
     const emailReq = document.getElementById(`${prefix}-emp-email-required-mark`);
     const emailInput = document.getElementById(`${prefix}-emp-email`);
     const pwdInput = document.getElementById(`${prefix}-emp-password`);
+    const roleSelect = document.getElementById(`${prefix}-emp-role`);
 
     if (fields) fields.style.display = isEnabled ? 'block' : 'none';
     if (notice) notice.style.display = isEnabled ? 'none' : 'block';
     if (emailReq) emailReq.style.display = isEnabled ? 'inline' : 'none';
     if (emailInput) emailInput.required = !!isEnabled;
-    if (pwdInput) pwdInput.required = !!isEnabled;
+    if (pwdInput) {
+        // Password is only required when creating a new employee with login enabled.
+        // For editing existing employees, password is ALWAYS optional (leave blank to keep current password).
+        pwdInput.required = (prefix === 'add' && !!isEnabled);
+    }
+    if (roleSelect && (!AppState.currentUser || AppState.currentUser.role !== 'hod')) {
+        roleSelect.disabled = !isEnabled;
+        roleSelect.style.opacity = isEnabled ? '1' : '0.6';
+    }
 }
+
+// Global Password Visibility Toggle
+function togglePasswordInputVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (btn) btn.innerHTML = '🙈';
+    } else {
+        input.type = 'password';
+        if (btn) btn.innerHTML = '👁️';
+    }
+}
+window.togglePasswordInputVisibility = togglePasswordInputVisibility;
+
 
 // ==========================================
 // EMPLOYEE CRUD MODALS & SUBMISSIONS
@@ -1505,6 +1532,14 @@ function openAddEmployeeModal() {
     const canLoginCheck = document.getElementById('add-emp-can-login');
     if (canLoginCheck) canLoginCheck.checked = false;
     toggleLoginCredentialsSection('add', false);
+
+    const addPwdInput = document.getElementById('add-emp-password');
+    if (addPwdInput) {
+        addPwdInput.value = 'DiscoverPakistan123';
+        addPwdInput.type = 'password';
+    }
+    const addEyeBtn = document.querySelector("#add-employee-modal .btn-eye-toggle");
+    if (addEyeBtn) addEyeBtn.innerHTML = '👁️';
 
     const desigInput = document.getElementById('add-emp-designation');
     if (desigInput) desigInput.value = '';
@@ -1679,7 +1714,13 @@ function openEditEmployeeModal(empId) {
     document.getElementById('edit-emp-name').value = emp.name;
     document.getElementById('edit-emp-email').value = emp.email || '';
     const pwdInput = document.getElementById('edit-emp-password');
-    if (pwdInput) pwdInput.value = '';
+    if (pwdInput) {
+        pwdInput.value = '';
+        pwdInput.required = false;
+        pwdInput.type = 'password';
+    }
+    const editEyeBtn = document.querySelector("#edit-employee-modal .btn-eye-toggle");
+    if (editEyeBtn) editEyeBtn.innerHTML = '👁️';
     let editRole = emp.role || 'employee';
     if (editRole === 'admin') editRole = 'super_admin';
 
@@ -2306,6 +2347,22 @@ function applyRolePreset(roleValue) {
         if (isReports) isReports.checked = true;
         if (isAttendance) isAttendance.checked = true;
         if (isManageEmp) isManageEmp.checked = false;
+    } else if (roleValue === 'deputy_hod') {
+        if (isAssign) isAssign.checked = true;
+        if (isEdit) isEdit.checked = true;
+        if (isUnlock) isUnlock.checked = true;
+        if (isInspect) isInspect.checked = true;
+        if (isReports) isReports.checked = true;
+        if (isAttendance) isAttendance.checked = true;
+        if (isManageEmp) isManageEmp.checked = false;
+    } else if (roleValue === 'shift_supervisor') {
+        if (isAssign) isAssign.checked = true;
+        if (isEdit) isEdit.checked = true;
+        if (isUnlock) isUnlock.checked = true;
+        if (isInspect) isInspect.checked = true;
+        if (isReports) isReports.checked = false;
+        if (isAttendance) isAttendance.checked = true;
+        if (isManageEmp) isManageEmp.checked = false;
     } else if (roleValue === 'team_lead') {
         if (isAssign) isAssign.checked = true;
         if (isEdit) isEdit.checked = true;
@@ -2321,6 +2378,14 @@ function applyRolePreset(roleValue) {
         if (isInspect) isInspect.checked = false;
         if (isReports) isReports.checked = false;
         if (isAttendance) isAttendance.checked = false;
+        if (isManageEmp) isManageEmp.checked = false;
+    } else if (roleValue === 'quality_auditor') {
+        if (isAssign) isAssign.checked = false;
+        if (isEdit) isEdit.checked = false;
+        if (isUnlock) isUnlock.checked = false;
+        if (isInspect) isInspect.checked = true;
+        if (isReports) isReports.checked = true;
+        if (isAttendance) isAttendance.checked = true;
         if (isManageEmp) isManageEmp.checked = false;
     } else {
         if (isAssign) isAssign.checked = false;

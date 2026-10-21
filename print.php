@@ -52,7 +52,18 @@ $isHodChecked = !empty($sheet['is_hod_checked']) ? 1 : 0;
 // Security check if printing is restricted for employees until checked
 $sessionUserId = $_SESSION['user_id'] ?? 0;
 $sessionUserRole = strtolower($_SESSION['role'] ?? 'employee');
-$isElevatedUser = in_array($sessionUserRole, ['super_admin', 'admin', 'hod']);
+
+$hasInspectPerm = false;
+if ($sessionUserId > 0) {
+    try {
+        $uStmt = $pdo->prepare("SELECT can_inspect_sheets, can_unlock_sheets FROM employees WHERE id = ?");
+        $uStmt->execute([$sessionUserId]);
+        $uRow = $uStmt->fetch();
+        $hasInspectPerm = !empty($uRow['can_inspect_sheets']) || !empty($uRow['can_unlock_sheets']);
+    } catch (Exception $e) {}
+}
+
+$isElevatedUser = in_array($sessionUserRole, ['super_admin', 'admin', 'hod']) || $hasInspectPerm;
 
 if ($blockPrintBeforeHodCheck && !$isHodChecked && !$isElevatedUser && $sessionUserId == $empId) {
     ?>

@@ -171,12 +171,32 @@ const defaultTimeSlots = [
     '06:00 AM to 07:30 AM'
 ];
 
+function isViewingOtherEmployee() {
+    return !!(AppState.adminSelectedEmpId && AppState.adminSelectedEmpId != AppState.currentUser?.id);
+}
+
+function canManageInspectedSheet() {
+    if (!AppState.currentUser) return false;
+    const role = AppState.currentUser.role;
+    if (role === 'admin' || role === 'super_admin' || role === 'hod') {
+        return true;
+    }
+    return hasPermission('can_unlock_sheets');
+}
+
+function canMarkHodChecked() {
+    if (!AppState.currentUser) return false;
+    const role = AppState.currentUser.role;
+    return (role === 'admin' || role === 'super_admin' || role === 'hod');
+}
+
 function getActiveWorksheetEmpId() {
     const isElevated = AppState.currentUser && (
         AppState.currentUser.role === 'admin' || 
         AppState.currentUser.role === 'super_admin' || 
         AppState.currentUser.role === 'hod' || 
-        hasPermission('can_inspect_sheets')
+        hasPermission('can_inspect_sheets') ||
+        hasPermission('can_unlock_sheets')
     );
     if (isElevated && AppState.adminSelectedEmpId) {
         return AppState.adminSelectedEmpId;
@@ -210,6 +230,9 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
         AppState.hodCheckedByName = data.hod_checked_by_name || null;
         AppState.hodCheckedAt = data.hod_checked_at || null;
         AppState.canPrint = data.can_print;
+        AppState.isReadOnlyInspection = !!data.is_read_only_inspection || (isViewingOtherEmployee() && !canManageInspectedSheet());
+        AppState.canMarkCheck = !!data.can_mark_check && canMarkHodChecked();
+        AppState.canUnlock = !!data.can_unlock && hasPermission('can_unlock_sheets');
 
         const deptId = (data.employee && data.employee.department_id) ? data.employee.department_id : (AppState.currentUser?.department_id || 2);
         if (data.columns && data.columns.length > 0) {
@@ -254,7 +277,13 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
 }
 
 function renderWorksheetHero(sheet, empData, data = null) {
-    const isElevated = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
+    const isElevated = AppState.currentUser && (
+        AppState.currentUser.role === 'admin' || 
+        AppState.currentUser.role === 'super_admin' || 
+        AppState.currentUser.role === 'hod' || 
+        hasPermission('can_inspect_sheets') ||
+        hasPermission('can_unlock_sheets')
+    );
 
     if (isElevated && empData) {
         // Update Admin Hero Inspector View
@@ -326,33 +355,48 @@ function renderWorksheetHero(sheet, empData, data = null) {
         const btnAdminCheckIn = document.getElementById('admin-btn-check-in');
         const btnAdminCheckOut = document.getElementById('admin-btn-check-out');
         const adminAttendanceGroup = btnAdminCheckIn ? btnAdminCheckIn.closest('.admin-ctrl-attendance') : null;
+        const adminHolidayBtn = document.getElementById('admin-btn-toggle-holiday');
 
-        if (checkIn && checkOut) {
-            // Shift is completed: hide attendance punch buttons from top controls.
-            // In & Out times are displayed exclusively in the Shift Info Bar below.
+        const isOther = isViewingOtherEmployee();
+        const canManage = canManageInspectedSheet();
+        const isReadOnlyInspection = isOther && !canManage;
+        const canCheck = canMarkHodChecked();
+
+        if (isReadOnlyInspection) {
+            // Read-only inspection mode: hide attendance punches and holiday toggle
             if (btnAdminCheckIn) btnAdminCheckIn.style.display = 'none';
             if (btnAdminCheckOut) btnAdminCheckOut.style.display = 'none';
             if (adminAttendanceGroup) adminAttendanceGroup.style.display = 'none';
-        } else if (checkIn && !checkOut) {
-            // Shift in progress: hide Check In, show Check Out
-            if (adminAttendanceGroup) adminAttendanceGroup.style.display = 'inline-flex';
-            if (btnAdminCheckIn) btnAdminCheckIn.style.display = 'none';
-            if (btnAdminCheckOut) {
-                btnAdminCheckOut.style.display = 'inline-flex';
-                btnAdminCheckOut.textContent = '🔴 Check Out';
-                btnAdminCheckOut.title = 'Record Check-Out and lock sheet for this employee';
-                btnAdminCheckOut.className = 'btn btn-danger';
-            }
+            if (adminHolidayBtn) adminHolidayBtn.style.display = 'none';
         } else {
-            // Fresh day: not checked in -> show Check In, hide Check Out
-            if (adminAttendanceGroup) adminAttendanceGroup.style.display = 'inline-flex';
-            if (btnAdminCheckIn) {
-                btnAdminCheckIn.style.display = 'inline-flex';
-                btnAdminCheckIn.textContent = '🟢 Check In';
-                btnAdminCheckIn.title = 'Record Check-In for this employee';
-                btnAdminCheckIn.className = 'btn btn-success';
+            if (adminHolidayBtn) adminHolidayBtn.style.display = '';
+
+            if (checkIn && checkOut) {
+                // Shift is completed: hide attendance punch buttons from top controls
+                if (btnAdminCheckIn) btnAdminCheckIn.style.display = 'none';
+                if (btnAdminCheckOut) btnAdminCheckOut.style.display = 'none';
+                if (adminAttendanceGroup) adminAttendanceGroup.style.display = 'none';
+            } else if (checkIn && !checkOut) {
+                // Shift in progress: hide Check In, show Check Out
+                if (adminAttendanceGroup) adminAttendanceGroup.style.display = 'inline-flex';
+                if (btnAdminCheckIn) btnAdminCheckIn.style.display = 'none';
+                if (btnAdminCheckOut) {
+                    btnAdminCheckOut.style.display = 'inline-flex';
+                    btnAdminCheckOut.textContent = '🔴 Check Out';
+                    btnAdminCheckOut.title = 'Record Check-Out and lock sheet for this employee';
+                    btnAdminCheckOut.className = 'btn btn-danger';
+                }
+            } else {
+                // Fresh day: not checked in -> show Check In, hide Check Out
+                if (adminAttendanceGroup) adminAttendanceGroup.style.display = 'inline-flex';
+                if (btnAdminCheckIn) {
+                    btnAdminCheckIn.style.display = 'inline-flex';
+                    btnAdminCheckIn.textContent = '🟢 Check In';
+                    btnAdminCheckIn.title = 'Record Check-In for this employee';
+                    btnAdminCheckIn.className = 'btn btn-success';
+                }
+                if (btnAdminCheckOut) btnAdminCheckOut.style.display = 'none';
             }
-            if (btnAdminCheckOut) btnAdminCheckOut.style.display = 'none';
         }
 
         // Update HOD Verification Button and Header Appearance in Inspector
@@ -368,8 +412,9 @@ function renderWorksheetHero(sheet, empData, data = null) {
         const checkerName = data?.hod_checked_by_name || 'HOD';
         const checkedAt = data?.hod_checked_at || '';
 
+        // "Mark Checked" is specifically a task for HOD / Admin
         if (btnHodCheck && btnHodCheckText) {
-            if (requireCheck || isHodChecked) {
+            if (canCheck && (requireCheck || isHodChecked)) {
                 btnHodCheck.style.display = 'inline-flex';
                 if (isHodChecked) {
                     btnHodCheck.className = 'btn btn-outline';
@@ -406,7 +451,11 @@ function renderWorksheetHero(sheet, empData, data = null) {
                 verifiedHeaderBadge.style.display = 'none';
             }
             if (inspectorSubtitle) {
-                inspectorSubtitle.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
+                if (isReadOnlyInspection) {
+                    inspectorSubtitle.innerHTML = `👁️ <strong style="color: var(--primary);">Inspection Mode (View & Print Only)</strong>: You are reviewing this worksheet with read-only access. Editing entries requires "Lock & Unlock Sheets" access.`;
+                } else {
+                    inspectorSubtitle.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
+                }
             }
             if (inspectorBox) {
                 inspectorBox.classList.remove('is-verified');
@@ -622,38 +671,67 @@ function updateLockBadge(isLocked, canEdit) {
         if (isLocked) empLockBadge.title = postLockHint;
     }
 
+    const isOther = isViewingOtherEmployee();
+    const canManage = canManageInspectedSheet();
+    const isReadOnlyInspection = isOther && !canManage;
+
     if (adminLockCtrl) {
-        adminLockCtrl.innerHTML = isLocked ? '🔓 Unlock Sheet' : '🔒 Lock Sheet';
-        adminLockCtrl.className = isLocked ? 'btn btn-success' : 'btn btn-outline';
+        if (!hasPermission('can_unlock_sheets')) {
+            adminLockCtrl.style.display = 'none';
+        } else {
+            adminLockCtrl.style.display = 'inline-flex';
+            adminLockCtrl.innerHTML = isLocked ? '🔓 Unlock Sheet' : '🔒 Lock Sheet';
+            adminLockCtrl.className = isLocked ? 'btn btn-success' : 'btn btn-outline';
+        }
     }
 
     // Save button stays enabled so employees can paste/save links even when sheet is locked!
     const btnSave = document.getElementById('btn-save-sheet');
     if (btnSave) {
-        btnSave.disabled = false;
-        if (isLocked && AppState.currentUser?.role !== 'admin' && AppState.currentUser?.role !== 'super_admin') {
-            btnSave.innerHTML = '💾 Save Links / Sheet';
-            btnSave.title = 'Save your added links/updates to this locked sheet';
+        if (isReadOnlyInspection) {
+            btnSave.disabled = true;
+            btnSave.style.display = 'none';
         } else {
-            btnSave.innerHTML = '💾 Save Sheet';
-            btnSave.title = 'Save all entries';
+            btnSave.disabled = false;
+            btnSave.style.display = '';
+            if (isLocked && AppState.currentUser?.role !== 'admin' && AppState.currentUser?.role !== 'super_admin') {
+                btnSave.innerHTML = '💾 Save Links / Sheet';
+                btnSave.title = 'Save your added links/updates to this locked sheet';
+            } else {
+                btnSave.innerHTML = '💾 Save Sheet';
+                btnSave.title = 'Save all entries';
+            }
         }
     }
 
     const btnAddRow = document.getElementById('btn-add-row');
     const btnAddRowBottom = document.getElementById('btn-add-row-bottom');
     if (btnAddRow) {
-        btnAddRow.disabled = !canEdit;
-        if (!canEdit && isLocked) {
-            btnAddRow.title = "Worksheet is locked after checkout. Adding new rows is disabled.";
+        if (isReadOnlyInspection) {
+            btnAddRow.disabled = true;
+            btnAddRow.style.display = 'none';
+            btnAddRow.title = "Inspection mode is read-only. Adding new rows is disabled.";
         } else {
-            btnAddRow.title = "Add a new work row";
+            btnAddRow.style.display = '';
+            btnAddRow.disabled = !canEdit;
+            if (!canEdit && isLocked) {
+                btnAddRow.title = "Worksheet is locked after checkout. Adding new rows is disabled.";
+            } else {
+                btnAddRow.title = "Add a new work row";
+            }
         }
     }
     if (btnAddRowBottom) {
-        btnAddRowBottom.disabled = !canEdit;
-        if (!canEdit && isLocked) {
-            btnAddRowBottom.title = "Worksheet is locked after checkout. Adding new rows is disabled.";
+        if (isReadOnlyInspection) {
+            btnAddRowBottom.disabled = true;
+            btnAddRowBottom.style.display = 'none';
+            btnAddRowBottom.title = "Inspection mode is read-only. Adding new rows is disabled.";
+        } else {
+            btnAddRowBottom.style.display = '';
+            btnAddRowBottom.disabled = !canEdit;
+            if (!canEdit && isLocked) {
+                btnAddRowBottom.title = "Worksheet is locked after checkout. Adding new rows is disabled.";
+            }
         }
     }
 }
@@ -663,9 +741,19 @@ function renderWorksheetTable(entries, canEdit) {
     const tbody = document.getElementById('worksheet-table-body');
     if (!tbody) return;
 
+    const isOther = isViewingOtherEmployee();
+    const canManage = canManageInspectedSheet();
+    const isReadOnlyInspection = isOther && !canManage;
+
     const visibleCols = getVisibleWorksheetColumns();
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
+    const isAdmin = AppState.currentUser && (
+        AppState.currentUser.role === 'admin' || 
+        AppState.currentUser.role === 'super_admin' || 
+        AppState.currentUser.role === 'hod' || 
+        hasPermission('can_unlock_sheets')
+    );
     const isLocked = !!(AppState.isLocked && !isAdmin);
+    const effectiveCanEdit = canEdit && !isReadOnlyInspection;
 
     // Dynamically render table headers matching HOD custom order & labels
     if (thead) {
@@ -679,7 +767,7 @@ function renderWorksheetTable(entries, canEdit) {
                     else if (col.column_key === 'department') { w = '15%'; minW = '145px'; }
                     else if (col.column_key === 'link') { w = '18%'; minW = '160px'; }
                     else if (col.column_key === 'title') { w = '26%'; minW = '190px'; }
-                    const isPostLock = isLocked && (col.editable_after_lock === 1 || col.editable_after_lock === '1');
+                    const isPostLock = !isReadOnlyInspection && isLocked && (col.editable_after_lock === 1 || col.editable_after_lock === '1');
                     const headerBadge = isPostLock ? ' <span style="font-size: 10px; color: var(--success); font-weight: 700;">(Editable)</span>' : '';
                     return `<th class="col-${escapeHtml(col.column_key)}" style="width: ${w}; min-width: ${minW};">${escapeHtml(col.column_label)}${headerBadge}</th>`;
                 }).join('')}
@@ -692,16 +780,16 @@ function renderWorksheetTable(entries, canEdit) {
     const colCount = visibleCols.length + 1;
 
     if (!entries || entries.length === 0) {
-        if (canEdit && !isLocked) {
-            addTableRow({}, canEdit);
-            addTableRow({}, canEdit);
-            addTableRow({}, canEdit);
+        if (effectiveCanEdit && !isLocked) {
+            addTableRow({}, effectiveCanEdit);
+            addTableRow({}, effectiveCanEdit);
+            addTableRow({}, effectiveCanEdit);
         } else {
             tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center; color: var(--text-muted); padding: 20px;">No entries logged for this date.</td></tr>`;
         }
     } else {
         entries.forEach(entry => {
-            addTableRow(entry, canEdit);
+            addTableRow(entry, effectiveCanEdit);
         });
     }
 
@@ -749,8 +837,17 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
     const row = document.createElement('tr');
     row.className = 'sheet-entry-row';
 
+    const isOther = isViewingOtherEmployee();
+    const canManage = canManageInspectedSheet();
+    const isReadOnlyInspection = isOther && !canManage;
+
     const visibleCols = getVisibleWorksheetColumns();
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
+    const isAdmin = AppState.currentUser && (
+        AppState.currentUser.role === 'admin' || 
+        AppState.currentUser.role === 'super_admin' || 
+        AppState.currentUser.role === 'hod' || 
+        hasPermission('can_unlock_sheets')
+    );
     const isLocked = !!(AppState.isLocked && !isAdmin);
     const customData = data.custom_data || {};
 
@@ -763,10 +860,12 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
 
         // Check if this column is permitted to be edited after checkout
         const isPostLockEditable = isLocked && (col.editable_after_lock === 1 || col.editable_after_lock === '1');
-        const isColEditable = canEdit || isPostLockEditable;
+        const isColEditable = !isReadOnlyInspection && (canEdit || isPostLockEditable);
         const disabledAttr = isColEditable ? '' : 'disabled';
         const postLockStyle = isPostLockEditable ? 'border-color: rgba(16, 185, 129, 0.6); box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.15);' : '';
-        const postLockTitle = isPostLockEditable ? ' title="Editable after checkout (post-duty update permitted)"' : (isLocked ? ' title="Locked (Duty checkout finalized)"' : '');
+        const postLockTitle = isReadOnlyInspection 
+            ? ' title="Read-only view in Employee Inspector"' 
+            : (isPostLockEditable ? ' title="Editable after checkout (post-duty update permitted)"' : (isLocked ? ' title="Locked (Duty checkout finalized)"' : ''));
 
         // Extract value
         let val = '';
@@ -868,7 +967,7 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
     // Action column
     cellsHtml += `
         <td class="col-action" style="text-align: center;">
-            ${(canEdit && !isLocked) ? '<button type="button" class="btn-icon-del" onclick="removeTableRow(this)" title="Delete Row">🗑️</button>' : (isLocked ? '<span style="color: var(--text-dim); font-size: 11px;" title="Rows cannot be deleted after shift checkout">🔒</span>' : '')}
+            ${(!isReadOnlyInspection && canEdit && !isLocked) ? '<button type="button" class="btn-icon-del" onclick="removeTableRow(this)" title="Delete Row">🗑️</button>' : (isLocked ? '<span style="color: var(--text-dim); font-size: 11px;" title="Rows cannot be deleted after shift checkout">🔒</span>' : (isReadOnlyInspection ? '<span style="color: var(--text-dim); font-size: 11px;" title="Read-only view">👁️</span>' : ''))}
         </td>
     `;
 
@@ -891,7 +990,21 @@ function addNewRowBelow() {
     const tbody = document.getElementById('worksheet-table-body');
     if (!tbody) return;
 
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'));
+    const isOther = isViewingOtherEmployee();
+    const canManage = canManageInspectedSheet();
+    const isReadOnlyInspection = isOther && !canManage;
+
+    if (isReadOnlyInspection) {
+        showToast("Inspection mode is read-only (view & print only). Adding rows is disabled.", "warning");
+        return;
+    }
+
+    const isAdmin = AppState.currentUser && (
+        AppState.currentUser.role === 'admin' || 
+        AppState.currentUser.role === 'super_admin' || 
+        AppState.currentUser.role === 'hod' || 
+        hasPermission('can_unlock_sheets')
+    );
     const canEdit = isAdmin || !AppState.isLocked;
 
     if (!canEdit) {
@@ -914,6 +1027,13 @@ function addNewRowBelow() {
 }
 
 function removeTableRow(btn) {
+    const isOther = isViewingOtherEmployee();
+    const canManage = canManageInspectedSheet();
+    if (isOther && !canManage) {
+        showToast("Inspection mode is read-only. Deleting rows is disabled.", "warning");
+        return;
+    }
+
     const row = btn.closest('tr');
     if (row) {
         row.remove();
@@ -954,6 +1074,10 @@ function getDraftStorageKey(empId, date) {
 }
 
 function saveLocalDraft() {
+    const isOther = isViewingOtherEmployee();
+    const canManage = canManageInspectedSheet();
+    if (isOther && !canManage) return; // Do not overwrite drafts in read-only inspection mode
+
     const empId = getActiveWorksheetEmpId();
     const date = AppState.selectedDate;
     if (!empId || !date) return;
@@ -1070,6 +1194,10 @@ function discardLocalDraft() {
 }
 
 function triggerAutoSave(delayMs = 700) {
+    const isOther = isViewingOtherEmployee();
+    const canManage = canManageInspectedSheet();
+    if (isOther && !canManage) return; // Do not auto-save in read-only inspection mode
+
     // 1. Instantly write to browser local storage on every single keystroke (Zero data loss guarantee)
     saveLocalDraft();
 
@@ -1122,6 +1250,20 @@ function renderWorksheetSummary(sheet) {
 
     if (summaryInput) summaryInput.value = sheet ? (sheet.work_summary || '') : '';
     if (remarksInput) remarksInput.value = sheet ? (sheet.remarks || '') : '';
+
+    const isOther = isViewingOtherEmployee();
+    const canManage = canManageInspectedSheet();
+    const isReadOnlyInspection = isOther && !canManage;
+    const isLocked = !!(AppState.isLocked && !canManage);
+
+    if (summaryInput) {
+        summaryInput.disabled = isReadOnlyInspection || isLocked;
+        if (isReadOnlyInspection) summaryInput.title = "Read-only inspection mode";
+    }
+    if (remarksInput) {
+        remarksInput.disabled = isReadOnlyInspection || isLocked;
+        if (isReadOnlyInspection) remarksInput.title = "Read-only inspection mode";
+    }
 }
 
 // Employee Check-In Action
@@ -1502,6 +1644,15 @@ async function handleAdminClearShift() {
 
 // Save Current Worksheet Entries (Admin can save for any employee; Employee can save their own)
 async function saveCurrentWorksheet(notify = true, isAuto = false) {
+    const isOther = isViewingOtherEmployee();
+    const canManage = canManageInspectedSheet();
+    if (isOther && !canManage) {
+        if (notify && !isAuto) {
+            showToast("Inspection mode is read-only (view & print only).", "warning");
+        }
+        return;
+    }
+
     const empId = getActiveWorksheetEmpId();
     const date = AppState.selectedDate;
 
@@ -1695,6 +1846,11 @@ function triggerPrintSheet() {
 }
 
 async function handleToggleHodCheckSheet() {
+    if (!canMarkHodChecked()) {
+        showToast("Only Head of Department (HOD) and Admins can mark worksheets as checked.", "error");
+        return;
+    }
+
     const empId = getActiveWorksheetEmpId();
     const date = AppState.selectedDate;
     const sheetId = AppState.currentSheet?.id || 0;
