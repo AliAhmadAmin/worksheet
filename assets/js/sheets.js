@@ -421,13 +421,13 @@ function renderWorksheetHero(sheet, empData, data = null) {
                     btnHodCheck.style.borderColor = '#10b981';
                     btnHodCheck.style.color = '#10b981';
                     btnHodCheck.innerHTML = '<span>↩️</span> <span id="admin-btn-hod-check-text">Reopen Review</span>';
-                    btnHodCheck.title = `Worksheet verified by ${checkerName} on ${checkedAt}. Click to reopen review.`;
+                    btnHodCheck.title = `Worksheet checked by ${checkerName} on ${checkedAt}. Click to reopen review.`;
                 } else {
                     btnHodCheck.className = 'btn btn-success';
                     btnHodCheck.style.borderColor = '';
                     btnHodCheck.style.color = '';
                     btnHodCheck.innerHTML = '<span>✅</span> <span id="admin-btn-hod-check-text">Mark Checked</span>';
-                    btnHodCheck.title = 'Review entries and mark sheet as Checked & Verified by HOD';
+                    btnHodCheck.title = 'Review entries and mark sheet as Checked by HOD';
                 }
             } else {
                 btnHodCheck.style.display = 'none';
@@ -438,10 +438,10 @@ function renderWorksheetHero(sheet, empData, data = null) {
         if (isHodChecked) {
             if (verifiedHeaderBadge) {
                 verifiedHeaderBadge.style.display = 'inline-flex';
-                verifiedHeaderBadge.title = `Verified by ${checkerName} on ${checkedAt}`;
+                verifiedHeaderBadge.title = `Checked by ${checkerName} on ${checkedAt}`;
             }
             if (inspectorSubtitle) {
-                inspectorSubtitle.innerHTML = `🛡️ <strong style="color: #10b981;">Verified & Approved</strong> by ${escapeHtml(checkerName)}${checkedAt ? ` on ${escapeHtml(checkedAt)}` : ''}. Ready for printing with official seal.`;
+                inspectorSubtitle.innerHTML = `✅ <strong style="color: #10b981;">Checked & Approved</strong> by ${escapeHtml(checkerName)}${checkedAt ? ` on ${escapeHtml(checkedAt)}` : ''}. Ready for printing with official seal.`;
             }
             if (inspectorBox) {
                 inspectorBox.classList.add('is-verified');
@@ -2084,3 +2084,5 @@ async function handleToggleHoliday(forcedState = null) {
         showToast('Error updating holiday status.', 'error');
     }
 }
+
+

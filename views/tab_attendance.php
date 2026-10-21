@@ -31,7 +31,10 @@ try {
 } catch (Exception $e) {}
 ?>
         <!-- TAB 4: STAFF ATTENDANCE & TIMESHEET REPORTS (ADMIN / HR / HOD) -->
-        <section id="tab-attendance" class="tab-section">
+        <?php
+        $isHodAttSection = in_array($userRoleAtt, ['hod', 'deputy_hod']);
+        ?>
+        <section id="tab-attendance" class="tab-section <?= ($isHodAttSection && ($currentPortal ?? '') === 'digital') ? 'active' : '' ?>">
             <div class="worksheet-card">
                 <!-- Header with View Mode Switcher -->
                 <div class="card-header-flex" style="flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
@@ -47,7 +50,7 @@ try {
                         </div>
                     </div>
 
-                    <!-- Quad View Mode Switcher Buttons -->
+                    <!-- View Mode Switcher Buttons -->
                     <div style="display: flex; background: var(--bg-input); padding: 3px; border-radius: var(--radius-lg); border: 1px solid var(--border-color); gap: 4px; flex-wrap: wrap;">
                         <button type="button" id="btn-att-view-live" class="btn btn-primary" style="padding: 6px 14px; font-size: 12px; font-weight: 700; border-radius: var(--radius-md); border: none;" onclick="switchAttendanceView('live')">
                             🔴 Live Shift Roster
@@ -55,12 +58,14 @@ try {
                         <button type="button" id="btn-att-view-report" class="btn btn-outline" style="padding: 6px 14px; font-size: 12px; font-weight: 700; border-radius: var(--radius-md); border: none;" onclick="switchAttendanceView('report')">
                             📊 Detailed Attendance Report & Timesheet
                         </button>
+                        <?php if ($isGlobalAdminAtt): ?>
                         <button type="button" id="btn-att-view-whatsapp" class="btn btn-outline" style="padding: 6px 14px; font-size: 12px; font-weight: 700; border-radius: var(--radius-md); border: none;" onclick="switchAttendanceView('whatsapp')">
                             💬 WhatsApp Group Attendance & OrbitSend
                         </button>
                         <button type="button" id="btn-att-view-zkteco" class="btn btn-outline" style="padding: 6px 14px; font-size: 12px; font-weight: 700; border-radius: var(--radius-md); border: none;" onclick="switchAttendanceView('zkteco')">
                             📟 ZKTeco Biometric Devices
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -96,7 +101,7 @@ try {
                     </div>
 
                     <!-- Live KPI Badges -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 14px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px;">
                         <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
                             <div>
                                 <span style="font-size: 9.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">TOTAL STAFF</span>
@@ -125,6 +130,20 @@ try {
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">⚪</span>
                         </div>
+                        <div id="card-stat-checked" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(16, 185, 129, 0.3); display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <span style="font-size: 9.5px; color: #059669; font-weight: 800; text-transform: uppercase;">✅ CHECKED</span>
+                                <h3 id="att-stat-checked" style="font-size: 18px; color: #10b981; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
+                            </div>
+                            <span style="font-size: 18px; opacity: 0.8;">✓</span>
+                        </div>
+                        <div id="card-stat-pending" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <span style="font-size: 9.5px; color: #d97706; font-weight: 800; text-transform: uppercase;">⏳ PENDING CHECK</span>
+                                <h3 id="att-stat-pending" style="font-size: 18px; color: #f59e0b; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
+                            </div>
+                            <span style="font-size: 18px; opacity: 0.8;">⚡</span>
+                        </div>
                     </div>
 
                     <!-- Live Roster Table -->
@@ -132,13 +151,14 @@ try {
                         <table class="interactive-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 26%;">Employee Name</th>
-                                    <th style="width: 14%;">Department</th>
-                                    <th style="width: 11%;">Check In</th>
-                                    <th style="width: 11%;">Check Out</th>
-                                    <th style="width: 11%;">Duty Hours</th>
-                                    <th style="width: 16%;">Status</th>
-                                    <th style="width: 11%; text-align: right;">Action</th>
+                                    <th style="width: 22%;">Employee Name</th>
+                                    <th style="width: 12%;">Department</th>
+                                    <th style="width: 9%;">Check In</th>
+                                    <th style="width: 9%;">Check Out</th>
+                                    <th style="width: 9%;">Duty Hours</th>
+                                    <th style="width: 12%;">Attendance</th>
+                                    <th id="th-live-sheet-status" style="width: 14%;">Sheet Status</th>
+                                    <th style="width: 13%; text-align: right;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="live-attendance-tbody">

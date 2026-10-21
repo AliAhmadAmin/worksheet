@@ -395,13 +395,17 @@ switch ($action) {
                 e.avatar,
                 e.department_id,
                 d.name as department_name,
+                d.require_hod_sheet_check,
                 t.name as team_name,
                 s.id as sheet_id,
                 s.check_in_time,
                 s.check_out_time,
                 s.total_duty_hours,
-                s.total_duty_seconds,
                 s.is_locked,
+                s.is_hod_checked,
+                s.hod_checked_by,
+                s.hod_checked_at,
+                s.hod_checked_notes,
                 s.day_type,
                 s.holiday_reason,
                 (SELECT COUNT(*) FROM sheet_entries se WHERE se.sheet_id = s.id) as total_entries
@@ -435,7 +439,12 @@ switch ($action) {
             'checked_in' => 0,
             'checked_out' => 0,
             'day_off' => 0,
-            'not_arrived' => 0
+            'not_arrived' => 0,
+            'sheets_checked' => 0,
+            'sheets_verified' => 0,
+            'sheets_pending' => 0,
+            'sheets_not_checked' => 0,
+            'sheets_empty' => 0
         ];
 
         foreach ($rows as &$r) {
@@ -454,12 +463,53 @@ switch ($action) {
                 $r['status'] = 'absent';
                 $stats['not_arrived']++;
             }
+
+            $isChecked = !empty($r['is_hod_checked']);
+            if ($isChecked) {
+                $r['sheet_status'] = 'checked';
+                $stats['sheets_checked']++;
+                $stats['sheets_verified']++;
+            } elseif ($r['status'] === 'checked_out') {
+                // When employee checks out, show as pending check
+                $r['sheet_status'] = 'pending';
+                $stats['sheets_pending']++;
+            } elseif ($r['status'] === 'working') {
+                $r['sheet_status'] = 'working';
+                $stats['sheets_empty']++;
+            } else {
+                $r['sheet_status'] = 'not_checked';
+                $stats['sheets_not_checked']++;
+                $stats['sheets_empty']++;
+            }
+        }
+
+        // Determine if HOD checked system is enabled for this view
+        $hasHodCheckEnabled = false;
+        if (!empty($deptFilter) && $deptFilter !== 'all') {
+            $stmtD = $pdo->prepare("SELECT require_hod_sheet_check FROM departments WHERE id = ?");
+            $stmtD->execute([(int)$deptFilter]);
+            $deptCheckVal = $stmtD->fetchColumn();
+            if ($deptCheckVal !== false) {
+                $hasHodCheckEnabled = ((int)$deptCheckVal === 1);
+            }
+        } elseif ($isHod && !empty($managedDeptIds)) {
+            $inD = implode(',', array_map('intval', $managedDeptIds));
+            $deptCheckVal = $pdo->query("SELECT MAX(require_hod_sheet_check) FROM departments WHERE id IN ($inD)")->fetchColumn();
+            $hasHodCheckEnabled = ((int)$deptCheckVal === 1);
+        } else {
+            foreach ($rows as $r) {
+                if (!empty($r['require_hod_sheet_check'])) {
+                    $hasHodCheckEnabled = true;
+                    break;
+                }
+            }
         }
 
         echo json_encode([
             'success' => true,
             'date' => $date,
             'stats' => $stats,
+            'has_hod_check_enabled' => $hasHodCheckEnabled,
             'employees' => $rows
         ]);
         break;

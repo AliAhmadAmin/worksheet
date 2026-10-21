@@ -915,6 +915,27 @@ function handleAdminSelectEmployee(empId) {
     loadDailyWorksheet();
 }
 
+// Seamless one-click inspection from Attendance & Dashboard
+function inspectEmployeeWorksheet(empId, date = null) {
+    if (date) {
+        AppState.selectedDate = date;
+        const picker = document.getElementById('worksheet-date-picker');
+        if (picker) picker.value = date;
+    }
+    navigateToTab('tab-worksheet');
+    handleAdminSelectEmployee(empId);
+
+    // Smooth scroll to the live inspector
+    setTimeout(() => {
+        const inspector = document.getElementById('admin-inspector-header-container');
+        if (inspector) {
+            inspector.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, 150);
+}
+window.inspectEmployeeWorksheet = inspectEmployeeWorksheet;
+
+
 function toggleMobileSidebar() {
     document.body.classList.toggle('sidebar-open');
 }
@@ -1020,6 +1041,12 @@ function setupTabNavigation() {
                 navigateToTab(tabId, false);
                 return;
             }
+        }
+
+        // For HODs: if no hash is provided, default to attendance (Team Dashboard)
+        if (!hash && AppState.currentUser && (AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'deputy_hod')) {
+            navigateToTab('tab-attendance', false);
+            return;
         }
 
         // Default: activate whichever tab button has .active on page render

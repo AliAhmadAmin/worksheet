@@ -196,20 +196,35 @@ async function loadLiveAttendance() {
         const workingEl = document.getElementById('att-stat-working');
         const outEl = document.getElementById('att-stat-out');
         const absentEl = document.getElementById('att-stat-absent');
+        const checkedEl = document.getElementById('att-stat-checked') || document.getElementById('att-stat-verified');
+        const pendingEl = document.getElementById('att-stat-pending');
 
         if (totalEl) totalEl.textContent = data.stats.total_employees;
         if (workingEl) workingEl.textContent = data.stats.checked_in;
         if (outEl) outEl.textContent = data.stats.checked_out;
         if (absentEl) absentEl.textContent = data.stats.not_arrived;
+        if (checkedEl) checkedEl.textContent = data.stats.sheets_checked ?? (data.stats.sheets_verified || 0);
+        if (pendingEl) pendingEl.textContent = data.stats.sheets_pending || 0;
 
         const dashTeam = document.getElementById('dash-stat-team');
         if (dashTeam) dashTeam.textContent = `${data.stats.total_employees} Employees`;
         const dashWorking = document.getElementById('dash-stat-working');
         if (dashWorking) dashWorking.textContent = `${data.stats.checked_in} Working`;
 
+        const showHodCheck = (data.has_hod_check_enabled !== undefined) ? !!data.has_hod_check_enabled : true;
+
+        const cardChecked = document.getElementById('card-stat-checked');
+        const cardPending = document.getElementById('card-stat-pending');
+        const thSheetStatus = document.getElementById('th-live-sheet-status');
+
+        if (cardChecked) cardChecked.style.display = showHodCheck ? 'flex' : 'none';
+        if (cardPending) cardPending.style.display = showHodCheck ? 'flex' : 'none';
+        if (thSheetStatus) thSheetStatus.style.display = showHodCheck ? '' : 'none';
+
         tbody.innerHTML = '';
         if (data.employees.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No staff records found for this date/department.</td></tr>';
+            const colSpan = showHodCheck ? 8 : 7;
+            tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: var(--text-muted); padding: 30px;">No staff records found for this date/department.</td></tr>`;
             return;
         }
 
@@ -218,6 +233,13 @@ async function loadLiveAttendance() {
             AppState.currentUser.role === 'admin' ||
             AppState.currentUser.role === 'hr' ||
             (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr')
+        );
+
+        const canInspect = AppState.currentUser && (
+            AppState.currentUser.role === 'super_admin' ||
+            AppState.currentUser.role === 'admin' ||
+            AppState.currentUser.role === 'hod' ||
+            AppState.currentUser.can_inspect_sheets
         );
 
         data.employees.forEach(emp => {
@@ -234,13 +256,28 @@ async function loadLiveAttendance() {
                 statusBadge = '<span class="attendance-status-pill absent">⚪ Absent / Off Duty</span>';
             }
 
+            let sheetBadge = '';
+            const isHodChecked = (emp.is_hod_checked == 1 || emp.is_hod_checked === '1');
+
+            if (isHodChecked) {
+                sheetBadge = `<span class="badge badge-hod-checked" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700; padding: 3px 9px; border-radius: 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Checked by HOD at ${escapeHtml(emp.hod_checked_at || '')}">✅ Checked</span>`;
+            } else if (emp.status === 'checked_out' || emp.sheet_status === 'pending') {
+                sheetBadge = `<span class="badge badge-hod-pending" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; padding: 3px 9px; border-radius: 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Shift completed and checked out, pending HOD check">⏳ Pending Check</span>`;
+            } else if (emp.status === 'working' || emp.check_in_time) {
+                sheetBadge = `<span style="color: var(--text-muted); font-size: 11px; display: inline-flex; align-items: center; gap: 3px;" title="Working / On Duty">📝 In Progress</span>`;
+            } else {
+                sheetBadge = `<span style="color: var(--text-dim); font-size: 11px; display: inline-flex; align-items: center; gap: 3px;">⚪ Not Checked</span>`;
+            }
+
+            const sheetStatusTd = showHodCheck ? `<td>${sheetBadge}</td>` : '';
+
             const avatarHtml = emp.avatar
                 ? `<img src="${escapeHtml(emp.avatar)}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 30px; height: 30px; font-size: 11px;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
                 : `<div class="user-avatar" style="width: 30px; height: 30px; font-size: 11px; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
 
             tr.innerHTML = `
                 <td>
-                    <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; ${canInspect ? 'cursor: pointer;' : ''}" ${canInspect ? `onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')"` : ''} title="${canInspect ? 'Click to inspect ' + escapeHtml(emp.name) + '\'s worksheet' : ''}">
                         ${avatarHtml}
                         <div>
                             <strong style="color: var(--text-main); font-size: 13px;">${escapeHtml(emp.name)}</strong>
@@ -253,11 +290,17 @@ async function loadLiveAttendance() {
                 <td><code style="font-size: 12px; font-weight: 700; color: ${emp.check_out_time ? '#3b82f6' : 'var(--text-dim)'};">${escapeHtml(emp.check_out_time || '-')}</code></td>
                 <td><strong style="font-size: 13px; color: ${emp.total_duty_hours ? 'var(--text-main)' : 'var(--text-dim)'};">${escapeHtml(emp.total_duty_hours || '-')}</strong></td>
                 <td>${statusBadge}</td>
+                ${sheetStatusTd}
                 <td>
                     <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px;">
+                        ${canInspect ? `
+                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(16, 185, 129, 0.4); color: #10b981; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')" title="Inspect & Check Employee Worksheet">
+                                📝 Inspect
+                            </button>
+                        ` : ''}
                         ${isSuperOrHr ? `
-                            <button type="button" class="btn btn-outline" style="padding: 4px 10px; font-size: 11.5px; border-color: rgba(59,130,246,0.4); color: var(--primary); white-space: nowrap; font-weight: 600;" onclick="openAdminShiftModal(${emp.employee_id}, '${targetDate}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${emp.check_in_time || ''}', '${emp.check_out_time || ''}', ${emp.is_locked ? 1 : 0})" title="Adjust Check-In/Out Times">
-                                ⏱️ Adjust
+                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; border-color: rgba(59,130,246,0.4); color: var(--primary); white-space: nowrap; font-weight: 600;" onclick="openAdminShiftModal(${emp.employee_id}, '${targetDate}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${emp.check_in_time || ''}', '${emp.check_out_time || ''}', ${emp.is_locked ? 1 : 0})" title="Adjust Check-In/Out Times">
+                                ⏱️
                             </button>
                         ` : ''}
                     </div>

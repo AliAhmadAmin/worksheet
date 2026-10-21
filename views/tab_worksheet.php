@@ -2,8 +2,9 @@
         <?php
         $userRoleWs = strtolower($authUser['role'] ?? '');
         $canInspectWs = in_array($userRoleWs, ['super_admin', 'admin', 'hod']) || !empty($authUser['can_inspect_sheets']);
+        $isHodWs = in_array($userRoleWs, ['hod', 'deputy_hod']);
         ?>
-        <section id="tab-worksheet" class="tab-section <?= ($currentPortal === 'digital') ? 'active' : '' ?>">
+        <section id="tab-worksheet" class="tab-section <?= (!$isHodWs && ($currentPortal ?? '') === 'digital') ? 'active' : '' ?>">
             <!-- EMPLOYEE PERSONAL SHIFT HERO (Hidden for Admin) -->
             <!-- EMPLOYEE PERSONAL SHIFT HERO (Hidden for Admin) -->
             <div id="hero-employee-container" class="shift-hero-card employee-only" style="<?= $canInspectWs ? 'display: none;' : '' ?>">
@@ -84,7 +85,7 @@
                         <div>
                             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                                 <h3 id="admin-inspector-title" style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 0;">Employee Worksheet Inspector & Live Editor</h3>
-                                <span id="admin-verified-header-badge" class="badge badge-hod-checked" style="display: none; font-size: 11px; padding: 3px 10px; border-radius: 20px;">🛡️ Verified by HOD</span>
+                                <span id="admin-verified-header-badge" class="badge badge-hod-checked" style="display: none; font-size: 11px; padding: 3px 10px; border-radius: 20px;">✅ Checked by HOD</span>
                             </div>
                             <p id="admin-inspector-subtitle" style="font-size: 12.5px; color: var(--text-muted); margin-top: 3px;">Reviewing, editing, and managing daily work entries for team members.</p>
                         </div>

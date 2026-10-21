@@ -131,13 +131,25 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
     <!-- Navigation Menu Scrollable Area -->
     <nav class="sidebar-nav">
     <?php if ($currentPortal === 'digital'): ?>
+        <?php $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); ?>
         <!-- Workspace Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">WORKSPACE</div>
+            <?php if ($isHodNav): ?>
+            <button type="button" class="nav-btn active" data-tab="tab-attendance" data-route="attendance">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Team Dashboard</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
+                <span class="nav-icon" id="main-nav-tab-icon">📝</span>
+                <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
+            </button>
+            <?php else: ?>
             <button type="button" class="nav-btn active" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
             </button>
+            <?php endif; ?>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
                 <span class="nav-label" id="tasks-nav-tab-label">Assign Task</span>
@@ -195,10 +207,12 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Matrix Reports</span>
             </button>
+            <?php if (!$isHodNav): ?>
             <button type="button" class="nav-btn admin-only" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Live Attendance</span>
             </button>
+            <?php endif; ?>
             <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Manage Staff</span>
