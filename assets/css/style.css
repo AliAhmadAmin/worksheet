@@ -3310,13 +3310,58 @@ body.dark-theme .login-card-fresh {
 }
 
 /* Attendance status pill & badge for Shift Pending (Today in-progress) */
+.attendance-status-pill {
+    white-space: nowrap !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
 .attendance-status-pill.not-arrived,
 .badge-today-pending {
     background: rgba(245, 158, 11, 0.12) !important;
     color: #d97706 !important;
     border: 1px solid rgba(245, 158, 11, 0.35) !important;
     font-weight: 700;
+    white-space: nowrap !important;
 }
+
+/* Live Attendance KPI Interactive Filter Cards */
+.live-kpi-card {
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    position: relative;
+}
+.live-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.live-kpi-card.active-filter {
+    box-shadow: 0 0 0 2px var(--primary), 0 4px 14px rgba(59, 130, 246, 0.25) !important;
+    border-color: var(--primary) !important;
+    background: var(--bg-card) !important;
+}
+#card-stat-working.active-filter {
+    box-shadow: 0 0 0 2px #10b981, 0 4px 14px rgba(16, 185, 129, 0.25) !important;
+    border-color: #10b981 !important;
+}
+#card-stat-out.active-filter {
+    box-shadow: 0 0 0 2px #3b82f6, 0 4px 14px rgba(59, 130, 246, 0.25) !important;
+    border-color: #3b82f6 !important;
+}
+#card-stat-absent-box.active-filter {
+    box-shadow: 0 0 0 2px #f59e0b, 0 4px 14px rgba(245, 158, 11, 0.25) !important;
+    border-color: #f59e0b !important;
+}
+#card-stat-checked.active-filter {
+    box-shadow: 0 0 0 2px #059669, 0 4px 14px rgba(5, 150, 105, 0.25) !important;
+    border-color: #059669 !important;
+}
+#card-stat-pending.active-filter {
+    box-shadow: 0 0 0 2px #d97706, 0 4px 14px rgba(217, 119, 6, 0.25) !important;
+    border-color: #d97706 !important;
+}
+
 
 
 

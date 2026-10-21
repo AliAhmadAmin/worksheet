@@ -102,44 +102,44 @@ try {
 
                     <!-- Live KPI Badges -->
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px;">
-                        <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                        <div id="card-stat-total" class="live-kpi-card" onclick="filterLiveRosterCards('all')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to show all staff">
                             <div>
                                 <span style="font-size: 9.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">TOTAL STAFF</span>
                                 <h3 id="att-stat-total" style="font-size: 18px; color: var(--primary); margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">👥</span>
                         </div>
-                        <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                        <div id="card-stat-working" class="live-kpi-card" onclick="filterLiveRosterCards('working')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by On Duty staff">
                             <div>
                                 <span style="font-size: 9.5px; color: #10b981; font-weight: 800; text-transform: uppercase;">ON DUTY</span>
                                 <h3 id="att-stat-working" style="font-size: 18px; color: #10b981; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">🟢</span>
                         </div>
-                        <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                        <div id="card-stat-out" class="live-kpi-card" onclick="filterLiveRosterCards('checked_out')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by Checked Out staff">
                             <div>
                                 <span style="font-size: 9.5px; color: #3b82f6; font-weight: 800; text-transform: uppercase;">CHECKED OUT</span>
                                 <h3 id="att-stat-out" style="font-size: 18px; color: #3b82f6; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">🔵</span>
                         </div>
-                        <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                        <div id="card-stat-absent-box" class="live-kpi-card" onclick="filterLiveRosterCards('absent')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by Shift Pending / Absent staff">
                             <div>
                                 <span style="font-size: 9.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">ABSENT / OFF</span>
                                 <h3 id="att-stat-absent" style="font-size: 18px; color: #94a3b8; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">⚪</span>
                         </div>
-                        <div id="card-stat-checked" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(16, 185, 129, 0.3); display: flex; align-items: center; justify-content: space-between;">
+                        <div id="card-stat-checked" class="live-kpi-card" onclick="filterLiveRosterCards('checked')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(16, 185, 129, 0.3); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by Checked worksheets">
                             <div>
                                 <span style="font-size: 9.5px; color: #059669; font-weight: 800; text-transform: uppercase;">✅ CHECKED</span>
                                 <h3 id="att-stat-checked" style="font-size: 18px; color: #10b981; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">✓</span>
                         </div>
-                        <div id="card-stat-pending" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: space-between;">
+                        <div id="card-stat-pending" class="live-kpi-card" onclick="filterLiveRosterCards('pending')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by Pending Check worksheets">
                             <div>
-                                <span style="font-size: 9.5px; color: #d97706; font-weight: 800; text-transform: uppercase;">⏳ PENDING CHECK</span>
+                                <span style="font-size: 9.5px; color: #d97706; font-weight: 800; text-transform: uppercase;">⚡ PENDING CHECK</span>
                                 <h3 id="att-stat-pending" style="font-size: 18px; color: #f59e0b; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">⚡</span>
@@ -156,9 +156,9 @@ try {
                                     <th style="width: 9%;">Check In</th>
                                     <th style="width: 9%;">Check Out</th>
                                     <th style="width: 9%;">Duty Hours</th>
-                                    <th style="width: 12%;">Attendance</th>
-                                    <th id="th-live-sheet-status" style="width: 14%;">Sheet Status</th>
-                                    <th style="width: 13%; text-align: right;">Action</th>
+                                    <th style="width: 15%; white-space: nowrap;">Attendance</th>
+                                    <th id="th-live-sheet-status" style="width: 13%;">Sheet Status</th>
+                                    <th style="width: 11%; text-align: right;">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="live-attendance-tbody">

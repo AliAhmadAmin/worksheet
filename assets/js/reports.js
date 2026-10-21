@@ -172,7 +172,168 @@ function switchAttendanceView(mode) {
     }
 }
 
-// Live Attendance Board for Admin & HR
+// Live Attendance Board for Admin & HR (State & Interactive Filter)
+let currentLiveAttendanceEmployees = [];
+let currentLiveAttendanceFilter = 'all';
+let currentLiveAttendanceData = null;
+
+// Filter Live Roster Table on KPI Card Click
+function filterLiveRosterCards(filterName) {
+    if (currentLiveAttendanceFilter === filterName && filterName !== 'all') {
+        currentLiveAttendanceFilter = 'all';
+    } else {
+        currentLiveAttendanceFilter = filterName;
+    }
+    renderLiveAttendanceTable();
+}
+
+function updateLiveCardActiveStates(activeFilter) {
+    const cardMap = {
+        'all': 'card-stat-total',
+        'working': 'card-stat-working',
+        'checked_out': 'card-stat-out',
+        'absent': 'card-stat-absent-box',
+        'checked': 'card-stat-checked',
+        'pending': 'card-stat-pending'
+    };
+
+    Object.values(cardMap).forEach(cardId => {
+        const el = document.getElementById(cardId);
+        if (el) el.classList.remove('active-filter');
+    });
+
+    const activeId = cardMap[activeFilter];
+    if (activeId) {
+        const activeEl = document.getElementById(activeId);
+        if (activeEl) activeEl.classList.add('active-filter');
+    }
+}
+
+function renderLiveAttendanceTable() {
+    const tbody = document.getElementById('live-attendance-tbody');
+    if (!tbody || !currentLiveAttendanceData) return;
+
+    updateLiveCardActiveStates(currentLiveAttendanceFilter);
+
+    const showHodCheck = (currentLiveAttendanceData.has_hod_check_enabled !== undefined) ? !!currentLiveAttendanceData.has_hod_check_enabled : true;
+    const targetDate = document.getElementById('attendance-board-date')?.value || new Date().toISOString().split('T')[0];
+
+    let filteredEmployees = currentLiveAttendanceEmployees || [];
+    if (currentLiveAttendanceFilter === 'working') {
+        filteredEmployees = filteredEmployees.filter(e => e.status === 'working');
+    } else if (currentLiveAttendanceFilter === 'checked_out') {
+        filteredEmployees = filteredEmployees.filter(e => e.status === 'checked_out');
+    } else if (currentLiveAttendanceFilter === 'absent') {
+        filteredEmployees = filteredEmployees.filter(e => e.status === 'not_arrived' || e.status === 'absent' || e.status === 'holiday');
+    } else if (currentLiveAttendanceFilter === 'checked') {
+        filteredEmployees = filteredEmployees.filter(e => (e.is_hod_checked == 1 || e.sheet_status === 'checked'));
+    } else if (currentLiveAttendanceFilter === 'pending') {
+        filteredEmployees = filteredEmployees.filter(e => (e.sheet_status === 'pending' || (e.status === 'checked_out' && !e.is_hod_checked)));
+    }
+
+    tbody.innerHTML = '';
+    if (filteredEmployees.length === 0) {
+        const colSpan = showHodCheck ? 8 : 7;
+        const filterNames = {
+            'all': 'All Staff',
+            'working': 'On Duty',
+            'checked_out': 'Checked Out',
+            'absent': 'Absent / Off',
+            'checked': 'Checked',
+            'pending': 'Pending Check'
+        };
+        const fLabel = filterNames[currentLiveAttendanceFilter] || currentLiveAttendanceFilter;
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: var(--text-muted); padding: 35px 20px;">
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">No staff records found for filter "<strong>${escapeHtml(fLabel)}</strong>"</div>
+            <button type="button" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; margin-top: 6px;" onclick="filterLiveRosterCards('all')">Show All Staff</button>
+        </td></tr>`;
+        return;
+    }
+
+    const isSuperOrHr = AppState.currentUser && (
+        AppState.currentUser.role === 'super_admin' ||
+        AppState.currentUser.role === 'admin' ||
+        AppState.currentUser.role === 'hr' ||
+        (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr')
+    );
+
+    const canInspect = AppState.currentUser && (
+        AppState.currentUser.role === 'super_admin' ||
+        AppState.currentUser.role === 'admin' ||
+        AppState.currentUser.role === 'hod' ||
+        AppState.currentUser.can_inspect_sheets
+    );
+
+    filteredEmployees.forEach(emp => {
+        const tr = document.createElement('tr');
+
+        let statusBadge = '';
+        if (emp.status === 'holiday') {
+            statusBadge = '<span class="attendance-status-pill holiday" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">🏖️ Day Off</span>';
+        } else if (emp.status === 'working') {
+            statusBadge = '<span class="attendance-status-pill working" style="white-space: nowrap; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🟢 On Duty</span>';
+        } else if (emp.status === 'checked_out') {
+            statusBadge = '<span class="attendance-status-pill checked_out" style="white-space: nowrap; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🔵 Checked Out</span>';
+        } else if (emp.status === 'not_arrived') {
+            statusBadge = '<span class="attendance-status-pill not-arrived" style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">⏳ Shift Pending</span>';
+        } else {
+            statusBadge = '<span class="attendance-status-pill absent" style="white-space: nowrap; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🔴 Absent</span>';
+        }
+
+        let sheetBadge = '';
+        const isHodChecked = (emp.is_hod_checked == 1 || emp.is_hod_checked === '1');
+
+        if (isHodChecked) {
+            sheetBadge = `<span class="badge badge-hod-checked" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700; padding: 3px 9px; border-radius: 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;" title="Checked by HOD at ${escapeHtml(emp.hod_checked_at || '')}">✅ Checked</span>`;
+        } else if (emp.status === 'checked_out' || emp.sheet_status === 'pending') {
+            sheetBadge = `<span class="badge badge-hod-pending" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; padding: 3px 9px; border-radius: 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;" title="Shift completed and checked out, pending HOD check">⏳ Pending Check</span>`;
+        } else if (emp.status === 'working' || emp.check_in_time) {
+            sheetBadge = `<span style="color: var(--text-muted); font-size: 11px; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;" title="Working / On Duty">📝 In Progress</span>`;
+        } else {
+            sheetBadge = `<span style="color: var(--text-dim); font-size: 11px; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;">⚪ Not Checked</span>`;
+        }
+
+        const sheetStatusTd = showHodCheck ? `<td style="white-space: nowrap;">${sheetBadge}</td>` : '';
+
+        const avatarHtml = emp.avatar
+            ? `<img src="${escapeHtml(emp.avatar)}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 30px; height: 30px; font-size: 11px;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
+            : `<div class="user-avatar" style="width: 30px; height: 30px; font-size: 11px; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
+
+        tr.innerHTML = `
+            <td>
+                <div style="display: flex; align-items: center; gap: 8px; ${canInspect ? 'cursor: pointer;' : ''}" ${canInspect ? `onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')"` : ''} title="${canInspect ? 'Click to inspect ' + escapeHtml(emp.name) + '\'s worksheet' : ''}">
+                    ${avatarHtml}
+                    <div>
+                        <strong style="color: var(--text-main); font-size: 13px;">${escapeHtml(emp.name)}</strong>
+                        <div style="font-size: 11px; color: var(--text-dim);">${escapeHtml(emp.designation || 'Staff')}</div>
+                    </div>
+                </div>
+            </td>
+            <td><span class="user-role-tag" style="background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">${escapeHtml(emp.department_name || 'Digital')}</span></td>
+            <td style="white-space: nowrap;"><code style="font-size: 12px; font-weight: 700; color: ${emp.check_in_time ? '#10b981' : 'var(--text-dim)'};">${escapeHtml(emp.check_in_time || '-')}</code></td>
+            <td style="white-space: nowrap;"><code style="font-size: 12px; font-weight: 700; color: ${emp.check_out_time ? '#3b82f6' : 'var(--text-dim)'};">${escapeHtml(emp.check_out_time || '-')}</code></td>
+            <td style="white-space: nowrap;"><strong style="font-size: 13px; color: ${emp.total_duty_hours ? 'var(--text-main)' : 'var(--text-dim)'};">${escapeHtml(emp.total_duty_hours || '-')}</strong></td>
+            <td style="white-space: nowrap;">${statusBadge}</td>
+            ${sheetStatusTd}
+            <td style="text-align: right; white-space: nowrap;">
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px;">
+                    ${canInspect ? `
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(16, 185, 129, 0.4); color: #10b981; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')" title="Inspect & Check Employee Worksheet">
+                            📝 Inspect
+                        </button>
+                    ` : ''}
+                    ${isSuperOrHr ? `
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; border-color: rgba(59,130,246,0.4); color: var(--primary); white-space: nowrap; font-weight: 600;" onclick="openAdminShiftModal(${emp.employee_id}, '${targetDate}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${emp.check_in_time || ''}', '${emp.check_out_time || ''}', ${emp.is_locked ? 1 : 0})" title="Adjust Check-In/Out Times">
+                            ⏱️
+                        </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
 async function loadLiveAttendance() {
     const tbody = document.getElementById('live-attendance-tbody');
     if (!tbody) return;
@@ -190,6 +351,9 @@ async function loadLiveAttendance() {
         const data = await res.json();
 
         if (!data.success) return;
+
+        currentLiveAttendanceData = data;
+        currentLiveAttendanceEmployees = data.employees || [];
 
         // Render stats badges
         const totalEl = document.getElementById('att-stat-total');
@@ -221,95 +385,7 @@ async function loadLiveAttendance() {
         if (cardPending) cardPending.style.display = showHodCheck ? 'flex' : 'none';
         if (thSheetStatus) thSheetStatus.style.display = showHodCheck ? '' : 'none';
 
-        tbody.innerHTML = '';
-        if (data.employees.length === 0) {
-            const colSpan = showHodCheck ? 8 : 7;
-            tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: var(--text-muted); padding: 30px;">No staff records found for this date/department.</td></tr>`;
-            return;
-        }
-
-        const isSuperOrHr = AppState.currentUser && (
-            AppState.currentUser.role === 'super_admin' ||
-            AppState.currentUser.role === 'admin' ||
-            AppState.currentUser.role === 'hr' ||
-            (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr')
-        );
-
-        const canInspect = AppState.currentUser && (
-            AppState.currentUser.role === 'super_admin' ||
-            AppState.currentUser.role === 'admin' ||
-            AppState.currentUser.role === 'hod' ||
-            AppState.currentUser.can_inspect_sheets
-        );
-
-        data.employees.forEach(emp => {
-            const tr = document.createElement('tr');
-
-            let statusBadge = '';
-            if (emp.status === 'holiday') {
-                statusBadge = '<span class="attendance-status-pill holiday" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); font-weight: 700; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🏖️ Day Off</span>';
-            } else if (emp.status === 'working') {
-                statusBadge = '<span class="attendance-status-pill working">🟢 On Duty</span>';
-            } else if (emp.status === 'checked_out') {
-                statusBadge = '<span class="attendance-status-pill checked_out">🔵 Checked Out</span>';
-            } else if (emp.status === 'not_arrived') {
-                statusBadge = '<span class="attendance-status-pill not-arrived" style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; padding: 3px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">⏳ Shift Pending</span>';
-            } else {
-                statusBadge = '<span class="attendance-status-pill absent">🔴 Absent</span>';
-            }
-
-            let sheetBadge = '';
-            const isHodChecked = (emp.is_hod_checked == 1 || emp.is_hod_checked === '1');
-
-            if (isHodChecked) {
-                sheetBadge = `<span class="badge badge-hod-checked" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700; padding: 3px 9px; border-radius: 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Checked by HOD at ${escapeHtml(emp.hod_checked_at || '')}">✅ Checked</span>`;
-            } else if (emp.status === 'checked_out' || emp.sheet_status === 'pending') {
-                sheetBadge = `<span class="badge badge-hod-pending" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; padding: 3px 9px; border-radius: 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Shift completed and checked out, pending HOD check">⏳ Pending Check</span>`;
-            } else if (emp.status === 'working' || emp.check_in_time) {
-                sheetBadge = `<span style="color: var(--text-muted); font-size: 11px; display: inline-flex; align-items: center; gap: 3px;" title="Working / On Duty">📝 In Progress</span>`;
-            } else {
-                sheetBadge = `<span style="color: var(--text-dim); font-size: 11px; display: inline-flex; align-items: center; gap: 3px;">⚪ Not Checked</span>`;
-            }
-
-            const sheetStatusTd = showHodCheck ? `<td>${sheetBadge}</td>` : '';
-
-            const avatarHtml = emp.avatar
-                ? `<img src="${escapeHtml(emp.avatar)}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 30px; height: 30px; font-size: 11px;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
-                : `<div class="user-avatar" style="width: 30px; height: 30px; font-size: 11px; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
-
-            tr.innerHTML = `
-                <td>
-                    <div style="display: flex; align-items: center; gap: 8px; ${canInspect ? 'cursor: pointer;' : ''}" ${canInspect ? `onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')"` : ''} title="${canInspect ? 'Click to inspect ' + escapeHtml(emp.name) + '\'s worksheet' : ''}">
-                        ${avatarHtml}
-                        <div>
-                            <strong style="color: var(--text-main); font-size: 13px;">${escapeHtml(emp.name)}</strong>
-                            <div style="font-size: 11px; color: var(--text-dim);">${escapeHtml(emp.designation || 'Staff')}</div>
-                        </div>
-                    </div>
-                </td>
-                <td><span class="user-role-tag" style="background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600;">${escapeHtml(emp.department_name || 'Digital')}</span></td>
-                <td><code style="font-size: 12px; font-weight: 700; color: ${emp.check_in_time ? '#10b981' : 'var(--text-dim)'};">${escapeHtml(emp.check_in_time || '-')}</code></td>
-                <td><code style="font-size: 12px; font-weight: 700; color: ${emp.check_out_time ? '#3b82f6' : 'var(--text-dim)'};">${escapeHtml(emp.check_out_time || '-')}</code></td>
-                <td><strong style="font-size: 13px; color: ${emp.total_duty_hours ? 'var(--text-main)' : 'var(--text-dim)'};">${escapeHtml(emp.total_duty_hours || '-')}</strong></td>
-                <td>${statusBadge}</td>
-                ${sheetStatusTd}
-                <td>
-                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px;">
-                        ${canInspect ? `
-                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(16, 185, 129, 0.4); color: #10b981; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')" title="Inspect & Check Employee Worksheet">
-                                📝 Inspect
-                            </button>
-                        ` : ''}
-                        ${isSuperOrHr ? `
-                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; border-color: rgba(59,130,246,0.4); color: var(--primary); white-space: nowrap; font-weight: 600;" onclick="openAdminShiftModal(${emp.employee_id}, '${targetDate}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${emp.check_in_time || ''}', '${emp.check_out_time || ''}', ${emp.is_locked ? 1 : 0})" title="Adjust Check-In/Out Times">
-                                ⏱️
-                            </button>
-                        ` : ''}
-                    </div>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+        renderLiveAttendanceTable();
 
     } catch (err) {
         console.error("Error loading live attendance:", err);
