@@ -549,7 +549,8 @@ switch ($action) {
             $whereSql = "WHERE " . implode(' AND ', $whereClauses);
 
             $empStmt = $pdo->prepare("
-                SELECT e.id, e.name, e.email, e.designation, e.role, e.avatar, e.department_id, e.weekly_off,
+                SELECT e.id, e.name, e.email, e.designation, e.role, e.avatar, e.department_id, e.weekly_off, e.created_at,
+                       p.joining_date,
                        COALESCE(p.expected_hours, 8.0) as expected_hours,
                        COALESCE(p.shift_policy, 'standard_8h') as shift_policy,
                        d.name as department_name, t.name as team_name
@@ -712,6 +713,22 @@ switch ($action) {
 
                 $empLeaves = $leavesByEmp[$empId] ?? [];
 
+                // Resolve effective employee joining date (from HR profile or employee creation)
+                $effectiveJoiningDate = null;
+                if (!empty($emp['joining_date'])) {
+                    $effectiveJoiningDate = $emp['joining_date'];
+                    // If joining_date defaulted to 1st of the month, but employee was created later in that same month, use created_at date
+                    if (!empty($emp['created_at'])) {
+                        $createdDate = substr($emp['created_at'], 0, 10);
+                        $monthStart = substr($createdDate, 0, 7) . '-01';
+                        if ($effectiveJoiningDate === $monthStart && $createdDate > $monthStart) {
+                            $effectiveJoiningDate = $createdDate;
+                        }
+                    }
+                } elseif (!empty($emp['created_at'])) {
+                    $effectiveJoiningDate = substr($emp['created_at'], 0, 10);
+                }
+
                 // Step 1: Pre-analyze all days in period to detect worked weekly off days and candidate rotation days
                 $dayMetaMap = [];
                 $workedOffDays = [];
@@ -765,6 +782,9 @@ switch ($action) {
                     $holidayReason = $sheet ? ($sheet['holiday_reason'] ?? '') : '';
                     $isExplicitRest = in_array($explicitDayType, ['holiday', 'swapped_off', 'alt_off', 'day_off'], true);
 
+                    // Check if day is prior to employee's joining date (pre-employment)
+                    $isPreEmployment = ($effectiveJoiningDate && $dt < $effectiveJoiningDate && $dutySeconds == 0 && empty($sheet['check_in_time']) && !$isOnLeave);
+
                     if ($d['is_past']) {
                         if ($isEmpWeeklyOff && $dutyHours >= 1.0) {
                             $workedOffDays[] = [
@@ -773,7 +793,7 @@ switch ($action) {
                                 'day' => $dayOfWeek,
                                 'ts' => strtotime($dt)
                             ];
-                        } elseif (!$isEmpWeeklyOff && !$isExplicitRest && !$isOnLeave && $dutySeconds == 0 && empty($sheet['check_in_time'])) {
+                        } elseif (!$isEmpWeeklyOff && !$isExplicitRest && !$isOnLeave && $dutySeconds == 0 && empty($sheet['check_in_time']) && !$isPreEmployment) {
                             $unclockedDays[] = [
                                 'date' => $dt,
                                 'day' => $dayOfWeek,
@@ -799,7 +819,8 @@ switch ($action) {
                         'duty_seconds' => $dutySeconds,
                         'duty_hours' => $dutyHours,
                         'explicit_day_type' => $explicitDayType,
-                        'holiday_reason' => $holidayReason
+                        'holiday_reason' => $holidayReason,
+                        'is_pre_employment' => $isPreEmployment
                     ];
                 }
 
@@ -855,6 +876,8 @@ switch ($action) {
                     $explicitDayType = $meta['explicit_day_type'];
                     $holidayReason = $meta['holiday_reason'];
 
+                    $isPreEmployment = $meta['is_pre_employment'] ?? false;
+
                     $isSwappedOff = ($explicitDayType === 'swapped_off') || isset($autoSwappedMap[$dt]);
                     $isAltOff = ($explicitDayType === 'alt_off');
                     $isExplicitHoliday = ($explicitDayType === 'holiday' || $explicitDayType === 'day_off');
@@ -884,9 +907,11 @@ switch ($action) {
                         $empSummary['weekly_hours'][$weekNum] += $dutyHours;
 
                         if ($d['is_past']) {
-                            $empSummary['working_days_count']++;
-                            if (!$isOpenFlexible && !$isRestDay && !$isOnLeave) {
-                                $empSummary['expected_duty_hours'] += $shiftHours;
+                            if (!$isPreEmployment) {
+                                $empSummary['working_days_count']++;
+                                if (!$isOpenFlexible && !$isRestDay && !$isOnLeave) {
+                                    $empSummary['expected_duty_hours'] += $shiftHours;
+                                }
                             }
                         } elseif ($d['is_today']) {
                             if ($hasCheckOut) {
@@ -915,6 +940,12 @@ switch ($action) {
                         $status = 'upcoming';
                         $statusLabel = 'Upcoming';
                         $badgeClass = 'badge-upcoming';
+                    } elseif ($isPreEmployment) {
+                        $status = 'not_joined';
+                        $statusLabel = '⚪ Not Joined Yet';
+                        $badgeClass = 'badge-upcoming';
+                        if (!isset($empSummary['not_joined_days'])) $empSummary['not_joined_days'] = 0;
+                        $empSummary['not_joined_days']++;
                     } elseif ($isOnLeave) {
                         $status = 'approved_leave';
                         $statusLabel = '🌴 ' . ucfirst($leaveType) . ' Leave';

@@ -602,7 +602,14 @@ async function loadAttendanceReport(targetEmpId = null) {
 
     const deptSelect = document.getElementById('rep-att-dept-select')?.value || 'all';
     const monthSelect = document.getElementById('rep-att-month-select')?.value || new Date().toISOString().slice(0, 7);
+    const startDate = document.getElementById('rep-att-start-date')?.value || '';
+    const endDate = document.getElementById('rep-att-end-date')?.value || '';
     const standardHours = document.getElementById('rep-att-standard-hours')?.value || '8';
+
+    const clearDatesBtn = document.getElementById('rep-att-clear-dates-btn');
+    if (clearDatesBtn) {
+        clearDatesBtn.style.display = (startDate || endDate) ? 'inline-block' : 'none';
+    }
 
     if (kpisGrid) {
         kpisGrid.innerHTML = '';
@@ -612,6 +619,8 @@ async function loadAttendanceReport(targetEmpId = null) {
     container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);"><div class="spinner" style="margin: 0 auto 10px;"></div>Loading attendance timesheet...</div>';
 
     let url = `api/attendance.php?action=attendance_report&month=${encodeURIComponent(monthSelect)}&standard_hours=${encodeURIComponent(standardHours)}`;
+    if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+    if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
     if (empSelect !== 'all') {
         url += `&employee_id=${encodeURIComponent(empSelect)}`;
     } else if (deptSelect !== 'all') {
@@ -657,6 +666,14 @@ async function loadAttendanceReport(targetEmpId = null) {
         console.error("Error generating attendance report:", err);
         container.innerHTML = `<div style="text-align: center; padding: 30px; color: #ef4444;">Error generating attendance report: ${escapeHtml(err.message || 'Network error')}</div>`;
     }
+}
+
+function clearRepAttDates() {
+    if (document.getElementById('rep-att-start-date')) document.getElementById('rep-att-start-date').value = '';
+    if (document.getElementById('rep-att-end-date')) document.getElementById('rep-att-end-date').value = '';
+    const clearDatesBtn = document.getElementById('rep-att-clear-dates-btn');
+    if (clearDatesBtn) clearDatesBtn.style.display = 'none';
+    loadAttendanceReport();
 }
 
 // Render Single Employee Detailed Day-by-Day Timesheet (Clean & Executive UI)
@@ -723,6 +740,8 @@ function renderSingleEmployeeTimesheet(item, globalData) {
             badgeStyle = 'background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700;';
         } else if (r.status === 'incomplete' || r.status === 'absent') {
             badgeStyle = 'background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.25); font-weight: 600;';
+        } else if (r.status === 'not_joined') {
+            badgeStyle = 'background: rgba(148, 163, 184, 0.12); color: #64748b; border: 1px solid rgba(148, 163, 184, 0.25); font-weight: 600;';
         }
 
         const rowBg = r.is_weekend ? 'style="background: rgba(0,0,0,0.015);"' : '';
@@ -779,6 +798,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
             else if (r.status === 'today_pending') cleanStatusText = '⏳ Shift Pending';
             else if (r.status === 'incomplete') cleanStatusText = '🔴 Incomplete';
             else if (r.status === 'absent') cleanStatusText = '🔴 Absent';
+            else if (r.status === 'not_joined') cleanStatusText = '⚪ Not Joined Yet';
 
             const offWorkedPill = r.is_off_day_worked
                 ? `<span style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 4px; white-space: nowrap;" title="Worked on scheduled weekly off / rest day (Earned compensatory day off credit)">⭐ Off Worked</span>`
@@ -862,6 +882,8 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                         <span><span style="color: #ea580c; font-weight: 600;">Half:</span> <b style="color: #ea580c;">${sum.half_leaves}</b></span>
                         <span style="color: var(--border-color);">|</span>
                         <span><span style="color: #3b82f6; font-weight: 600;">Leaves:</span> <b style="color: #3b82f6;">${sum.approved_leaves}</b></span>
+                        <span style="color: var(--border-color);">|</span>
+                        <span><span style="color: #ef4444; font-weight: 600;">Absents:</span> <b style="color: #ef4444;">${(sum.absences || 0) + (sum.incomplete || 0)}</b></span>
                     </div>
 
                     <div style="padding: 4px 10px; background: ${balanceBg}; border: 1px solid ${balanceBorder}; border-radius: 6px; font-size: 12px;">

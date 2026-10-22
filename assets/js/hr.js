@@ -1593,11 +1593,20 @@ async function loadHrClaims() {
 
     const typeFilter = document.getElementById('hr-claims-type-filter')?.value || 'all';
     const monthFilter = document.getElementById('hr-claims-month-filter')?.value || '';
+    const dateFrom = document.getElementById('hr-claims-date-from')?.value || '';
+    const dateTo = document.getElementById('hr-claims-date-to')?.value || '';
     const statusFilter = document.getElementById('hr-claims-status-filter')?.value || 'all';
     const empFilter = document.getElementById('hr-claims-emp-filter')?.value || '';
 
+    const dateClearBtn = document.getElementById('hr-claims-date-clear-btn');
+    if (dateClearBtn) {
+        dateClearBtn.style.display = (dateFrom || dateTo) ? 'inline-block' : 'none';
+    }
+
     let url = `api/hr.php?action=get_claims&claim_type=${encodeURIComponent(typeFilter)}&status=${encodeURIComponent(statusFilter)}`;
     if (monthFilter) url += `&month=${encodeURIComponent(monthFilter)}`;
+    if (dateFrom) url += `&start_date=${encodeURIComponent(dateFrom)}`;
+    if (dateTo) url += `&end_date=${encodeURIComponent(dateTo)}`;
     if (empFilter) url += `&employee_id=${encodeURIComponent(empFilter)}`;
 
     try {
@@ -1628,19 +1637,34 @@ async function loadHrClaims() {
     }
 }
 
+function clearClaimsDates() {
+    if (document.getElementById('hr-claims-date-from')) document.getElementById('hr-claims-date-from').value = '';
+    if (document.getElementById('hr-claims-date-to')) document.getElementById('hr-claims-date-to').value = '';
+    const dateClearBtn = document.getElementById('hr-claims-date-clear-btn');
+    if (dateClearBtn) dateClearBtn.style.display = 'none';
+    loadHrClaims();
+}
+
 function applyClaimsClientFilters() {
     const search = (document.getElementById('hr-claims-search')?.value || '').toLowerCase().trim();
     const dept = (document.getElementById('hr-claims-dept-filter')?.value || '').toLowerCase().trim();
     const type = document.getElementById('hr-claims-type-filter')?.value || 'all';
     const status = document.getElementById('hr-claims-status-filter')?.value || 'all';
     const month = document.getElementById('hr-claims-month-filter')?.value || '';
+    const dateFrom = document.getElementById('hr-claims-date-from')?.value || '';
+    const dateTo = document.getElementById('hr-claims-date-to')?.value || '';
     const empId = document.getElementById('hr-claims-emp-filter')?.value || '';
 
     const currentMonth = new Date().toISOString().slice(0, 7);
     const resetBtn = document.getElementById('hr-claims-reset-filters-btn');
     if (resetBtn) {
-        const isFiltered = !!(search || dept || empId || type !== 'all' || status !== 'approved' || (month && month !== currentMonth));
+        const isFiltered = !!(search || dept || empId || dateFrom || dateTo || type !== 'all' || status !== 'approved' || (month && month !== currentMonth));
         resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
+    }
+
+    const dateClearBtn = document.getElementById('hr-claims-date-clear-btn');
+    if (dateClearBtn) {
+        dateClearBtn.style.display = (dateFrom || dateTo) ? 'inline-block' : 'none';
     }
 
     let list = HrState.claims || [];
@@ -1652,13 +1676,22 @@ function applyClaimsClientFilters() {
         });
     }
 
+    if (dateFrom) {
+        list = list.filter(c => c.claim_date && c.claim_date >= dateFrom);
+    }
+    if (dateTo) {
+        list = list.filter(c => c.claim_date && c.claim_date <= dateTo);
+    }
+
     if (search) {
         list = list.filter(c => {
             return (c.employee_name && c.employee_name.toLowerCase().includes(search)) ||
+                   (c.emp_code && c.emp_code.toLowerCase().includes(search)) ||
                    (c.claim_type && c.claim_type.toLowerCase().includes(search)) ||
+                   (c.reason && c.reason.toLowerCase().includes(search)) ||
                    (c.description && c.description.toLowerCase().includes(search)) ||
+                   (c.receipt_no && c.receipt_no.toLowerCase().includes(search)) ||
                    (c.route_details && c.route_details.toLowerCase().includes(search)) ||
-                   (c.receipt_number && c.receipt_number.toLowerCase().includes(search)) ||
                    (c.department_name && c.department_name.toLowerCase().includes(search)) ||
                    (c.status && c.status.toLowerCase().includes(search)) ||
                    (c.amount && String(c.amount).includes(search));
@@ -1675,7 +1708,11 @@ function resetClaimsFilters() {
     if (document.getElementById('hr-claims-type-filter')) document.getElementById('hr-claims-type-filter').value = 'all';
     if (document.getElementById('hr-claims-status-filter')) document.getElementById('hr-claims-status-filter').value = 'approved';
     if (document.getElementById('hr-claims-month-filter')) document.getElementById('hr-claims-month-filter').value = currentMonth;
+    if (document.getElementById('hr-claims-date-from')) document.getElementById('hr-claims-date-from').value = '';
+    if (document.getElementById('hr-claims-date-to')) document.getElementById('hr-claims-date-to').value = '';
     if (document.getElementById('hr-claims-emp-filter')) document.getElementById('hr-claims-emp-filter').value = '';
+    const dateClearBtn = document.getElementById('hr-claims-date-clear-btn');
+    if (dateClearBtn) dateClearBtn.style.display = 'none';
     loadHrClaims();
 }
 

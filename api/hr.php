@@ -1973,6 +1973,15 @@ switch ($action) {
                         $remainingToDeduct -= $deductFromThis;
                     }
                 }
+
+                // 3. Auto-mark Approved Claims/Allowances (Fuel, Travel, Food Bills, Incentive, Bonus) as Paid with Salary
+                $stmtClmPaid = $pdo->prepare("
+                    UPDATE hr_claims 
+                    SET status = 'paid', action_at = NOW(),
+                        admin_notes = CONCAT(COALESCE(admin_notes, ''), IF(admin_notes IS NULL OR admin_notes = '', '', ' | '), '[Auto-marked Paid with Salary: ', ?, ']')
+                    WHERE employee_id = ? AND salary_month = ? AND status = 'approved'
+                ");
+                $stmtClmPaid->execute([$salaryMonth, $empId, $salaryMonth]);
             }
 
             echo json_encode(['success' => true, 'message' => 'Payroll adjustments saved successfully.']);
@@ -1983,9 +1992,24 @@ switch ($action) {
 
     // ================= 7. FUEL, TRAVEL, FOOD & INCENTIVE CLAIMS =================
     case 'get_claims':
+        // Self-healing Auto-Sync: If any approved claim belongs to a salary month that was marked paid in payroll, mark claim as paid
+        try {
+            $pdo->exec("
+                UPDATE hr_claims c
+                JOIN hr_payroll p ON c.employee_id = p.employee_id AND c.salary_month = p.salary_month
+                SET c.status = 'paid', c.action_at = NOW(),
+                    c.admin_notes = CONCAT(COALESCE(c.admin_notes, ''), IF(c.admin_notes IS NULL OR c.admin_notes = '', '', ' | '), '[Disbursed with salary: ', p.salary_month, ']')
+                WHERE c.status = 'approved' AND p.payment_status = 'paid'
+            ");
+        } catch (\Exception $e) {
+            // Non-blocking sync
+        }
+
         $statusFilter = $_GET['status'] ?? 'all';
         $typeFilter = $_GET['claim_type'] ?? 'all';
         $monthFilter = $_GET['month'] ?? '';
+        $startDate = $_GET['start_date'] ?? '';
+        $endDate = $_GET['end_date'] ?? '';
         $empFilter = (int)($_GET['employee_id'] ?? 0);
 
         $whereClauses = ["1=1"];
@@ -2013,6 +2037,16 @@ switch ($action) {
         if ($monthFilter) {
             $whereClauses[] = "c.salary_month = ?";
             $params[] = $monthFilter;
+        }
+
+        if ($startDate) {
+            $whereClauses[] = "c.claim_date >= ?";
+            $params[] = $startDate;
+        }
+
+        if ($endDate) {
+            $whereClauses[] = "c.claim_date <= ?";
+            $params[] = $endDate;
         }
 
         if ($empFilter > 0 && ($canManageHr || $isHod)) {
@@ -2116,6 +2150,14 @@ switch ($action) {
             $status = 'approved';
             $actionBy = $currentUserId;
             $actionAt = date('Y-m-d H:i:s');
+
+            // If salary for this employee and month is already paid, directly mark as paid
+            $stmtPayCheck = $pdo->prepare("SELECT payment_status FROM hr_payroll WHERE employee_id = ? AND salary_month = ?");
+            $stmtPayCheck->execute([$empId, $salaryMonth]);
+            $payRec = $stmtPayCheck->fetch();
+            if ($payRec && $payRec['payment_status'] === 'paid') {
+                $status = 'paid';
+            }
         }
 
         $stmt = $pdo->prepare("

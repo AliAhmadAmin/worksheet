@@ -567,22 +567,45 @@
         </div>
 
         <div class="worksheet-card">
-            <!-- Unified Filter Toolbar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                <!-- Search Box -->
-                <div style="position: relative; flex: 1; min-width: 200px; max-width: 280px;">
-                    <input type="text" id="hr-claims-search" class="input-control" placeholder="🔍 Search employee, route, receipt..." style="width: 100%; padding: 7px 12px; font-size: 12px; border-radius: var(--radius-md);" oninput="applyClaimsClientFilters()">
+            <!-- Modern Responsive Filter Toolbar -->
+            <div class="modern-filter-toolbar">
+                <!-- Row 1: Search, Month/Date Range & Actions -->
+                <div class="filter-row-primary">
+                    <div class="filter-search-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="hr-claims-search" placeholder="Search employee, category, receipt, route, notes..." oninput="applyClaimsClientFilters()">
+                    </div>
+
+                    <div class="filter-date-group">
+                        <span class="date-label">📅 Salary Month:</span>
+                        <input type="month" id="hr-claims-month-filter" value="<?php echo date('Y-m'); ?>" onchange="loadHrClaims()" style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 4px 7px; font-size: 12px; font-weight: 600; color: var(--text-main); cursor: pointer; width: 140px;">
+                    </div>
+
+                    <div class="filter-date-group">
+                        <span class="date-label">🗓️ Dates:</span>
+                        <input type="date" id="hr-claims-date-from" title="From Date" onchange="loadHrClaims()" oninput="applyClaimsClientFilters()">
+                        <span class="date-sep">to</span>
+                        <input type="date" id="hr-claims-date-to" title="To Date" onchange="loadHrClaims()" oninput="applyClaimsClientFilters()">
+                        <button type="button" id="hr-claims-date-clear-btn" class="date-clear-btn" style="display: none;" onclick="clearClaimsDates()" title="Clear dates">✕</button>
+                    </div>
+
+                    <div class="filter-toolbar-actions">
+                        <button type="button" id="hr-claims-reset-filters-btn" class="btn btn-outline" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; border-radius: var(--radius-md); display: none; color: #ef4444; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.05);" onclick="resetClaimsFilters()" title="Reset all filters">
+                            ↺ Reset
+                        </button>
+                        <span id="hr-claims-count-label" class="filter-count-chip">
+                            Showing 0 claim(s)
+                        </span>
+                    </div>
                 </div>
 
-                <!-- Dropdown Filter Pills -->
-                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-                    <input type="month" id="hr-claims-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrClaims()">
-
-                    <select id="hr-claims-dept-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyClaimsClientFilters()">
+                <!-- Row 2: Secondary Dropdown Filters -->
+                <div class="filter-row-secondary">
+                    <select id="hr-claims-dept-filter" onchange="applyClaimsClientFilters()">
                         <option value="">🏢 All Departments</option>
                     </select>
 
-                    <select id="hr-claims-type-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrClaims()">
+                    <select id="hr-claims-type-filter" onchange="loadHrClaims()">
                         <option value="all">⛽ All Claim Types</option>
                         <option value="fuel">⛽ Fuel & Mileage</option>
                         <option value="travel">✈️ Travel / Official Trip</option>
@@ -592,7 +615,7 @@
                         <option value="bonus">🎁 Bonus & Others</option>
                     </select>
 
-                    <select id="hr-claims-status-filter" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrClaims()">
+                    <select id="hr-claims-status-filter" onchange="loadHrClaims()">
                         <option value="all">All Statuses</option>
                         <option value="pending">⏳ Pending Review</option>
                         <option value="approved" selected>✅ Approved</option>
@@ -600,17 +623,9 @@
                         <option value="rejected">❌ Rejected</option>
                     </select>
 
-                    <select id="hr-claims-emp-filter" class="input-control admin-only" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="loadHrClaims()">
+                    <select id="hr-claims-emp-filter" class="admin-only" onchange="loadHrClaims()">
                         <option value="">👤 All Employees</option>
                     </select>
-
-                    <button type="button" id="hr-claims-reset-filters-btn" class="btn btn-outline" style="padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); display: none; color: var(--text-muted);" onclick="resetClaimsFilters()" title="Reset all filters">
-                        ↺ Reset
-                    </button>
-                    
-                    <span style="font-size: 12px; color: var(--text-muted); font-weight: 600; padding-left: 4px;" id="hr-claims-count-label">
-                        Showing 0 claim(s)
-                    </span>
                 </div>
             </div>
 

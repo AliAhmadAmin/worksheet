@@ -211,6 +211,15 @@ try {
                             <!-- Month Selector -->
                             <input type="month" id="rep-att-month-select" class="input-control" value="<?= date('Y-m') ?>" onchange="loadAttendanceReport()" style="padding: 4px 8px; font-size: 11.5px; width: 140px; border-radius: var(--radius-md);">
 
+                            <!-- Date Range Filter -->
+                            <div style="display: inline-flex; align-items: center; gap: 4px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: var(--radius-md);">
+                                <span style="font-size: 11px; font-weight: 700; color: var(--text-muted);" title="Filter by date range">🗓️</span>
+                                <input type="date" id="rep-att-start-date" class="input-control" style="padding: 3px 5px; font-size: 11px; border: none; background: transparent; width: 115px;" title="From Date" onchange="loadAttendanceReport()">
+                                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">to</span>
+                                <input type="date" id="rep-att-end-date" class="input-control" style="padding: 3px 5px; font-size: 11px; border: none; background: transparent; width: 115px;" title="To Date" onchange="loadAttendanceReport()">
+                                <button type="button" id="rep-att-clear-dates-btn" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 0 4px; display: none; line-height: 1;" onclick="clearRepAttDates()" title="Clear date range">✕</button>
+                            </div>
+
                             <!-- Expected Standard Duty Hours -->
                             <select id="rep-att-standard-hours" class="input-control" style="padding: 4px 8px; font-size: 11.5px; max-width: 155px; border-radius: var(--radius-md);" onchange="loadAttendanceReport()">
                                 <option value="auto" selected>⚙️ Auto (Shift)</option>
