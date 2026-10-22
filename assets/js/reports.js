@@ -284,13 +284,13 @@ function renderLiveAttendanceTable() {
         const isHodChecked = (emp.is_hod_checked == 1 || emp.is_hod_checked === '1');
 
         if (isHodChecked) {
-            sheetBadge = `<span class="badge badge-hod-checked" title="Checked by HOD at ${escapeHtml(emp.hod_checked_at || '')}">✅ Checked</span>`;
+            sheetBadge = `<span class="badge badge-hod-checked" title="Verified by HOD at ${escapeHtml(emp.hod_checked_at || '')}">✅ Verified</span>`;
         } else if (emp.status === 'checked_out' || emp.sheet_status === 'pending') {
-            sheetBadge = `<span class="badge badge-hod-pending" title="Shift completed and checked out, urgent: not verified yet">⚠️ Not Verified</span>`;
+            sheetBadge = `<span class="badge badge-hod-pending" title="Shift completed and checked out, urgent: not verified yet">⚠️ Pending Verify</span>`;
         } else if (emp.status === 'working' || emp.check_in_time) {
             sheetBadge = `<span style="color: var(--text-muted); font-size: 11px; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;" title="Working / On Duty">📝 In Progress</span>`;
         } else {
-            sheetBadge = `<span style="color: var(--text-dim); font-size: 11px; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;">⚪ Not Checked</span>`;
+            sheetBadge = `<span style="color: var(--text-dim); font-size: 11px; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;">⚪ Pending Verify</span>`;
         }
 
         const sheetStatusTd = showHodCheck ? `<td style="white-space: nowrap;">${sheetBadge}</td>` : '';
