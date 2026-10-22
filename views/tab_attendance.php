@@ -132,14 +132,14 @@ try {
                         </div>
                         <div id="card-stat-checked" class="live-kpi-card" onclick="filterLiveRosterCards('checked')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(16, 185, 129, 0.3); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by Checked worksheets">
                             <div>
-                                <span style="font-size: 9.5px; color: #059669; font-weight: 800; text-transform: uppercase;">✅ CHECKED</span>
+                                <span style="font-size: 9.5px; color: #059669; font-weight: 800; text-transform: uppercase;">✅ Verified</span>
                                 <h3 id="att-stat-checked" style="font-size: 18px; color: #10b981; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">✓</span>
                         </div>
                         <div id="card-stat-pending" class="live-kpi-card" onclick="filterLiveRosterCards('pending')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by Pending Check worksheets">
                             <div>
-                                <span style="font-size: 9.5px; color: #d97706; font-weight: 800; text-transform: uppercase;">⚡ PENDING CHECK</span>
+                                <span style="font-size: 9.5px; color: #d97706; font-weight: 800; text-transform: uppercase;">⚡ Pending Verify</span>
                                 <h3 id="att-stat-pending" style="font-size: 18px; color: #f59e0b; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">⚡</span>

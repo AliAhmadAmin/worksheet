@@ -239,8 +239,8 @@ function renderLiveAttendanceTable() {
             'working': 'On Duty',
             'checked_out': 'Checked Out',
             'absent': 'Absent / Off',
-            'checked': 'Checked',
-            'pending': 'Pending Check'
+            'checked': 'Verify',
+            'pending': 'Pending Verify'
         };
         const fLabel = filterNames[currentLiveAttendanceFilter] || currentLiveAttendanceFilter;
         tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: var(--text-muted); padding: 35px 20px;">
