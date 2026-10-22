@@ -1633,7 +1633,7 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
     const reasonInput = document.getElementById('admin-shift-holiday-reason');
 
     let effectiveType = 'working';
-    if (dayType && (dayType === 'swapped_off' || dayType === 'alt_off' || dayType === 'holiday')) {
+    if (dayType && (dayType === 'swapped_off' || dayType === 'alt_off' || dayType === 'holiday' || dayType === 'absent')) {
         effectiveType = dayType;
     } else if (isSwappedOff) {
         effectiveType = 'swapped_off';
@@ -1664,15 +1664,38 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
 function handleAdminShiftDayTypeChange() {
     const dayType = document.getElementById('admin-shift-day-type')?.value || 'working';
     const reasonGroup = document.getElementById('admin-shift-reason-group');
+    const reasonLabel = document.getElementById('admin-shift-reason-label');
+    const reasonHint = document.getElementById('admin-shift-reason-hint');
+    const reasonInput = document.getElementById('admin-shift-holiday-reason');
     const timesSection = document.getElementById('admin-shift-times-section');
+    const inInput = document.getElementById('admin-shift-in-time');
+    const outInput = document.getElementById('admin-shift-out-time');
 
     const isOffType = (dayType === 'swapped_off' || dayType === 'alt_off' || dayType === 'holiday');
+    const isAbsent = (dayType === 'absent');
+
     if (reasonGroup) {
-        reasonGroup.style.display = isOffType ? 'block' : 'none';
+        reasonGroup.style.display = (isOffType || isAbsent) ? 'block' : 'none';
+        if (reasonLabel) {
+            reasonLabel.textContent = isAbsent ? 'Absent Reason / Remarks (Optional)' : 'Swap / Day Off Notes & Reference';
+        }
+        if (reasonHint) {
+            reasonHint.textContent = isAbsent ? 'Optional remarks (e.g. Uninformed leave, Sick without notice, etc.)' : 'Reference date worked or HOD rotation approval reason.';
+        }
+        if (reasonInput) {
+            reasonInput.placeholder = isAbsent ? 'e.g. Unexcused absence / Informed absence' : 'e.g. Swapped with Saturday (HOD approved)';
+        }
     }
 
     if (timesSection) {
-        timesSection.style.opacity = isOffType ? '0.65' : '1.0';
+        if (isAbsent) {
+            timesSection.style.display = 'none';
+            if (inInput) inInput.value = '';
+            if (outInput) outInput.value = '';
+        } else {
+            timesSection.style.display = 'block';
+            timesSection.style.opacity = isOffType ? '0.65' : '1.0';
+        }
     }
 }
 
@@ -1699,9 +1722,13 @@ async function handleAdminSaveShiftSubmit(e) {
     if (e) e.preventDefault();
     const empId = document.getElementById('admin-shift-emp-id')?.value || getActiveWorksheetEmpId();
     const date = document.getElementById('admin-shift-date')?.value || AppState.selectedDate;
-    const inTime = document.getElementById('admin-shift-in-time')?.value.trim() || '';
-    const outTime = document.getElementById('admin-shift-out-time')?.value.trim() || '';
     const dayType = document.getElementById('admin-shift-day-type')?.value || 'working';
+    let inTime = document.getElementById('admin-shift-in-time')?.value.trim() || '';
+    let outTime = document.getElementById('admin-shift-out-time')?.value.trim() || '';
+    if (dayType === 'absent') {
+        inTime = '';
+        outTime = '';
+    }
     const holidayReason = document.getElementById('admin-shift-holiday-reason')?.value.trim() || '';
 
     try {

@@ -1274,6 +1274,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         <label class="form-label" style="font-weight: 700;">Day Schedule & Status</label>
                         <select id="admin-shift-day-type" class="input-control" onchange="handleAdminShiftDayTypeChange()" style="font-weight: 600;">
                             <option value="working">💼 Normal Working Shift</option>
+                            <option value="absent">🔴 Mark Absent (Unexcused / Absent)</option>
                             <option value="swapped_off">🔄 Swapped Weekly Off (Rotated Day Off)</option>
                             <option value="alt_off">⭐ Alternate Day Off (Comp Off for Extra Day Worked)</option>
                             <option value="holiday">🏖️ Scheduled Day Off / Rest Day</option>
@@ -1281,9 +1282,9 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                     </div>
 
                     <div id="admin-shift-reason-group" class="form-group" style="display: none; margin-bottom: 14px;">
-                        <label class="form-label" style="font-weight: 700;">Swap / Day Off Notes & Reference</label>
+                        <label id="admin-shift-reason-label" class="form-label" style="font-weight: 700;">Swap / Day Off Notes & Reference</label>
                         <input type="text" id="admin-shift-holiday-reason" class="input-control" placeholder="e.g. Swapped with Saturday (HOD approved)">
-                        <small style="font-size: 11px; color: var(--text-dim);">Reference date worked or HOD rotation approval reason.</small>
+                        <small id="admin-shift-reason-hint" style="font-size: 11px; color: var(--text-dim);">Reference date worked or HOD rotation approval reason.</small>
                     </div>
 
                     <div id="admin-shift-times-section">

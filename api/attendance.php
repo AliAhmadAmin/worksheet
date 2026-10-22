@@ -264,7 +264,7 @@ switch ($action) {
         $date = $data['date'] ?? date('Y-m-d');
         $inTime = trim($data['check_in_time'] ?? '');
         $outTime = trim($data['check_out_time'] ?? '');
-        $dayType = isset($data['day_type']) && in_array($data['day_type'], ['working', 'swapped_off', 'alt_off', 'holiday'], true)
+        $dayType = isset($data['day_type']) && in_array($data['day_type'], ['working', 'swapped_off', 'alt_off', 'holiday', 'absent'], true)
             ? $data['day_type'] 
             : null;
         $holidayReason = isset($data['holiday_reason']) ? trim($data['holiday_reason']) : null;
@@ -291,7 +291,10 @@ switch ($action) {
         $dutySeconds = 0;
         $dutyFormatted = null;
 
-        if (!empty($inTime) && !empty($outTime)) {
+        if ($dayType === 'absent') {
+            $inTime = '';
+            $outTime = '';
+        } elseif (!empty($inTime) && !empty($outTime)) {
             $inTs = strtotime($inTime);
             $outTs = strtotime($outTime);
             if ($inTs && $outTs) {
@@ -729,6 +732,35 @@ switch ($action) {
                     $effectiveJoiningDate = substr($emp['created_at'], 0, 10);
                 }
 
+                // Detect earliest active attendance/work date in the period or recorded sheets
+                $earliestActivityDate = null;
+                if (!empty($sheetsByEmp[$empId])) {
+                    foreach ($sheetsByEmp[$empId] as $sDt => $sRow) {
+                        $hasAct = !empty($sRow['check_in_time']) || ((int)($sRow['total_duty_seconds'] ?? 0) > 0) || (!empty($sRow['day_type']) && $sRow['day_type'] !== 'absent');
+                        if ($hasAct) {
+                            if ($earliestActivityDate === null || $sDt < $earliestActivityDate) {
+                                $earliestActivityDate = $sDt;
+                            }
+                        }
+                    }
+                }
+                if (!empty($empLeaves)) {
+                    foreach ($empLeaves as $lv) {
+                        $lvStart = $lv['start_date'] ?? null;
+                        if ($lvStart && ($earliestActivityDate === null || $lvStart < $earliestActivityDate)) {
+                            $earliestActivityDate = $lvStart;
+                        }
+                    }
+                }
+
+                // If employee has logged activity or leaves earlier than their joining date / created_at date,
+                // their effective joining date must be at least as early as that first active date.
+                if ($earliestActivityDate !== null) {
+                    if ($effectiveJoiningDate === null || $earliestActivityDate < $effectiveJoiningDate) {
+                        $effectiveJoiningDate = $earliestActivityDate;
+                    }
+                }
+
                 // Step 1: Pre-analyze all days in period to detect worked weekly off days and candidate rotation days
                 $dayMetaMap = [];
                 $workedOffDays = [];
@@ -781,9 +813,16 @@ switch ($action) {
                     $explicitDayType = $sheet ? ($sheet['day_type'] ?? '') : '';
                     $holidayReason = $sheet ? ($sheet['holiday_reason'] ?? '') : '';
                     $isExplicitRest = in_array($explicitDayType, ['holiday', 'swapped_off', 'alt_off', 'day_off'], true);
+                    $isExplicitAbsent = ($explicitDayType === 'absent');
 
                     // Check if day is prior to employee's joining date (pre-employment)
-                    $isPreEmployment = ($effectiveJoiningDate && $dt < $effectiveJoiningDate && $dutySeconds == 0 && empty($sheet['check_in_time']) && !$isOnLeave);
+                    // Rule: Can ONLY be pre-employment if strictly prior to effective joining date AND prior to their very first active date
+                    $isPreEmployment = false;
+                    if ($effectiveJoiningDate && $dt < $effectiveJoiningDate && ($earliestActivityDate === null || $dt < $earliestActivityDate)) {
+                        if ($dutySeconds == 0 && empty($sheet['check_in_time']) && !$isOnLeave && !$isExplicitAbsent) {
+                            $isPreEmployment = true;
+                        }
+                    }
 
                     if ($d['is_past']) {
                         if ($isEmpWeeklyOff && $dutyHours >= 1.0) {
@@ -940,6 +979,12 @@ switch ($action) {
                         $status = 'upcoming';
                         $statusLabel = 'Upcoming';
                         $badgeClass = 'badge-upcoming';
+                    } elseif ($isExplicitAbsent) {
+                        $status = 'absent';
+                        $statusLabel = '🔴 Absent';
+                        $badgeClass = 'badge-absent';
+                        $empSummary['absences']++;
+                        $grandTotals['total_absences']++;
                     } elseif ($isPreEmployment) {
                         $status = 'not_joined';
                         $statusLabel = '⚪ Not Joined Yet';

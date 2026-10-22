@@ -753,7 +753,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
         const isWeekendOff = (r.is_weekend && !r.check_in && !r.check_out && !isSwappedOff && !isAltOff);
         const isMergedDay = (isLeaveDay || isDayOff || isWeekendOff);
 
-        const adjustArgs = `${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0}, '${r.day_type || (isSwappedOff ? 'swapped_off' : (isAltOff ? 'alt_off' : ''))}', '${escapeHtml(r.holiday_reason || r.swapped_note || '')}', ${isSwappedOff ? 1 : 0}, '${escapeHtml(r.swapped_with_date || '')}'`;
+        const adjustArgs = `${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0}, '${r.day_type || (isSwappedOff ? 'swapped_off' : (isAltOff ? 'alt_off' : (r.status === 'absent' ? 'absent' : '')))}', '${escapeHtml(r.holiday_reason || r.swapped_note || '')}', ${isSwappedOff ? 1 : 0}, '${escapeHtml(r.swapped_with_date || '')}'`;
 
         if (isMergedDay) {
             let mergedContentHtml = '';
