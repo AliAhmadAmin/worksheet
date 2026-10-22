@@ -523,9 +523,31 @@ switch ($action) {
 
     case 'attendance_report':
         try {
-            $month = $_GET['month'] ?? date('Y-m');
-            $startDate = $_GET['start_date'] ?? ($month . '-01');
-            $endDate = $_GET['end_date'] ?? date('Y-m-t', strtotime($startDate));
+            $rawMonth = !empty($_GET['month']) ? trim($_GET['month']) : date('Y-m');
+            $rawStart = !empty($_GET['start_date']) ? trim($_GET['start_date']) : '';
+            $rawEnd = !empty($_GET['end_date']) ? trim($_GET['end_date']) : '';
+
+            if (!empty($rawStart) && !empty($rawEnd)) {
+                $startDate = $rawStart;
+                $endDate = $rawEnd;
+            } elseif (!empty($rawStart)) {
+                $startDate = $rawStart;
+                $endDate = date('Y-m-t', strtotime($startDate));
+            } elseif (!empty($rawEnd)) {
+                $endDate = $rawEnd;
+                $startDate = substr($endDate, 0, 7) . '-01';
+            } else {
+                $startDate = $rawMonth . '-01';
+                $endDate = date('Y-m-t', strtotime($startDate));
+            }
+
+            // Ensure valid chronological ordering
+            if (strtotime($startDate) > strtotime($endDate)) {
+                $tmp = $startDate;
+                $startDate = $endDate;
+                $endDate = $tmp;
+            }
+
             $empIdFilter = isset($_GET['employee_id']) && $_GET['employee_id'] !== '' && $_GET['employee_id'] !== 'all' ? (int)$_GET['employee_id'] : null;
             $deptFilter = isset($_GET['department_id']) && $_GET['department_id'] !== '' && $_GET['department_id'] !== 'all' ? (int)$_GET['department_id'] : null;
             $rawStandardParam = $_GET['standard_hours'] ?? 'auto';

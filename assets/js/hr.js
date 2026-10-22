@@ -155,7 +155,7 @@ function renderDashboardPendingQueue(pendingList) {
                 </div>
             `;
         } else if (l.status === 'approved_by_hod') {
-            actionBtnHtml = `<span style="font-size: 11px; color: #0284c7; font-weight: 700; white-space: nowrap;">🟡 Approved by HOD (Awaiting HR)</span>`;
+            actionBtnHtml = `<span style="font-size: 11px; color: #0284c7; font-weight: 700; white-space: nowrap;">🟡 Awaiting HR Approval</span>`;
         } else if (l.status === 'pending') {
             if (isHodForDept) {
                 actionBtnHtml = `
@@ -182,7 +182,6 @@ function renderDashboardPendingQueue(pendingList) {
                 <div style="flex: 1; min-width: 150px;">
                     <div style="font-size: 12px; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
                         ${l.leave_type.toUpperCase()} LEAVE (${l.days_count} Day${l.days_count > 1 ? 's' : ''})
-                        ${l.status === 'approved_by_hod' ? `<span style="font-size: 10px; background: rgba(14, 165, 233, 0.12); color: #0284c7; padding: 1px 6px; border-radius: 4px; font-weight: 800;">HOD Approved</span>` : ''}
                     </div>
                     <div style="font-size: 11px; color: var(--primary); font-weight: 600;">
                         📅 ${escapeHtml(l.start_date)} ${l.end_date !== l.start_date ? 'to ' + escapeHtml(l.end_date) : ''}
@@ -248,7 +247,7 @@ function renderDashboardPendingLoansQueue(loanList) {
                 </div>
             `;
         } else if (l.status === 'approved_by_hod') {
-            actionBtnHtml = `<span style="font-size: 11px; color: #0284c7; font-weight: 700;">🟡 Approved by HOD (Awaiting HR)</span>`;
+            actionBtnHtml = `<span style="font-size: 11px; color: #0284c7; font-weight: 700;">🟡 Awaiting HR Approval</span>`;
         } else if (l.status === 'pending') {
             if (isHodForDept) {
                 actionBtnHtml = `
@@ -791,7 +790,7 @@ function renderLeavesTable(leaves) {
 
     const statusBadges = {
         pending: { label: isHodOnly ? '⏳ Pending' : '⏳ Pending HOD', bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)' },
-        approved_by_hod: { label: isHodOnly ? '🟡 Sent to HR' : '🟡 Approved by HOD', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7', border: 'rgba(14, 165, 233, 0.35)' },
+        approved_by_hod: { label: isHodOnly ? '🟡 Sent to HR' : '🟡 Awaiting HR', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7', border: 'rgba(14, 165, 233, 0.35)' },
         approved: { label: isHodOnly ? '✅ Approved' : '✅ Approved by HR', bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.35)' },
         rejected: { label: '❌ Rejected', bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.35)' },
         cancelled: { label: '🚫 Cancelled', bg: 'rgba(107, 114, 128, 0.12)', color: '#6b7280', border: 'rgba(107, 114, 128, 0.35)' }
@@ -844,7 +843,7 @@ function renderLeavesTable(leaves) {
                     </div>
                 `;
             } else if (l.status === 'approved_by_hod') {
-                actionHtml = `<span style="color: #0284c7; font-size: 11px; font-weight: 700; white-space: nowrap;">✓ Approved by HOD (Sent to HR)</span>`;
+                actionHtml = `<span style="color: #0284c7; font-size: 11px; font-weight: 700; white-space: nowrap;">✓ Awaiting HR Approval</span>`;
             } else if (l.status === 'approved') {
                 actionHtml = `<span style="color: #10b981; font-size: 11px; font-weight: 700; white-space: nowrap;">✅ Final Approved</span>`;
             } else {
@@ -1261,7 +1260,7 @@ function renderLoansTable(loans) {
 
     const statusBadges = {
         pending: { label: isHodOnly ? '⏳ Pending' : '⏳ Pending HOD', bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)' },
-        approved_by_hod: { label: isHodOnly ? '🟡 Sent to HR' : '🟡 Approved by HOD', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7', border: 'rgba(14, 165, 233, 0.35)' },
+        approved_by_hod: { label: isHodOnly ? '🟡 Sent to HR' : '🟡 Awaiting HR', bg: 'rgba(14, 165, 233, 0.12)', color: '#0284c7', border: 'rgba(14, 165, 233, 0.35)' },
         approved: { label: isHodOnly ? '✅ Approved' : '✅ Active / Approved', bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: 'rgba(16, 185, 129, 0.35)' },
         repaid: { label: '🎉 Fully Repaid', bg: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', border: 'rgba(59, 130, 246, 0.35)' },
         rejected: { label: '❌ Rejected', bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.35)' },
@@ -1319,7 +1318,7 @@ function renderLoansTable(loans) {
                     </div>
                 `;
             } else if (l.status === 'approved_by_hod') {
-                actionHtml = `<span style="color: #0284c7; font-size: 11px; font-weight: 700; white-space: nowrap;">✓ Approved by HOD (Sent to HR)</span>`;
+                actionHtml = `<span style="color: #0284c7; font-size: 11px; font-weight: 700; white-space: nowrap;">✓ Awaiting HR Approval</span>`;
             } else if (l.status === 'approved') {
                 actionHtml = `<span style="color: #10b981; font-size: 11px; font-weight: 700; white-space: nowrap;">✅ Final Approved</span>`;
             } else {

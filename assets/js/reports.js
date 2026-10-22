@@ -646,6 +646,13 @@ async function loadAttendanceReport(targetEmpId = null) {
 
         currentAttReportData = data;
 
+        // Update live active date indicator badge
+        const indicator = document.getElementById('rep-att-filter-indicator');
+        if (indicator && data.start_date && data.end_date) {
+            const daysCount = data.period_dates ? data.period_dates.length : '';
+            indicator.innerHTML = `<span>🗓️ <strong>${escapeHtml(data.start_date)}</strong> to <strong>${escapeHtml(data.end_date)}</strong></span> <span style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 800; color: var(--primary);">${daysCount} Days</span>`;
+        }
+
         // Render Detailed View: Single Employee or Multi-Employee Summary Matrix
         if (empSelect !== 'all') {
             if (data.report_data && data.report_data.length > 0) {
@@ -668,9 +675,103 @@ async function loadAttendanceReport(targetEmpId = null) {
     }
 }
 
+// Handler when Month Selector changes
+function handleRepAttMonthChange() {
+    const startInput = document.getElementById('rep-att-start-date');
+    const endInput = document.getElementById('rep-att-end-date');
+    const clearBtn = document.getElementById('rep-att-clear-dates-btn');
+    if (startInput) startInput.value = '';
+    if (endInput) {
+        endInput.value = '';
+        endInput.removeAttribute('min');
+    }
+    if (clearBtn) clearBtn.style.display = 'none';
+    loadAttendanceReport();
+}
+
+// Step Month Forward or Backward
+function stepRepAttMonth(delta) {
+    const monthInput = document.getElementById('rep-att-month-select');
+    if (!monthInput) return;
+    let currVal = monthInput.value || new Date().toISOString().slice(0, 7);
+    const parts = currVal.split('-');
+    let y = parseInt(parts[0], 10);
+    let m = parseInt(parts[1], 10) - 1; // 0-based
+    
+    m += delta;
+    const d = new Date(y, m, 1);
+    const newMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    monthInput.value = newMonthStr;
+    handleRepAttMonthChange();
+}
+
+// Jump to Current Month
+function jumpRepAttMonthCurrent() {
+    const monthInput = document.getElementById('rep-att-month-select');
+    if (!monthInput) return;
+    monthInput.value = new Date().toISOString().slice(0, 7);
+    handleRepAttMonthChange();
+}
+
+// Custom Date Range Input Change Handler
+function handleRepAttCustomDateChange() {
+    const startInput = document.getElementById('rep-att-start-date');
+    const endInput = document.getElementById('rep-att-end-date');
+    const clearBtn = document.getElementById('rep-att-clear-dates-btn');
+    const monthInput = document.getElementById('rep-att-month-select');
+
+    const sVal = startInput?.value || '';
+    const eVal = endInput?.value || '';
+
+    if (clearBtn) {
+        clearBtn.style.display = (sVal || eVal) ? 'inline-block' : 'none';
+    }
+
+    if (sVal) {
+        if (monthInput) monthInput.value = sVal.slice(0, 7);
+        if (endInput) endInput.min = sVal;
+    }
+
+    // If both dates are selected or cleared, reload automatically
+    if ((sVal && eVal) || (!sVal && !eVal)) {
+        loadAttendanceReport();
+    }
+}
+
+// Set Quick Date Range Presets
+function setRepAttDatePreset(preset) {
+    const monthInput = document.getElementById('rep-att-month-select');
+    const startInput = document.getElementById('rep-att-start-date');
+    const endInput = document.getElementById('rep-att-end-date');
+    const clearBtn = document.getElementById('rep-att-clear-dates-btn');
+
+    const monthStr = monthInput?.value || new Date().toISOString().slice(0, 7);
+    const parts = monthStr.split('-');
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10); // 1-based
+    const lastDay = new Date(y, m, 0).getDate();
+
+    if (preset === 'first_half') {
+        if (startInput) startInput.value = `${monthStr}-01`;
+        if (endInput) endInput.value = `${monthStr}-15`;
+    } else if (preset === 'second_half') {
+        if (startInput) startInput.value = `${monthStr}-16`;
+        if (endInput) endInput.value = `${monthStr}-${String(lastDay).padStart(2, '0')}`;
+    }
+
+    if (clearBtn) clearBtn.style.display = 'inline-block';
+    loadAttendanceReport();
+}
+
+// Clear Custom Date Range
 function clearRepAttDates() {
-    if (document.getElementById('rep-att-start-date')) document.getElementById('rep-att-start-date').value = '';
-    if (document.getElementById('rep-att-end-date')) document.getElementById('rep-att-end-date').value = '';
+    const startInput = document.getElementById('rep-att-start-date');
+    const endInput = document.getElementById('rep-att-end-date');
+    if (startInput) startInput.value = '';
+    if (endInput) {
+        endInput.value = '';
+        endInput.removeAttribute('min');
+    }
     const clearDatesBtn = document.getElementById('rep-att-clear-dates-btn');
     if (clearDatesBtn) clearDatesBtn.style.display = 'none';
     loadAttendanceReport();

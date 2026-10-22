@@ -165,80 +165,104 @@ try {
                                 <!-- Populated via reports.js -->
                             </tbody>
                         </table>
-                    </div>
-                </div>
-
-                <!-- ================= VIEW 2: DETAILED ATTENDANCE TIMESHEET & REPORTS ================= -->
+                  <!-- ================= VIEW 2: DETAILED ATTENDANCE TIMESHEET & REPORTS ================= -->
                 <div id="att-view-report-section" style="display: none;">
-                    <!-- Compact Filter Controls Bar -->
-                    <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; box-shadow: var(--shadow-sm);">
+                    <!-- Modern Responsive Filter Controls Container -->
+                    <div class="att-report-filter-bar" style="background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-lg); border: 1px solid var(--border-color); margin-bottom: 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 10px;">
                         
-                        <!-- Left Group: Compact Filter Inputs -->
-                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1;">
+                        <!-- Row 1: Who & Actions (Employee, Department, Shift Policy, CSV, Print) -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
                             
-                            <!-- Searchable Target Employee Combobox -->
-                            <div class="searchable-dropdown-wrapper" id="rep-att-emp-search-wrapper" style="position: relative; min-width: 190px; max-width: 250px; flex: 1;">
-                                <button type="button" id="rep-att-emp-dropdown-btn" class="input-control" style="font-weight: 700; font-size: 11.5px; padding: 4px 8px; width: 100%; border-color: var(--border-color); background: var(--bg-card); cursor: pointer; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 6px; text-align: left;" onclick="toggleRepAttEmpDropdown()">
-                                    <span id="rep-att-emp-dropdown-selected-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👥 All Employees Summary</span>
-                                    <span style="font-size: 9px; color: var(--text-muted);">▼</span>
-                                </button>
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1;">
+                                <!-- Searchable Target Employee Combobox -->
+                                <div class="searchable-dropdown-wrapper" id="rep-att-emp-search-wrapper" style="position: relative; min-width: 200px; max-width: 280px; flex: 1;">
+                                    <button type="button" id="rep-att-emp-dropdown-btn" class="input-control" style="font-weight: 700; font-size: 12px; padding: 6px 10px; width: 100%; border-color: var(--border-color); background: var(--bg-card); cursor: pointer; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 6px; text-align: left;" onclick="toggleRepAttEmpDropdown()">
+                                        <span id="rep-att-emp-dropdown-selected-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">👥 All Employees Summary</span>
+                                        <span style="font-size: 9px; color: var(--text-muted);">▼</span>
+                                    </button>
 
-                                <select id="rep-att-emp-select" style="display: none;" onchange="loadAttendanceReport()">
-                                    <option value="all">👥 All Employees Summary</option>
+                                    <select id="rep-att-emp-select" style="display: none;" onchange="loadAttendanceReport()">
+                                        <option value="all">👥 All Employees Summary</option>
+                                    </select>
+
+                                    <!-- Floating Search Dropdown Menu -->
+                                    <div id="rep-att-emp-dropdown-menu" class="searchable-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 280px; width: 100%; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 1050; padding: 6px; text-align: left;">
+                                        <div style="padding-bottom: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
+                                            <input type="text" id="rep-att-search-input" class="input-control" placeholder="🔍 Search employee..." style="width: 100%; padding: 5px 9px; font-size: 11.5px;" oninput="filterRepAttEmpDropdown(this.value)" autocomplete="off">
+                                        </div>
+                                        <div id="rep-att-emp-dropdown-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+                                            <!-- Populated dynamically via reports.js -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Dynamic Department Filter -->
+                                <select id="rep-att-dept-select" class="input-control" style="padding: 6px 10px; font-size: 12px; font-weight: 600; min-width: 150px; max-width: 180px; border-radius: var(--radius-md);" onchange="loadAttendanceReport()" <?= (!$isGlobalAdminAtt && count($deptList) <= 1) ? 'disabled title="Restricted to your department"' : '' ?>>
+                                    <?php if ($isGlobalAdminAtt): ?>
+                                        <option value="all">🏢 All Departments</option>
+                                    <?php endif; ?>
+                                    <?php foreach ($deptList as $d): ?>
+                                        <option value="<?= htmlspecialchars($d['id']) ?>">🏢 <?= htmlspecialchars($d['name']) ?></option>
+                                    <?php endforeach; ?>
                                 </select>
 
-                                <!-- Floating Search Dropdown Menu -->
-                                <div id="rep-att-emp-dropdown-menu" class="searchable-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 260px; width: 100%; background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 1050; padding: 6px; text-align: left;">
-                                    <div style="padding-bottom: 4px; border-bottom: 1px solid var(--border-color); margin-bottom: 4px;">
-                                        <input type="text" id="rep-att-search-input" class="input-control" placeholder="🔍 Search employee..." style="width: 100%; padding: 4px 8px; font-size: 11.5px;" oninput="filterRepAttEmpDropdown(this.value)" autocomplete="off">
-                                    </div>
-                                    <div id="rep-att-emp-dropdown-list" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
-                                        <!-- Populated dynamically via reports.js -->
-                                    </div>
+                                <!-- Expected Standard Duty Hours -->
+                                <select id="rep-att-standard-hours" class="input-control" style="padding: 6px 10px; font-size: 12px; font-weight: 600; min-width: 135px; max-width: 160px; border-radius: var(--radius-md);" onchange="loadAttendanceReport()">
+                                    <option value="auto" selected>⚙️ Auto (Shift)</option>
+                                    <option value="8">⏱️ 8.0 Hours / Day</option>
+                                    <option value="9">⏱️ 9.0 Hours / Day</option>
+                                    <option value="7">⏱️ 7.0 Hours / Day</option>
+                                    <option value="6">⏱️ 6.0 Hours / Day</option>
+                                    <option value="open">🌐 Flexible Shift</option>
+                                </select>
+                            </div>
+
+                            <!-- Right Group: Action Buttons -->
+                            <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
+                                <button type="button" class="btn btn-outline" onclick="exportAttendanceReportCsv()" style="padding: 6px 12px; font-size: 12px; font-weight: 700; border-color: rgba(16, 185, 129, 0.4); color: #10b981; display: inline-flex; align-items: center; gap: 5px;" title="Export Current Report to CSV">
+                                    <span>📥</span> <span>CSV</span>
+                                </button>
+                                <button type="button" class="btn btn-primary" onclick="printAttendanceReport()" style="padding: 6px 14px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;" title="Print Formatted Monthly Timesheet">
+                                    <span>🖨️</span> <span>Print</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Row 2: Period & Date Range Filter Bar (Clean, Unified & Highly Adjusted) -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
+                            
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1;">
+                                <!-- Month Stepper Pill -->
+                                <div style="display: inline-flex; align-items: center; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1px 3px;">
+                                    <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px; font-weight: 800; border: none; background: transparent; cursor: pointer;" onclick="stepRepAttMonth(-1)" title="Previous Month">◀</button>
+                                    <input type="month" id="rep-att-month-select" class="input-control" value="<?= date('Y-m') ?>" onchange="handleRepAttMonthChange()" style="padding: 4px 6px; font-size: 12px; font-weight: 700; border: none; background: transparent; width: 140px;" title="Select Month">
+                                    <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px; font-weight: 800; border: none; background: transparent; cursor: pointer;" onclick="stepRepAttMonth(1)" title="Next Month">▶</button>
+                                </div>
+                                <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700;" onclick="jumpRepAttMonthCurrent()" title="Jump to Current Month">⚡ This Month</button>
+
+                                <span style="color: var(--border-color); font-weight: 300;">|</span>
+
+                                <!-- Custom Date Range Filter Pill -->
+                                <div style="display: inline-flex; align-items: center; gap: 4px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 2px 8px; border-radius: var(--radius-md);">
+                                    <span style="font-size: 11px; font-weight: 700; color: var(--text-muted);" title="Filter by custom date range">📅 Range:</span>
+                                    <input type="date" id="rep-att-start-date" class="input-control" style="padding: 3px 5px; font-size: 11.5px; border: none; background: transparent; width: 120px;" title="From Date" onchange="handleRepAttCustomDateChange()">
+                                    <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">to</span>
+                                    <input type="date" id="rep-att-end-date" class="input-control" style="padding: 3px 5px; font-size: 11.5px; border: none; background: transparent; width: 120px;" title="To Date" onchange="handleRepAttCustomDateChange()">
+                                    <button type="button" id="rep-att-clear-dates-btn" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 12px; padding: 0 4px; display: none; line-height: 1; font-weight: 800;" onclick="clearRepAttDates()" title="Clear custom dates and show full month">✕</button>
+                                </div>
+
+                                <!-- Quick Presets -->
+                                <div style="display: inline-flex; gap: 4px;">
+                                    <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 10.5px; font-weight: 600;" onclick="setRepAttDatePreset('first_half')" title="1st to 15th of the month">1st - 15th</button>
+                                    <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 10.5px; font-weight: 600;" onclick="setRepAttDatePreset('second_half')" title="16th to end of month">16th - End</button>
                                 </div>
                             </div>
 
-                            <!-- Dynamic Department Filter -->
-                            <select id="rep-att-dept-select" class="input-control" style="padding: 4px 8px; font-size: 11.5px; max-width: 170px; border-radius: var(--radius-md);" onchange="loadAttendanceReport()" <?= (!$isGlobalAdminAtt && count($deptList) <= 1) ? 'disabled title="Restricted to your department"' : '' ?>>
-                                <?php if ($isGlobalAdminAtt): ?>
-                                    <option value="all">🏢 All Departments</option>
-                                <?php endif; ?>
-                                <?php foreach ($deptList as $d): ?>
-                                    <option value="<?= htmlspecialchars($d['id']) ?>">🏢 <?= htmlspecialchars($d['name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-
-                            <!-- Month Selector -->
-                            <input type="month" id="rep-att-month-select" class="input-control" value="<?= date('Y-m') ?>" onchange="loadAttendanceReport()" style="padding: 4px 8px; font-size: 11.5px; width: 140px; border-radius: var(--radius-md);">
-
-                            <!-- Date Range Filter -->
-                            <div style="display: inline-flex; align-items: center; gap: 4px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 2px 6px; border-radius: var(--radius-md);">
-                                <span style="font-size: 11px; font-weight: 700; color: var(--text-muted);" title="Filter by date range">🗓️</span>
-                                <input type="date" id="rep-att-start-date" class="input-control" style="padding: 3px 5px; font-size: 11px; border: none; background: transparent; width: 115px;" title="From Date" onchange="loadAttendanceReport()">
-                                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">to</span>
-                                <input type="date" id="rep-att-end-date" class="input-control" style="padding: 3px 5px; font-size: 11px; border: none; background: transparent; width: 115px;" title="To Date" onchange="loadAttendanceReport()">
-                                <button type="button" id="rep-att-clear-dates-btn" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 0 4px; display: none; line-height: 1;" onclick="clearRepAttDates()" title="Clear date range">✕</button>
+                            <!-- Live Filter Feedback Badge -->
+                            <div id="rep-att-filter-indicator" style="font-size: 11px; font-weight: 700; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px;">
+                                <!-- Updated via JS with active date span -->
                             </div>
 
-                            <!-- Expected Standard Duty Hours -->
-                            <select id="rep-att-standard-hours" class="input-control" style="padding: 4px 8px; font-size: 11.5px; max-width: 155px; border-radius: var(--radius-md);" onchange="loadAttendanceReport()">
-                                <option value="auto" selected>⚙️ Auto (Shift)</option>
-                                <option value="8">⏱️ 8.0 Hours / Day</option>
-                                <option value="9">⏱️ 9.0 Hours / Day</option>
-                                <option value="7">⏱️ 7.0 Hours / Day</option>
-                                <option value="6">⏱️ 6.0 Hours / Day</option>
-                                <option value="open">🌐 Flexible Shift</option>
-                            </select>
-                        </div>
-
-                        <!-- Right Group: Action Buttons -->
-                        <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
-                            <button type="button" class="btn btn-outline" onclick="exportAttendanceReportCsv()" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; border-color: rgba(16, 185, 129, 0.4); color: #10b981;" title="Export Current Report to CSV">
-                                📥 CSV
-                            </button>
-                            <button type="button" class="btn btn-primary" onclick="printAttendanceReport()" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" title="Print Formatted Monthly Timesheet">
-                                🖨️ Print
-                            </button>
                         </div>
 
                     </div>
