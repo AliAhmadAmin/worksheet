@@ -217,6 +217,7 @@ switch ($action) {
         $canEditTasks = !empty($data['can_edit_tasks']) ? 1 : 0;
         $canUnlockSheets = !empty($data['can_unlock_sheets']) ? 1 : 0;
         $canInspectSheets = !empty($data['can_inspect_sheets']) ? 1 : 0;
+        $canPrintUnverifiedSheets = !empty($data['can_print_unverified_sheets']) ? 1 : 0;
         $canViewReports = !empty($data['can_view_reports']) ? 1 : 0;
         $canViewAttendance = !empty($data['can_view_attendance']) ? 1 : 0;
         $canManageEmployees = !empty($data['can_manage_employees']) ? 1 : 0;
@@ -240,6 +241,7 @@ switch ($action) {
             $canEditTasks = 1;
             $canUnlockSheets = 1;
             $canInspectSheets = 1;
+            $canPrintUnverifiedSheets = 1;
             $canViewReports = 1;
             $canViewAttendance = 1;
             $canManageEmployees = 1;
@@ -248,13 +250,13 @@ switch ($action) {
         $stmt = $pdo->prepare("
             UPDATE employees 
             SET role = ?, can_assign_tasks = ?, can_edit_tasks = ?, can_unlock_sheets = ?, 
-                can_inspect_sheets = ?, can_view_reports = ?, can_view_attendance = ?, 
+                can_inspect_sheets = ?, can_print_unverified_sheets = ?, can_view_reports = ?, can_view_attendance = ?, 
                 can_manage_employees = ?
             WHERE id = ?
         ");
         $stmt->execute([
             $role, $canAssignTasks, $canEditTasks, $canUnlockSheets,
-            $canInspectSheets, $canViewReports, $canViewAttendance,
+            $canInspectSheets, $canPrintUnverifiedSheets, $canViewReports, $canViewAttendance,
             $canManageEmployees, $targetId
         ]);
 

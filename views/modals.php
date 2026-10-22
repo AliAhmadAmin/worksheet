@@ -1193,12 +1193,21 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 </div>
                             </label>
 
-                            <!-- Perm 4: Inspect & Edit Team Sheets -->
+                            <!-- Perm 4: Inspect Other Sheets -->
                             <label class="perm-checkbox-card" style="display: flex; align-items: flex-start; gap: 9px; padding: 9px 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s ease;">
                                 <input type="checkbox" id="perm-can-inspect-sheets" style="margin-top: 2px; cursor: pointer; transform: scale(1.1);">
                                 <div>
                                     <strong style="font-size: 12.5px; color: var(--text-main); display: block;">📝 Inspect Other Sheets</strong>
-                                    <span style="font-size: 11px; color: var(--text-muted); line-height: 1.3; display: block; margin-top: 2px;">Can use Employee Inspector to view and print worksheets only (read-only view & printing).</span>
+                                    <span style="font-size: 11px; color: var(--text-muted); line-height: 1.3; display: block; margin-top: 2px;">Can use Employee Inspector to view worksheets (read-only view; printing requires HOD verification).</span>
+                                </div>
+                            </label>
+
+                            <!-- Perm 5: Print Unverified Sheets -->
+                            <label class="perm-checkbox-card" style="display: flex; align-items: flex-start; gap: 9px; padding: 9px 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s ease;">
+                                <input type="checkbox" id="perm-can-print-unverified-sheets" style="margin-top: 2px; cursor: pointer; transform: scale(1.1);">
+                                <div>
+                                    <strong style="font-size: 12.5px; color: var(--text-main); display: block;">🖨️ Print Unverified Sheets</strong>
+                                    <span style="font-size: 11px; color: var(--text-muted); line-height: 1.3; display: block; margin-top: 2px;">Can bypass HOD verification check and print worksheets before HOD approval.</span>
                                 </div>
                             </label>
 

@@ -472,13 +472,30 @@ function renderWorksheetHero(sheet, empData, data = null) {
             }
             if (inspectorSubtitle) {
                 if (isReadOnlyInspection) {
-                    inspectorSubtitle.innerHTML = `👁️ <strong style="color: var(--primary);">Inspection Mode (View & Print Only)</strong>: You are reviewing this worksheet with read-only access. Editing entries requires "Lock & Unlock Sheets" access.`;
+                    inspectorSubtitle.innerHTML = `👁️ <strong style="color: var(--primary);">Inspection Mode</strong>: You are reviewing this worksheet with read-only access. Editing entries requires "Lock & Unlock Sheets" access.`;
                 } else {
                     inspectorSubtitle.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
                 }
             }
             if (inspectorBox) {
                 inspectorBox.classList.remove('is-verified');
+            }
+        }
+
+        // Inspector Print Button State
+        const btnAdminPrint = document.getElementById('admin-btn-print');
+        const canBypassHodCheckAdmin = hasPermission('can_print_unverified_sheets');
+        const blockPrintAdmin = parseInt(deptSettings.block_print_before_hod_check) === 1 || parseInt(deptSettings.require_hod_sheet_check) === 1;
+
+        if (btnAdminPrint) {
+            if (!canBypassHodCheckAdmin && blockPrintAdmin && !isHodChecked) {
+                btnAdminPrint.innerHTML = '🔒 Print';
+                btnAdminPrint.title = 'Print Restricted: Worksheet must be verified by HOD before printing.';
+                btnAdminPrint.style.opacity = '0.75';
+            } else {
+                btnAdminPrint.innerHTML = '🖨️ Print';
+                btnAdminPrint.title = 'Print official hourly worksheet';
+                btnAdminPrint.style.opacity = '1';
             }
         }
 
@@ -510,7 +527,8 @@ function renderWorksheetHero(sheet, empData, data = null) {
         const isHodChecked = parseInt(sheet?.is_hod_checked || data?.is_hod_checked) === 1;
         const deptSettings = data?.department_settings || {};
         const requireCheck = parseInt(deptSettings.require_hod_sheet_check) === 1;
-        const blockPrint = parseInt(deptSettings.block_print_before_hod_check) === 1;
+        const blockPrint = parseInt(deptSettings.block_print_before_hod_check) === 1 || requireCheck;
+        const canBypassHodCheckEmp = hasPermission('can_print_unverified_sheets');
 
         if (empHodBadge) {
             if (isHodChecked) {
@@ -529,7 +547,7 @@ function renderWorksheetHero(sheet, empData, data = null) {
         }
 
         if (empPrintBtn) {
-            if (blockPrint && !isHodChecked) {
+            if (!canBypassHodCheckEmp && blockPrint && !isHodChecked) {
                 empPrintBtn.innerHTML = '🔒 Print Sheet';
                 empPrintBtn.className = 'btn btn-outline';
                 empPrintBtn.style.opacity = '0.85';
@@ -1923,21 +1941,16 @@ function triggerPrintSheet() {
     if (isPrintingSheet) return;
 
     // Check if department enforces HOD check before printing
-    const isAdminOrHod = AppState.currentUser && (
-        AppState.currentUser.role === 'admin' ||
-        AppState.currentUser.role === 'super_admin' ||
-        AppState.currentUser.role === 'hod' ||
-        hasPermission('can_inspect_sheets')
-    );
+    const canBypassHodCheck = hasPermission('can_print_unverified_sheets');
     const isHodChecked = parseInt(AppState.currentSheet?.is_hod_checked) === 1;
-    const blockPrint = parseInt(AppState.departmentSettings?.block_print_before_hod_check) === 1;
+    const blockPrint = parseInt(AppState.departmentSettings?.block_print_before_hod_check) === 1 || parseInt(AppState.departmentSettings?.require_hod_sheet_check) === 1;
 
-    if (!isAdminOrHod && blockPrint && !isHodChecked) {
-        showToast("⚠️ Sheet must be checked by your HOD before printing.", "error");
+    if (!canBypassHodCheck && blockPrint && !isHodChecked) {
+        showToast("⚠️ Sheet must be verified by HOD before printing.", "error");
         if (typeof openConfirmDialog === 'function') {
             openConfirmDialog({
                 title: 'HOD Verification Required',
-                message: 'Your department has enabled pre-print verification.\n\nPlease request your Head of Department (HOD) to inspect and mark your worksheet as "Checked" on the system. Once marked, your sheet will automatically be enabled for printing with the digital verification seal.',
+                message: 'This department requires HOD verification before printing.\n\nThe worksheet must be inspected and marked "Checked" by the Head of Department (HOD) before it can be printed, or you must have the "Print Unverified Sheets" delegated capability.',
                 icon: '🔒',
                 confirmText: 'Understood',
                 confirmClass: 'btn-primary',

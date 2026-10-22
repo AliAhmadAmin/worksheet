@@ -47,31 +47,32 @@ $deptStmt->execute([$empDeptId]);
 $department = $deptStmt->fetch() ?: [];
 
 $blockPrintBeforeHodCheck = (int)($department['block_print_before_hod_check'] ?? 0);
+$requireHodCheck = (int)($department['require_hod_sheet_check'] ?? 0);
 $isHodChecked = !empty($sheet['is_hod_checked']) ? 1 : 0;
 
-// Security check if printing is restricted for employees until checked
+// Security check if printing is restricted for employees and inspectors until verified by HOD
 $sessionUserId = $_SESSION['user_id'] ?? 0;
 $sessionUserRole = strtolower($_SESSION['role'] ?? 'employee');
 
-$hasInspectPerm = false;
+$canPrintUnverified = false;
 if ($sessionUserId > 0) {
     try {
-        $uStmt = $pdo->prepare("SELECT can_inspect_sheets, can_unlock_sheets FROM employees WHERE id = ?");
+        $uStmt = $pdo->prepare("SELECT can_print_unverified_sheets FROM employees WHERE id = ?");
         $uStmt->execute([$sessionUserId]);
         $uRow = $uStmt->fetch();
-        $hasInspectPerm = !empty($uRow['can_inspect_sheets']) || !empty($uRow['can_unlock_sheets']);
+        $canPrintUnverified = !empty($uRow['can_print_unverified_sheets']);
     } catch (Exception $e) {}
 }
 
-$isElevatedUser = in_array($sessionUserRole, ['super_admin', 'admin', 'hod']) || $hasInspectPerm;
+$isPrivilegedUser = in_array($sessionUserRole, ['super_admin', 'admin', 'hod']) || $canPrintUnverified;
 
-if ($blockPrintBeforeHodCheck && !$isHodChecked && !$isElevatedUser && $sessionUserId == $empId) {
+if (($blockPrintBeforeHodCheck || $requireHodCheck) && !$isHodChecked && !$isPrivilegedUser) {
     ?>
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Print Restricted - HOD Check Required</title>
+        <title>Print Restricted - HOD Verification Required</title>
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
     </head>
     <body style="font-family: 'Plus Jakarta Sans', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #f8fafc; margin: 0;">
@@ -79,7 +80,7 @@ if ($blockPrintBeforeHodCheck && !$isHodChecked && !$isElevatedUser && $sessionU
             <div style="width: 58px; height: 58px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 16px;">🔒</div>
             <h2 style="font-size: 19px; font-weight: 800; color: #0f172a; margin: 0 0 10px 0;">HOD Verification Required</h2>
             <p style="font-size: 13.5px; color: #64748b; line-height: 1.55; margin: 0 0 22px 0;">
-                Your department requires worksheets to be inspected and marked as <strong>"Checked"</strong> by your Head of Department on the system before physical printing is enabled.
+                Your department requires worksheets to be inspected and marked as <strong>"Verified"</strong> by the Head of Department (HOD) on the system before physical printing is enabled.
             </p>
             <button onclick="window.close()" style="background: #2563eb; color: white; border: none; padding: 9px 24px; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">Close Window</button>
         </div>

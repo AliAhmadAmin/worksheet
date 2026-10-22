@@ -127,6 +127,7 @@ function migratePermissionsSchema($pdo) {
             'can_edit_tasks' => "TINYINT DEFAULT 0",
             'can_unlock_sheets' => "TINYINT DEFAULT 0",
             'can_inspect_sheets' => "TINYINT DEFAULT 0",
+            'can_print_unverified_sheets' => "TINYINT DEFAULT 0",
             'can_view_reports' => "TINYINT DEFAULT 0",
             'can_view_attendance' => "TINYINT DEFAULT 0",
             'can_manage_employees' => "TINYINT DEFAULT 0",
@@ -195,7 +196,7 @@ function migratePermissionsSchema($pdo) {
         $pdo->exec("
             UPDATE employees 
             SET can_assign_tasks = 1, can_edit_tasks = 1, can_unlock_sheets = 1, 
-                can_inspect_sheets = 1, can_view_reports = 1, can_view_attendance = 1, 
+                can_inspect_sheets = 1, can_print_unverified_sheets = 1, can_view_reports = 1, can_view_attendance = 1, 
                 can_manage_employees = 1, can_manage_hr = 1 
             WHERE role = 'admin'
         ");

@@ -2315,6 +2315,10 @@ function openPermissionsModal(empId) {
     document.getElementById('perm-can-edit-tasks').checked = !!parseInt(emp.can_edit_tasks || (isFullAccess ? 1 : 0));
     document.getElementById('perm-can-unlock-sheets').checked = !!parseInt(emp.can_unlock_sheets || (isFullAccess ? 1 : 0));
     document.getElementById('perm-can-inspect-sheets').checked = !!parseInt(emp.can_inspect_sheets || (isFullAccess ? 1 : 0));
+    const chkPrintUnverified = document.getElementById('perm-can-print-unverified-sheets');
+    if (chkPrintUnverified) {
+        chkPrintUnverified.checked = !!parseInt(emp.can_print_unverified_sheets || (isFullAccess ? 1 : 0));
+    }
     document.getElementById('perm-can-view-reports').checked = !!parseInt(emp.can_view_reports || (isFullAccess ? 1 : 0));
     document.getElementById('perm-can-view-attendance').checked = !!parseInt(emp.can_view_attendance || (isFullAccess ? 1 : 0));
     document.getElementById('perm-can-manage-employees').checked = !!parseInt(emp.can_manage_employees || (isFullAccess ? 1 : 0));
@@ -2327,6 +2331,7 @@ function applyRolePreset(roleValue) {
     const isEdit = document.getElementById('perm-can-edit-tasks');
     const isUnlock = document.getElementById('perm-can-unlock-sheets');
     const isInspect = document.getElementById('perm-can-inspect-sheets');
+    const isPrintUnverified = document.getElementById('perm-can-print-unverified-sheets');
     const isReports = document.getElementById('perm-can-view-reports');
     const isAttendance = document.getElementById('perm-can-view-attendance');
     const isManageEmp = document.getElementById('perm-can-manage-employees');
@@ -2336,6 +2341,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isPrintUnverified) isPrintUnverified.checked = true;
         if (isReports) isReports.checked = true;
         if (isAttendance) isAttendance.checked = true;
         if (isManageEmp) isManageEmp.checked = true;
@@ -2344,6 +2350,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isPrintUnverified) isPrintUnverified.checked = true;
         if (isReports) isReports.checked = true;
         if (isAttendance) isAttendance.checked = true;
         if (isManageEmp) isManageEmp.checked = false;
@@ -2352,6 +2359,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = true;
         if (isAttendance) isAttendance.checked = true;
         if (isManageEmp) isManageEmp.checked = false;
@@ -2360,6 +2368,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = false;
         if (isAttendance) isAttendance.checked = true;
         if (isManageEmp) isManageEmp.checked = false;
@@ -2368,6 +2377,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = false;
         if (isAttendance) isAttendance.checked = true;
         if (isManageEmp) isManageEmp.checked = false;
@@ -2376,6 +2386,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = false;
         if (isInspect) isInspect.checked = false;
+        if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = false;
         if (isAttendance) isAttendance.checked = false;
         if (isManageEmp) isManageEmp.checked = false;
@@ -2384,6 +2395,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = false;
         if (isUnlock) isUnlock.checked = false;
         if (isInspect) isInspect.checked = true;
+        if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = true;
         if (isAttendance) isAttendance.checked = true;
         if (isManageEmp) isManageEmp.checked = false;
@@ -2392,6 +2404,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = false;
         if (isUnlock) isUnlock.checked = false;
         if (isInspect) isInspect.checked = false;
+        if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = false;
         if (isAttendance) isAttendance.checked = false;
         if (isManageEmp) isManageEmp.checked = false;
@@ -2407,6 +2420,7 @@ async function handleSavePermissionsSubmit(e) {
     const canEdit = document.getElementById('perm-can-edit-tasks')?.checked ? 1 : 0;
     const canUnlock = document.getElementById('perm-can-unlock-sheets')?.checked ? 1 : 0;
     const canInspect = document.getElementById('perm-can-inspect-sheets')?.checked ? 1 : 0;
+    const canPrintUnverified = document.getElementById('perm-can-print-unverified-sheets')?.checked ? 1 : 0;
     const canReports = document.getElementById('perm-can-view-reports')?.checked ? 1 : 0;
     const canAttendance = document.getElementById('perm-can-view-attendance')?.checked ? 1 : 0;
     const canManageEmp = document.getElementById('perm-can-manage-employees')?.checked ? 1 : 0;
@@ -2428,6 +2442,7 @@ async function handleSavePermissionsSubmit(e) {
                 can_edit_tasks: canEdit,
                 can_unlock_sheets: canUnlock,
                 can_inspect_sheets: canInspect,
+                can_print_unverified_sheets: canPrintUnverified,
                 can_view_reports: canReports,
                 can_view_attendance: canAttendance,
                 can_manage_employees: canManageEmp

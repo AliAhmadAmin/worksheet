@@ -163,7 +163,7 @@
                                 <button type="button" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="openTrackingOptionsModal()" title="Customize Content Types & Tracking Departments">
                                     ⚙️ Options
                                 </button>
-                                <button type="button" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="triggerPrintSheet()">
+                                <button type="button" id="admin-btn-print" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="triggerPrintSheet()">
                                     🖨️ Print
                                 </button>
                             </div>
