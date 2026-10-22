@@ -27,13 +27,16 @@ require_once __DIR__ . '/includes/navbar.php';
 <!-- Dedicated News Room Application Workspace Container -->
 <main class="main-content">
     <?php
-    // Core News Room Handover Matrix View
+    // Modular Feature Views
     require_once __DIR__ . '/views/tab_newsroom.php';
     require_once __DIR__ . '/views/tab_worksheet.php';
+    require_once __DIR__ . '/views/tab_roster.php';
     require_once __DIR__ . '/views/tab_tasks.php';
+    require_once __DIR__ . '/views/tab_programming.php';
+    require_once __DIR__ . '/views/tab_hr.php';
+    require_once __DIR__ . '/views/tab_reports.php';
     require_once __DIR__ . '/views/tab_attendance.php';
     require_once __DIR__ . '/views/tab_employees.php';
-    require_once __DIR__ . '/views/tab_hr.php';
     ?>
 </main>
 

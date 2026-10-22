@@ -530,17 +530,15 @@ function applyRoleBasedVisibility(user) {
         document.querySelectorAll('.employee-only').forEach(el => el.style.display = '');
     }
 
-    const btnAttendance = document.querySelector('.nav-btn[data-tab="tab-attendance"]');
-    if (btnAttendance) btnAttendance.style.display = canAttendance ? '' : 'none';
+    const hasAnyAdminAccess = canInspect || canAttendance || canManage || canReports;
+    document.querySelectorAll('.sidebar-nav-group.admin-only').forEach(el => {
+        el.style.display = hasAnyAdminAccess ? '' : 'none';
+    });
 
-    const btnEmployees = document.querySelector('.nav-btn[data-tab="tab-employees"]');
-    if (btnEmployees) btnEmployees.style.display = canManage ? '' : 'none';
+    document.querySelectorAll('.nav-btn[data-tab="tab-attendance"]').forEach(el => el.style.display = canAttendance ? '' : 'none');
+    document.querySelectorAll('.nav-btn[data-tab="tab-employees"]').forEach(el => el.style.display = canManage ? '' : 'none');
+    document.querySelectorAll('.nav-btn[data-tab="tab-reports"]').forEach(el => el.style.display = canReports ? '' : 'none');
 
-    const btnReports = document.querySelector('.nav-btn[data-tab="tab-reports"]');
-    if (btnReports) btnReports.style.display = canReports ? '' : 'none';
-
-    const btnNewsroom = document.querySelector('.nav-btn[data-tab="tab-newsroom"]');
-    const btnProgramming = document.querySelector('.nav-btn[data-tab="tab-programming"]');
     const uRole = (user.role || '').toLowerCase();
     const uDept = (user.department_name || '').toLowerCase();
     const isGlobal = (uRole === 'super_admin' || uRole === 'admin');
@@ -548,12 +546,15 @@ function applyRoleBasedVisibility(user) {
     const isProg = uDept.includes('prog');
     const isDigital = uDept.includes('digital');
 
-    if (btnNewsroom) {
-        btnNewsroom.style.display = (isGlobal || (isNews && !isProg) || isDigital) ? '' : 'none';
-    }
-    if (btnProgramming) {
-        btnProgramming.style.display = (isGlobal || (isProg && !isNews) || isDigital) ? '' : 'none';
-    }
+    const isDedicatedNewsroom = window.location.pathname.includes('newsroom');
+    const isDedicatedProg = window.location.pathname.includes('programming');
+
+    document.querySelectorAll('.nav-btn[data-tab="tab-newsroom"]').forEach(el => {
+        el.style.display = (isDedicatedNewsroom || isGlobal || (isNews && !isProg) || isDigital) ? '' : 'none';
+    });
+    document.querySelectorAll('.nav-btn[data-tab="tab-programming"]').forEach(el => {
+        el.style.display = (isDedicatedProg || isGlobal || (isProg && !isNews) || isDigital) ? '' : 'none';
+    });
 
     const portalSwitcher = document.querySelector('.portal-switcher-wrapper');
     if (portalSwitcher && !portalSwitcher.classList.contains('static-portal')) {
@@ -1096,8 +1097,9 @@ function setupTabNavigation() {
             }
         }
 
-        // For HODs: if no hash is provided, default to attendance (Team Dashboard)
-        if (!hash && AppState.currentUser && (AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'deputy_hod')) {
+        // For HODs on Digital Portal: if no hash is provided, default to attendance (Team Dashboard)
+        const isDigitalPortal = !window.location.pathname.includes('newsroom') && !window.location.pathname.includes('programming') && !window.location.pathname.includes('hr');
+        if (!hash && isDigitalPortal && AppState.currentUser && (AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'deputy_hod')) {
             navigateToTab('tab-attendance', false);
             return;
         }

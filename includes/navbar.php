@@ -65,6 +65,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         // - Program Handover: visible to Programming, Digital Media, or Global Admin (News Room cannot see)
         $canViewProgHandover = $isGlobalAdmin || ($isProgDept && !$isNewsDept) || $isDigitalDept;
         $canViewManagement = $isGlobalAdmin || $userRole === 'hod' || !empty($authUser['can_view_reports']) || !empty($authUser['can_view_attendance']) || !empty($authUser['can_manage_employees']);
+        $isHodNav = in_array($userRole, ['hod', 'deputy_hod']);
         ?>
         <?php if ($isGlobalAdmin): ?>
         <div class="portal-switcher-wrapper admin-only" style="position: relative;">
@@ -228,38 +229,71 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <button type="button" class="nav-btn active" data-tab="tab-newsroom" data-route="newsroom">
                 <span class="nav-icon">📺</span>
                 <span class="nav-label">Newsroom</span>
-                <span id="pending-news-badge-nr" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
+                <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
-                <span class="nav-icon">📝</span>
-                <span class="nav-label">WorkSheets</span>
+                <span class="nav-icon" id="main-nav-tab-icon">📝</span>
+                <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
-                <span class="nav-icon">🎯</span>
-                <span class="nav-label">My Tasks</span>
-                <span id="pending-task-badge-nr" class="nav-badge" style="display: none;">0</span>
+                <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
+                <span class="nav-label" id="tasks-nav-tab-label">Assign Task</span>
+                <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
             </button>
+            <?php if ($canViewProgHandover): ?>
+            <button type="button" class="nav-btn" data-tab="tab-programming" data-route="programming">
+                <span class="nav-icon">📡</span>
+                <span class="nav-label">Programming</span>
+                <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
+            </button>
+            <?php endif; ?>
         </div>
 
-        <!-- Operations & Staff Category -->
+        <!-- People & Services Category -->
         <div class="sidebar-nav-group">
-            <div class="sidebar-nav-title">STAFF & SERVICES</div>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
-                <span class="nav-icon">📅</span>
-                <span class="nav-label">Duty Roster</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-attendance" data-route="attendance">
-                <span class="nav-icon">👥</span>
-                <span class="nav-label">Live Attendance</span>
-            </button>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
-                <span class="nav-icon">📁</span>
-                <span class="nav-label">Staff Directory</span>
-            </button>
+            <div class="sidebar-nav-title">PEOPLE & SERVICES</div>
             <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
                 <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+                <span class="nav-icon">💳</span>
+                <span class="nav-label">Advance Salary</span>
+                <span class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+                <span class="nav-icon">⛽</span>
+                <span class="nav-label">Fuel, Travel & Food</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+                <span class="nav-icon">📢</span>
+                <span class="nav-label">Notice Board</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+                <span class="nav-icon">⚠️</span>
+                <span class="nav-label">Disciplinary & Fines</span>
+            </button>
+        </div>
+
+        <!-- Department Management Category -->
+        <div class="sidebar-nav-group admin-only" style="<?= $canViewManagement ? '' : 'display: none;' ?>">
+            <div class="sidebar-nav-title">MANAGEMENT</div>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">Duty Roster</span>
+            </button>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-reports" data-route="reports">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Matrix Reports</span>
+            </button>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-attendance" data-route="attendance">
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">Live Attendance</span>
+            </button>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">Manage Staff</span>
             </button>
         </div>
 
@@ -270,38 +304,71 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <button type="button" class="nav-btn active" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
                 <span class="nav-label">Programming</span>
-                <span id="pending-prog-badge-pg" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
+                <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
-                <span class="nav-icon">📝</span>
-                <span class="nav-label">WorkSheets</span>
+                <span class="nav-icon" id="main-nav-tab-icon">📝</span>
+                <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
             </button>
             <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
-                <span class="nav-icon">🎯</span>
-                <span class="nav-label">My Tasks</span>
-                <span id="pending-task-badge-pg" class="nav-badge" style="display: none;">0</span>
+                <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
+                <span class="nav-label" id="tasks-nav-tab-label">Assign Task</span>
+                <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
             </button>
+            <?php if ($canViewNewsHandover): ?>
+            <button type="button" class="nav-btn" data-tab="tab-newsroom" data-route="newsroom">
+                <span class="nav-icon">📺</span>
+                <span class="nav-label">Newsroom</span>
+                <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
+            </button>
+            <?php endif; ?>
         </div>
 
-        <!-- Operations & Staff Category -->
+        <!-- People & Services Category -->
         <div class="sidebar-nav-group">
-            <div class="sidebar-nav-title">STAFF & SERVICES</div>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
-                <span class="nav-icon">📅</span>
-                <span class="nav-label">Duty Roster</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-attendance" data-route="attendance">
-                <span class="nav-icon">👥</span>
-                <span class="nav-label">Live Attendance</span>
-            </button>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
-                <span class="nav-icon">📁</span>
-                <span class="nav-label">Staff Directory</span>
-            </button>
+            <div class="sidebar-nav-title">PEOPLE & SERVICES</div>
             <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
                 <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+                <span class="nav-icon">💳</span>
+                <span class="nav-label">Advance Salary</span>
+                <span class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+                <span class="nav-icon">⛽</span>
+                <span class="nav-label">Fuel, Travel & Food</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+                <span class="nav-icon">📢</span>
+                <span class="nav-label">Notice Board</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+                <span class="nav-icon">⚠️</span>
+                <span class="nav-label">Disciplinary & Fines</span>
+            </button>
+        </div>
+
+        <!-- Department Management Category -->
+        <div class="sidebar-nav-group admin-only" style="<?= $canViewManagement ? '' : 'display: none;' ?>">
+            <div class="sidebar-nav-title">MANAGEMENT</div>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
+                <span class="nav-icon">📅</span>
+                <span class="nav-label">Duty Roster</span>
+            </button>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-reports" data-route="reports">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Matrix Reports</span>
+            </button>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-attendance" data-route="attendance">
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">Live Attendance</span>
+            </button>
+            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-label">Manage Staff</span>
             </button>
         </div>
 
