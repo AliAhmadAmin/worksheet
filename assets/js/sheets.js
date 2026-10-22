@@ -449,7 +449,9 @@ function renderWorksheetHero(sheet, empData, data = null) {
         if (isHodChecked) {
             if (verifiedHeaderBadge) {
                 verifiedHeaderBadge.style.display = 'inline-flex';
-                verifiedHeaderBadge.title = `Checked by ${checkerName} on ${checkedAt}`;
+                verifiedHeaderBadge.className = 'badge badge-hod-checked';
+                verifiedHeaderBadge.textContent = '✅ Checked by HOD';
+                verifiedHeaderBadge.title = `Checked & verified by ${checkerName} on ${checkedAt}`;
             }
             if (inspectorSubtitle) {
                 inspectorSubtitle.innerHTML = `✅ <strong style="color: #10b981;">Checked & Approved</strong> by ${escapeHtml(checkerName)}${checkedAt ? ` on ${escapeHtml(checkedAt)}` : ''}. Ready for printing with official seal.`;
@@ -459,7 +461,14 @@ function renderWorksheetHero(sheet, empData, data = null) {
             }
         } else {
             if (verifiedHeaderBadge) {
-                verifiedHeaderBadge.style.display = 'none';
+                if (requireCheck) {
+                    verifiedHeaderBadge.style.display = 'inline-flex';
+                    verifiedHeaderBadge.className = 'badge badge-hod-pending';
+                    verifiedHeaderBadge.textContent = '⚠️ Not Verified';
+                    verifiedHeaderBadge.title = 'Urgent: This worksheet is not verified by HOD yet.';
+                } else {
+                    verifiedHeaderBadge.style.display = 'none';
+                }
             }
             if (inspectorSubtitle) {
                 if (isReadOnlyInspection) {
@@ -512,8 +521,8 @@ function renderWorksheetHero(sheet, empData, data = null) {
             } else if (requireCheck) {
                 empHodBadge.style.display = 'inline-block';
                 empHodBadge.className = 'badge badge-hod-pending';
-                empHodBadge.textContent = '⏳ Not Approved';
-                empHodBadge.title = 'Awaiting review and verification by Head of Department';
+                empHodBadge.textContent = '⚠️ Not Verified';
+                empHodBadge.title = 'Urgent: Awaiting review and verification by Head of Department';
             } else {
                 empHodBadge.style.display = 'none';
             }

@@ -284,9 +284,9 @@ function renderLiveAttendanceTable() {
         const isHodChecked = (emp.is_hod_checked == 1 || emp.is_hod_checked === '1');
 
         if (isHodChecked) {
-            sheetBadge = `<span class="badge badge-hod-checked" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700; padding: 3px 9px; border-radius: 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;" title="Checked by HOD at ${escapeHtml(emp.hod_checked_at || '')}">✅ Checked</span>`;
+            sheetBadge = `<span class="badge badge-hod-checked" title="Checked by HOD at ${escapeHtml(emp.hod_checked_at || '')}">✅ Checked</span>`;
         } else if (emp.status === 'checked_out' || emp.sheet_status === 'pending') {
-            sheetBadge = `<span class="badge badge-hod-pending" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; padding: 3px 9px; border-radius: 12px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;" title="Shift completed and checked out, pending HOD check">⏳ Pending Check</span>`;
+            sheetBadge = `<span class="badge badge-hod-pending" title="Shift completed and checked out, urgent: not verified yet">⚠️ Not Verified</span>`;
         } else if (emp.status === 'working' || emp.check_in_time) {
             sheetBadge = `<span style="color: var(--text-muted); font-size: 11px; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;" title="Working / On Duty">📝 In Progress</span>`;
         } else {
