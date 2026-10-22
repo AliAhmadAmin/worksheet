@@ -23,13 +23,30 @@ function getPrevDayString(fromStr = AppState.selectedDate) {
     return getLocalDateString(d);
 }
 
-function changeWorksheetDate(newDateStr) {
+async function changeWorksheetDate(newDateStr) {
     if (!newDateStr) return;
+    if (newDateStr === AppState.selectedDate) return;
+
+    // Flush any pending auto-save on current date before changing to another date
+    if (typeof flushPendingAutoSave === 'function') {
+        try {
+            await flushPendingAutoSave();
+        } catch (e) {
+            console.warn("Could not flush pending auto-save before date change:", e);
+        }
+    }
+
+    AppState.isLoadingSheet = true;
     AppState.selectedDate = newDateStr;
     document.querySelectorAll('.worksheet-date-input').forEach(input => {
         if (input.value !== newDateStr) input.value = newDateStr;
     });
-    loadDailyWorksheet();
+
+    try {
+        await loadDailyWorksheet();
+    } finally {
+        AppState.isLoadingSheet = false;
+    }
 }
 
 function goToNextDay() {
@@ -55,7 +72,10 @@ const AppState = {
     currentEntries: [],
     isLocked: 0,
     timerInterval: null,
-    elapsedSeconds: 0
+    elapsedSeconds: 0,
+    isLoadingSheet: false,
+    pendingAutoSaveDate: null,
+    pendingAutoSaveEmpId: null
 };
 
 // Utility Toast Notifications
@@ -758,9 +778,17 @@ function toggleAdminEmpDropdown() {
     }
 }
 
-function selectAdminEmpFromDropdown(empId) {
+async function selectAdminEmpFromDropdown(empId) {
     const menu = document.getElementById('admin-emp-dropdown-menu');
     if (menu) menu.style.display = 'none';
+
+    if (AppState.adminSelectedEmpId === parseInt(empId)) return;
+
+    if (typeof flushPendingAutoSave === 'function') {
+        try {
+            await flushPendingAutoSave();
+        } catch (e) {}
+    }
 
     const inspectable = getInspectableEmployees();
     const currentSelectedEmp = inspectable.find(e => e.id == empId);
@@ -780,7 +808,12 @@ function selectAdminEmpFromDropdown(empId) {
     }
 
     renderAdminEmpDropdownList(inspectable);
-    loadDailyWorksheet();
+    AppState.isLoadingSheet = true;
+    try {
+        await loadDailyWorksheet();
+    } finally {
+        AppState.isLoadingSheet = false;
+    }
 }
 
 // Global click outside listener to auto-close dropdown

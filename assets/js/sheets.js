@@ -192,9 +192,9 @@ function canMarkHodChecked() {
 
 function getActiveWorksheetEmpId() {
     const isElevated = AppState.currentUser && (
-        AppState.currentUser.role === 'admin' || 
-        AppState.currentUser.role === 'super_admin' || 
-        AppState.currentUser.role === 'hod' || 
+        AppState.currentUser.role === 'admin' ||
+        AppState.currentUser.role === 'super_admin' ||
+        AppState.currentUser.role === 'hod' ||
         hasPermission('can_inspect_sheets') ||
         hasPermission('can_unlock_sheets')
     );
@@ -249,6 +249,17 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
         updateLockBadge(data.is_locked, data.can_edit);
         renderHolidayView(data);
 
+        // Update save indicator with this sheet's specific saved status & timestamp
+        if (data.is_locked) {
+            const timeStr = data.sheet?.updated_at ? formatShortTime(data.sheet.updated_at) : '';
+            updateSaveIndicator('neutral', timeStr ? `🔒 Locked (Saved ${timeStr})` : '🔒 Sheet Locked');
+        } else if (data.sheet && data.sheet.updated_at) {
+            const timeStr = formatShortTime(data.sheet.updated_at);
+            updateSaveIndicator('saved', `Last saved: ${timeStr}`);
+        } else {
+            updateSaveIndicator('neutral', 'Auto-save ready');
+        }
+
         // Draft Recovery Banner
         const draftBanner = document.getElementById('worksheet-draft-banner');
 
@@ -278,9 +289,9 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
 
 function renderWorksheetHero(sheet, empData, data = null) {
     const isElevated = AppState.currentUser && (
-        AppState.currentUser.role === 'admin' || 
-        AppState.currentUser.role === 'super_admin' || 
-        AppState.currentUser.role === 'hod' || 
+        AppState.currentUser.role === 'admin' ||
+        AppState.currentUser.role === 'super_admin' ||
+        AppState.currentUser.role === 'hod' ||
         hasPermission('can_inspect_sheets') ||
         hasPermission('can_unlock_sheets')
     );
@@ -501,7 +512,7 @@ function renderWorksheetHero(sheet, empData, data = null) {
             } else if (requireCheck) {
                 empHodBadge.style.display = 'inline-block';
                 empHodBadge.className = 'badge badge-hod-pending';
-                empHodBadge.textContent = '⏳ Awaiting HOD';
+                empHodBadge.textContent = '⏳ Not Approved';
                 empHodBadge.title = 'Awaiting review and verification by Head of Department';
             } else {
                 empHodBadge.style.display = 'none';
@@ -656,8 +667,8 @@ function updateLockBadge(isLocked, canEdit) {
     const badgeClass = isLocked ? 'badge-lock locked' : 'badge-lock unlocked';
 
     const allowedCols = (AppState.worksheetColumns || []).filter(c => c.is_visible && (c.editable_after_lock === 1 || c.editable_after_lock === '1')).map(c => c.column_label);
-    const postLockHint = allowedCols.length > 0 
-        ? `Post-checkout editing permitted for: ${allowedCols.join(', ')}` 
+    const postLockHint = allowedCols.length > 0
+        ? `Post-checkout editing permitted for: ${allowedCols.join(', ')}`
         : 'Worksheet is completely locked.';
 
     if (adminLockBadge) {
@@ -747,9 +758,9 @@ function renderWorksheetTable(entries, canEdit) {
 
     const visibleCols = getVisibleWorksheetColumns();
     const isAdmin = AppState.currentUser && (
-        AppState.currentUser.role === 'admin' || 
-        AppState.currentUser.role === 'super_admin' || 
-        AppState.currentUser.role === 'hod' || 
+        AppState.currentUser.role === 'admin' ||
+        AppState.currentUser.role === 'super_admin' ||
+        AppState.currentUser.role === 'hod' ||
         hasPermission('can_unlock_sheets')
     );
     const isLocked = !!(AppState.isLocked && !isAdmin);
@@ -760,17 +771,17 @@ function renderWorksheetTable(entries, canEdit) {
         thead.innerHTML = `
             <tr>
                 ${visibleCols.map(col => {
-                    let w = 'auto';
-                    let minW = '120px';
-                    if (col.column_key === 'time_slot') { w = '16%'; minW = '150px'; }
-                    else if (col.column_key === 'content_type') { w = '15%'; minW = '145px'; }
-                    else if (col.column_key === 'department') { w = '15%'; minW = '145px'; }
-                    else if (col.column_key === 'link') { w = '18%'; minW = '160px'; }
-                    else if (col.column_key === 'title') { w = '26%'; minW = '190px'; }
-                    const isPostLock = !isReadOnlyInspection && isLocked && (col.editable_after_lock === 1 || col.editable_after_lock === '1');
-                    const headerBadge = isPostLock ? ' <span style="font-size: 10px; color: var(--success); font-weight: 700;">(Editable)</span>' : '';
-                    return `<th class="col-${escapeHtml(col.column_key)}" style="width: ${w}; min-width: ${minW};">${escapeHtml(col.column_label)}${headerBadge}</th>`;
-                }).join('')}
+            let w = 'auto';
+            let minW = '120px';
+            if (col.column_key === 'time_slot') { w = '16%'; minW = '150px'; }
+            else if (col.column_key === 'content_type') { w = '15%'; minW = '145px'; }
+            else if (col.column_key === 'department') { w = '15%'; minW = '145px'; }
+            else if (col.column_key === 'link') { w = '18%'; minW = '160px'; }
+            else if (col.column_key === 'title') { w = '26%'; minW = '190px'; }
+            const isPostLock = !isReadOnlyInspection && isLocked && (col.editable_after_lock === 1 || col.editable_after_lock === '1');
+            const headerBadge = isPostLock ? ' <span style="font-size: 10px; color: var(--success); font-weight: 700;">(Editable)</span>' : '';
+            return `<th class="col-${escapeHtml(col.column_key)}" style="width: ${w}; min-width: ${minW};">${escapeHtml(col.column_label)}${headerBadge}</th>`;
+        }).join('')}
                 <th class="col-action" style="width: 4%; min-width: 45px; text-align: center;">Action</th>
             </tr>
         `;
@@ -843,9 +854,9 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
 
     const visibleCols = getVisibleWorksheetColumns();
     const isAdmin = AppState.currentUser && (
-        AppState.currentUser.role === 'admin' || 
-        AppState.currentUser.role === 'super_admin' || 
-        AppState.currentUser.role === 'hod' || 
+        AppState.currentUser.role === 'admin' ||
+        AppState.currentUser.role === 'super_admin' ||
+        AppState.currentUser.role === 'hod' ||
         hasPermission('can_unlock_sheets')
     );
     const isLocked = !!(AppState.isLocked && !isAdmin);
@@ -863,8 +874,8 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
         const isColEditable = !isReadOnlyInspection && (canEdit || isPostLockEditable);
         const disabledAttr = isColEditable ? '' : 'disabled';
         const postLockStyle = isPostLockEditable ? 'border-color: rgba(16, 185, 129, 0.6); box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.15);' : '';
-        const postLockTitle = isReadOnlyInspection 
-            ? ' title="Read-only view in Employee Inspector"' 
+        const postLockTitle = isReadOnlyInspection
+            ? ' title="Read-only view in Employee Inspector"'
             : (isPostLockEditable ? ' title="Editable after checkout (post-duty update permitted)"' : (isLocked ? ' title="Locked (Duty checkout finalized)"' : ''));
 
         // Extract value
@@ -1000,9 +1011,9 @@ function addNewRowBelow() {
     }
 
     const isAdmin = AppState.currentUser && (
-        AppState.currentUser.role === 'admin' || 
-        AppState.currentUser.role === 'super_admin' || 
-        AppState.currentUser.role === 'hod' || 
+        AppState.currentUser.role === 'admin' ||
+        AppState.currentUser.role === 'super_admin' ||
+        AppState.currentUser.role === 'hod' ||
         hasPermission('can_unlock_sheets')
     );
     const canEdit = isAdmin || !AppState.isLocked;
@@ -1042,6 +1053,17 @@ function removeTableRow(btn) {
 }
 
 // Auto-Save Management & Indicators
+function formatShortTime(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr.replace(' ', 'T'));
+        if (isNaN(d.getTime())) return dateStr;
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
 let autoSaveTimer = null;
 
 function updateSaveIndicator(status, text) {
@@ -1155,7 +1177,7 @@ function getLocalDraft(empId, date) {
 function clearLocalDraft(empId, date) {
     try {
         localStorage.removeItem(getDraftStorageKey(empId, date));
-    } catch (e) {}
+    } catch (e) { }
 }
 
 function restoreLocalDraft() {
@@ -1193,10 +1215,33 @@ function discardLocalDraft() {
     showToast("Offline draft dismissed.", "info");
 }
 
+async function flushPendingAutoSave() {
+    if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = null;
+        if (AppState.pendingAutoSaveDate) {
+            const pDate = AppState.pendingAutoSaveDate;
+            const pEmp = AppState.pendingAutoSaveEmpId;
+            AppState.pendingAutoSaveDate = null;
+            AppState.pendingAutoSaveEmpId = null;
+            try {
+                await saveCurrentWorksheet(false, true, pDate, pEmp);
+            } catch (e) {
+                console.warn("Could not flush pending auto-save:", e);
+            }
+        }
+    }
+}
+
 function triggerAutoSave(delayMs = 700) {
     const isOther = isViewingOtherEmployee();
     const canManage = canManageInspectedSheet();
     if (isOther && !canManage) return; // Do not auto-save in read-only inspection mode
+    if (AppState.isLoadingSheet) return; // Do not auto-save while sheet is in the middle of loading
+
+    // Lock the date and employee ID to this edit action
+    AppState.pendingAutoSaveDate = AppState.selectedDate;
+    AppState.pendingAutoSaveEmpId = getActiveWorksheetEmpId();
 
     // 1. Instantly write to browser local storage on every single keystroke (Zero data loss guarantee)
     saveLocalDraft();
@@ -1204,9 +1249,12 @@ function triggerAutoSave(delayMs = 700) {
     updateSaveIndicator('saving', 'Saving changes...');
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
 
+    const lockedDate = AppState.pendingAutoSaveDate;
+    const lockedEmpId = AppState.pendingAutoSaveEmpId;
+
     autoSaveTimer = setTimeout(async () => {
         try {
-            await saveCurrentWorksheet(false, true);
+            await saveCurrentWorksheet(false, true, lockedDate, lockedEmpId);
         } catch (e) {
             updateSaveIndicator('error', 'Saved offline in browser');
         }
@@ -1248,8 +1296,13 @@ function renderWorksheetSummary(sheet) {
     const summaryInput = document.getElementById('worksheet-work-summary');
     const remarksInput = document.getElementById('worksheet-remarks');
 
-    if (summaryInput) summaryInput.value = sheet ? (sheet.work_summary || '') : '';
-    if (remarksInput) remarksInput.value = sheet ? (sheet.remarks || '') : '';
+    // Protect active typing in summary or remarks from being blown away on reload
+    if (summaryInput && document.activeElement !== summaryInput) {
+        summaryInput.value = sheet ? (sheet.work_summary || '') : '';
+    }
+    if (remarksInput && document.activeElement !== remarksInput) {
+        remarksInput.value = sheet ? (sheet.remarks || '') : '';
+    }
 
     const isOther = isViewingOtherEmployee();
     const canManage = canManageInspectedSheet();
@@ -1264,6 +1317,64 @@ function renderWorksheetSummary(sheet) {
         remarksInput.disabled = isReadOnlyInspection || isLocked;
         if (isReadOnlyInspection) remarksInput.title = "Read-only inspection mode";
     }
+}
+
+// Auto-calculate work summary counts from logged table entries
+function autoCalculateWorkSummary() {
+    const rows = document.querySelectorAll('#worksheet-table-body tr.sheet-entry-row');
+    const summaryInput = document.getElementById('worksheet-work-summary');
+    if (!summaryInput) return;
+
+    if (summaryInput.disabled) {
+        showToast("Work summary is locked for this sheet.", "warning");
+        return;
+    }
+
+    const deptCounts = {};
+    let totalItems = 0;
+
+    rows.forEach(r => {
+        const dept = (r.querySelector('.select-dept, [data-key="department"]')?.value || '').trim();
+        const type = (r.querySelector('.select-content-type, [data-key="content_type"]')?.value || '').trim();
+        const title = (r.querySelector('.input-title, [data-key="title"]')?.value || '').trim();
+        const link = (r.querySelector('.input-link, [data-key="link"]')?.value || '').trim();
+
+        // Skip blank rows or breaks
+        if (!title && !link) return;
+        const lowerTitle = title.toLowerCase();
+        if (lowerTitle.includes('lunch') || lowerTitle.includes('break')) return;
+
+        // Check if title starts with a number (e.g. "5 postcard upload for fb", "2 postcard")
+        let count = 1;
+        const numMatch = title.match(/^(\d+)\s+/);
+        if (numMatch && parseInt(numMatch[1], 10) > 0 && parseInt(numMatch[1], 10) <= 200) {
+            count = parseInt(numMatch[1], 10);
+        }
+
+        const effectiveDept = dept || 'News Room';
+        const effectiveType = type || 'Posts';
+
+        if (!deptCounts[effectiveDept]) deptCounts[effectiveDept] = {};
+        deptCounts[effectiveDept][effectiveType] = (deptCounts[effectiveDept][effectiveType] || 0) + count;
+        totalItems += count;
+    });
+
+    if (totalItems === 0) {
+        showToast("No logged work items found to calculate summary.", "info");
+        return;
+    }
+
+    const sections = [];
+    for (const [dept, types] of Object.entries(deptCounts)) {
+        const typeParts = Object.entries(types).map(([t, cnt]) => `${t}=${cnt}`).join(' ');
+        sections.push(`${dept} ${typeParts}`);
+    }
+    sections.push(`Total ${totalItems}`);
+
+    const newSummary = sections.join(' | ');
+    summaryInput.value = newSummary;
+    triggerAutoSave(300);
+    showToast(`Work summary calculated: Total ${totalItems} items!`, "success");
 }
 
 // Employee Check-In Action
@@ -1643,7 +1754,7 @@ async function handleAdminClearShift() {
 }
 
 // Save Current Worksheet Entries (Admin can save for any employee; Employee can save their own)
-async function saveCurrentWorksheet(notify = true, isAuto = false) {
+async function saveCurrentWorksheet(notify = true, isAuto = false, explicitDate = null, explicitEmpId = null) {
     const isOther = isViewingOtherEmployee();
     const canManage = canManageInspectedSheet();
     if (isOther && !canManage) {
@@ -1653,8 +1764,16 @@ async function saveCurrentWorksheet(notify = true, isAuto = false) {
         return;
     }
 
-    const empId = getActiveWorksheetEmpId();
-    const date = AppState.selectedDate;
+    if (AppState.isLoadingSheet && isAuto) {
+        return; // Never auto-save while sheet is in the middle of loading/re-rendering
+    }
+
+    const empId = explicitEmpId || AppState.pendingAutoSaveEmpId || getActiveWorksheetEmpId();
+    const date = explicitDate || AppState.pendingAutoSaveDate || AppState.selectedDate;
+
+    // Reset pending auto save state
+    AppState.pendingAutoSaveDate = null;
+    AppState.pendingAutoSaveEmpId = null;
 
     const rows = document.querySelectorAll('#worksheet-table-body tr.sheet-entry-row');
     const entries = [];
@@ -1711,6 +1830,7 @@ async function saveCurrentWorksheet(notify = true, isAuto = false) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'save_entries',
+                is_auto: isAuto ? 1 : 0,
                 employee_id: empId,
                 date: date,
                 entries: entries,
@@ -1721,22 +1841,33 @@ async function saveCurrentWorksheet(notify = true, isAuto = false) {
         const data = await res.json();
 
         if (data.success) {
-            updateSaveIndicator('saved');
+            // Only update indicator if user is still viewing this exact date
+            if (date === AppState.selectedDate) {
+                updateSaveIndicator('saved');
+            }
             if (typeof loadReports === 'function') {
                 loadReports();
             }
             if (notify) {
                 showToast("Worksheet saved successfully!", "success");
-                await loadDailyWorksheet();
+                if (date === AppState.selectedDate) {
+                    await loadDailyWorksheet();
+                }
             } else if (!isAuto) {
-                await loadDailyWorksheet();
+                if (date === AppState.selectedDate) {
+                    await loadDailyWorksheet();
+                }
             }
         } else {
-            updateSaveIndicator('error', data.message || 'Auto-save error');
+            if (date === AppState.selectedDate) {
+                updateSaveIndicator('error', data.message || 'Auto-save error');
+            }
             if (notify) showToast(data.message, "error");
         }
     } catch (err) {
-        updateSaveIndicator('error', 'Network error on save');
+        if (date === AppState.selectedDate) {
+            updateSaveIndicator('error', 'Network error on save');
+        }
         if (notify) showToast("Failed to save worksheet.", "error");
     }
 }
@@ -1784,9 +1915,9 @@ function triggerPrintSheet() {
 
     // Check if department enforces HOD check before printing
     const isAdminOrHod = AppState.currentUser && (
-        AppState.currentUser.role === 'admin' || 
-        AppState.currentUser.role === 'super_admin' || 
-        AppState.currentUser.role === 'hod' || 
+        AppState.currentUser.role === 'admin' ||
+        AppState.currentUser.role === 'super_admin' ||
+        AppState.currentUser.role === 'hod' ||
         hasPermission('can_inspect_sheets')
     );
     const isHodChecked = parseInt(AppState.currentSheet?.is_hod_checked) === 1;
@@ -1802,7 +1933,7 @@ function triggerPrintSheet() {
                 confirmText: 'Understood',
                 confirmClass: 'btn-primary',
                 showCancel: false,
-                onConfirm: () => {}
+                onConfirm: () => { }
             });
         }
         return;
@@ -1830,7 +1961,7 @@ function triggerPrintSheet() {
     printIframe.style.border = 'none';
     printIframe.style.visibility = 'hidden';
 
-    printIframe.onload = function() {
+    printIframe.onload = function () {
         setTimeout(() => {
             try {
                 printIframe.contentWindow.focus();
@@ -2038,18 +2169,18 @@ async function handleToggleHoliday(forcedState = null) {
         targetType = 'working';
     }
 
-    const empName = (AppState.currentUser && AppState.currentUser.id === empId) 
-        ? 'your schedule' 
+    const empName = (AppState.currentUser && AppState.currentUser.id === empId)
+        ? 'your schedule'
         : (document.getElementById('admin-emp-dropdown-selected-name')?.textContent || 'this employee');
 
-    const actionText = targetType === 'holiday' 
+    const actionText = targetType === 'holiday'
         ? `Mark ${empName} as on Day Off / Holiday for ${date}?`
         : `Switch ${empName} back to a regular working day for ${date}?`;
 
     const confirmed = await showConfirmDialog({
         title: targetType === 'holiday' ? '🏖️ Confirm Day Off / Holiday' : '💼 Switch to Working Day',
         message: actionText,
-        detail: targetType === 'holiday' 
+        detail: targetType === 'holiday'
             ? 'This will register as an official rest day in attendance without penalizing duty hours or deducting from HR leaves.'
             : 'The worksheet table will be restored for normal hourly task logging and shift check-in.',
         confirmText: targetType === 'holiday' ? 'Mark Day Off' : 'Switch to Work Day',

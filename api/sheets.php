@@ -343,6 +343,12 @@ switch ($action) {
                 $prevRows = [];
             } else {
                 $sheetId = $sheet['id'];
+
+                // Fetch previous entries before any potential modification
+                $stmtPrev = $pdo->prepare("SELECT * FROM sheet_entries WHERE sheet_id = ? ORDER BY id ASC");
+                $stmtPrev->execute([$sheetId]);
+                $prevRows = $stmtPrev->fetchAll(PDO::FETCH_ASSOC);
+
                 $updateFields = ["remarks = ?", "work_summary = ?", "updated_at = CURRENT_TIMESTAMP"];
                 $params = [$remarks, $workSummary];
 
@@ -358,11 +364,39 @@ switch ($action) {
 
                 $updateSheet = $pdo->prepare("UPDATE daily_sheets SET " . implode(', ', $updateFields) . " WHERE id = ?");
                 $updateSheet->execute($params);
+            }
 
-                // Fetch previous entries before replacement
-                $stmtPrev = $pdo->prepare("SELECT * FROM sheet_entries WHERE sheet_id = ? ORDER BY id ASC");
-                $stmtPrev->execute([$sheetId]);
-                $prevRows = $stmtPrev->fetchAll(PDO::FETCH_ASSOC);
+            // Anti-Wipe Safeguard: Filter valid rows with content
+            $validEntries = [];
+            foreach ($entries as $row) {
+                $tSlot = trim($row['time_slot'] ?? '');
+                $tTitle = trim($row['title'] ?? '');
+                $tRawLink = trim($row['link'] ?? '');
+                $tLink = ($tRawLink === 'upload') ? '' : $tRawLink;
+                $tCustom = $row['custom_data'] ?? [];
+                if (!is_array($tCustom)) $tCustom = json_decode($tCustom, true) ?: [];
+                $hasCust = false;
+                if (!empty($tCustom)) {
+                    foreach ($tCustom as $cv) {
+                        if (trim((string)$cv) !== '') { $hasCust = true; break; }
+                    }
+                }
+                if (!empty($tTitle) || !empty($tLink) || !empty($tSlot) || $hasCust) {
+                    $validEntries[] = $row;
+                }
+            }
+
+            // If an auto-save sends 0 valid entries while database already has logged rows, DO NOT wipe existing rows!
+            $isAuto = !empty($data['is_auto']);
+            if ($isAuto && empty($validEntries) && !empty($prevRows)) {
+                $pdo->commit();
+                echo json_encode([
+                    'success' => true, 
+                    'message' => 'Active entries preserved against empty auto-save race condition', 
+                    'preserved' => true,
+                    'sheet_id' => $sheetId
+                ]);
+                break;
             }
 
             // If locked and user is NOT admin/HOD, enforce post-checkout column editing rules
@@ -444,12 +478,18 @@ switch ($action) {
                     }
                 }
 
+                $hasCustomVal = false;
+                if (!empty($customData)) {
+                    foreach ($customData as $cv) {
+                        if (trim((string)$cv) !== '') { $hasCustomVal = true; break; }
+                    }
+                }
                 $customDataJson = !empty($customData) ? json_encode($customData) : null;
 
-                // A valid real work unit must have a description or link or custom data
-                if (empty($title) && empty($link) && empty($customData)) {
+                // A valid real work unit must have a description or link or time slot or custom data
+                if (empty($title) && empty($link) && empty($timeSlot) && !$hasCustomVal) {
                     $idx++;
-                    continue; // skip blank rows without work description
+                    continue; // skip completely blank rows
                 }
 
                 $countVal = 1; // 1 real unit of work per entry row

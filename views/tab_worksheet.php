@@ -297,7 +297,12 @@
                     <!-- Summary & Remarks Grid -->
                     <div class="form-split-grid">
                         <div class="form-group">
-                            <label class="form-label">Work Summary</label>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                <label class="form-label" style="margin-bottom: 0;">Work Summary</label>
+                                <button type="button" class="btn btn-sm btn-outline" style="font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; border-color: var(--primary); color: var(--primary);" onclick="autoCalculateWorkSummary()" title="Auto-calculate counts from logged work entries">
+                                    ⚡ Auto-Calculate Summary
+                                </button>
+                            </div>
                             <textarea id="worksheet-work-summary" class="form-textarea" placeholder="Overall summary of the day's completed tasks..."></textarea>
                         </div>
                         <div class="form-group">
