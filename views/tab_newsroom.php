@@ -34,9 +34,14 @@
                 <div id="news-stat-dp" style="font-size: 24px; font-weight: 800; color: #16a34a; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #059669;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🟢 PT Published</div>
-                <div id="news-stat-pt" style="font-size: 24px; font-weight: 800; color: #059669; margin-top: 4px; line-height: 1;">0</div>
+            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #dc2626;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🔴 PT Published</div>
+                <div id="news-stat-pt" style="font-size: 24px; font-weight: 800; color: #dc2626; margin-top: 4px; line-height: 1;">0</div>
+            </div>
+
+            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #b45309;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🟤 Move to PT</div>
+                <div id="news-stat-move-pt" style="font-size: 24px; font-weight: 800; color: #b45309; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
             <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #2563eb;">
@@ -114,7 +119,7 @@
                         <th colspan="7" style="background: #b91c1c; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px; border-right: 3px solid rgba(0,0,0,0.15);">
                             🟥 NEWS ROOM DEPARTMENT (DISPATCH)
                         </th>
-                        <th colspan="8" style="background: #15803d; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px;">
+                        <th colspan="6" style="background: #15803d; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px;">
                             🟩 DIGITAL DEPARTMENT (PUBLISHING & STATUS)
                         </th>
                     </tr>
@@ -129,10 +134,8 @@
                         <th style="width: 105px; min-width: 100px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff; border-right: 3px solid rgba(0,0,0,0.2);">PT Link</th>
 
                         <!-- Digital Columns -->
-                        <th style="width: 160px; min-width: 150px; background: #1e3a5f; color: #ffffff;">DP Status</th>
-                        <th style="width: 85px; min-width: 80px; background: #1e3a5f; color: #ffffff;">Time</th>
-                        <th style="width: 160px; min-width: 150px; background: #1e3a5f; color: #ffffff;">PT Status</th>
-                        <th style="width: 85px; min-width: 80px; background: #1e3a5f; color: #ffffff;">Time</th>
+                        <th style="width: 150px; min-width: 140px; background: #1e3a5f; color: #ffffff;">Status</th>
+                        <th style="width: 95px; min-width: 90px; background: #1e3a5f; color: #ffffff;">Publish Time</th>
                         <th style="width: 135px; min-width: 125px; background: #1e3a5f; color: #ffffff;">Employee Name</th>
                         <th style="width: 170px; min-width: 150px; background: #1e3a5f; color: #ffffff;">Remarks</th>
                         <th style="width: 75px; min-width: 70px; text-align: center; background: #1e3a5f; color: #ffffff;">Rating</th>
@@ -141,7 +144,7 @@
                 </thead>
                 <tbody id="news-matrix-tbody">
                     <tr>
-                        <td colspan="15" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <td colspan="13" style="text-align: center; padding: 40px; color: var(--text-muted);">
                             <div class="spinner" style="margin: 0 auto 10px;"></div>
                             Loading newsroom dispatches...
                         </td>
@@ -282,53 +285,40 @@
 
                 <!-- Section 2: Digital Department Publishing Info -->
                 <div style="background: rgba(22, 163, 74, 0.04); border: 1px solid rgba(22, 163, 74, 0.2); border-radius: var(--radius-md); padding: 14px 16px;">
-                    <div style="font-size: 12px; font-weight: 800; color: #15803d; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-                        <span>🟩</span> Digital Department Publishing Status
+                    <div style="font-size: 12px; font-weight: 800; color: #15803d; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="display: flex; align-items: center; gap: 6px;"><span>🟩</span> Digital Department Publishing Status</span>
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: #b45309; cursor: pointer; text-transform: none;">
+                            <input type="checkbox" id="edit-news-moved-to-pt" style="accent-color: #b45309; width: 14px; height: 14px;">
+                            <span>🟤 Moved to Pakistan Today (PT)</span>
+                        </label>
                     </div>
 
                     <div class="form-grid-2">
                         <div class="form-group">
-                            <label class="form-label">DP Status (Discover Pakistan)</label>
-                            <select id="edit-news-dp-status" class="input-control" style="font-weight: 700;" onchange="handleNewsModalDpStatusChange(this.value)">
+                            <label class="form-label">Publishing Status</label>
+                            <select id="edit-news-status" class="input-control" style="font-weight: 700;">
                                 <option value="" style="background: #334155; color: #f8fafc;">⏳ Pending</option>
                                 <option value="In Progress" style="background: #d97706; color: #fff;">⚡ In Progress</option>
                                 <option value="Published" style="background: #16a34a; color: #fff;">🟢 Published</option>
-                                <option value="Violation" style="background: #dc2626; color: #fff;">🔴 Violation</option>
-                                <option value="Correction" style="background: #2563eb; color: #fff;">🔵 Correction</option>
-                                <option value="Move to PT" style="background: #7f1d1d; color: #fff;">🟤 Move to PT</option>
-                                <option value="Published on PT" style="background: #15803d; color: #fff;">🟢 Published on PT</option>
-                                <option value="Expire" style="background: #b91c1c; color: #fff;">⛔ Expire</option>
-                                <option value="Rejected" style="background: #78350f; color: #fff;">🟤 Rejected</option>
-                                <option value="N/A" style="background: #1e293b; color: #94a3b8;">— N/A</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">DP Publishing Time</label>
-                            <input type="text" id="edit-news-dp-time" class="input-control" placeholder="Publish time">
-                        </div>
-                    </div>
-
-                    <div class="form-grid-2">
-                        <div class="form-group">
-                            <label class="form-label">PT Status (Pakistan Today)</label>
-                            <select id="edit-news-pt-status" class="input-control" style="font-weight: 700;" onchange="handleNewsModalPtStatusChange(this.value)">
-                                <option value="" style="background: #334155; color: #f8fafc;">⏳ Pending</option>
-                                <option value="In Progress" style="background: #d97706; color: #fff;">⚡ In Progress</option>
-                                <option value="Published" style="background: #16a34a; color: #fff;">🟢 Published</option>
+                                <option value="Move to PT" style="background: #b45309; color: #fff;">🟤 Move to PT</option>
                                 <option value="Violation" style="background: #dc2626; color: #fff;">🔴 Violation</option>
                                 <option value="Correction" style="background: #2563eb; color: #fff;">🔵 Correction</option>
                                 <option value="Expire" style="background: #b91c1c; color: #fff;">⛔ Expire</option>
                                 <option value="Rejected" style="background: #78350f; color: #fff;">🟤 Rejected</option>
-                                <option value="N/A" style="background: #1e293b; color: #94a3b8;">— N/A</option>
                             </select>
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">PT Publishing Time</label>
-                            <input type="text" id="edit-news-pt-time" class="input-control" placeholder="Publish time">
+                            <label class="form-label">Publishing Time</label>
+                            <input type="text" id="edit-news-publish-time" class="input-control" placeholder="e.g. 03:45:00 PM">
                         </div>
                     </div>
+
+                    <!-- Hidden compatibility fields -->
+                    <input type="hidden" id="edit-news-dp-status">
+                    <input type="hidden" id="edit-news-dp-time">
+                    <input type="hidden" id="edit-news-pt-status">
+                    <input type="hidden" id="edit-news-pt-time">
 
                     <div class="form-grid-2">
                         <div class="form-group">

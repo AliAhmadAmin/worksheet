@@ -117,12 +117,19 @@ switch ($action) {
         $statsStmt = $pdo->query("
             SELECT 
                 COUNT(*) as total_dispatches,
-                COALESCE(SUM(CASE WHEN dp_status = 'Published' THEN 1 ELSE 0 END), 0) as dp_published,
-                COALESCE(SUM(CASE WHEN pt_status = 'Published' OR dp_status = 'Published on PT' THEN 1 ELSE 0 END), 0) as pt_published,
+                COALESCE(SUM(CASE 
+                    WHEN (dp_status = 'Published' OR pt_status = 'Published') 
+                     AND ((channel != 'Pakistan Today' AND (moved_to_pt = 0 OR moved_to_pt IS NULL)) OR channel = 'All Channels' OR channel = 'Both') 
+                    THEN 1 ELSE 0 END), 0) as dp_published,
+                COALESCE(SUM(CASE 
+                    WHEN (pt_status = 'Published' OR dp_status = 'Published on PT' OR (dp_status = 'Published' AND (channel = 'Pakistan Today' OR moved_to_pt = 1))) 
+                    THEN 1 ELSE 0 END), 0) as pt_published,
+                COALESCE(SUM(CASE 
+                    WHEN moved_to_pt = 1 OR dp_status = 'Move to PT' OR pt_status = 'Move to PT' 
+                    THEN 1 ELSE 0 END), 0) as moved_to_pt_count,
                 COALESCE(SUM(CASE WHEN dp_status IN ('Correction', 'Violation') OR pt_status IN ('Correction', 'Violation') THEN 1 ELSE 0 END), 0) as total_corrections,
                 COALESCE(SUM(CASE 
-                    WHEN (dp_status NOT IN ('Published', 'Published on PT', 'Expire', 'Rejected', 'N/A') AND (dp_status = '' OR dp_status IS NULL OR dp_status = 'Pending' OR dp_status = 'Move to PT'))
-                      OR (pt_status NOT IN ('Published', 'Expire', 'Rejected', 'N/A') AND (pt_status = '' OR pt_status IS NULL OR pt_status = 'Pending') AND (dp_status != 'Published on PT'))
+                    WHEN (dp_status NOT IN ('Published', 'Published on PT', 'Expire', 'Rejected', 'N/A') AND pt_status NOT IN ('Published', 'Expire', 'Rejected', 'N/A'))
                     THEN 1 ELSE 0 END), 0) as pending_queue
             FROM newsroom_dispatches
         ");
@@ -130,6 +137,7 @@ switch ($action) {
             'total_dispatches' => 0,
             'dp_published' => 0,
             'pt_published' => 0,
+            'moved_to_pt_count' => 0,
             'total_corrections' => 0,
             'pending_queue' => 0
         ];
@@ -232,6 +240,12 @@ switch ($action) {
             exit;
         }
 
+        $nowFormatted = date('h:i:s A');
+        $movedToPt = (int)($dispatch['moved_to_pt'] ?? 0);
+        if (isset($data['moved_to_pt'])) {
+            $movedToPt = (int)$data['moved_to_pt'];
+        }
+
         $dpStatus = isset($data['dp_status']) ? trim($data['dp_status']) : $dispatch['dp_status'];
         $dpTime = isset($data['dp_time']) ? trim($data['dp_time']) : $dispatch['dp_time'];
         $ptStatus = isset($data['pt_status']) ? trim($data['pt_status']) : $dispatch['pt_status'];
@@ -243,34 +257,64 @@ switch ($action) {
         $link = isset($data['link']) ? trim($data['link']) : $dispatch['link'];
         $ptLink = isset($data['pt_link']) ? trim($data['pt_link']) : ($dispatch['pt_link'] ?? '');
 
-        // Auto-sync status: When published on PT, automatically mark DP status as 'Published on PT'
-        $nowFormatted = date('h:i:s A');
-        if ($ptStatus === 'Published' || $ptStatus === 'Published on PT') {
-            if (empty($dpStatus) || $dpStatus === 'Pending' || $dpStatus === 'Move to PT' || $dpStatus === 'N/A') {
-                $dpStatus = 'Published on PT';
-                if (empty($dpTime)) {
-                    $dpTime = $nowFormatted;
-                }
-            }
-        } elseif ($dpStatus === 'Published on PT') {
-            if (empty($ptStatus) || $ptStatus === 'Pending' || $ptStatus === 'N/A') {
-                $ptStatus = 'Published';
-                if (empty($ptTime)) {
+        // If unified 'status' parameter is passed from the single status dropdown
+        if (isset($data['status'])) {
+            $unifiedStatus = trim($data['status']);
+            if ($unifiedStatus === 'Move to PT') {
+                $movedToPt = 1;
+                $dpStatus = 'Move to PT';
+                $ptStatus = 'Move to PT';
+                if (empty($dpTime)) $dpTime = $nowFormatted;
+            } elseif ($unifiedStatus === 'Published') {
+                if ($dispatch['channel'] === 'Pakistan Today' || $movedToPt === 1) {
+                    $ptStatus = 'Published';
                     $ptTime = $nowFormatted;
+                    $dpStatus = 'Published on PT';
+                    $dpTime = $nowFormatted;
+                } elseif ($dispatch['channel'] === 'All Channels' || $dispatch['channel'] === 'Both') {
+                    $dpStatus = 'Published';
+                    $dpTime = $nowFormatted;
+                    $ptStatus = 'Published';
+                    $ptTime = $nowFormatted;
+                } else {
+                    $dpStatus = 'Published';
+                    $dpTime = $nowFormatted;
+                    $ptStatus = 'N/A';
+                }
+            } else {
+                if ($dispatch['channel'] === 'Pakistan Today' || $movedToPt === 1) {
+                    $ptStatus = $unifiedStatus;
+                    if ($unifiedStatus !== 'Pending' && empty($ptTime)) $ptTime = $nowFormatted;
+                } else {
+                    $dpStatus = $unifiedStatus;
+                    if ($unifiedStatus !== 'Pending' && empty($dpTime)) $dpTime = $nowFormatted;
                 }
             }
-        } elseif ($dpStatus === 'Published') {
-            if ($dispatch['channel'] === 'Discover Pakistan' && (empty($ptStatus) || $ptStatus === 'Pending')) {
-                $ptStatus = 'N/A';
+        } else {
+            // Auto-sync status: When published on PT, automatically mark DP status as 'Published on PT'
+            if ($ptStatus === 'Published' || $ptStatus === 'Published on PT') {
+                if (empty($dpStatus) || $dpStatus === 'Pending' || $dpStatus === 'Move to PT' || $dpStatus === 'N/A') {
+                    $dpStatus = 'Published on PT';
+                    if (empty($dpTime)) $dpTime = $nowFormatted;
+                }
+            } elseif ($dpStatus === 'Published on PT') {
+                if (empty($ptStatus) || $ptStatus === 'Pending' || $ptStatus === 'N/A') {
+                    $ptStatus = 'Published';
+                    if (empty($ptTime)) $ptTime = $nowFormatted;
+                }
+            } elseif ($dpStatus === 'Published') {
+                if ($dispatch['channel'] === 'Discover Pakistan' && (empty($ptStatus) || $ptStatus === 'Pending')) {
+                    $ptStatus = 'N/A';
+                }
+            }
+            if (!empty($dpStatus) && $dpStatus !== $dispatch['dp_status'] && empty($dpTime)) {
+                $dpTime = $nowFormatted;
+            }
+            if (!empty($ptStatus) && $ptStatus !== $dispatch['pt_status'] && empty($ptTime)) {
+                $ptTime = $nowFormatted;
             }
         }
 
-        if (!empty($dpStatus) && $dpStatus !== $dispatch['dp_status'] && empty($dpTime)) {
-            $dpTime = $nowFormatted;
-        }
-        if (!empty($ptStatus) && $ptStatus !== $dispatch['pt_status'] && empty($ptTime)) {
-            $ptTime = $nowFormatted;
-        }
         if (empty($publisherName) && $publisherId) {
             $stmtP = $pdo->prepare("SELECT name FROM employees WHERE id = ?");
             $stmtP->execute([$publisherId]);
@@ -279,12 +323,34 @@ switch ($action) {
 
         $stmtUpdate = $pdo->prepare("
             UPDATE newsroom_dispatches
-            SET dp_status = ?, dp_time = ?, pt_status = ?, pt_time = ?,
+            SET dp_status = ?, dp_time = ?, pt_status = ?, pt_time = ?, moved_to_pt = ?,
                 publisher_id = ?, publisher_name = ?, remarks = ?, rating = ?, link = ?, pt_link = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
-        $stmtUpdate->execute([$dpStatus, $dpTime, $ptStatus, $ptTime, $publisherId, $publisherName, $remarks, $rating, $link, $ptLink, $id]);
+        $stmtUpdate->execute([$dpStatus, $dpTime, $ptStatus, $ptTime, $movedToPt, $publisherId, $publisherName, $remarks, $rating, $link, $ptLink, $id]);
+
+        // Recalculate stats for live response
+        $statsStmt = $pdo->query("
+            SELECT 
+                COUNT(*) as total_dispatches,
+                COALESCE(SUM(CASE 
+                    WHEN (dp_status = 'Published' OR pt_status = 'Published') 
+                     AND ((channel != 'Pakistan Today' AND (moved_to_pt = 0 OR moved_to_pt IS NULL)) OR channel = 'All Channels' OR channel = 'Both') 
+                    THEN 1 ELSE 0 END), 0) as dp_published,
+                COALESCE(SUM(CASE 
+                    WHEN (pt_status = 'Published' OR dp_status = 'Published on PT' OR (dp_status = 'Published' AND (channel = 'Pakistan Today' OR moved_to_pt = 1))) 
+                    THEN 1 ELSE 0 END), 0) as pt_published,
+                COALESCE(SUM(CASE 
+                    WHEN moved_to_pt = 1 OR dp_status = 'Move to PT' OR pt_status = 'Move to PT' 
+                    THEN 1 ELSE 0 END), 0) as moved_to_pt_count,
+                COALESCE(SUM(CASE WHEN dp_status IN ('Correction', 'Violation') OR pt_status IN ('Correction', 'Violation') THEN 1 ELSE 0 END), 0) as total_corrections,
+                COALESCE(SUM(CASE 
+                    WHEN (dp_status NOT IN ('Published', 'Published on PT', 'Expire', 'Rejected', 'N/A') AND pt_status NOT IN ('Published', 'Expire', 'Rejected', 'N/A'))
+                    THEN 1 ELSE 0 END), 0) as pending_queue
+            FROM newsroom_dispatches
+        ");
+        $liveStats = $statsStmt->fetch();
 
         echo json_encode([
             'success' => true,
@@ -293,9 +359,11 @@ switch ($action) {
             'dp_time' => $dpTime,
             'pt_status' => $ptStatus,
             'pt_time' => $ptTime,
+            'moved_to_pt' => $movedToPt,
             'publisher_name' => $publisherName,
             'link' => $link,
-            'pt_link' => $ptLink
+            'pt_link' => $ptLink,
+            'stats' => $liveStats
         ]);
         break;
 
@@ -381,12 +449,39 @@ switch ($action) {
         $publisherId = !empty($data['publisher_id']) ? (int)$data['publisher_id'] : null;
         $remarks = trim($data['remarks'] ?? '');
         $rating = trim($data['rating'] ?? '');
+        $movedToPt = isset($data['moved_to_pt']) ? (int)$data['moved_to_pt'] : 0;
+
+        if (isset($data['status'])) {
+            $unifiedStatus = trim($data['status']);
+            if ($unifiedStatus === 'Move to PT') {
+                $movedToPt = 1;
+                $dpStatus = 'Move to PT';
+                $ptStatus = 'Move to PT';
+            } elseif ($unifiedStatus === 'Published') {
+                if ($channel === 'Pakistan Today' || $movedToPt === 1) {
+                    $ptStatus = 'Published';
+                    $dpStatus = 'Published on PT';
+                } elseif ($channel === 'All Channels' || $channel === 'Both') {
+                    $dpStatus = 'Published';
+                    $ptStatus = 'Published';
+                } else {
+                    $dpStatus = 'Published';
+                    $ptStatus = 'N/A';
+                }
+            } else {
+                if ($channel === 'Pakistan Today' || $movedToPt === 1) {
+                    $ptStatus = $unifiedStatus;
+                } else {
+                    $dpStatus = $unifiedStatus;
+                }
+            }
+        }
 
         $stmt = $pdo->prepare("
             UPDATE newsroom_dispatches
             SET title = ?, path_whatsapp = ?, channel = ?, dispatch_date = ?,
                 sender_id = ?, sender_name = ?, dispatch_time = ?, link = ?, pt_link = ?,
-                dp_status = ?, dp_time = ?, pt_status = ?, pt_time = ?,
+                dp_status = ?, dp_time = ?, pt_status = ?, pt_time = ?, moved_to_pt = ?,
                 publisher_id = ?, remarks = ?, rating = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -394,7 +489,7 @@ switch ($action) {
         $stmt->execute([
             $title, $pathWhatsapp, $channel, $dispatchDate,
             $senderId, $senderName, $dispatchTime, $link, $ptLink,
-            $dpStatus, $dpTime, $ptStatus, $ptTime,
+            $dpStatus, $dpTime, $ptStatus, $ptTime, $movedToPt,
             $publisherId, $remarks, $rating, $id
         ]);
 

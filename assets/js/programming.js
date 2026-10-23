@@ -130,12 +130,14 @@ function updateProgKpis(stats) {
     const elTotal = document.getElementById('prog-stat-total');
     const elDp = document.getElementById('prog-stat-dp');
     const elPt = document.getElementById('prog-stat-pt');
+    const elMovePt = document.getElementById('prog-stat-move-pt');
     const elCorr = document.getElementById('prog-stat-corrections');
     const elPend = document.getElementById('prog-stat-pending');
 
     if (elTotal) elTotal.textContent = stats.total_dispatches || 0;
     if (elDp) elDp.textContent = stats.dp_published || 0;
     if (elPt) elPt.textContent = stats.pt_published || 0;
+    if (elMovePt) elMovePt.textContent = stats.moved_to_pt_count || 0;
     if (elCorr) elCorr.textContent = stats.total_corrections || 0;
     if (elPend) elPend.textContent = stats.pending_queue || 0;
 
@@ -148,19 +150,23 @@ function updateProgKpis(stats) {
     });
 }
 
-function getStatusBadgeStyle(status) {
+function getStatusBadgeStyle(status, isPT = false, isBoth = false) {
+    if (status === 'Published') {
+        if (isBoth) return { bg: '#6366f1', color: '#ffffff', label: '🟢 Published (Both)' };
+        if (isPT) return { bg: '#dc2626', color: '#ffffff', label: '🔴 Published (PT)' };
+        return { bg: '#16a34a', color: '#ffffff', label: '🟢 Published (DP)' };
+    }
     const map = {
-        'In Progress': { bg: '#d97706', color: '#ffffff' },
-        'Published': { bg: '#16a34a', color: '#ffffff' },
-        'Published on PT': { bg: '#15803d', color: '#ffffff' },
-        'Violation': { bg: '#dc2626', color: '#ffffff' },
-        'Correction': { bg: '#2563eb', color: '#ffffff' },
-        'Move to PT': { bg: '#7f1d1d', color: '#ffffff' },
-        'Expire': { bg: '#b91c1c', color: '#ffffff' },
-        'Rejected': { bg: '#78350f', color: '#ffffff' },
-        'N/A': { bg: 'rgba(100, 116, 139, 0.15)', color: '#94a3b8' }
+        'In Progress': { bg: '#d97706', color: '#ffffff', label: '⚡ In Progress' },
+        'Move to PT': { bg: '#b45309', color: '#ffffff', label: '🟤 Move to PT' },
+        'Violation': { bg: '#dc2626', color: '#ffffff', label: '🔴 Violation' },
+        'Correction': { bg: '#2563eb', color: '#ffffff', label: '🔵 Correction' },
+        'Expire': { bg: '#64748b', color: '#ffffff', label: '⛔ Expire' },
+        'Rejected': { bg: '#475569', color: '#ffffff', label: '🟤 Rejected' },
+        'Pending': { bg: 'rgba(148, 163, 184, 0.15)', color: '#64748b', label: '⏳ Pending' },
+        'N/A': { bg: 'rgba(100, 116, 139, 0.15)', color: '#94a3b8', label: '— N/A' }
     };
-    return map[status] || { bg: 'rgba(148, 163, 184, 0.15)', color: '#64748b' };
+    return map[status] || { bg: 'rgba(148, 163, 184, 0.15)', color: '#64748b', label: status || '⏳ Pending' };
 }
 
 function renderProgrammingMatrix(dispatches) {
@@ -170,7 +176,7 @@ function renderProgrammingMatrix(dispatches) {
     if (!dispatches || dispatches.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="15" style="text-align: center; padding: 45px 20px; color: var(--text-muted);">
+                <td colspan="13" style="text-align: center; padding: 45px 20px; color: var(--text-muted);">
                     <div style="font-size: 32px; margin-bottom: 8px;">📡</div>
                     <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No Content Dispatches Found</div>
                     <div style="font-size: 12.5px; margin-top: 3px;">Click "➕ Dispatch New Content" above to send new program clips to Digital.</div>
@@ -184,12 +190,63 @@ function renderProgrammingMatrix(dispatches) {
 
     let html = '';
     dispatches.forEach((d, idx) => {
-        const dpStyle = getStatusBadgeStyle(d.dp_status);
-        const ptStyle = getStatusBadgeStyle(d.pt_status);
+        const isMovedToPt = (d.moved_to_pt == 1 || d.dp_status === 'Move to PT' || d.pt_status === 'Move to PT');
+        const isPTChannel = (d.channel === 'Pakistan Today' || isMovedToPt);
+        const isBothChannel = (d.channel === 'All Channels' || d.channel === 'Both');
 
-        const channelBadge = d.channel === 'Pakistan Today'
-            ? `<span style="background: rgba(220, 38, 38, 0.12); color: #dc2626; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px;">🔴 PT</span>`
-            : `<span style="background: rgba(22, 163, 74, 0.12); color: #16a34a; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px;">🟢 DP</span>`;
+        let currentStatus = 'Pending';
+        if (d.pt_status === 'Published' || d.dp_status === 'Published on PT' || d.dp_status === 'Published') {
+            currentStatus = 'Published';
+        } else if (isMovedToPt) {
+            currentStatus = 'Move to PT';
+        } else if (d.dp_status === 'In Progress' || d.pt_status === 'In Progress') {
+            currentStatus = 'In Progress';
+        } else if (d.dp_status === 'Correction' || d.pt_status === 'Correction') {
+            currentStatus = 'Correction';
+        } else if (d.dp_status === 'Violation' || d.pt_status === 'Violation') {
+            currentStatus = 'Violation';
+        } else if (d.dp_status === 'Expire' || d.pt_status === 'Expire') {
+            currentStatus = 'Expire';
+        } else if (d.dp_status === 'Rejected' || d.pt_status === 'Rejected') {
+            currentStatus = 'Rejected';
+        } else {
+            currentStatus = d.dp_status || d.pt_status || 'Pending';
+        }
+
+        const isPublished = (currentStatus === 'Published');
+        const publishTime = d.pt_time || d.dp_time || '-';
+
+        // Executive Row background & border highlight
+        let rowBg = idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)';
+        let rowBorderLeft = 'none';
+
+        if (isPublished) {
+            if (isBothChannel) {
+                // Both: elegant indigo/violet tint
+                rowBg = 'rgba(99, 102, 241, 0.055)';
+                rowBorderLeft = '4px solid #6366f1';
+            } else if (isPTChannel) {
+                // Pakistan Today: elegant soft red/rose tint
+                rowBg = 'rgba(220, 38, 38, 0.055)';
+                rowBorderLeft = '4px solid #dc2626';
+            } else {
+                // Discover Pakistan: elegant soft emerald/green tint
+                rowBg = 'rgba(22, 163, 74, 0.055)';
+                rowBorderLeft = '4px solid #16a34a';
+            }
+        } else if (isMovedToPt) {
+            // Moved to PT: soft warm amber tint
+            rowBg = 'rgba(245, 158, 11, 0.055)';
+            rowBorderLeft = '4px solid #f59e0b';
+        }
+
+        const statusStyle = getStatusBadgeStyle(currentStatus, isPTChannel, isBothChannel);
+
+        const channelBadge = isBothChannel
+            ? `<span style="background: rgba(99, 102, 241, 0.12); color: #6366f1; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px;">🌐 Both</span>`
+            : (d.channel === 'Pakistan Today'
+                ? `<span style="background: rgba(220, 38, 38, 0.12); color: #dc2626; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px;">🔴 PT</span>`
+                : `<span style="background: rgba(22, 163, 74, 0.12); color: #16a34a; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px;">🟢 DP</span>`);
 
         // Format Date nicely
         const dateFormatted = d.dispatch_date ? new Date(d.dispatch_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-';
@@ -237,44 +294,22 @@ function renderProgrammingMatrix(dispatches) {
             </div>
         `;
 
-        // Status Elements: Interactive for Digital/Admin, Read-only Badges for Programming Staff
-        const dpStatusHtml = canManage 
+        const statusHtml = canManage 
             ? `
-                <select class="prog-status-select" style="background: ${dpStyle.bg}; color: ${dpStyle.color};" onchange="quickUpdateProgStatus(${d.id}, 'dp_status', this.value)" title="Change DP Status">
-                    <option value="" ${!d.dp_status ? 'selected' : ''} style="background: #334155; color: #f8fafc;">⏳ Pending</option>
-                    <option value="In Progress" ${d.dp_status === 'In Progress' ? 'selected' : ''} style="background: #d97706; color: #ffffff;">⚡ In Progress</option>
-                    <option value="Published" ${d.dp_status === 'Published' ? 'selected' : ''} style="background: #16a34a; color: #ffffff;">🟢 Published</option>
-                    <option value="Violation" ${d.dp_status === 'Violation' ? 'selected' : ''} style="background: #dc2626; color: #ffffff;">🔴 Violation</option>
-                    <option value="Correction" ${d.dp_status === 'Correction' ? 'selected' : ''} style="background: #2563eb; color: #ffffff;">🔵 Correction</option>
-                    <option value="Move to PT" ${d.dp_status === 'Move to PT' ? 'selected' : ''} style="background: #7f1d1d; color: #ffffff;">🟤 Move to PT</option>
-                    <option value="Published on PT" ${d.dp_status === 'Published on PT' ? 'selected' : ''} style="background: #15803d; color: #ffffff;">🟢 Published on PT</option>
-                    <option value="Expire" ${d.dp_status === 'Expire' ? 'selected' : ''} style="background: #b91c1c; color: #ffffff;">⛔ Expire</option>
-                    <option value="Rejected" ${d.dp_status === 'Rejected' ? 'selected' : ''} style="background: #78350f; color: #ffffff;">🟤 Rejected</option>
-                    <option value="N/A" ${d.dp_status === 'N/A' ? 'selected' : ''} style="background: #1e293b; color: #94a3b8;">— N/A</option>
+                <select class="prog-status-select" style="background: ${statusStyle.bg}; color: ${statusStyle.color}; font-weight: 700;" onchange="quickUpdateProgStatus(${d.id}, 'status', this.value)" title="Change Publishing Status">
+                    <option value="Pending" ${currentStatus === 'Pending' ? 'selected' : ''} style="background: #334155; color: #f8fafc;">⏳ Pending</option>
+                    <option value="In Progress" ${currentStatus === 'In Progress' ? 'selected' : ''} style="background: #d97706; color: #ffffff;">⚡ In Progress</option>
+                    <option value="Published" ${currentStatus === 'Published' ? 'selected' : ''} style="background: ${isPTChannel ? '#dc2626' : (isBothChannel ? '#6366f1' : '#16a34a')}; color: #ffffff;">${isPTChannel ? '🔴 Published (PT)' : (isBothChannel ? '🟢 Published (Both)' : '🟢 Published (DP)')}</option>
+                    <option value="Move to PT" ${currentStatus === 'Move to PT' ? 'selected' : ''} style="background: #b45309; color: #ffffff;">🟤 Move to PT</option>
+                    <option value="Violation" ${currentStatus === 'Violation' ? 'selected' : ''} style="background: #dc2626; color: #ffffff;">🔴 Violation</option>
+                    <option value="Correction" ${currentStatus === 'Correction' ? 'selected' : ''} style="background: #2563eb; color: #ffffff;">🔵 Correction</option>
+                    <option value="Expire" ${currentStatus === 'Expire' ? 'selected' : ''} style="background: #64748b; color: #ffffff;">⛔ Expire</option>
+                    <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''} style="background: #475569; color: #ffffff;">🟤 Rejected</option>
                 </select>
             `
             : `
-                <span class="prog-status-pill" style="background: ${dpStyle.bg}; color: ${dpStyle.color};" title="Publishing status is managed by Digital Department">
-                    ${d.dp_status === 'N/A' ? '— N/A' : escapeHtml(d.dp_status || '⏳ Pending')}
-                </span>
-            `;
-
-        const ptStatusHtml = canManage 
-            ? `
-                <select class="prog-status-select" style="background: ${ptStyle.bg}; color: ${ptStyle.color};" onchange="quickUpdateProgStatus(${d.id}, 'pt_status', this.value)" title="Change PT Status">
-                    <option value="" ${!d.pt_status ? 'selected' : ''} style="background: #334155; color: #f8fafc;">⏳ Pending</option>
-                    <option value="In Progress" ${d.pt_status === 'In Progress' ? 'selected' : ''} style="background: #d97706; color: #ffffff;">⚡ In Progress</option>
-                    <option value="Published" ${d.pt_status === 'Published' ? 'selected' : ''} style="background: #16a34a; color: #ffffff;">🟢 Published</option>
-                    <option value="Violation" ${d.pt_status === 'Violation' ? 'selected' : ''} style="background: #dc2626; color: #ffffff;">🔴 Violation</option>
-                    <option value="Correction" ${d.pt_status === 'Correction' ? 'selected' : ''} style="background: #2563eb; color: #ffffff;">🔵 Correction</option>
-                    <option value="Expire" ${d.pt_status === 'Expire' ? 'selected' : ''} style="background: #b91c1c; color: #ffffff;">⛔ Expire</option>
-                    <option value="Rejected" ${d.pt_status === 'Rejected' ? 'selected' : ''} style="background: #78350f; color: #ffffff;">🟤 Rejected</option>
-                    <option value="N/A" ${d.pt_status === 'N/A' ? 'selected' : ''} style="background: #1e293b; color: #94a3b8;">— N/A</option>
-                </select>
-            `
-            : `
-                <span class="prog-status-pill" style="background: ${ptStyle.bg}; color: ${ptStyle.color};" title="Publishing status is managed by Digital Department">
-                    ${d.pt_status === 'N/A' ? '— N/A' : escapeHtml(d.pt_status || '⏳ Pending')}
+                <span class="prog-status-pill" style="background: ${statusStyle.bg}; color: ${statusStyle.color}; font-weight: 700;" title="Publishing status is managed by Digital Department">
+                    ${escapeHtml(statusStyle.label)}
                 </span>
             `;
 
@@ -291,7 +326,7 @@ function renderProgrammingMatrix(dispatches) {
             `;
 
         html += `
-            <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'};">
+            <tr style="border-bottom: 1px solid var(--border-color); background: ${rowBg}; border-left: ${rowBorderLeft};">
                 <!-- 1. Date (Sticky Column) -->
                 <td class="sticky-col-date" style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">
                     ${escapeHtml(dateFormatted)}
@@ -341,49 +376,39 @@ function renderProgrammingMatrix(dispatches) {
                     ${dpLinkHtml}
                 </td>
 
-                <!-- 8. PT Link (Border separator to Digital Zone) -->
+                <!-- 7. PT Link (Border separator to Digital Zone) -->
                 <td style="text-align: center; vertical-align: middle; white-space: nowrap; border-right: 3px solid rgba(0,0,0,0.2);">
                     ${ptLinkHtml}
                 </td>
 
-                <!-- 8. DP Status -->
+                <!-- 8. Publishing Status -->
                 <td>
-                    ${dpStatusHtml}
+                    ${statusHtml}
                 </td>
 
-                <!-- 9. DP Time -->
-                <td style="font-size: 11px; font-family: monospace; color: ${d.dp_time ? '#16a34a' : 'var(--text-dim)'}; font-weight: 600; white-space: nowrap;">
-                    ${escapeHtml(d.dp_time || '-')}
+                <!-- 9. Publishing Time -->
+                <td style="font-size: 11px; font-family: monospace; color: ${publishTime !== '-' ? (isPTChannel ? '#dc2626' : '#16a34a') : 'var(--text-dim)'}; font-weight: 700; white-space: nowrap;">
+                    ${escapeHtml(publishTime)}
                 </td>
 
-                <!-- 10. PT Status -->
-                <td>
-                    ${ptStatusHtml}
-                </td>
-
-                <!-- 11. PT Time -->
-                <td style="font-size: 11px; font-family: monospace; color: ${d.pt_time ? '#059669' : 'var(--text-dim)'}; font-weight: 600; white-space: nowrap;">
-                    ${escapeHtml(d.pt_time || '-')}
-                </td>
-
-                <!-- 12. Digital Publisher / Claim Action -->
+                <!-- 10. Digital Publisher / Claim Action -->
                 <td style="white-space: nowrap;">
                     ${publisherHtml}
                 </td>
 
-                <!-- 13. Remarks -->
+                <!-- 11. Remarks -->
                 <td>
                     <div style="font-size: 11.5px; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(d.remarks || '')}">
                         ${escapeHtml(d.remarks || '—')}
                     </div>
                 </td>
 
-                <!-- 14. Rating -->
+                <!-- 12. Rating -->
                 <td style="text-align: center; white-space: nowrap;">
                     ${ratingHtml}
                 </td>
 
-                <!-- 15. Action -->
+                <!-- 13. Action -->
                 <td style="text-align: center; white-space: nowrap;">
                     ${actionHtml}
                 </td>
@@ -438,11 +463,12 @@ function copyProgPath(event, text) {
 // ⚡ 1-Click Status Quick Update from Table Dropdown
 async function quickUpdateProgStatus(id, field, value) {
     try {
-        const payload = {
-            action: 'update_status',
-            id: id,
-            [field]: value
-        };
+        let payload = { action: 'update_status', id: id };
+        if (field === 'status') {
+            payload.status = value;
+        } else {
+            payload[field] = value;
+        }
 
         const res = await fetch('api/programming.php', {
             method: 'POST',
@@ -453,7 +479,8 @@ async function quickUpdateProgStatus(id, field, value) {
 
         if (data.success) {
             showToast("Publishing status updated.", "success");
-            loadProgrammingDispatches();
+            if (data.stats) updateProgKpis(data.stats);
+            loadProgrammingDispatches(true);
             if (typeof updateGlobalSidebarBadges === 'function') updateGlobalSidebarBadges();
         } else {
             showToast(data.message || "Failed to update status", "error");
@@ -604,10 +631,40 @@ function openEditDispatchModal(id) {
     document.getElementById('edit-prog-date').value = item.dispatch_date || '';
     document.getElementById('edit-prog-sender').value = item.sender_name || '';
     document.getElementById('edit-prog-time').value = item.dispatch_time || '';
-    document.getElementById('edit-prog-dp-status').value = item.dp_status || '';
-    document.getElementById('edit-prog-dp-time').value = item.dp_time || '';
-    document.getElementById('edit-prog-pt-status').value = item.pt_status || '';
-    document.getElementById('edit-prog-pt-time').value = item.pt_time || '';
+
+    const isMovedToPt = (item.moved_to_pt == 1 || item.dp_status === 'Move to PT' || item.pt_status === 'Move to PT');
+    const chkMoved = document.getElementById('edit-prog-moved-to-pt');
+    if (chkMoved) chkMoved.checked = isMovedToPt;
+
+    let modalStatus = 'Pending';
+    if (item.pt_status === 'Published' || item.dp_status === 'Published on PT' || item.dp_status === 'Published') {
+        modalStatus = 'Published';
+    } else if (isMovedToPt) {
+        modalStatus = 'Move to PT';
+    } else if (item.dp_status === 'In Progress' || item.pt_status === 'In Progress') {
+        modalStatus = 'In Progress';
+    } else if (item.dp_status === 'Correction' || item.pt_status === 'Correction') {
+        modalStatus = 'Correction';
+    } else if (item.dp_status === 'Violation' || item.pt_status === 'Violation') {
+        modalStatus = 'Violation';
+    } else if (item.dp_status === 'Expire' || item.pt_status === 'Expire') {
+        modalStatus = 'Expire';
+    } else if (item.dp_status === 'Rejected' || item.pt_status === 'Rejected') {
+        modalStatus = 'Rejected';
+    } else {
+        modalStatus = item.dp_status || item.pt_status || 'Pending';
+    }
+
+    const statusSel = document.getElementById('edit-prog-status');
+    if (statusSel) statusSel.value = modalStatus;
+
+    const pubTimeInput = document.getElementById('edit-prog-publish-time');
+    if (pubTimeInput) pubTimeInput.value = item.pt_time || item.dp_time || '';
+
+    if (document.getElementById('edit-prog-dp-status')) document.getElementById('edit-prog-dp-status').value = item.dp_status || '';
+    if (document.getElementById('edit-prog-dp-time')) document.getElementById('edit-prog-dp-time').value = item.dp_time || '';
+    if (document.getElementById('edit-prog-pt-status')) document.getElementById('edit-prog-pt-status').value = item.pt_status || '';
+    if (document.getElementById('edit-prog-pt-time')) document.getElementById('edit-prog-pt-time').value = item.pt_time || '';
     document.getElementById('edit-prog-publisher').value = item.publisher_id || '';
     document.getElementById('edit-prog-rating').value = item.rating || '';
     document.getElementById('edit-prog-remarks').value = item.remarks || '';
@@ -678,10 +735,13 @@ async function handleEditDispatchSubmit(event) {
         dispatch_time: document.getElementById('edit-prog-time')?.value.trim(),
         link: document.getElementById('edit-prog-link')?.value.trim(),
         pt_link: document.getElementById('edit-prog-pt-link')?.value.trim(),
-        dp_status: document.getElementById('edit-prog-dp-status')?.value,
-        dp_time: document.getElementById('edit-prog-dp-time')?.value.trim(),
-        pt_status: document.getElementById('edit-prog-pt-status')?.value,
-        pt_time: document.getElementById('edit-prog-pt-time')?.value.trim(),
+        status: document.getElementById('edit-prog-status')?.value || '',
+        publish_time: document.getElementById('edit-prog-publish-time')?.value.trim() || '',
+        moved_to_pt: document.getElementById('edit-prog-moved-to-pt')?.checked ? 1 : 0,
+        dp_status: document.getElementById('edit-prog-dp-status')?.value || '',
+        dp_time: document.getElementById('edit-prog-dp-time')?.value.trim() || '',
+        pt_status: document.getElementById('edit-prog-pt-status')?.value || '',
+        pt_time: document.getElementById('edit-prog-pt-time')?.value.trim() || '',
         publisher_id: document.getElementById('edit-prog-publisher')?.value,
         rating: document.getElementById('edit-prog-rating')?.value,
         remarks: document.getElementById('edit-prog-remarks')?.value.trim()
@@ -791,37 +851,51 @@ function exportProgrammingCsv() {
     }
 
     const headers = [
-        "Date", "Title", "Path / WhatsApp", "Channel", "News Sender", "Dispatch Time", "DP Link", "PT Link",
-        "DP Status", "DP Time", "PT Status", "PT Time", "Digital Publisher", "Remarks", "Rating"
+        "ID", "Date", "Title", "Path_WhatsApp", "Channel",
+        "Sender", "Dispatch_Time", "DP_Link", "PT_Link", "Status", "Publish_Time",
+        "Publisher", "Remarks", "Rating"
     ];
 
-    const rows = ProgState.dispatches.map(d => [
-        `"${d.dispatch_date || ''}"`,
-        `"${(d.title || '').replace(/"/g, '""')}"`,
-        `"${(d.path_whatsapp || '').replace(/"/g, '""')}"`,
-        `"${d.channel || ''}"`,
-        `"${d.sender_name || ''}"`,
-        `"${d.dispatch_time || ''}"`,
-        `"${d.link || ''}"`,
-        `"${d.pt_link || ''}"`,
-        `"${d.dp_status || ''}"`,
-        `"${d.dp_time || ''}"`,
-        `"${d.pt_status || ''}"`,
-        `"${d.pt_time || ''}"`,
-        `"${d.publisher_name || ''}"`,
-        `"${(d.remarks || '').replace(/"/g, '""')}"`,
-        `"${d.rating || ''}"`
-    ]);
+    const rows = ProgState.dispatches.map(d => {
+        const isMovedToPt = (d.moved_to_pt == 1 || d.dp_status === 'Move to PT' || d.pt_status === 'Move to PT');
+        let status = 'Pending';
+        if (d.pt_status === 'Published' || d.dp_status === 'Published on PT' || d.dp_status === 'Published') {
+            status = 'Published';
+        } else if (isMovedToPt) {
+            status = 'Move to PT';
+        } else if (d.dp_status === 'In Progress' || d.pt_status === 'In Progress') {
+            status = 'In Progress';
+        } else {
+            status = d.dp_status || d.pt_status || 'Pending';
+        }
+        const pubTime = d.pt_time || d.dp_time || '';
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        return [
+            d.id,
+            `"${(d.dispatch_date || '').replace(/"/g, '""')}"`,
+            `"${(d.title || '').replace(/"/g, '""')}"`,
+            `"${(d.path_whatsapp || '').replace(/"/g, '""')}"`,
+            `"${(d.channel || '').replace(/"/g, '""')}"`,
+            `"${(d.sender_name || '').replace(/"/g, '""')}"`,
+            `"${(d.dispatch_time || '').replace(/"/g, '""')}"`,
+            `"${(d.link || '').replace(/"/g, '""')}"`,
+            `"${(d.pt_link || '').replace(/"/g, '""')}"`,
+            `"${status}"`,
+            `"${pubTime.replace(/"/g, '""')}"`,
+            `"${(d.publisher_name || '').replace(/"/g, '""')}"`,
+            `"${(d.remarks || '').replace(/"/g, '""')}"`,
+            `"${(d.rating || '').replace(/"/g, '""')}"`
+        ];
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `programming_digital_handover_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `Programming_Digital_Handover_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
     showToast("📊 CSV file exported successfully!", "success");
 }
 

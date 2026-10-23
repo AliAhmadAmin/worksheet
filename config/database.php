@@ -486,6 +486,14 @@ function migratePermissionsSchema($pdo) {
               AND (dp_status = '' OR dp_status IS NULL OR dp_status = 'Pending')
         ");
 
+        // Ensure moved_to_pt column exists in dispatches
+        try {
+            $pdo->exec("ALTER TABLE newsroom_dispatches ADD COLUMN moved_to_pt TINYINT(1) DEFAULT 0 AFTER pt_status");
+        } catch (Exception $e) {}
+        try {
+            $pdo->exec("ALTER TABLE programming_dispatches ADD COLUMN moved_to_pt TINYINT(1) DEFAULT 0 AFTER pt_status");
+        } catch (Exception $e) {}
+
         // Auto-seed default hr_employee_profiles for any existing employees missing a profile without altering data
         $pdo->exec("
             INSERT IGNORE INTO hr_employee_profiles (employee_id, joining_date, employment_type, basic_salary, expected_hours, shift_policy, annual_leave_quota, casual_leave_quota, sick_leave_quota)
