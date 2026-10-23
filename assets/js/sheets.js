@@ -424,8 +424,9 @@ function renderWorksheetHero(sheet, empData, data = null) {
         const checkedAt = data?.hod_checked_at || '';
 
         // "Mark Checked" is specifically a task for HOD / Admin
+        // Only active if the department has enabled HOD sheet verification (require_hod_sheet_check = 1)
         if (btnHodCheck && btnHodCheckText) {
-            if (canCheck && (requireCheck || isHodChecked)) {
+            if (canCheck && requireCheck) {
                 btnHodCheck.style.display = 'inline-flex';
                 if (isHodChecked) {
                     btnHodCheck.className = 'btn btn-outline';
@@ -445,8 +446,8 @@ function renderWorksheetHero(sheet, empData, data = null) {
             }
         }
 
-        // Visual header confirmation when marked checked
-        if (isHodChecked) {
+        // Visual header confirmation when marked checked (only if department has enabled HOD verification)
+        if (requireCheck && isHodChecked) {
             if (verifiedHeaderBadge) {
                 verifiedHeaderBadge.style.display = 'inline-flex';
                 verifiedHeaderBadge.className = 'badge badge-hod-checked';
@@ -459,16 +460,29 @@ function renderWorksheetHero(sheet, empData, data = null) {
             if (inspectorBox) {
                 inspectorBox.classList.add('is-verified');
             }
-        } else {
+        } else if (requireCheck && !isHodChecked) {
             if (verifiedHeaderBadge) {
-                if (requireCheck) {
-                    verifiedHeaderBadge.style.display = 'inline-flex';
-                    verifiedHeaderBadge.className = 'badge badge-hod-pending';
-                    verifiedHeaderBadge.textContent = '⚠️ Not Verified';
-                    verifiedHeaderBadge.title = 'Urgent: This worksheet is not verified by HOD yet.';
+                verifiedHeaderBadge.style.display = 'inline-flex';
+                verifiedHeaderBadge.className = 'badge badge-hod-pending';
+                verifiedHeaderBadge.textContent = '⚠️ Not Verified';
+                verifiedHeaderBadge.title = 'Urgent: This worksheet is not verified by HOD yet.';
+            }
+            if (inspectorSubtitle) {
+                if (isReadOnlyInspection) {
+                    inspectorSubtitle.innerHTML = `👁️ <strong style="color: var(--primary);">Inspection Mode</strong>: You are reviewing this worksheet with read-only access. Editing entries requires "Lock & Unlock Sheets" access.`;
                 } else {
-                    verifiedHeaderBadge.style.display = 'none';
+                    inspectorSubtitle.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
                 }
+            }
+            if (inspectorBox) {
+                inspectorBox.classList.remove('is-verified');
+            }
+        } else {
+            // Department does NOT have HOD sheet check enabled -> hide badge and clear state completely
+            if (verifiedHeaderBadge) {
+                verifiedHeaderBadge.style.display = 'none';
+                verifiedHeaderBadge.className = 'badge';
+                verifiedHeaderBadge.textContent = '';
             }
             if (inspectorSubtitle) {
                 if (isReadOnlyInspection) {
@@ -485,7 +499,7 @@ function renderWorksheetHero(sheet, empData, data = null) {
         // Inspector Print Button State
         const btnAdminPrint = document.getElementById('admin-btn-print');
         const canBypassHodCheckAdmin = hasPermission('can_print_unverified_sheets');
-        const blockPrintAdmin = parseInt(deptSettings.block_print_before_hod_check) === 1 || parseInt(deptSettings.require_hod_sheet_check) === 1;
+        const blockPrintAdmin = requireCheck && (parseInt(deptSettings.block_print_before_hod_check) === 1);
 
         if (btnAdminPrint) {
             if (!canBypassHodCheckAdmin && blockPrintAdmin && !isHodChecked) {
@@ -527,22 +541,24 @@ function renderWorksheetHero(sheet, empData, data = null) {
         const isHodChecked = parseInt(sheet?.is_hod_checked || data?.is_hod_checked) === 1;
         const deptSettings = data?.department_settings || {};
         const requireCheck = parseInt(deptSettings.require_hod_sheet_check) === 1;
-        const blockPrint = parseInt(deptSettings.block_print_before_hod_check) === 1 || requireCheck;
+        const blockPrint = requireCheck && (parseInt(deptSettings.block_print_before_hod_check) === 1);
         const canBypassHodCheckEmp = hasPermission('can_print_unverified_sheets');
 
         if (empHodBadge) {
-            if (isHodChecked) {
+            if (requireCheck && isHodChecked) {
                 empHodBadge.style.display = 'inline-block';
                 empHodBadge.className = 'badge badge-hod-checked';
                 empHodBadge.textContent = `✓ HOD Verified`;
                 empHodBadge.title = `Verified by ${data?.hod_checked_by_name || 'HOD'} on ${data?.hod_checked_at || ''}`;
-            } else if (requireCheck) {
+            } else if (requireCheck && !isHodChecked) {
                 empHodBadge.style.display = 'inline-block';
                 empHodBadge.className = 'badge badge-hod-pending';
                 empHodBadge.textContent = '⚠️ Not Verified';
                 empHodBadge.title = 'Urgent: Awaiting review and verification by Head of Department';
             } else {
                 empHodBadge.style.display = 'none';
+                empHodBadge.className = 'badge';
+                empHodBadge.textContent = '';
             }
         }
 

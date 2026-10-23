@@ -165,7 +165,10 @@ try {
                                 <!-- Populated via reports.js -->
                             </tbody>
                         </table>
-                  <!-- ================= VIEW 2: DETAILED ATTENDANCE TIMESHEET & REPORTS ================= -->
+                    </div>
+                </div>
+
+                <!-- ================= VIEW 2: DETAILED ATTENDANCE TIMESHEET & REPORTS ================= -->
                 <div id="att-view-report-section" style="display: none;">
                     <!-- Modern Responsive Filter Controls Container -->
                     <div class="att-report-filter-bar" style="background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-lg); border: 1px solid var(--border-color); margin-bottom: 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 10px;">

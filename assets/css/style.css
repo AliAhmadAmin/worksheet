@@ -3057,7 +3057,7 @@ body.dark-theme .login-card-fresh {
     font-size: 11px !important;
     line-height: 1.4 !important;
     white-space: nowrap !important;
-    display: inline-flex !important;
+    display: inline-flex;
     align-items: center !important;
     gap: 4px !important;
 }
@@ -3071,7 +3071,7 @@ body.dark-theme .login-card-fresh {
     font-size: 11px !important;
     line-height: 1.4 !important;
     white-space: nowrap !important;
-    display: inline-flex !important;
+    display: inline-flex;
     align-items: center !important;
     gap: 4px !important;
     letter-spacing: 0.2px !important;
