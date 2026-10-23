@@ -111,7 +111,7 @@
                 <thead>
                     <!-- Multi-Tier Dual Header -->
                     <tr>
-                        <th colspan="8" style="background: #b45309; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px; border-right: 3px solid rgba(0,0,0,0.15);">
+                        <th colspan="7" style="background: #b45309; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px; border-right: 3px solid rgba(0,0,0,0.15);">
                             🟨 PROGRAMMING DEPARTMENT (DISPATCH)
                         </th>
                         <th colspan="8" style="background: #15803d; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px;">
@@ -124,8 +124,7 @@
                         <th class="sticky-col-title" style="width: 220px; min-width: 200px; background: #1e3a5f; color: #ffffff;">Title</th>
                         <th style="width: 240px; min-width: 220px; background: #1e3a5f; color: #ffffff;">Path / WhatsApp</th>
                         <th style="width: 120px; min-width: 110px; background: #1e3a5f; color: #ffffff;">Channel</th>
-                        <th style="width: 140px; min-width: 130px; background: #1e3a5f; color: #ffffff;">News Sender</th>
-                        <th style="width: 85px; min-width: 80px; background: #1e3a5f; color: #ffffff;">Time</th>
+                        <th style="width: 160px; min-width: 150px; background: #1e3a5f; color: #ffffff;">News Sender</th>
                         <th style="width: 105px; min-width: 100px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff;">DP Link</th>
                         <th style="width: 105px; min-width: 100px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff; border-right: 3px solid rgba(0,0,0,0.2);">PT Link</th>
 
@@ -143,7 +142,7 @@
                 <tbody id="prog-matrix-tbody">
                     <!-- Loaded dynamically via programming.js -->
                     <tr>
-                        <td colspan="16" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <td colspan="15" style="text-align: center; padding: 40px; color: var(--text-muted);">
                             <div class="spinner" style="margin: 0 auto 10px;"></div>
                             Loading programming dispatches...
                         </td>

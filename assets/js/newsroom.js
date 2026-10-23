@@ -172,7 +172,7 @@ function renderNewsroomMatrix(dispatches) {
     if (!dispatches || dispatches.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="16" style="text-align: center; padding: 45px 20px; color: var(--text-muted);">
+                <td colspan="15" style="text-align: center; padding: 45px 20px; color: var(--text-muted);">
                     <div style="font-size: 32px; margin-bottom: 8px;">📺</div>
                     <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No News Dispatches Found</div>
                     <div style="font-size: 12.5px; margin-top: 3px;">Click "➕ Dispatch New Story" above to send new news packages to Digital.</div>
@@ -321,20 +321,20 @@ function renderNewsroomMatrix(dispatches) {
                     ${channelBadge}
                 </td>
 
-                <!-- 5. News Sender -->
+                <!-- 5. News Sender & Dispatch Time -->
                 <td style="white-space: nowrap;">
-                    <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
+                    <div style="display: flex; align-items: center; gap: 7px;">
                         ${senderAvatar}
-                        <span>${escapeHtml(d.sender_name || 'News Producer')}</span>
+                        <div style="display: flex; flex-direction: column; line-height: 1.25;">
+                            <span style="font-size: 12px; font-weight: 700; color: var(--text-main);">${escapeHtml(d.sender_name || 'News Producer')}</span>
+                            <span style="font-size: 10.5px; font-family: monospace; color: var(--text-dim); margin-top: 1px;">
+                                🕒 ${escapeHtml(d.dispatch_time || '-')}
+                            </span>
+                        </div>
                     </div>
                 </td>
 
-                <!-- 6. Dispatch Time -->
-                <td style="font-size: 11px; font-family: monospace; color: var(--text-dim); white-space: nowrap;">
-                    ${escapeHtml(d.dispatch_time || '-')}
-                </td>
-
-                <!-- 7. DP Link -->
+                <!-- 6. DP Link -->
                 <td style="text-align: center; vertical-align: middle; white-space: nowrap;">
                     ${dpLinkHtml}
                 </td>
