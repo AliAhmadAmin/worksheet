@@ -115,6 +115,14 @@ async function loadNewsroomDispatches(isSilent = false) {
         NewsState.stats = data.stats || {};
         NewsState.currentUser = data.current_user || {};
         NewsState.canManageDigital = (data.current_user && data.current_user.can_manage_digital === true);
+        NewsState.canDispatch = (data.current_user && data.current_user.can_dispatch === true);
+
+        // Control Dispatch Button: Newsroom team & Admins can dispatch; pure Digital cannot!
+        const btnDispatch = document.getElementById('btn-open-news-dispatch');
+        if (btnDispatch) {
+            const canDispatch = (data.current_user && data.current_user.can_dispatch !== false);
+            btnDispatch.style.display = canDispatch ? 'inline-flex' : 'none';
+        }
 
         updateNewsKpis(data.stats);
         renderNewsroomMatrix(NewsState.dispatches);
@@ -528,23 +536,24 @@ function openNewsDispatchModal() {
     const timeInput = document.getElementById('news-dispatch-time');
     if (timeInput) timeInput.value = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    // Handle sender selection: auto-lock to logged-in user unless HOD/Admin
+    // Handle sender selection: hidden for regular employee, visible for HOD/Admin
+    const user = NewsState.currentUser || AppState.currentUser || {};
+    const isElevated = (NewsState.currentUser && NewsState.currentUser.is_hod === true) 
+        || (user && ['hod', 'admin', 'super_admin'].includes(user.role)) 
+        || (user && user.designation && (user.designation.toLowerCase().includes('hod') || user.designation.toLowerCase().includes('head') || user.designation.toLowerCase().includes('director') || user.designation.toLowerCase().includes('manager')));
+
+    const senderGroup = document.getElementById('news-sender-group');
     const senderSelect = document.getElementById('news-dispatch-sender');
-    if (senderSelect) {
-        const user = AppState.currentUser || NewsState.currentUser;
-        if (user && user.id) {
+    const senderHidden = document.getElementById('news-dispatch-sender-id');
+
+    if (senderHidden) {
+        senderHidden.value = user.id || '';
+    }
+
+    if (senderGroup) {
+        senderGroup.style.display = isElevated ? 'block' : 'none';
+        if (isElevated && senderSelect && user.id) {
             senderSelect.value = user.id;
-        }
-        const isElevated = user && (['hod', 'admin', 'super_admin'].includes(user.role) || (user.designation && (user.designation.toLowerCase().includes('hod') || user.designation.toLowerCase().includes('director'))));
-        senderSelect.disabled = !isElevated;
-        if (!isElevated) {
-            senderSelect.style.background = 'var(--bg-input)';
-            senderSelect.style.cursor = 'not-allowed';
-            senderSelect.title = 'Sender is automatically locked to your user account';
-        } else {
-            senderSelect.style.background = '';
-            senderSelect.style.cursor = '';
-            senderSelect.title = '';
         }
     }
 
@@ -558,8 +567,22 @@ async function handleNewsDispatchSubmit(event) {
     const title = document.getElementById('news-dispatch-title')?.value.trim();
     const path = document.getElementById('news-dispatch-path')?.value.trim();
     const channel = document.getElementById('news-dispatch-channel')?.value;
+    
     const senderSelect = document.getElementById('news-dispatch-sender');
-    const senderId = (senderSelect ? senderSelect.value : null) || AppState.currentUser?.id;
+    const senderHidden = document.getElementById('news-dispatch-sender-id');
+    const user = NewsState.currentUser || AppState.currentUser || {};
+    const isElevated = (NewsState.currentUser && NewsState.currentUser.is_hod === true) 
+        || (user && ['hod', 'admin', 'super_admin'].includes(user.role));
+
+    let senderId = null;
+    if (isElevated && senderSelect && senderSelect.value) {
+        senderId = senderSelect.value;
+    } else if (senderHidden && senderHidden.value) {
+        senderId = senderHidden.value;
+    } else {
+        senderId = user.id || null;
+    }
+
     const now = new Date();
     const autoDate = now.toISOString().split('T')[0];
     const autoTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });

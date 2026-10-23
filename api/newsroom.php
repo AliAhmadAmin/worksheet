@@ -32,11 +32,16 @@ $currentUserObj = $stmtUserCheck->fetch() ?: [];
 
 $currentUserRole = strtolower($currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee'));
 $userDeptName = strtolower($currentUserObj['department_name'] ?? '');
+$userDesignation = strtolower($currentUserObj['designation'] ?? '');
 
 $isAdmin = in_array($currentUserRole, ['super_admin', 'admin', 'manager']);
 $isDigital = (stripos($userDeptName, 'digital') !== false);
 $isNews = (stripos($userDeptName, 'news') !== false);
 $canManageDigital = ($isAdmin || $isDigital);
+
+$isElevated = ($isAdmin || $currentUserRole === 'hod' || stripos($userDesignation, 'director') !== false || stripos($userDesignation, 'hod') !== false || stripos($userDesignation, 'head') !== false);
+$isPureDigital = ($isDigital && !$isNews && !in_array($currentUserRole, ['super_admin', 'admin']));
+$canDispatchNews = !$isPureDigital && ($isNews || in_array($currentUserRole, ['super_admin', 'admin']));
 
 // Restrict access: strictly News Room, Digital Media, and Admins (Programming cannot access)
 if (!$isAdmin && !$isDigital && !$isNews) {
@@ -151,12 +156,20 @@ switch ($action) {
                 'name' => $currentUserObj['name'] ?? 'Staff',
                 'role' => $currentUserRole,
                 'department' => $currentUserObj['department_name'] ?? '',
-                'can_manage_digital' => $canManageDigital
+                'can_manage_digital' => $canManageDigital,
+                'can_dispatch' => $canDispatchNews,
+                'is_hod' => $isElevated
             ]
         ]);
         break;
 
     case 'create':
+        if (!$canDispatchNews) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access Denied: Digital department cannot dispatch news. Only News Room team can dispatch stories.']);
+            exit;
+        }
+
         $title = trim($data['title'] ?? '');
         if (empty($title)) {
             http_response_code(400);
@@ -573,7 +586,7 @@ switch ($action) {
             ['value' => 'Rejected', 'label' => 'Rejected', 'bg' => '#78350f', 'color' => '#ffffff']
         ];
 
-        $channels = ['Discover Pakistan', 'Pakistan Today', 'Discover Islam', 'All Channels'];
+        $channels = ['Discover Pakistan', 'Pakistan Today', 'All Channels'];
 
         echo json_encode([
             'success' => true,

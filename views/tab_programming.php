@@ -13,7 +13,7 @@
             </div>
 
             <div class="controls-group" style="display: flex; gap: 10px; align-items: center;">
-                <button type="button" class="btn btn-primary" style="background: linear-gradient(135deg, #d97706, #b45309); border: none; font-weight: 700; padding: 8px 14px; border-radius: 6px; font-size: 13px;" onclick="openDispatchModal()">
+                <button type="button" id="btn-open-prog-dispatch" class="btn btn-primary" style="background: linear-gradient(135deg, #d97706, #b45309); border: none; font-weight: 700; padding: 8px 14px; border-radius: 6px; font-size: 13px;" onclick="openDispatchModal()">
                     ➕ Dispatch New Content
                 </button>
                 <button type="button" class="btn btn-outline" style="padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600;" onclick="exportProgrammingCsv()">
@@ -75,7 +75,7 @@
                     <option value="all">All Channels</option>
                     <option value="Discover Pakistan">Discover Pakistan</option>
                     <option value="Pakistan Today">Pakistan Today</option>
-                    <option value="Discover Islam">Discover Islam</option>
+                    <option value="All Channels">Both Channels</option>
                 </select>
             </div>
 
@@ -158,72 +158,57 @@
 
 <!-- MODAL: DISPATCH NEW CONTENT (PROGRAMMING TEAM) -->
 <div id="dispatch-content-modal" class="modal-overlay">
-    <div class="modal-card modal-card-lg">
-        <div class="modal-header" style="border-bottom: 2px solid #d97706;">
-            <div>
-                <h3 style="display: flex; align-items: center; gap: 8px; color: #b45309;">
-                    📡 Dispatch New Content to Digital
-                </h3>
-                <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">
-                    Export and send video clips, reels, promos, or program segments to Digital Media Team.
-                </p>
-            </div>
+    <div class="modal-card" style="max-width: 500px;">
+        <div class="modal-header" style="border-bottom: 2px solid #d97706; padding: 12px 18px;">
+            <h3 style="display: flex; align-items: center; gap: 8px; color: #b45309; margin: 0; font-size: 16px;">
+                📡 Dispatch Content
+            </h3>
             <button type="button" class="btn-modal-close" onclick="closeModal('dispatch-content-modal')">✕</button>
         </div>
         <form id="dispatch-content-form" onsubmit="handleDispatchSubmit(event)">
-            <div class="modal-body" style="gap: 14px;">
+            <!-- Auto-populated Date & Time & Sender -->
+            <input type="hidden" id="dispatch-date">
+            <input type="hidden" id="dispatch-time">
+            <input type="hidden" id="dispatch-sender-id">
+
+            <div class="modal-body" style="gap: 12px; padding: 16px 18px;">
                 <div class="form-group">
-                    <label class="form-label">Content Title / Segment Name *</label>
-                    <input type="text" id="dispatch-title" class="input-control" placeholder="e.g. Fashion Dairy AI segments 03, Discover Islam Promo" required style="font-weight: 700; font-size: 13.5px;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 700;">Content Title *</label>
+                    <input type="text" id="dispatch-title" class="input-control" placeholder="Segment or program name" required style="font-weight: 700; font-size: 13px;">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Network Path / WhatsApp / Archive Location *</label>
-                    <input type="text" id="dispatch-path" class="input-control" placeholder="e.g. \\10.0.0.4\transmission2\PROGRAMS\FLAVOR OF PAKISTAN\EPISODE 02" required style="font-family: monospace; font-size: 12px;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 700;">Path / WhatsApp *</label>
+                    <input type="text" id="dispatch-path" class="input-control" placeholder="\\Server path or WhatsApp link" required style="font-family: monospace; font-size: 12px;">
                 </div>
 
-                <div class="form-grid-2">
+                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="form-group">
-                        <label class="form-label">Target Channel</label>
-                        <select id="dispatch-channel" class="input-control" style="font-weight: 700;">
+                        <label class="form-label" style="font-size: 12px; font-weight: 700;">Channel</label>
+                        <select id="dispatch-channel" class="input-control" style="font-weight: 700; font-size: 12px;">
                             <option value="Discover Pakistan" selected>🟢 Discover Pakistan</option>
                             <option value="Pakistan Today">🔴 Pakistan Today</option>
-                            <option value="Discover Islam">🔵 Discover Islam</option>
-                            <option value="All Channels">🌐 All Channels</option>
+                            <option value="All Channels">🌐 Both Channels</option>
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">News Sender (Programming Producer)</label>
-                        <select id="dispatch-sender" class="input-control" style="font-weight: 600;">
+                    <!-- Sender dropdown: shown only for HOD; auto-hidden for regular employees -->
+                    <div id="prog-sender-group" class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 700;">Sender</label>
+                        <select id="dispatch-sender" class="input-control" style="font-weight: 600; font-size: 12px;">
                             <!-- Populated dynamically via programming.js -->
                         </select>
                     </div>
                 </div>
 
-                <div class="form-grid-3">
-                    <div class="form-group">
-                        <label class="form-label">Dispatch Date</label>
-                        <input type="date" id="dispatch-date" class="input-control">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Dispatch Time</label>
-                        <input type="text" id="dispatch-time" class="input-control" placeholder="Auto now (e.g. 03:23:51 PM)">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
-                            <span>Story Link (Optional)</span>
-                            <span style="font-size: 11px; color: var(--text-dim); font-weight: normal;">Usually added later after published</span>
-                        </label>
-                        <input type="url" id="dispatch-link" class="input-control" placeholder="Optional - can be pasted later directly in table">
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 12px; font-weight: 700;">Story Link (Optional)</label>
+                    <input type="url" id="dispatch-link" class="input-control" placeholder="Optional link" style="font-size: 12px;">
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="padding: 12px 18px;">
                 <button type="button" class="btn btn-outline" onclick="closeModal('dispatch-content-modal')">Cancel</button>
-                <button type="submit" class="btn btn-primary" style="background: #b45309; border: none; font-weight: 700; padding: 9px 20px;">
+                <button type="submit" class="btn btn-primary" style="background: #b45309; border: none; font-weight: 700; padding: 8px 18px;">
                     🚀 Dispatch Content
                 </button>
             </div>
@@ -261,8 +246,7 @@
                             <select id="edit-prog-channel" class="input-control">
                                 <option value="Discover Pakistan">Discover Pakistan</option>
                                 <option value="Pakistan Today">Pakistan Today</option>
-                                <option value="Discover Islam">Discover Islam</option>
-                                <option value="All Channels">All Channels</option>
+                                <option value="All Channels">Both Channels</option>
                             </select>
                         </div>
                     </div>

@@ -13,7 +13,7 @@
             </div>
 
             <div class="controls-group" style="display: flex; gap: 10px; align-items: center;">
-                <button type="button" class="btn btn-primary" style="background: linear-gradient(135deg, #dc2626, #b91c1c); border: none; font-weight: 700; padding: 8px 14px; border-radius: 6px; font-size: 13px;" onclick="openNewsDispatchModal()">
+                <button type="button" id="btn-open-news-dispatch" class="btn btn-primary" style="background: linear-gradient(135deg, #dc2626, #b91c1c); border: none; font-weight: 700; padding: 8px 14px; border-radius: 6px; font-size: 13px;" onclick="openNewsDispatchModal()">
                     ➕ Dispatch New Story
                 </button>
                 <button type="button" class="btn btn-outline" style="padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600;" onclick="exportNewsroomCsv()">
@@ -75,7 +75,7 @@
                     <option value="all">All Channels</option>
                     <option value="Discover Pakistan">Discover Pakistan</option>
                     <option value="Pakistan Today">Pakistan Today</option>
-                    <option value="Discover Islam">Discover Islam</option>
+                    <option value="All Channels">Both Channels</option>
                 </select>
             </div>
 
@@ -157,64 +157,57 @@
 
 <!-- MODAL: DISPATCH NEW STORY (NEWS ROOM TEAM) -->
 <div id="dispatch-news-modal" class="modal-overlay">
-    <div class="modal-card modal-card-lg">
-        <div class="modal-header" style="border-bottom: 2px solid #dc2626;">
-            <div>
-                <h3 style="display: flex; align-items: center; gap: 8px; color: #b91c1c;">
-                    📺 Dispatch New Story / Package to Digital
-                </h3>
-                <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">
-                    Dispatch news package or ticker to Digital Media.
-                </p>
-            </div>
+    <div class="modal-card" style="max-width: 500px;">
+        <div class="modal-header" style="border-bottom: 2px solid #dc2626; padding: 12px 18px;">
+            <h3 style="display: flex; align-items: center; gap: 8px; color: #b91c1c; margin: 0; font-size: 16px;">
+                📺 Dispatch New Story
+            </h3>
             <button type="button" class="btn-modal-close" onclick="closeModal('dispatch-news-modal')">✕</button>
         </div>
         <form id="dispatch-news-form" onsubmit="handleNewsDispatchSubmit(event)">
-            <!-- Auto-populated Date & Time -->
+            <!-- Auto-populated Date & Time & Sender -->
             <input type="hidden" id="news-dispatch-date">
             <input type="hidden" id="news-dispatch-time">
+            <input type="hidden" id="news-dispatch-sender-id">
 
-            <div class="modal-body" style="gap: 14px;">
+            <div class="modal-body" style="gap: 12px; padding: 16px 18px;">
                 <div class="form-group">
-                    <label class="form-label">News Title / Slug *</label>
-                    <input type="text" id="news-dispatch-title" class="input-control" placeholder="Story title or slug" required style="font-weight: 700; font-size: 13.5px;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 700;">Story Title / Slug *</label>
+                    <input type="text" id="news-dispatch-title" class="input-control" placeholder="Story title or slug" required style="font-weight: 700; font-size: 13px;">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Network Path / WhatsApp / Location *</label>
+                    <label class="form-label" style="font-size: 12px; font-weight: 700;">Path / WhatsApp *</label>
                     <input type="text" id="news-dispatch-path" class="input-control" placeholder="\\Server path or WhatsApp link" required style="font-family: monospace; font-size: 12px;">
                 </div>
 
-                <div class="form-grid-2">
+                <div class="form-grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div class="form-group">
-                        <label class="form-label">Target Channel</label>
-                        <select id="news-dispatch-channel" class="input-control" style="font-weight: 700;">
+                        <label class="form-label" style="font-size: 12px; font-weight: 700;">Channel</label>
+                        <select id="news-dispatch-channel" class="input-control" style="font-weight: 700; font-size: 12px;">
                             <option value="Discover Pakistan" selected>🟢 Discover Pakistan</option>
                             <option value="Pakistan Today">🔴 Pakistan Today</option>
-                            <option value="Discover Islam">🔵 Discover Islam</option>
-                            <option value="All Channels">🌐 All Channels</option>
+                            <option value="All Channels">🌐 Both Channels</option>
                         </select>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">News Sender (Producer / Editor)</label>
-                        <select id="news-dispatch-sender" class="input-control" style="font-weight: 600;">
+                    <!-- Sender dropdown: shown only for HOD; auto-hidden for regular employees -->
+                    <div id="news-sender-group" class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 700;">Sender</label>
+                        <select id="news-dispatch-sender" class="input-control" style="font-weight: 600; font-size: 12px;">
                             <!-- Populated dynamically via newsroom.js -->
                         </select>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" style="display: flex; justify-content: space-between; align-items: center;">
-                        <span>Story Link (Optional)</span>
-                        <span style="font-size: 11px; color: var(--text-dim); font-weight: normal;">Usually added later after story is published</span>
-                    </label>
-                    <input type="url" id="news-dispatch-link" class="input-control" placeholder="Optional - can be pasted later directly in the table">
+                    <label class="form-label" style="font-size: 12px; font-weight: 700;">Story Link (Optional)</label>
+                    <input type="url" id="news-dispatch-link" class="input-control" placeholder="Optional link" style="font-size: 12px;">
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer" style="padding: 12px 18px;">
                 <button type="button" class="btn btn-outline" onclick="closeModal('dispatch-news-modal')">Cancel</button>
-                <button type="submit" class="btn btn-primary" style="background: #b91c1c; border: none; font-weight: 700; padding: 9px 20px;">
+                <button type="submit" class="btn btn-primary" style="background: #b91c1c; border: none; font-weight: 700; padding: 8px 18px;">
                     🚀 Dispatch Story
                 </button>
             </div>
@@ -256,8 +249,7 @@
                             <select id="edit-news-channel" class="input-control">
                                 <option value="Discover Pakistan">Discover Pakistan</option>
                                 <option value="Pakistan Today">Pakistan Today</option>
-                                <option value="Discover Islam">Discover Islam</option>
-                                <option value="All Channels">All Channels</option>
+                                <option value="All Channels">Both Channels</option>
                             </select>
                         </div>
                         <div class="form-group">

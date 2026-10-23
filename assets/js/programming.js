@@ -115,6 +115,14 @@ async function loadProgrammingDispatches() {
         ProgState.stats = data.stats || {};
         ProgState.currentUser = data.current_user || {};
         ProgState.canManageDigital = (data.current_user && data.current_user.can_manage_digital === true);
+        ProgState.canDispatch = (data.current_user && data.current_user.can_dispatch === true);
+
+        // Control Dispatch Button: Programming team & Admins can dispatch; pure Digital cannot!
+        const btnDispatch = document.getElementById('btn-open-prog-dispatch');
+        if (btnDispatch) {
+            const canDispatch = (data.current_user && data.current_user.can_dispatch !== false);
+            btnDispatch.style.display = canDispatch ? 'inline-flex' : 'none';
+        }
 
         updateProgKpis(data.stats);
         renderProgrammingMatrix(ProgState.dispatches);
@@ -535,23 +543,24 @@ function openDispatchModal() {
     const timeInput = document.getElementById('dispatch-time');
     if (timeInput) timeInput.value = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    // Handle sender selection: auto-lock to logged-in user unless HOD/Admin
+    // Handle sender selection: hidden for regular employee, visible for HOD/Admin
+    const user = ProgState.currentUser || AppState.currentUser || {};
+    const isElevated = (ProgState.currentUser && ProgState.currentUser.is_hod === true) 
+        || (user && ['hod', 'admin', 'super_admin'].includes(user.role)) 
+        || (user && user.designation && (user.designation.toLowerCase().includes('hod') || user.designation.toLowerCase().includes('head') || user.designation.toLowerCase().includes('director') || user.designation.toLowerCase().includes('manager')));
+
+    const senderGroup = document.getElementById('prog-sender-group');
     const senderSelect = document.getElementById('dispatch-sender');
-    if (senderSelect) {
-        const user = AppState.currentUser || ProgState.currentUser;
-        if (user && user.id) {
+    const senderHidden = document.getElementById('dispatch-sender-id');
+
+    if (senderHidden) {
+        senderHidden.value = user.id || '';
+    }
+
+    if (senderGroup) {
+        senderGroup.style.display = isElevated ? 'block' : 'none';
+        if (isElevated && senderSelect && user.id) {
             senderSelect.value = user.id;
-        }
-        const isElevated = user && (['hod', 'admin', 'super_admin'].includes(user.role) || (user.designation && (user.designation.toLowerCase().includes('hod') || user.designation.toLowerCase().includes('director'))));
-        senderSelect.disabled = !isElevated;
-        if (!isElevated) {
-            senderSelect.style.background = 'var(--bg-input)';
-            senderSelect.style.cursor = 'not-allowed';
-            senderSelect.title = 'Sender is automatically locked to your user account';
-        } else {
-            senderSelect.style.background = '';
-            senderSelect.style.cursor = '';
-            senderSelect.title = '';
         }
     }
 
@@ -565,10 +574,28 @@ async function handleDispatchSubmit(event) {
     const title = document.getElementById('dispatch-title')?.value.trim();
     const path = document.getElementById('dispatch-path')?.value.trim();
     const channel = document.getElementById('dispatch-channel')?.value;
+    
     const senderSelect = document.getElementById('dispatch-sender');
-    const senderId = (senderSelect ? senderSelect.value : null) || AppState.currentUser?.id;
-    const date = document.getElementById('dispatch-date')?.value;
-    const time = document.getElementById('dispatch-time')?.value.trim();
+    const senderHidden = document.getElementById('dispatch-sender-id');
+    const user = ProgState.currentUser || AppState.currentUser || {};
+    const isElevated = (ProgState.currentUser && ProgState.currentUser.is_hod === true) 
+        || (user && ['hod', 'admin', 'super_admin'].includes(user.role));
+
+    let senderId = null;
+    if (isElevated && senderSelect && senderSelect.value) {
+        senderId = senderSelect.value;
+    } else if (senderHidden && senderHidden.value) {
+        senderId = senderHidden.value;
+    } else {
+        senderId = user.id || null;
+    }
+
+    const now = new Date();
+    const autoDate = now.toISOString().split('T')[0];
+    const autoTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const date = document.getElementById('dispatch-date')?.value || autoDate;
+    const time = document.getElementById('dispatch-time')?.value?.trim() || autoTime;
     const link = document.getElementById('dispatch-link')?.value.trim();
 
     if (!title) {
