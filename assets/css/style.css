@@ -2746,12 +2746,12 @@ body.dark-theme .login-card-fresh {
    ========================================================================== */
 .prog-status-select,
 .news-status-select {
-    display: block !important;
-    width: 100% !important;
-    min-width: 146px !important;
-    max-width: 165px !important;
-    padding: 4px 8px !important;
-    font-size: 11.5px !important;
+    display: inline-block !important;
+    width: auto !important;
+    min-width: 115px !important;
+    max-width: 130px !important;
+    padding: 3px 6px !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
     font-family: inherit !important;
     line-height: 1.25 !important;
@@ -2842,7 +2842,7 @@ body.dark-theme .login-card-fresh {
 
 .news-matrix-table thead tr:nth-child(2) th.sticky-col-title,
 .prog-matrix-table thead tr:nth-child(2) th.sticky-col-title {
-    left: 95px !important;
+    left: 88px !important;
     box-shadow: 4px 0 8px -2px rgba(0, 0, 0, 0.2) !important;
     border-right: 2px solid rgba(255, 255, 255, 0.15) !important;
 }
@@ -2860,12 +2860,22 @@ body.dark-theme .login-card-fresh {
 .news-matrix-table td.sticky-col-title,
 .prog-matrix-table td.sticky-col-title {
     position: sticky !important;
-    left: 95px !important;
+    left: 88px !important;
     z-index: 5 !important;
     background: var(--bg-card, #ffffff) !important;
     color: var(--text-main, #1e293b) !important;
     box-shadow: 4px 0 8px -2px rgba(0, 0, 0, 0.08) !important;
     border-right: 2px solid var(--border-color) !important;
+}
+
+/* Compact Table Cell Padding to eliminate dead space */
+.news-matrix-table th,
+.prog-matrix-table th {
+    padding: 8px 6px !important;
+}
+.news-matrix-table td,
+.prog-matrix-table td {
+    padding: 6px 6px !important;
 }
 
 /* Hover state keeps sticky cell backgrounds in sync */

@@ -125,21 +125,21 @@
                     </tr>
                     <tr style="background: #1e3a5f; color: #ffffff; font-size: 12px; border-bottom: 2px solid var(--border-color);">
                         <!-- Programming Columns -->
-                        <th class="sticky-col-date" style="width: 95px; min-width: 95px; background: #1e3a5f; color: #ffffff;">Date</th>
-                        <th class="sticky-col-title" style="width: 220px; min-width: 200px; background: #1e3a5f; color: #ffffff;">Title</th>
-                        <th style="width: 240px; min-width: 220px; background: #1e3a5f; color: #ffffff;">Path / WhatsApp</th>
-                        <th style="width: 120px; min-width: 110px; background: #1e3a5f; color: #ffffff;">Channel</th>
-                        <th style="width: 160px; min-width: 150px; background: #1e3a5f; color: #ffffff;">News Sender</th>
-                        <th style="width: 105px; min-width: 100px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff;">DP Link</th>
-                        <th style="width: 105px; min-width: 100px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff; border-right: 3px solid rgba(0,0,0,0.2);">PT Link</th>
+                        <th class="sticky-col-date" style="width: 88px; min-width: 85px; background: #1e3a5f; color: #ffffff;">Date</th>
+                        <th class="sticky-col-title" style="width: 175px; min-width: 155px; background: #1e3a5f; color: #ffffff;">Title</th>
+                        <th style="width: 125px; min-width: 115px; background: #1e3a5f; color: #ffffff;">Path / WhatsApp</th>
+                        <th style="width: 70px; min-width: 65px; text-align: center; background: #1e3a5f; color: #ffffff;">Channel</th>
+                        <th style="width: 120px; min-width: 110px; background: #1e3a5f; color: #ffffff;">News Sender</th>
+                        <th style="width: 75px; min-width: 70px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff;">DP Link</th>
+                        <th style="width: 75px; min-width: 70px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff; border-right: 3px solid rgba(0,0,0,0.2);">PT Link</th>
 
                         <!-- Digital Columns -->
-                        <th style="width: 150px; min-width: 140px; background: #1e3a5f; color: #ffffff;">Status</th>
-                        <th style="width: 95px; min-width: 90px; background: #1e3a5f; color: #ffffff;">Publish Time</th>
-                        <th style="width: 135px; min-width: 125px; background: #1e3a5f; color: #ffffff;">Employee Name</th>
-                        <th style="width: 170px; min-width: 150px; background: #1e3a5f; color: #ffffff;">Remarks</th>
-                        <th style="width: 75px; min-width: 70px; text-align: center; background: #1e3a5f; color: #ffffff;">Rating</th>
-                        <th style="width: 80px; min-width: 75px; text-align: center; background: #1e3a5f; color: #ffffff;">Action</th>
+                        <th style="width: 125px; min-width: 118px; background: #1e3a5f; color: #ffffff;">Status</th>
+                        <th style="width: 88px; min-width: 82px; text-align: center; background: #1e3a5f; color: #ffffff;">Publish Time</th>
+                        <th style="width: 115px; min-width: 105px; background: #1e3a5f; color: #ffffff;">Employee Name</th>
+                        <th style="width: 130px; min-width: 115px; background: #1e3a5f; color: #ffffff;">Remarks</th>
+                        <th style="width: 60px; min-width: 55px; text-align: center; background: #1e3a5f; color: #ffffff;">Rating</th>
+                        <th style="width: 65px; min-width: 60px; text-align: center; background: #1e3a5f; color: #ffffff;">Action</th>
                     </tr>
                 </thead>
                 <tbody id="prog-matrix-tbody">

@@ -152,17 +152,17 @@ function updateProgKpis(stats) {
 
 function getStatusBadgeStyle(status, isPT = false, isBoth = false) {
     if (status === 'Published') {
-        if (isBoth) return { bg: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.3)', color: '#4f46e5', label: '🟢 Published (Both)' };
-        if (isPT) return { bg: 'rgba(220, 38, 38, 0.12)', border: '1px solid rgba(220, 38, 38, 0.3)', color: '#dc2626', label: '🔴 Published (PT)' };
-        return { bg: 'rgba(22, 163, 74, 0.12)', border: '1px solid rgba(22, 163, 74, 0.3)', color: '#16a34a', label: '🟢 Published (DP)' };
+        if (isBoth) return { bg: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.3)', color: '#4f46e5', label: '● Published (Both)' };
+        if (isPT) return { bg: 'rgba(220, 38, 38, 0.12)', border: '1px solid rgba(220, 38, 38, 0.3)', color: '#dc2626', label: '● Published (PT)' };
+        return { bg: 'rgba(22, 163, 74, 0.12)', border: '1px solid rgba(22, 163, 74, 0.3)', color: '#16a34a', label: '● Published (DP)' };
     }
     const map = {
         'In Progress': { bg: 'rgba(217, 119, 6, 0.12)', border: '1px solid rgba(217, 119, 6, 0.3)', color: '#b45309', label: '⚡ In Progress' },
-        'Move to PT': { bg: 'rgba(180, 83, 9, 0.12)', border: '1px solid rgba(180, 83, 9, 0.3)', color: '#92400e', label: '🟤 Move to PT' },
-        'Violation': { bg: 'rgba(220, 38, 38, 0.12)', border: '1px solid rgba(220, 38, 38, 0.3)', color: '#dc2626', label: '🔴 Violation' },
-        'Correction': { bg: 'rgba(37, 99, 235, 0.12)', border: '1px solid rgba(37, 99, 235, 0.3)', color: '#2563eb', label: '🔵 Correction' },
-        'Expire': { bg: 'rgba(100, 116, 139, 0.12)', border: '1px solid rgba(100, 116, 139, 0.3)', color: '#475569', label: '⛔ Expire' },
-        'Rejected': { bg: 'rgba(71, 85, 105, 0.12)', border: '1px solid rgba(71, 85, 105, 0.3)', color: '#334155', label: '🟤 Rejected' },
+        'Move to PT': { bg: 'rgba(180, 83, 9, 0.12)', border: '1px solid rgba(180, 83, 9, 0.3)', color: '#92400e', label: '➔ Move to PT' },
+        'Violation': { bg: 'rgba(220, 38, 38, 0.12)', border: '1px solid rgba(220, 38, 38, 0.3)', color: '#dc2626', label: '● Violation' },
+        'Correction': { bg: 'rgba(37, 99, 235, 0.12)', border: '1px solid rgba(37, 99, 235, 0.3)', color: '#2563eb', label: '● Correction' },
+        'Expire': { bg: 'rgba(100, 116, 139, 0.12)', border: '1px solid rgba(100, 116, 139, 0.3)', color: '#475569', label: '● Expire' },
+        'Rejected': { bg: 'rgba(71, 85, 105, 0.12)', border: '1px solid rgba(71, 85, 105, 0.3)', color: '#334155', label: '● Rejected' },
         'Pending': { bg: 'rgba(148, 163, 184, 0.12)', border: '1px solid rgba(148, 163, 184, 0.25)', color: '#64748b', label: '⏳ Pending' },
         'N/A': { bg: 'rgba(100, 116, 139, 0.08)', border: '1px solid rgba(100, 116, 139, 0.2)', color: '#94a3b8', label: '— N/A' }
     };
@@ -288,10 +288,7 @@ function renderProgrammingMatrix(dispatches) {
                 ⚡ Claim
             </button>
         ` : `
-            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
-                ${pubAvatar}
-                <span>${escapeHtml(d.publisher_name || '—')}</span>
-            </div>
+            <span style="font-size: 12px; font-weight: 600; color: var(--text-main);">${escapeHtml(d.publisher_name || '—')}</span>
         `;
 
         const statusHtml = canManage 
@@ -299,12 +296,12 @@ function renderProgrammingMatrix(dispatches) {
                 <select class="prog-status-select" style="background: ${statusStyle.bg}; color: ${statusStyle.color}; border: ${statusStyle.border};" onchange="quickUpdateProgStatus(${d.id}, 'status', this.value)" title="Change Publishing Status">
                     <option value="Pending" ${currentStatus === 'Pending' ? 'selected' : ''}>⏳ Pending</option>
                     <option value="In Progress" ${currentStatus === 'In Progress' ? 'selected' : ''}>⚡ In Progress</option>
-                    <option value="Published" ${currentStatus === 'Published' ? 'selected' : ''}>${isPTChannel ? '🔴 Published (PT)' : (isBothChannel ? '🟢 Published (Both)' : '🟢 Published (DP)')}</option>
-                    <option value="Move to PT" ${currentStatus === 'Move to PT' ? 'selected' : ''}>🟤 Move to PT</option>
-                    <option value="Violation" ${currentStatus === 'Violation' ? 'selected' : ''}>🔴 Violation</option>
-                    <option value="Correction" ${currentStatus === 'Correction' ? 'selected' : ''}>🔵 Correction</option>
-                    <option value="Expire" ${currentStatus === 'Expire' ? 'selected' : ''}>⛔ Expire</option>
-                    <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''}>🟤 Rejected</option>
+                    <option value="Published" ${currentStatus === 'Published' ? 'selected' : ''}>● ${isPTChannel ? 'Published (PT)' : (isBothChannel ? 'Published (Both)' : 'Published (DP)')}</option>
+                    <option value="Move to PT" ${currentStatus === 'Move to PT' ? 'selected' : ''}>➔ Move to PT</option>
+                    <option value="Violation" ${currentStatus === 'Violation' ? 'selected' : ''}>● Violation</option>
+                    <option value="Correction" ${currentStatus === 'Correction' ? 'selected' : ''}>● Correction</option>
+                    <option value="Expire" ${currentStatus === 'Expire' ? 'selected' : ''}>● Expire</option>
+                    <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''}>● Rejected</option>
                 </select>
             `
             : `
@@ -333,20 +330,20 @@ function renderProgrammingMatrix(dispatches) {
                 </td>
 
                 <!-- 2. Title (Sticky Column) -->
-                <td class="sticky-col-title" style="font-weight: 700; color: var(--text-main); font-size: 13px;">
-                    <div style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(d.title)}">
+                <td class="sticky-col-title" style="font-weight: 700; color: var(--text-main); font-size: 12.5px;">
+                    <div style="max-width: 175px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(d.title)}">
                         ${escapeHtml(d.title)}
                     </div>
                 </td>
 
                 <!-- 3. Path / WhatsApp (with Copy Button) -->
                 <td>
-                    <div style="display: flex; align-items: center; gap: 6px; max-width: 260px;">
-                        <code style="font-size: 11px; font-family: monospace; color: var(--text-muted); background: var(--bg-input); padding: 2px 6px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;" title="${escapeHtml(d.path_whatsapp || '')}">
+                    <div style="display: flex; align-items: center; gap: 4px; max-width: 125px;">
+                        <code style="font-size: 10.5px; font-family: monospace; color: var(--text-muted); background: var(--bg-input); padding: 2px 4px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90px;" title="${escapeHtml(d.path_whatsapp || '')}">
                             ${escapeHtml(d.path_whatsapp || '—')}
                         </code>
                         ${d.path_whatsapp ? `
-                            <button type="button" class="btn-icon" style="padding: 2px 5px; font-size: 11px; background: transparent; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;" onclick="copyProgPath(event, '${escapeHtml(d.path_whatsapp).replace(/'/g, "\\'")}')" title="Copy Path to Clipboard">
+                            <button type="button" class="btn-icon" style="padding: 1px 4px; font-size: 10px; background: transparent; border: 1px solid var(--border-color); border-radius: 3px; cursor: pointer; flex-shrink: 0;" onclick="copyProgPath(event, '${escapeHtml(d.path_whatsapp).replace(/'/g, "\\'")}')" title="Copy Path">
                                 📋
                             </button>
                         ` : ''}
@@ -354,20 +351,17 @@ function renderProgrammingMatrix(dispatches) {
                 </td>
 
                 <!-- 4. Channel -->
-                <td style="white-space: nowrap;">
+                <td style="text-align: center; white-space: nowrap; padding: 6px 4px;">
                     ${channelBadge}
                 </td>
 
                 <!-- 5. News Sender & Dispatch Time -->
-                <td style="white-space: nowrap;">
-                    <div style="display: flex; align-items: center; gap: 7px;">
-                        ${senderAvatar}
-                        <div style="display: flex; flex-direction: column; line-height: 1.25;">
-                            <span style="font-size: 12px; font-weight: 700; color: var(--text-main);">${escapeHtml(d.sender_name || 'Producer')}</span>
-                            <span style="font-size: 10.5px; font-family: monospace; color: var(--text-dim); margin-top: 1px;">
-                                🕒 ${escapeHtml(d.dispatch_time || '-')}
-                            </span>
-                        </div>
+                <td style="white-space: nowrap; padding: 6px 6px;">
+                    <div style="display: flex; flex-direction: column; line-height: 1.2;">
+                        <span style="font-size: 12px; font-weight: 700; color: var(--text-main);">${escapeHtml(d.sender_name || 'Producer')}</span>
+                        <span style="font-size: 10px; font-family: monospace; color: var(--text-dim); margin-top: 1px;">
+                            🕒 ${escapeHtml(d.dispatch_time || '-')}
+                        </span>
                     </div>
                 </td>
 
@@ -387,7 +381,7 @@ function renderProgrammingMatrix(dispatches) {
                 </td>
 
                 <!-- 9. Publishing Time -->
-                <td style="font-size: 11.5px; font-family: monospace; color: ${publishTime !== '-' ? 'var(--text-main, #334155)' : 'var(--text-dim)'}; font-weight: 600; white-space: nowrap;">
+                <td style="text-align: center; font-size: 11px; font-family: monospace; color: ${publishTime !== '-' ? 'var(--text-main, #334155)' : 'var(--text-dim)'}; font-weight: 600; white-space: nowrap; padding: 6px 4px;">
                     ${escapeHtml(publishTime)}
                 </td>
 
