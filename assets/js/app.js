@@ -1327,3 +1327,152 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// ==========================================================================
+// Executive Hover Preview Reader (for Title, Remarks, and Long Cells)
+// ==========================================================================
+(function() {
+    let previewCard = null;
+    let showTimeout = null;
+    let hideTimeout = null;
+    let currentTrigger = null;
+
+    function getOrCreateCard() {
+        if (!previewCard) {
+            previewCard = document.getElementById('app-hover-preview-card');
+            if (!previewCard) {
+                previewCard = document.createElement('div');
+                previewCard.id = 'app-hover-preview-card';
+                previewCard.innerHTML = `
+                    <div class="preview-card-header">
+                        <span class="preview-card-title" id="preview-card-title">📖 PREVIEW</span>
+                        <button type="button" class="preview-card-copy-btn" id="preview-card-copy-btn" title="Copy full text to clipboard">
+                            📋 Copy
+                        </button>
+                    </div>
+                    <div class="preview-card-body" id="preview-card-body"></div>
+                    <div class="preview-card-hint">
+                        <span>💡 Full details</span>
+                        <span id="preview-card-length" style="font-family: monospace; font-size: 10px;"></span>
+                    </div>
+                `;
+                document.body.appendChild(previewCard);
+
+                const copyBtn = previewCard.querySelector('#preview-card-copy-btn');
+                if (copyBtn) {
+                    copyBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const body = previewCard.querySelector('#preview-card-body');
+                        if (body && body.textContent) {
+                            navigator.clipboard.writeText(body.textContent).then(() => {
+                                copyBtn.innerHTML = '✅ Copied!';
+                                copyBtn.style.background = 'rgba(22, 163, 74, 0.85)';
+                                setTimeout(() => {
+                                    copyBtn.innerHTML = '📋 Copy';
+                                    copyBtn.style.background = '';
+                                }, 1500);
+                            }).catch(() => {});
+                        }
+                    });
+                }
+
+                previewCard.addEventListener('mouseenter', () => {
+                    clearTimeout(hideTimeout);
+                });
+                previewCard.addEventListener('mouseleave', () => {
+                    hidePreview();
+                });
+            }
+        }
+        return previewCard;
+    }
+
+    function showPreview(triggerEl) {
+        currentTrigger = triggerEl;
+        const text = triggerEl.getAttribute('data-preview-text') || '';
+        const header = triggerEl.getAttribute('data-preview-header') || '📖 PREVIEW';
+        const isHtml = triggerEl.getAttribute('data-preview-html') === 'true';
+        if (!text || text.trim() === '' || text === '—') return;
+
+        const card = getOrCreateCard();
+        const titleEl = card.querySelector('#preview-card-title');
+        const bodyEl = card.querySelector('#preview-card-body');
+        const lenEl = card.querySelector('#preview-card-length');
+        const copyBtn = card.querySelector('#preview-card-copy-btn');
+        const hintEl = card.querySelector('.preview-card-hint');
+
+        titleEl.textContent = header;
+
+        if (isHtml) {
+            bodyEl.classList.add('has-html');
+            bodyEl.innerHTML = text;
+            if (copyBtn) copyBtn.style.display = 'none';
+            if (hintEl) hintEl.style.display = 'none';
+        } else {
+            bodyEl.classList.remove('has-html');
+            bodyEl.textContent = text;
+            if (copyBtn) copyBtn.style.display = 'inline-flex';
+            if (hintEl) {
+                hintEl.style.display = 'flex';
+                lenEl.textContent = `${text.length} chars`;
+            }
+        }
+
+        const rect = triggerEl.getBoundingClientRect();
+        card.style.display = 'block';
+        card.style.left = '-9999px';
+        card.style.top = '-9999px';
+        card.classList.add('is-visible');
+
+        const cardRect = card.getBoundingClientRect();
+        const cardWidth = cardRect.width;
+        const cardHeight = cardRect.height;
+
+        let left = rect.left + (rect.width / 2) - (cardWidth / 2);
+        left = Math.max(12, Math.min(left, window.innerWidth - cardWidth - 16));
+
+        let top = rect.top - cardHeight - 8;
+        if (top < 12) {
+            top = rect.bottom + 8;
+        }
+        if (top + cardHeight > window.innerHeight - 12) {
+            top = Math.max(12, window.innerHeight - cardHeight - 12);
+        }
+
+        card.style.left = `${Math.round(left)}px`;
+        card.style.top = `${Math.round(top)}px`;
+    }
+
+    function hidePreview() {
+        clearTimeout(showTimeout);
+        clearTimeout(hideTimeout);
+        if (previewCard) {
+            previewCard.classList.remove('is-visible');
+        }
+        currentTrigger = null;
+    }
+
+    document.addEventListener('mouseover', function(e) {
+        const trigger = e.target.closest('.hover-preview-trigger');
+        if (trigger) {
+            clearTimeout(hideTimeout);
+            clearTimeout(showTimeout);
+            showTimeout = setTimeout(() => {
+                showPreview(trigger);
+            }, 80);
+        }
+    });
+
+    document.addEventListener('mouseout', function(e) {
+        const trigger = e.target.closest('.hover-preview-trigger');
+        if (trigger) {
+            clearTimeout(showTimeout);
+            hideTimeout = setTimeout(() => {
+                hidePreview();
+            }, 180);
+        }
+    });
+
+    window.addEventListener('scroll', hidePreview, true);
+    window.addEventListener('resize', hidePreview);
+})();

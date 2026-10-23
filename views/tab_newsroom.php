@@ -45,7 +45,7 @@
             </div>
 
             <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #2563eb;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🔵 Corrections / Issues</div>
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🔵 Corrections</div>
                 <div id="news-stat-corrections" style="font-size: 24px; font-weight: 800; color: #2563eb; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
@@ -116,7 +116,7 @@
                 <thead>
                     <!-- Multi-Tier Dual Header -->
                     <tr>
-                        <th colspan="7" style="background: #b91c1c; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px; border-right: 3px solid rgba(0,0,0,0.15);">
+                        <th colspan="6" style="background: #b91c1c; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px; border-right: 3px solid rgba(0,0,0,0.15);">
                             🟥 NEWS ROOM DEPARTMENT (DISPATCH)
                         </th>
                         <th colspan="6" style="background: #15803d; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px;">
@@ -125,13 +125,12 @@
                     </tr>
                     <tr style="background: #1e3a5f; color: #ffffff; font-size: 12px; border-bottom: 2px solid var(--border-color);">
                         <!-- News Room Columns -->
-                        <th class="sticky-col-date" style="width: 88px; min-width: 85px; background: #1e3a5f; color: #ffffff;">Date</th>
-                        <th class="sticky-col-title" style="width: 175px; min-width: 155px; background: #1e3a5f; color: #ffffff;">Title / Slug</th>
+                        <th style="width: 88px; min-width: 85px; background: #1e3a5f; color: #ffffff;">Date</th>
+                        <th style="width: 175px; min-width: 155px; background: #1e3a5f; color: #ffffff;">Title / Slug</th>
                         <th style="width: 125px; min-width: 115px; background: #1e3a5f; color: #ffffff;">Path / WhatsApp</th>
                         <th style="width: 70px; min-width: 65px; text-align: center; background: #1e3a5f; color: #ffffff;">Channel</th>
                         <th style="width: 120px; min-width: 110px; background: #1e3a5f; color: #ffffff;">News Sender</th>
-                        <th style="width: 75px; min-width: 70px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff;">DP Link</th>
-                        <th style="width: 75px; min-width: 70px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff; border-right: 3px solid rgba(0,0,0,0.2);">PT Link</th>
+                        <th style="width: 85px; min-width: 80px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff; border-right: 3px solid rgba(0,0,0,0.2);">Links</th>
 
                         <!-- Digital Columns -->
                         <th style="width: 125px; min-width: 118px; background: #1e3a5f; color: #ffffff;">Status</th>
@@ -144,7 +143,7 @@
                 </thead>
                 <tbody id="news-matrix-tbody">
                     <tr>
-                        <td colspan="13" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <td colspan="12" style="text-align: center; padding: 40px; color: var(--text-muted);">
                             <div class="spinner" style="margin: 0 auto 10px;"></div>
                             Loading newsroom dispatches...
                         </td>

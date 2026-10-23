@@ -265,21 +265,63 @@ function renderProgrammingMatrix(dispatches) {
             ratingHtml = `<span style="color: #f59e0b; font-weight: 700; font-size: 12px;" title="${escapeHtml(d.rating)}/5">⭐ ${escapeHtml(d.rating)}</span>`;
         }
 
-        const dpLinkHtml = d.link ? `
-            <a href="${escapeHtml(d.link)}" target="_blank" rel="noopener noreferrer" 
-               style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; background: rgba(22, 163, 74, 0.12); color: #16a34a; font-weight: 700; font-size: 11px; text-decoration: none; border: 1px solid rgba(22, 163, 74, 0.25); white-space: nowrap;" 
-               title="${escapeHtml(d.link)}">
-                🔗 DP Link
-            </a>
-        ` : '<span style="color: var(--text-dim); font-size: 12px; white-space: nowrap;">—</span>';
+        const hasDpLink = Boolean(d.link && d.link.trim());
+        const hasPtLink = Boolean(d.pt_link && d.pt_link.trim());
+        const hasAnyLink = hasDpLink || hasPtLink;
 
-        const ptLinkHtml = d.pt_link ? `
-            <a href="${escapeHtml(d.pt_link)}" target="_blank" rel="noopener noreferrer" 
-               style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; background: rgba(220, 38, 38, 0.12); color: #dc2626; font-weight: 700; font-size: 11px; text-decoration: none; border: 1px solid rgba(220, 38, 38, 0.25); white-space: nowrap;" 
-               title="${escapeHtml(d.pt_link)}">
-                🔗 PT Link
-            </a>
-        ` : '<span style="color: var(--text-dim); font-size: 12px; white-space: nowrap;">—</span>';
+        let linksCellHtml = '';
+        if (hasAnyLink) {
+            let pillsHtml = '';
+            if (hasDpLink && hasPtLink) {
+                pillsHtml = `
+                    <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 4px; background: rgba(99, 102, 241, 0.12); color: #6366f1; font-weight: 700; font-size: 11px; border: 1px solid rgba(99, 102, 241, 0.25);">
+                        🌐 2 Links
+                    </span>
+                `;
+            } else if (hasDpLink) {
+                pillsHtml = `
+                    <span style="display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; background: rgba(22, 163, 74, 0.12); color: #16a34a; font-weight: 700; font-size: 11px; border: 1px solid rgba(22, 163, 74, 0.25);">
+                        🔗 DP Link
+                    </span>
+                `;
+            } else {
+                pillsHtml = `
+                    <span style="display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 4px; background: rgba(220, 38, 38, 0.12); color: #dc2626; font-weight: 700; font-size: 11px; border: 1px solid rgba(220, 38, 38, 0.25);">
+                        🔗 PT Link
+                    </span>
+                `;
+            }
+
+            let popoverItems = '<div class="preview-links-container">';
+            if (hasDpLink) {
+                const escapedDp = escapeHtml(d.link.trim());
+                popoverItems += `<div class="preview-link-row dp-theme"><div class="preview-link-top"><span class="preview-link-label" style="color:#4ade80;">🟢 Discover Pakistan</span><div class="preview-link-actions"><button type="button" class="preview-card-copy-btn" onclick="navigator.clipboard.writeText('${escapedDp.replace(/'/g, "\\'")}'); this.textContent='✅ Copied!'; setTimeout(()=>this.textContent='📋 Copy', 1500);" title="Copy DP link">📋 Copy</button><a href="${escapedDp}" target="_blank" rel="noopener noreferrer" style="background:rgba(22,163,74,0.85);border:1px solid rgba(74,222,128,0.5);color:#fff;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:4px;text-decoration:none;display:inline-flex;align-items:center;gap:2px;">Open ↗</a></div></div><div class="preview-link-url" title="${escapedDp}">${escapedDp}</div></div>`;
+            }
+            if (hasPtLink) {
+                const escapedPt = escapeHtml(d.pt_link.trim());
+                popoverItems += `<div class="preview-link-row pt-theme"><div class="preview-link-top"><span class="preview-link-label" style="color:#f87171;">🔴 Pakistan Today</span><div class="preview-link-actions"><button type="button" class="preview-card-copy-btn" onclick="navigator.clipboard.writeText('${escapedPt.replace(/'/g, "\\'")}'); this.textContent='✅ Copied!'; setTimeout(()=>this.textContent='📋 Copy', 1500);" title="Copy PT link">📋 Copy</button><a href="${escapedPt}" target="_blank" rel="noopener noreferrer" style="background:rgba(220,38,38,0.85);border:1px solid rgba(248,113,113,0.5);color:#fff;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:4px;text-decoration:none;display:inline-flex;align-items:center;gap:2px;">Open ↗</a></div></div><div class="preview-link-url" title="${escapedPt}">${escapedPt}</div></div>`;
+            }
+            if (canManage) {
+                popoverItems += `<div style="text-align:right;padding-top:2px;"><button type="button" onclick="openEditDispatchModal(${d.id})" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#cbd5e1;font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:4px;cursor:pointer;">✏️ Edit Links & Status</button></div>`;
+            }
+            popoverItems += '</div>';
+
+            linksCellHtml = `
+                <div class="hover-preview-trigger" data-preview-header="🔗 Published Program Links" data-preview-html="true" data-preview-text="${escapeHtml(popoverItems)}" style="cursor: pointer; display: inline-flex;">
+                    ${pillsHtml}
+                </div>
+            `;
+        } else {
+            if (canManage) {
+                linksCellHtml = `
+                    <button type="button" onclick="openEditDispatchModal(${d.id})" class="btn-add-link-quick" title="Add DP or PT publishing link" style="background: transparent; border: 1px dashed var(--border-color); color: var(--text-muted); font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;">
+                        + Add Link
+                    </button>
+                `;
+            } else {
+                linksCellHtml = `<span style="color: var(--text-dim); font-size: 12px;">—</span>`;
+            }
+        }
 
         // Sender & Publisher Avatars
         const senderAvatar = d.sender_avatar 
@@ -332,14 +374,14 @@ function renderProgrammingMatrix(dispatches) {
 
         html += `
             <tr style="border-bottom: 1px solid var(--border-color); background: ${rowBg}; border-left: ${rowBorderLeft};">
-                <!-- 1. Date (Sticky Column) -->
-                <td class="sticky-col-date" style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">
+                <!-- 1. Date -->
+                <td style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">
                     ${escapeHtml(dateFormatted)}
                 </td>
 
-                <!-- 2. Title (Sticky Column) -->
-                <td class="sticky-col-title" style="font-weight: 700; color: var(--text-main); font-size: 12.5px;">
-                    <div style="max-width: 175px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(d.title)}">
+                <!-- 2. Title -->
+                <td style="font-weight: 700; color: var(--text-main); font-size: 12.5px;">
+                    <div class="hover-preview-trigger" data-preview-header="🎬 Program Title" data-preview-text="${escapeHtml(d.title)}" style="max-width: 175px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         ${escapeHtml(d.title)}
                     </div>
                 </td>
@@ -373,44 +415,49 @@ function renderProgrammingMatrix(dispatches) {
                     </div>
                 </td>
 
-                <!-- 6. DP Link -->
-                <td style="text-align: center; vertical-align: middle; white-space: nowrap;">
-                    ${dpLinkHtml}
-                </td>
-
-                <!-- 7. PT Link (Border separator to Digital Zone) -->
+                <!-- 6. Links (Combined DP & PT Links with Interactive Hover Card) -->
                 <td style="text-align: center; vertical-align: middle; white-space: nowrap; border-right: 3px solid rgba(0,0,0,0.2);">
-                    ${ptLinkHtml}
+                    ${linksCellHtml}
                 </td>
 
-                <!-- 8. Publishing Status -->
+                <!-- 7. Publishing Status -->
                 <td>
                     ${statusHtml}
                 </td>
 
-                <!-- 9. Publishing Time -->
+                <!-- 8. Publishing Time -->
                 <td style="text-align: center; font-size: 11px; font-family: monospace; color: ${publishTime !== '-' ? 'var(--text-main, #334155)' : 'var(--text-dim)'}; font-weight: 600; white-space: nowrap; padding: 6px 4px;">
                     ${escapeHtml(publishTime)}
                 </td>
 
-                <!-- 10. Digital Publisher / Claim Action -->
+                <!-- 9. Digital Publisher / Claim Action -->
                 <td style="white-space: nowrap;">
                     ${publisherHtml}
                 </td>
 
-                <!-- 11. Remarks -->
+                <!-- 10. Remarks -->
                 <td>
-                    <div style="font-size: 11.5px; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(d.remarks || '')}">
-                        ${escapeHtml(d.remarks || '—')}
-                    </div>
+                    ${d.remarks && d.remarks.trim() !== '' && d.remarks.trim() !== '—' ? `
+                        <div class="hover-preview-trigger" data-preview-header="💬 Digital Remarks" data-preview-text="${escapeHtml(d.remarks)}" ${canManage ? `onclick="openEditDispatchModal(${d.id})"` : ''} style="font-size: 11.5px; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;">
+                            ${escapeHtml(d.remarks)}
+                        </div>
+                    ` : (canManage ? `
+                        <button type="button" onclick="openEditDispatchModal(${d.id})" style="background: transparent; border: none; color: var(--text-dim); font-size: 11.5px; cursor: pointer;" title="Click to add remarks">
+                            + Remarks
+                        </button>
+                    ` : `<span style="color: var(--text-dim); font-size: 11.5px;">—</span>`)}
                 </td>
 
-                <!-- 12. Rating -->
+                <!-- 11. Rating -->
                 <td style="text-align: center; white-space: nowrap;">
-                    ${ratingHtml}
+                    ${canManage ? `
+                        <span style="cursor: pointer;" onclick="openEditDispatchModal(${d.id})" title="Click to set/change rating">
+                            ${ratingHtml}
+                        </span>
+                    ` : ratingHtml}
                 </td>
 
-                <!-- 13. Action -->
+                <!-- 12. Action -->
                 <td style="text-align: center; white-space: nowrap;">
                     ${actionHtml}
                 </td>
