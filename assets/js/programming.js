@@ -152,21 +152,21 @@ function updateProgKpis(stats) {
 
 function getStatusBadgeStyle(status, isPT = false, isBoth = false) {
     if (status === 'Published') {
-        if (isBoth) return { bg: '#6366f1', color: '#ffffff', label: '🟢 Published (Both)' };
-        if (isPT) return { bg: '#dc2626', color: '#ffffff', label: '🔴 Published (PT)' };
-        return { bg: '#16a34a', color: '#ffffff', label: '🟢 Published (DP)' };
+        if (isBoth) return { bg: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.3)', color: '#4f46e5', label: '🟢 Published (Both)' };
+        if (isPT) return { bg: 'rgba(220, 38, 38, 0.12)', border: '1px solid rgba(220, 38, 38, 0.3)', color: '#dc2626', label: '🔴 Published (PT)' };
+        return { bg: 'rgba(22, 163, 74, 0.12)', border: '1px solid rgba(22, 163, 74, 0.3)', color: '#16a34a', label: '🟢 Published (DP)' };
     }
     const map = {
-        'In Progress': { bg: '#d97706', color: '#ffffff', label: '⚡ In Progress' },
-        'Move to PT': { bg: '#b45309', color: '#ffffff', label: '🟤 Move to PT' },
-        'Violation': { bg: '#dc2626', color: '#ffffff', label: '🔴 Violation' },
-        'Correction': { bg: '#2563eb', color: '#ffffff', label: '🔵 Correction' },
-        'Expire': { bg: '#64748b', color: '#ffffff', label: '⛔ Expire' },
-        'Rejected': { bg: '#475569', color: '#ffffff', label: '🟤 Rejected' },
-        'Pending': { bg: 'rgba(148, 163, 184, 0.15)', color: '#64748b', label: '⏳ Pending' },
-        'N/A': { bg: 'rgba(100, 116, 139, 0.15)', color: '#94a3b8', label: '— N/A' }
+        'In Progress': { bg: 'rgba(217, 119, 6, 0.12)', border: '1px solid rgba(217, 119, 6, 0.3)', color: '#b45309', label: '⚡ In Progress' },
+        'Move to PT': { bg: 'rgba(180, 83, 9, 0.12)', border: '1px solid rgba(180, 83, 9, 0.3)', color: '#92400e', label: '🟤 Move to PT' },
+        'Violation': { bg: 'rgba(220, 38, 38, 0.12)', border: '1px solid rgba(220, 38, 38, 0.3)', color: '#dc2626', label: '🔴 Violation' },
+        'Correction': { bg: 'rgba(37, 99, 235, 0.12)', border: '1px solid rgba(37, 99, 235, 0.3)', color: '#2563eb', label: '🔵 Correction' },
+        'Expire': { bg: 'rgba(100, 116, 139, 0.12)', border: '1px solid rgba(100, 116, 139, 0.3)', color: '#475569', label: '⛔ Expire' },
+        'Rejected': { bg: 'rgba(71, 85, 105, 0.12)', border: '1px solid rgba(71, 85, 105, 0.3)', color: '#334155', label: '🟤 Rejected' },
+        'Pending': { bg: 'rgba(148, 163, 184, 0.12)', border: '1px solid rgba(148, 163, 184, 0.25)', color: '#64748b', label: '⏳ Pending' },
+        'N/A': { bg: 'rgba(100, 116, 139, 0.08)', border: '1px solid rgba(100, 116, 139, 0.2)', color: '#94a3b8', label: '— N/A' }
     };
-    return map[status] || { bg: 'rgba(148, 163, 184, 0.15)', color: '#64748b', label: status || '⏳ Pending' };
+    return map[status] || { bg: 'rgba(148, 163, 184, 0.12)', border: '1px solid rgba(148, 163, 184, 0.25)', color: '#64748b', label: status || '⏳ Pending' };
 }
 
 function renderProgrammingMatrix(dispatches) {
@@ -296,19 +296,19 @@ function renderProgrammingMatrix(dispatches) {
 
         const statusHtml = canManage 
             ? `
-                <select class="prog-status-select" style="background: ${statusStyle.bg}; color: ${statusStyle.color}; font-weight: 700;" onchange="quickUpdateProgStatus(${d.id}, 'status', this.value)" title="Change Publishing Status">
-                    <option value="Pending" ${currentStatus === 'Pending' ? 'selected' : ''} style="background: #334155; color: #f8fafc;">⏳ Pending</option>
-                    <option value="In Progress" ${currentStatus === 'In Progress' ? 'selected' : ''} style="background: #d97706; color: #ffffff;">⚡ In Progress</option>
-                    <option value="Published" ${currentStatus === 'Published' ? 'selected' : ''} style="background: ${isPTChannel ? '#dc2626' : (isBothChannel ? '#6366f1' : '#16a34a')}; color: #ffffff;">${isPTChannel ? '🔴 Published (PT)' : (isBothChannel ? '🟢 Published (Both)' : '🟢 Published (DP)')}</option>
-                    <option value="Move to PT" ${currentStatus === 'Move to PT' ? 'selected' : ''} style="background: #b45309; color: #ffffff;">🟤 Move to PT</option>
-                    <option value="Violation" ${currentStatus === 'Violation' ? 'selected' : ''} style="background: #dc2626; color: #ffffff;">🔴 Violation</option>
-                    <option value="Correction" ${currentStatus === 'Correction' ? 'selected' : ''} style="background: #2563eb; color: #ffffff;">🔵 Correction</option>
-                    <option value="Expire" ${currentStatus === 'Expire' ? 'selected' : ''} style="background: #64748b; color: #ffffff;">⛔ Expire</option>
-                    <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''} style="background: #475569; color: #ffffff;">🟤 Rejected</option>
+                <select class="prog-status-select" style="background: ${statusStyle.bg}; color: ${statusStyle.color}; border: ${statusStyle.border};" onchange="quickUpdateProgStatus(${d.id}, 'status', this.value)" title="Change Publishing Status">
+                    <option value="Pending" ${currentStatus === 'Pending' ? 'selected' : ''}>⏳ Pending</option>
+                    <option value="In Progress" ${currentStatus === 'In Progress' ? 'selected' : ''}>⚡ In Progress</option>
+                    <option value="Published" ${currentStatus === 'Published' ? 'selected' : ''}>${isPTChannel ? '🔴 Published (PT)' : (isBothChannel ? '🟢 Published (Both)' : '🟢 Published (DP)')}</option>
+                    <option value="Move to PT" ${currentStatus === 'Move to PT' ? 'selected' : ''}>🟤 Move to PT</option>
+                    <option value="Violation" ${currentStatus === 'Violation' ? 'selected' : ''}>🔴 Violation</option>
+                    <option value="Correction" ${currentStatus === 'Correction' ? 'selected' : ''}>🔵 Correction</option>
+                    <option value="Expire" ${currentStatus === 'Expire' ? 'selected' : ''}>⛔ Expire</option>
+                    <option value="Rejected" ${currentStatus === 'Rejected' ? 'selected' : ''}>🟤 Rejected</option>
                 </select>
             `
             : `
-                <span class="prog-status-pill" style="background: ${statusStyle.bg}; color: ${statusStyle.color}; font-weight: 700;" title="Publishing status is managed by Digital Department">
+                <span class="prog-status-pill" style="background: ${statusStyle.bg}; color: ${statusStyle.color}; border: ${statusStyle.border};" title="Publishing status is managed by Digital Department">
                     ${escapeHtml(statusStyle.label)}
                 </span>
             `;
@@ -387,7 +387,7 @@ function renderProgrammingMatrix(dispatches) {
                 </td>
 
                 <!-- 9. Publishing Time -->
-                <td style="font-size: 11px; font-family: monospace; color: ${publishTime !== '-' ? (isPTChannel ? '#dc2626' : '#16a34a') : 'var(--text-dim)'}; font-weight: 700; white-space: nowrap;">
+                <td style="font-size: 11.5px; font-family: monospace; color: ${publishTime !== '-' ? 'var(--text-main, #334155)' : 'var(--text-dim)'}; font-weight: 600; white-space: nowrap;">
                     ${escapeHtml(publishTime)}
                 </td>
 
