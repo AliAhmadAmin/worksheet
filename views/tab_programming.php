@@ -1,117 +1,104 @@
 <!-- TAB: PROGRAMMING & DIGITAL HANDOVER PIPELINE -->
 <section id="tab-programming" class="tab-section <?= ($currentPortal === 'programming') ? 'active' : '' ?>">
     <!-- Hero Header -->
-    <div class="worksheet-card" style="margin-bottom: 20px; border-top: 4px solid #d97706;">
-        <div class="card-header-flex" style="flex-wrap: wrap; gap: 14px;">
+    <div class="worksheet-card" style="margin-bottom: 18px; border-top: 4px solid #d97706;">
+        <div class="card-header-flex" style="flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;">
             <div class="card-title-group">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 28px;">📡</span>
-                    <div>
-                        <h2 style="font-size: 20px; font-weight: 800; color: var(--text-main); margin: 0;">
-                            Programming ➔ Digital Content Handover Command Board
-                        </h2>
-                        <p style="font-size: 13px; color: var(--text-muted); margin: 3px 0 0 0;">
-                            Real-time broadcast dispatch, media path tracking, and multi-channel digital publishing workflow.
-                        </p>
-                    </div>
+                    <span style="font-size: 24px;">📡</span>
+                    <h2 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin: 0;">
+                        Programming ➔ Digital Content Handover
+                    </h2>
                 </div>
             </div>
 
-            <div class="controls-group" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button type="button" class="btn btn-primary" style="background: linear-gradient(135deg, #d97706, #b45309); border: none; font-weight: 700;" onclick="openDispatchModal()">
+            <div class="controls-group" style="display: flex; gap: 10px; align-items: center;">
+                <button type="button" class="btn btn-primary" style="background: linear-gradient(135deg, #d97706, #b45309); border: none; font-weight: 700; padding: 8px 14px; border-radius: 6px; font-size: 13px;" onclick="openDispatchModal()">
                     ➕ Dispatch New Content
                 </button>
-                <button type="button" class="btn btn-outline" onclick="loadProgrammingDispatches()">
-                    🔄 Refresh Board
-                </button>
-                <button type="button" class="btn btn-outline" onclick="exportProgrammingCsv()">
+                <button type="button" class="btn btn-outline" style="padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600;" onclick="exportProgrammingCsv()">
                     📊 Export CSV
-                </button>
-                <button type="button" class="btn btn-outline" onclick="printProgrammingReport()">
-                    🖨️ Print Log
                 </button>
             </div>
         </div>
 
         <!-- KPI Metrics Summary Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 20px;">
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px; border-left: 4px solid #d97706;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 16px;">
+            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #d97706;">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">📡 Total Dispatches</div>
-                <div id="prog-stat-total" style="font-size: 24px; font-weight: 800; color: #d97706; margin-top: 4px;">0</div>
-                <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">From Programming</div>
+                <div id="prog-stat-total" style="font-size: 24px; font-weight: 800; color: #d97706; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px; border-left: 4px solid #16a34a;">
+            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #16a34a;">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🟢 DP Published</div>
-                <div id="prog-stat-dp" style="font-size: 24px; font-weight: 800; color: #16a34a; margin-top: 4px;">0</div>
-                <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Discover Pakistan</div>
+                <div id="prog-stat-dp" style="font-size: 24px; font-weight: 800; color: #16a34a; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px; border-left: 4px solid #059669;">
+            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #059669;">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🟢 PT Published</div>
-                <div id="prog-stat-pt" style="font-size: 24px; font-weight: 800; color: #059669; margin-top: 4px;">0</div>
-                <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Pakistan Today</div>
+                <div id="prog-stat-pt" style="font-size: 24px; font-weight: 800; color: #059669; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px; border-left: 4px solid #2563eb;">
+            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #2563eb;">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🔵 Corrections / Issues</div>
-                <div id="prog-stat-corrections" style="font-size: 24px; font-weight: 800; color: #2563eb; margin-top: 4px;">0</div>
-                <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Revisions needed</div>
+                <div id="prog-stat-corrections" style="font-size: 24px; font-weight: 800; color: #2563eb; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px 16px; border-left: 4px solid #eab308;">
+            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #eab308;">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">⏳ In Queue</div>
-                <div id="prog-stat-pending" style="font-size: 24px; font-weight: 800; color: #eab308; margin-top: 4px;">0</div>
-                <div style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Awaiting Digital action</div>
+                <div id="prog-stat-pending" style="font-size: 24px; font-weight: 800; color: #eab308; margin-top: 4px; line-height: 1;">0</div>
             </div>
         </div>
     </div>
 
     <!-- Filters & Search Toolbar -->
-    <div class="worksheet-card" style="margin-bottom: 20px; padding: 14px 18px;">
-        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
-            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
-                <div class="form-group" style="margin-bottom: 0; min-width: 140px;">
-                    <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">📅 Date Filter</label>
-                    <input type="date" id="prog-filter-date" class="input-control" value="<?= date('Y-m-d') ?>" style="font-size: 12.5px; padding: 6px 10px;" onchange="handleProgFilterChange('date')">
-                </div>
+    <div class="worksheet-card" style="margin-bottom: 18px; padding: 12px 18px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+            <div style="flex: 0 0 140px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📅 Date</label>
+                <input type="date" id="prog-filter-date" class="input-control" value="<?= date('Y-m-d') ?>" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="handleProgFilterChange('date')">
+            </div>
 
-                <div class="form-group" style="margin-bottom: 0; min-width: 130px;">
-                    <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">🗓️ Month</label>
-                    <input type="month" id="prog-filter-month" class="input-control" value="<?= date('Y-m') ?>" style="font-size: 12.5px; padding: 6px 10px;" onchange="handleProgFilterChange('month')">
-                </div>
+            <div style="flex: 0 0 135px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🗓️ Month</label>
+                <input type="month" id="prog-filter-month" class="input-control" value="<?= date('Y-m') ?>" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="handleProgFilterChange('month')">
+            </div>
 
-                <div class="form-group" style="margin-bottom: 0; min-width: 160px;">
-                    <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">📺 Channel</label>
-                    <select id="prog-filter-channel" class="input-control" style="font-size: 12.5px; padding: 6px 10px;" onchange="loadProgrammingDispatches()">
-                        <option value="all">All Channels</option>
-                        <option value="Discover Pakistan">Discover Pakistan</option>
-                        <option value="Pakistan Today">Pakistan Today</option>
-                        <option value="Discover Islam">Discover Islam</option>
-                    </select>
-                </div>
+            <div style="flex: 0 0 150px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📺 Channel</label>
+                <select id="prog-filter-channel" class="input-control" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="loadProgrammingDispatches()">
+                    <option value="all">All Channels</option>
+                    <option value="Discover Pakistan">Discover Pakistan</option>
+                    <option value="Pakistan Today">Pakistan Today</option>
+                    <option value="Discover Islam">Discover Islam</option>
+                </select>
+            </div>
 
-                <div class="form-group" style="margin-bottom: 0; min-width: 160px;">
-                    <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">🏷️ Status</label>
-                    <select id="prog-filter-status" class="input-control" style="font-size: 12.5px; padding: 6px 10px;" onchange="loadProgrammingDispatches()">
-                        <option value="all">All Statuses</option>
-                        <option value="pending">⏳ Pending Queue</option>
-                        <option value="published">🟢 Published</option>
-                        <option value="Correction">🔵 Correction</option>
-                        <option value="Violation">🔴 Violation</option>
-                        <option value="Move to PT">🟤 Move to PT</option>
-                        <option value="Expire">⛔ Expire</option>
-                        <option value="Rejected">🟤 Rejected</option>
-                    </select>
+            <div style="flex: 0 0 160px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🏷️ Status</label>
+                <select id="prog-filter-status" class="input-control" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="loadProgrammingDispatches()">
+                    <option value="all">All Statuses</option>
+                    <option value="pending">⏳ Pending Queue</option>
+                    <option value="In Progress">⚡ In Progress</option>
+                    <option value="published">🟢 Published</option>
+                    <option value="Correction">🔵 Correction</option>
+                    <option value="Violation">🔴 Violation</option>
+                    <option value="Move to PT">🟤 Move to PT</option>
+                    <option value="Expire">⛔ Expire</option>
+                    <option value="Rejected">🟤 Rejected</option>
+                </select>
+            </div>
+
+            <div style="flex: 1; min-width: 220px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🔍 Search</label>
+                <div style="position: relative;">
+                    <input type="text" id="prog-search-input" class="input-control" placeholder="Search by title, path, sender..." style="font-size: 12.5px; padding: 7px 12px; height: 38px; border-radius: 6px; width: 100%;" oninput="debounceProgSearch()">
                 </div>
             </div>
 
-            <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 320px; min-width: 200px;">
-                <div style="position: relative; width: 100%;">
-                    <input type="text" id="prog-search-input" class="input-control" placeholder="🔍 Search title, path, sender..." style="padding-left: 12px; font-size: 12.5px;" oninput="debounceProgSearch()">
-                </div>
-                <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="resetProgFilters()" title="Reset All Filters">
-                    Reset
+            <div style="flex: 0 0 auto;">
+                <button type="button" class="btn btn-outline" style="height: 38px; padding: 0 14px; font-size: 12.5px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;" onclick="resetProgFilters()" title="Reset All Filters">
+                    ↺ Reset
                 </button>
             </div>
         </div>
@@ -124,38 +111,39 @@
                 <thead>
                     <!-- Multi-Tier Dual Header -->
                     <tr>
-                        <th colspan="7" style="background: #b45309; color: #ffffff; text-align: center; font-size: 14px; font-weight: 800; padding: 10px; letter-spacing: 0.5px; border-right: 3px solid rgba(0,0,0,0.15);">
+                        <th colspan="8" style="background: #b45309; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px; border-right: 3px solid rgba(0,0,0,0.15);">
                             🟨 PROGRAMMING DEPARTMENT (DISPATCH)
                         </th>
-                        <th colspan="8" style="background: #15803d; color: #ffffff; text-align: center; font-size: 14px; font-weight: 800; padding: 10px; letter-spacing: 0.5px;">
+                        <th colspan="8" style="background: #15803d; color: #ffffff; text-align: center; font-size: 13px; font-weight: 800; padding: 10px; letter-spacing: 0.5px;">
                             🟩 DIGITAL DEPARTMENT (PUBLISHING & STATUS)
                         </th>
                     </tr>
-                    <tr style="background: var(--bg-card-elevated); font-size: 12px; border-bottom: 2px solid var(--border-color);">
+                    <tr style="background: #1e3a5f; color: #ffffff; font-size: 12px; border-bottom: 2px solid var(--border-color);">
                         <!-- Programming Columns -->
-                        <th style="width: 95px; min-width: 95px;">Date</th>
-                        <th style="width: 220px; min-width: 200px;">Title</th>
-                        <th style="width: 260px; min-width: 240px;">Path / WhatsApp</th>
-                        <th style="width: 130px; min-width: 120px;">Channel</th>
-                        <th style="width: 140px; min-width: 130px;">News Sender</th>
-                        <th style="width: 90px; min-width: 85px;">Time</th>
-                        <th style="width: 170px; min-width: 160px; text-align: center; border-right: 3px solid var(--border-color);">Story Link</th>
+                        <th class="sticky-col-date" style="width: 95px; min-width: 95px; background: #1e3a5f; color: #ffffff;">Date</th>
+                        <th class="sticky-col-title" style="width: 220px; min-width: 200px; background: #1e3a5f; color: #ffffff;">Title</th>
+                        <th style="width: 240px; min-width: 220px; background: #1e3a5f; color: #ffffff;">Path / WhatsApp</th>
+                        <th style="width: 120px; min-width: 110px; background: #1e3a5f; color: #ffffff;">Channel</th>
+                        <th style="width: 140px; min-width: 130px; background: #1e3a5f; color: #ffffff;">News Sender</th>
+                        <th style="width: 85px; min-width: 80px; background: #1e3a5f; color: #ffffff;">Time</th>
+                        <th style="width: 105px; min-width: 100px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff;">DP Link</th>
+                        <th style="width: 105px; min-width: 100px; text-align: center; white-space: nowrap; background: #1e3a5f; color: #ffffff; border-right: 3px solid rgba(0,0,0,0.2);">PT Link</th>
 
                         <!-- Digital Columns -->
-                        <th style="width: 165px; min-width: 160px;">DP Status</th>
-                        <th style="width: 90px; min-width: 85px;">Time</th>
-                        <th style="width: 165px; min-width: 160px;">PT Status</th>
-                        <th style="width: 90px; min-width: 85px;">Time</th>
-                        <th style="width: 140px; min-width: 130px;">Employee Name</th>
-                        <th style="width: 180px; min-width: 160px;">Remarks</th>
-                        <th style="width: 80px; min-width: 75px; text-align: center;">Rating</th>
-                        <th style="width: 80px; min-width: 75px; text-align: center;">Action</th>
+                        <th style="width: 160px; min-width: 150px; background: #1e3a5f; color: #ffffff;">DP Status</th>
+                        <th style="width: 85px; min-width: 80px; background: #1e3a5f; color: #ffffff;">Time</th>
+                        <th style="width: 160px; min-width: 150px; background: #1e3a5f; color: #ffffff;">PT Status</th>
+                        <th style="width: 85px; min-width: 80px; background: #1e3a5f; color: #ffffff;">Time</th>
+                        <th style="width: 135px; min-width: 125px; background: #1e3a5f; color: #ffffff;">Employee Name</th>
+                        <th style="width: 170px; min-width: 150px; background: #1e3a5f; color: #ffffff;">Remarks</th>
+                        <th style="width: 75px; min-width: 70px; text-align: center; background: #1e3a5f; color: #ffffff;">Rating</th>
+                        <th style="width: 80px; min-width: 75px; text-align: center; background: #1e3a5f; color: #ffffff;">Action</th>
                     </tr>
                 </thead>
                 <tbody id="prog-matrix-tbody">
                     <!-- Loaded dynamically via programming.js -->
                     <tr>
-                        <td colspan="15" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <td colspan="16" style="text-align: center; padding: 40px; color: var(--text-muted);">
                             <div class="spinner" style="margin: 0 auto 10px;"></div>
                             Loading programming dispatches...
                         </td>
@@ -307,6 +295,7 @@
                             <label class="form-label">DP Status (Discover Pakistan)</label>
                             <select id="edit-prog-dp-status" class="input-control" style="font-weight: 700;" onchange="handleModalDpStatusChange(this.value)">
                                 <option value="" style="background: #334155; color: #f8fafc;">⏳ Pending</option>
+                                <option value="In Progress" style="background: #d97706; color: #fff;">⚡ In Progress</option>
                                 <option value="Published" style="background: #16a34a; color: #fff;">🟢 Published</option>
                                 <option value="Violation" style="background: #dc2626; color: #fff;">🔴 Violation</option>
                                 <option value="Correction" style="background: #2563eb; color: #fff;">🔵 Correction</option>
@@ -329,6 +318,7 @@
                             <label class="form-label">PT Status (Pakistan Today)</label>
                             <select id="edit-prog-pt-status" class="input-control" style="font-weight: 700;" onchange="handleModalPtStatusChange(this.value)">
                                 <option value="" style="background: #334155; color: #f8fafc;">⏳ Pending</option>
+                                <option value="In Progress" style="background: #d97706; color: #fff;">⚡ In Progress</option>
                                 <option value="Published" style="background: #16a34a; color: #fff;">🟢 Published</option>
                                 <option value="Violation" style="background: #dc2626; color: #fff;">🔴 Violation</option>
                                 <option value="Correction" style="background: #2563eb; color: #fff;">🔵 Correction</option>
@@ -365,13 +355,25 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Published Story Link (URL)</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="url" id="edit-prog-link" class="input-control" placeholder="https://..." style="flex: 1;" oninput="updateEditProgLinkButton(this.value)">
-                            <a id="edit-prog-link-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="display: none; align-items: center; padding: 0 12px; font-size: 12px; white-space: nowrap;" title="Open link in new tab">
-                                🔗 Open
-                            </a>
+                    <div class="form-grid-2">
+                        <div class="form-group">
+                            <label class="form-label">🟢 Discover Pakistan Story Link (URL)</label>
+                            <div style="display: flex; gap: 6px;">
+                                <input type="url" id="edit-prog-link" class="input-control" placeholder="https://..." style="flex: 1; font-family: monospace; font-size: 11.5px;" oninput="updateEditProgLinkButton(this.value, 'edit-prog-link-btn')">
+                                <a id="edit-prog-link-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="display: none; align-items: center; padding: 0 10px; font-size: 11px; white-space: nowrap;" title="Open DP link in new tab">
+                                    🔗 Open
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">🔴 Pakistan Today Story Link (URL)</label>
+                            <div style="display: flex; gap: 6px;">
+                                <input type="url" id="edit-prog-pt-link" class="input-control" placeholder="https://..." style="flex: 1; font-family: monospace; font-size: 11.5px;" oninput="updateEditProgLinkButton(this.value, 'edit-prog-pt-link-btn')">
+                                <a id="edit-prog-pt-link-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-outline" style="display: none; align-items: center; padding: 0 10px; font-size: 11px; white-space: nowrap;" title="Open PT link in new tab">
+                                    🔗 Open
+                                </a>
+                            </div>
                         </div>
                     </div>
 

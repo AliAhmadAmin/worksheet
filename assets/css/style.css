@@ -2815,6 +2815,84 @@ body.dark-theme .login-card-fresh {
     filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.6));
 }
 
+/* ==========================================================================
+   NEWSROOM & PROGRAMMING COMMAND BOARD (STICKY COLUMNS & CLAIM BUTTON)
+   ========================================================================== */
+/* Header Row 2 sticky headers - solid navy background with crisp white text */
+.news-matrix-table thead tr:nth-child(2) th.sticky-col-date,
+.news-matrix-table thead tr:nth-child(2) th.sticky-col-title,
+.prog-matrix-table thead tr:nth-child(2) th.sticky-col-date,
+.prog-matrix-table thead tr:nth-child(2) th.sticky-col-title {
+    position: sticky !important;
+    background: #1e3a5f !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    z-index: 15 !important;
+}
+
+.news-matrix-table thead tr:nth-child(2) th.sticky-col-date,
+.prog-matrix-table thead tr:nth-child(2) th.sticky-col-date {
+    left: 0 !important;
+}
+
+.news-matrix-table thead tr:nth-child(2) th.sticky-col-title,
+.prog-matrix-table thead tr:nth-child(2) th.sticky-col-title {
+    left: 95px !important;
+    box-shadow: 4px 0 8px -2px rgba(0, 0, 0, 0.2) !important;
+    border-right: 2px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Body Sticky Columns */
+.news-matrix-table td.sticky-col-date,
+.prog-matrix-table td.sticky-col-date {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 5 !important;
+    background: var(--bg-card, #ffffff) !important;
+    color: var(--text-main, #1e293b) !important;
+}
+
+.news-matrix-table td.sticky-col-title,
+.prog-matrix-table td.sticky-col-title {
+    position: sticky !important;
+    left: 95px !important;
+    z-index: 5 !important;
+    background: var(--bg-card, #ffffff) !important;
+    color: var(--text-main, #1e293b) !important;
+    box-shadow: 4px 0 8px -2px rgba(0, 0, 0, 0.08) !important;
+    border-right: 2px solid var(--border-color) !important;
+}
+
+/* Hover state keeps sticky cell backgrounds in sync */
+.news-matrix-table tbody tr:hover td.sticky-col-date,
+.news-matrix-table tbody tr:hover td.sticky-col-title,
+.prog-matrix-table tbody tr:hover td.sticky-col-date,
+.prog-matrix-table tbody tr:hover td.sticky-col-title {
+    background: var(--bg-card-elevated, #f8fafc) !important;
+}
+
+/* Fast-Claim Story Button */
+.btn-claim-story {
+    background: linear-gradient(135deg, #16a34a, #15803d) !important;
+    color: #ffffff !important;
+    border: none !important;
+    padding: 4px 9px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    border-radius: 5px !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease !important;
+}
+.btn-claim-story:hover {
+    filter: brightness(1.1) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 3px 8px rgba(22, 163, 74, 0.3) !important;
+}
+
 /* Duty Roster & Global Print Styling */
 @media print {
     @page {

@@ -24,6 +24,9 @@ let NewsState = {
 // Auto-initialize when tab is loaded or page opened
 let newsroomIsInitializing = false;
 let newsroomIsInitialized = false;
+let newsAutoRefreshInterval = null;
+let newsAutoRefreshCountdown = 30;
+let newsAutoRefreshActive = true;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('tab-newsroom')) {
@@ -82,7 +85,7 @@ function populateNewsDropdowns() {
     }
 }
 
-async function loadNewsroomDispatches() {
+async function loadNewsroomDispatches(isSilent = false) {
     const tbody = document.getElementById('news-matrix-tbody');
     if (!tbody) return;
 
@@ -104,7 +107,7 @@ async function loadNewsroomDispatches() {
         const data = await res.json();
 
         if (!data.success) {
-            tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading news records.')}</td></tr>`;
+            if (!isSilent) tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: #ef4444; padding: 25px;">${escapeHtml(data.message || 'Error loading news records.')}</td></tr>`;
             return;
         }
 
@@ -115,10 +118,12 @@ async function loadNewsroomDispatches() {
 
         updateNewsKpis(data.stats);
         renderNewsroomMatrix(NewsState.dispatches);
+        newsAutoRefreshCountdown = 30;
+        updateNewsTimerDisplay();
 
     } catch (err) {
         console.error("Error loading newsroom records:", err);
-        tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading news dispatch pipeline.</td></tr>`;
+        if (!isSilent) tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: #ef4444; padding: 25px;">Network error loading news dispatch pipeline.</td></tr>`;
     }
 }
 
@@ -147,6 +152,7 @@ function updateNewsKpis(stats) {
 
 function getNewsStatusBadgeStyle(status) {
     const map = {
+        'In Progress': { bg: '#d97706', color: '#ffffff' },
         'Published': { bg: '#16a34a', color: '#ffffff' },
         'Published on PT': { bg: '#15803d', color: '#ffffff' },
         'Violation': { bg: '#dc2626', color: '#ffffff' },
@@ -166,7 +172,7 @@ function renderNewsroomMatrix(dispatches) {
     if (!dispatches || dispatches.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="15" style="text-align: center; padding: 45px 20px; color: var(--text-muted);">
+                <td colspan="16" style="text-align: center; padding: 45px 20px; color: var(--text-muted);">
                     <div style="font-size: 32px; margin-bottom: 8px;">📺</div>
                     <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No News Dispatches Found</div>
                     <div style="font-size: 12.5px; margin-top: 3px;">Click "➕ Dispatch New Story" above to send new news packages to Digital.</div>
@@ -194,22 +200,21 @@ function renderNewsroomMatrix(dispatches) {
             ratingHtml = `<span style="color: #f59e0b; font-weight: 700; font-size: 12px;" title="${escapeHtml(d.rating)}/5">⭐ ${escapeHtml(d.rating)}</span>`;
         }
 
-        const linkInputHtml = `
-            <div style="display: flex; align-items: center; gap: 4px; min-width: 150px;">
-                <input type="url" class="news-link-input" value="${escapeHtml(d.link || '')}" 
-                       placeholder="Paste story link..." 
-                       style="width: 100%; font-size: 11px; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-family: monospace;"
-                       onchange="quickUpdateNewsLink(${d.id}, this.value)"
-                       title="Paste story link here (press Enter or click away to save)">
-                ${d.link ? `
-                    <a href="${escapeHtml(d.link)}" target="_blank" rel="noopener noreferrer" 
-                       style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; background: rgba(59, 130, 246, 0.12); color: #2563eb; text-decoration: none; font-size: 12px; flex-shrink: 0;" 
-                       title="Open published link in new tab">
-                        🔗
-                    </a>
-                ` : '<span style="color: var(--text-dim); font-size: 11px; width: 24px; text-align: center; flex-shrink: 0;">—</span>'}
-            </div>
-        `;
+        const dpLinkHtml = d.link ? `
+            <a href="${escapeHtml(d.link)}" target="_blank" rel="noopener noreferrer" 
+               style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; background: rgba(22, 163, 74, 0.12); color: #16a34a; font-weight: 700; font-size: 11px; text-decoration: none; border: 1px solid rgba(22, 163, 74, 0.25); white-space: nowrap;" 
+               title="${escapeHtml(d.link)}">
+                🔗 DP Link
+            </a>
+        ` : '<span style="color: var(--text-dim); font-size: 12px; white-space: nowrap;">—</span>';
+
+        const ptLinkHtml = d.pt_link ? `
+            <a href="${escapeHtml(d.pt_link)}" target="_blank" rel="noopener noreferrer" 
+               style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; background: rgba(220, 38, 38, 0.12); color: #dc2626; font-weight: 700; font-size: 11px; text-decoration: none; border: 1px solid rgba(220, 38, 38, 0.25); white-space: nowrap;" 
+               title="${escapeHtml(d.pt_link)}">
+                🔗 PT Link
+            </a>
+        ` : '<span style="color: var(--text-dim); font-size: 12px; white-space: nowrap;">—</span>';
 
         const senderAvatar = d.sender_avatar 
             ? `<img src="${escapeHtml(d.sender_avatar)}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;" alt="">`
@@ -219,10 +224,23 @@ function renderNewsroomMatrix(dispatches) {
             ? `<img src="${escapeHtml(d.publisher_avatar)}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;" alt="">`
             : `<span style="width: 22px; height: 22px; border-radius: 50%; background: #15803d; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;">${(d.publisher_name || 'D').charAt(0).toUpperCase()}</span>`;
 
+        const isClaimable = canManage && (!d.publisher_id || !d.publisher_name || d.publisher_name === '—');
+        const publisherHtml = isClaimable ? `
+            <button type="button" class="btn-claim-story" onclick="claimNewsStory(${d.id})" title="Claim this story to your name and start digital production">
+                ⚡ Claim
+            </button>
+        ` : `
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
+                ${pubAvatar}
+                <span>${escapeHtml(d.publisher_name || '—')}</span>
+            </div>
+        `;
+
         const dpStatusHtml = canManage 
             ? `
                 <select class="news-status-select" style="background: ${dpStyle.bg}; color: ${dpStyle.color};" onchange="quickUpdateNewsStatus(${d.id}, 'dp_status', this.value)" title="Change DP Status">
                     <option value="" ${!d.dp_status ? 'selected' : ''} style="background: #334155; color: #f8fafc;">⏳ Pending</option>
+                    <option value="In Progress" ${d.dp_status === 'In Progress' ? 'selected' : ''} style="background: #d97706; color: #ffffff;">⚡ In Progress</option>
                     <option value="Published" ${d.dp_status === 'Published' ? 'selected' : ''} style="background: #16a34a; color: #ffffff;">🟢 Published</option>
                     <option value="Violation" ${d.dp_status === 'Violation' ? 'selected' : ''} style="background: #dc2626; color: #ffffff;">🔴 Violation</option>
                     <option value="Correction" ${d.dp_status === 'Correction' ? 'selected' : ''} style="background: #2563eb; color: #ffffff;">🔵 Correction</option>
@@ -243,6 +261,7 @@ function renderNewsroomMatrix(dispatches) {
             ? `
                 <select class="news-status-select" style="background: ${ptStyle.bg}; color: ${ptStyle.color};" onchange="quickUpdateNewsStatus(${d.id}, 'pt_status', this.value)" title="Change PT Status">
                     <option value="" ${!d.pt_status ? 'selected' : ''} style="background: #334155; color: #f8fafc;">⏳ Pending</option>
+                    <option value="In Progress" ${d.pt_status === 'In Progress' ? 'selected' : ''} style="background: #d97706; color: #ffffff;">⚡ In Progress</option>
                     <option value="Published" ${d.pt_status === 'Published' ? 'selected' : ''} style="background: #16a34a; color: #ffffff;">🟢 Published</option>
                     <option value="Violation" ${d.pt_status === 'Violation' ? 'selected' : ''} style="background: #dc2626; color: #ffffff;">🔴 Violation</option>
                     <option value="Correction" ${d.pt_status === 'Correction' ? 'selected' : ''} style="background: #2563eb; color: #ffffff;">🔵 Correction</option>
@@ -271,13 +290,13 @@ function renderNewsroomMatrix(dispatches) {
 
         html += `
             <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'};">
-                <!-- 1. Date -->
-                <td style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">
+                <!-- 1. Date (Sticky Column) -->
+                <td class="sticky-col-date" style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">
                     ${escapeHtml(dateFormatted)}
                 </td>
 
-                <!-- 2. Title / Slug -->
-                <td style="font-weight: 700; color: var(--text-main); font-size: 13px;">
+                <!-- 2. Title / Slug (Sticky Column) -->
+                <td class="sticky-col-title" style="font-weight: 700; color: var(--text-main); font-size: 13px;">
                     <div style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(d.title)}">
                         ${escapeHtml(d.title)}
                     </div>
@@ -315,9 +334,14 @@ function renderNewsroomMatrix(dispatches) {
                     ${escapeHtml(d.dispatch_time || '-')}
                 </td>
 
-                <!-- 7. Link (Border separator to Digital Zone) -->
-                <td style="text-align: center; border-right: 3px solid var(--border-color);">
-                    ${linkInputHtml}
+                <!-- 7. DP Link -->
+                <td style="text-align: center; vertical-align: middle; white-space: nowrap;">
+                    ${dpLinkHtml}
+                </td>
+
+                <!-- 8. PT Link (Border separator to Digital Zone) -->
+                <td style="text-align: center; vertical-align: middle; white-space: nowrap; border-right: 3px solid rgba(0,0,0,0.2);">
+                    ${ptLinkHtml}
                 </td>
 
                 <!-- 8. DP Status -->
@@ -340,12 +364,9 @@ function renderNewsroomMatrix(dispatches) {
                     ${escapeHtml(d.pt_time || '-')}
                 </td>
 
-                <!-- 12. Digital Publisher -->
+                <!-- 12. Digital Publisher / Claim Action -->
                 <td style="white-space: nowrap;">
-                    <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
-                        ${pubAvatar}
-                        <span>${escapeHtml(d.publisher_name || '—')}</span>
-                    </div>
+                    ${publisherHtml}
                 </td>
 
                 <!-- 13. Remarks -->
@@ -369,6 +390,28 @@ function renderNewsroomMatrix(dispatches) {
     });
 
     tbody.innerHTML = html;
+}
+
+// ⚡ 1-Click Story Claim for Digital Desk
+async function claimNewsStory(id) {
+    if (!id) return;
+    try {
+        const res = await fetch('api/newsroom.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'claim_story', id: id })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message || "Story claimed successfully!", "success");
+            loadNewsroomDispatches(true);
+        } else {
+            showToast(data.message || "Failed to claim story.", "error");
+        }
+    } catch (err) {
+        console.error("Error claiming story:", err);
+        showToast("Network error claiming story.", "error");
+    }
 }
 
 // 📋 Clipboard Path Copying
@@ -417,8 +460,17 @@ async function quickUpdateNewsStatus(id, field, value) {
     }
 }
 
-// 🔗 1-Click / OnChange Quick Update for Published Story Link
-async function quickUpdateNewsLink(id, value) {
+// 🔗 1-Click / OnChange Quick Update for Published Story Link (DP or PT)
+async function quickUpdateNewsLink(id, field, value) {
+    if (!id) return;
+    let updateField = 'link';
+    let updateVal = value;
+    if (typeof field === 'string' && (field === 'link' || field === 'pt_link')) {
+        updateField = field;
+    } else if (typeof field === 'string') {
+        updateVal = field;
+    }
+
     try {
         const res = await fetch('api/newsroom.php', {
             method: 'POST',
@@ -426,13 +478,20 @@ async function quickUpdateNewsLink(id, value) {
             body: JSON.stringify({
                 action: 'update_link',
                 id: id,
-                link: (value || '').trim()
+                field: updateField,
+                val: (updateVal || '').trim()
             })
         });
         const data = await res.json();
         if (data.success) {
-            showToast("Story link saved.", "success");
-            loadNewsroomDispatches();
+            showToast(`Story ${updateField === 'pt_link' ? 'PT' : 'DP'} link saved.`, "success");
+            // Update in-memory item
+            const item = NewsState.dispatches.find(d => d.id == id);
+            if (item) {
+                if (updateField === 'pt_link') item.pt_link = (updateVal || '').trim();
+                else item.link = (updateVal || '').trim();
+                renderNewsroomMatrix(NewsState.dispatches);
+            }
         } else {
             showToast(data.message || "Failed to save link", "error");
         }
@@ -556,13 +615,17 @@ function openEditNewsDispatchModal(id) {
 
     const linkInput = document.getElementById('edit-news-link');
     if (linkInput) linkInput.value = item.link || '';
-    updateEditNewsLinkButton(item.link || '');
+    updateEditNewsLinkButton(item.link || '', 'edit-news-link-btn');
+
+    const ptLinkInput = document.getElementById('edit-news-pt-link');
+    if (ptLinkInput) ptLinkInput.value = item.pt_link || '';
+    updateEditNewsLinkButton(item.pt_link || '', 'edit-news-pt-link-btn');
 
     openModal('edit-news-dispatch-modal');
 }
 
-function updateEditNewsLinkButton(val) {
-    const btn = document.getElementById('edit-news-link-btn');
+function updateEditNewsLinkButton(val, btnId = 'edit-news-link-btn') {
+    const btn = document.getElementById(btnId);
     if (!btn) return;
     const clean = (val || '').trim();
     if (clean) {
@@ -612,6 +675,7 @@ async function handleEditNewsSubmit(event) {
         dispatch_date: document.getElementById('edit-news-date')?.value,
         dispatch_time: document.getElementById('edit-news-time')?.value.trim(),
         link: document.getElementById('edit-news-link')?.value.trim(),
+        pt_link: document.getElementById('edit-news-pt-link')?.value.trim(),
         dp_status: document.getElementById('edit-news-dp-status')?.value,
         dp_time: document.getElementById('edit-news-dp-time')?.value.trim(),
         pt_status: document.getElementById('edit-news-pt-status')?.value,
@@ -726,7 +790,7 @@ function exportNewsroomCsv() {
 
     const headers = [
         "ID", "Date", "Title", "Path_WhatsApp", "Channel",
-        "Sender", "Dispatch_Time", "DP_Status", "DP_Time",
+        "Sender", "Dispatch_Time", "DP_Link", "PT_Link", "DP_Status", "DP_Time",
         "PT_Status", "PT_Time", "Publisher", "Remarks", "Rating"
     ];
 
@@ -738,6 +802,8 @@ function exportNewsroomCsv() {
         `"${(d.channel || '').replace(/"/g, '""')}"`,
         `"${(d.sender_name || '').replace(/"/g, '""')}"`,
         `"${(d.dispatch_time || '').replace(/"/g, '""')}"`,
+        `"${(d.link || '').replace(/"/g, '""')}"`,
+        `"${(d.pt_link || '').replace(/"/g, '""')}"`,
         `"${(d.dp_status || '').replace(/"/g, '""')}"`,
         `"${(d.dp_time || '').replace(/"/g, '""')}"`,
         `"${(d.pt_status || '').replace(/"/g, '""')}"`,

@@ -177,6 +177,7 @@ switch ($action) {
 
         $dispatchTime = !empty($data['dispatch_time']) ? trim($data['dispatch_time']) : date('h:i:s A');
         $link = trim($data['link'] ?? '');
+        $ptLink = trim($data['pt_link'] ?? '');
 
         // Channel-aware initial status assignment
         $initDpStatus = '';
@@ -191,10 +192,10 @@ switch ($action) {
 
         $stmt = $pdo->prepare("
             INSERT INTO newsroom_dispatches 
-            (dispatch_date, title, path_whatsapp, channel, sender_id, sender_name, dispatch_time, link, dp_status, pt_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (dispatch_date, title, path_whatsapp, channel, sender_id, sender_name, dispatch_time, link, pt_link, dp_status, pt_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$dispatchDate, $title, $pathWhatsapp, $channel, $senderId, $senderName, $dispatchTime, $link, $initDpStatus, $initPtStatus]);
+        $stmt->execute([$dispatchDate, $title, $pathWhatsapp, $channel, $senderId, $senderName, $dispatchTime, $link, $ptLink, $initDpStatus, $initPtStatus]);
         $newId = $pdo->lastInsertId();
 
         echo json_encode([
@@ -240,6 +241,7 @@ switch ($action) {
         $remarks = isset($data['remarks']) ? trim($data['remarks']) : $dispatch['remarks'];
         $rating = isset($data['rating']) ? trim($data['rating']) : $dispatch['rating'];
         $link = isset($data['link']) ? trim($data['link']) : $dispatch['link'];
+        $ptLink = isset($data['pt_link']) ? trim($data['pt_link']) : ($dispatch['pt_link'] ?? '');
 
         // Auto-sync status: When published on PT, automatically mark DP status as 'Published on PT'
         $nowFormatted = date('h:i:s A');
@@ -278,11 +280,11 @@ switch ($action) {
         $stmtUpdate = $pdo->prepare("
             UPDATE newsroom_dispatches
             SET dp_status = ?, dp_time = ?, pt_status = ?, pt_time = ?,
-                publisher_id = ?, publisher_name = ?, remarks = ?, rating = ?, link = ?,
+                publisher_id = ?, publisher_name = ?, remarks = ?, rating = ?, link = ?, pt_link = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ");
-        $stmtUpdate->execute([$dpStatus, $dpTime, $ptStatus, $ptTime, $publisherId, $publisherName, $remarks, $rating, $link, $id]);
+        $stmtUpdate->execute([$dpStatus, $dpTime, $ptStatus, $ptTime, $publisherId, $publisherName, $remarks, $rating, $link, $ptLink, $id]);
 
         echo json_encode([
             'success' => true,
@@ -292,21 +294,58 @@ switch ($action) {
             'pt_status' => $ptStatus,
             'pt_time' => $ptTime,
             'publisher_name' => $publisherName,
-            'link' => $link
+            'link' => $link,
+            'pt_link' => $ptLink
         ]);
         break;
 
     case 'update_link':
         $id = (int)($data['id'] ?? 0);
-        $link = trim($data['link'] ?? '');
+        $field = ($data['field'] ?? 'link') === 'pt_link' ? 'pt_link' : 'link';
+        $val = trim($data['link'] ?? ($data['val'] ?? ''));
         if (!$id) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Dispatch ID is required.']);
             exit;
         }
-        $stmt = $pdo->prepare("UPDATE newsroom_dispatches SET link = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-        $stmt->execute([$link, $id]);
-        echo json_encode(['success' => true, 'message' => 'Story link updated successfully.', 'link' => $link]);
+        $stmt = $pdo->prepare("UPDATE newsroom_dispatches SET {$field} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+        $stmt->execute([$val, $id]);
+        echo json_encode(['success' => true, 'message' => 'Story link updated successfully.', 'field' => $field, 'val' => $val]);
+        break;
+
+    case 'claim_story':
+        if (!$canManageDigital) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Access Denied: Only Digital department staff or Admins can claim stories.']);
+            exit;
+        }
+        $id = (int)($data['id'] ?? 0);
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Dispatch ID is required.']);
+            exit;
+        }
+        $pubId = $currentUserObj['id'] ?? null;
+        $pubName = $currentUserObj['name'] ?? 'Digital Member';
+        $stmtClaim = $pdo->prepare("
+            UPDATE newsroom_dispatches
+            SET publisher_id = ?,
+                publisher_name = ?,
+                dp_status = CASE 
+                    WHEN dp_status IS NULL OR dp_status = '' OR dp_status = 'Pending' 
+                    THEN 'In Progress' 
+                    ELSE dp_status 
+                END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ");
+        $stmtClaim->execute([$pubId, $pubName, $id]);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Story claimed by ' . $pubName . '!',
+            'publisher_id' => $pubId,
+            'publisher_name' => $pubName
+        ]);
         break;
 
     case 'update_dispatch':
@@ -334,6 +373,7 @@ switch ($action) {
         $senderName = trim($data['sender_name'] ?? '');
         $dispatchTime = trim($data['dispatch_time'] ?? '');
         $link = trim($data['link'] ?? '');
+        $ptLink = trim($data['pt_link'] ?? '');
         $dpStatus = trim($data['dp_status'] ?? '');
         $dpTime = trim($data['dp_time'] ?? '');
         $ptStatus = trim($data['pt_status'] ?? '');
@@ -345,7 +385,7 @@ switch ($action) {
         $stmt = $pdo->prepare("
             UPDATE newsroom_dispatches
             SET title = ?, path_whatsapp = ?, channel = ?, dispatch_date = ?,
-                sender_id = ?, sender_name = ?, dispatch_time = ?, link = ?,
+                sender_id = ?, sender_name = ?, dispatch_time = ?, link = ?, pt_link = ?,
                 dp_status = ?, dp_time = ?, pt_status = ?, pt_time = ?,
                 publisher_id = ?, remarks = ?, rating = ?,
                 updated_at = CURRENT_TIMESTAMP
@@ -353,7 +393,7 @@ switch ($action) {
         ");
         $stmt->execute([
             $title, $pathWhatsapp, $channel, $dispatchDate,
-            $senderId, $senderName, $dispatchTime, $link,
+            $senderId, $senderName, $dispatchTime, $link, $ptLink,
             $dpStatus, $dpTime, $ptStatus, $ptTime,
             $publisherId, $remarks, $rating, $id
         ]);
@@ -419,6 +459,7 @@ switch ($action) {
         }
 
         $dpStatuses = [
+            ['value' => 'In Progress', 'label' => '⚡ In Progress', 'bg' => '#d97706', 'color' => '#ffffff'],
             ['value' => 'Published', 'label' => 'Published', 'bg' => '#16a34a', 'color' => '#ffffff'],
             ['value' => 'Violation', 'label' => 'Violation', 'bg' => '#dc2626', 'color' => '#ffffff'],
             ['value' => 'Correction', 'label' => 'Correction', 'bg' => '#2563eb', 'color' => '#ffffff'],
@@ -429,6 +470,7 @@ switch ($action) {
         ];
 
         $ptStatuses = [
+            ['value' => 'In Progress', 'label' => '⚡ In Progress', 'bg' => '#d97706', 'color' => '#ffffff'],
             ['value' => 'Published', 'label' => 'Published', 'bg' => '#16a34a', 'color' => '#ffffff'],
             ['value' => 'Violation', 'label' => 'Violation', 'bg' => '#dc2626', 'color' => '#ffffff'],
             ['value' => 'Correction', 'label' => 'Correction', 'bg' => '#2563eb', 'color' => '#ffffff'],

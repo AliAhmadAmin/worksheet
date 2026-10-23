@@ -23,6 +23,9 @@ let ProgState = {
 // Auto-initialize when tab is loaded or page opened
 let progIsInitializing = false;
 let progIsInitialized = false;
+let progAutoRefreshInterval = null;
+let progAutoRefreshCountdown = 30;
+let progAutoRefreshActive = true;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('tab-programming')) {
@@ -147,6 +150,7 @@ function updateProgKpis(stats) {
 
 function getStatusBadgeStyle(status) {
     const map = {
+        'In Progress': { bg: '#d97706', color: '#ffffff' },
         'Published': { bg: '#16a34a', color: '#ffffff' },
         'Published on PT': { bg: '#15803d', color: '#ffffff' },
         'Violation': { bg: '#dc2626', color: '#ffffff' },
@@ -166,7 +170,7 @@ function renderProgrammingMatrix(dispatches) {
     if (!dispatches || dispatches.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="15" style="text-align: center; padding: 45px 20px; color: var(--text-muted);">
+                <td colspan="16" style="text-align: center; padding: 45px 20px; color: var(--text-muted);">
                     <div style="font-size: 32px; margin-bottom: 8px;">📡</div>
                     <div style="font-weight: 700; font-size: 15px; color: var(--text-main);">No Content Dispatches Found</div>
                     <div style="font-size: 12.5px; margin-top: 3px;">Click "➕ Dispatch New Content" above to send new program clips to Digital.</div>
@@ -196,22 +200,21 @@ function renderProgrammingMatrix(dispatches) {
             ratingHtml = `<span style="color: #f59e0b; font-weight: 700; font-size: 12px;" title="${escapeHtml(d.rating)}/5">⭐ ${escapeHtml(d.rating)}</span>`;
         }
 
-        const linkInputHtml = `
-            <div style="display: flex; align-items: center; gap: 4px; min-width: 150px;">
-                <input type="url" class="prog-link-input" value="${escapeHtml(d.link || '')}" 
-                       placeholder="Paste story link..." 
-                       style="width: 100%; font-size: 11px; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-family: monospace;"
-                       onchange="quickUpdateProgLink(${d.id}, this.value)"
-                       title="Paste story link here (press Enter or click away to save)">
-                ${d.link ? `
-                    <a href="${escapeHtml(d.link)}" target="_blank" rel="noopener noreferrer" 
-                       style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; background: rgba(59, 130, 246, 0.12); color: #2563eb; text-decoration: none; font-size: 12px; flex-shrink: 0;" 
-                       title="Open published link in new tab">
-                        🔗
-                    </a>
-                ` : '<span style="color: var(--text-dim); font-size: 11px; width: 24px; text-align: center; flex-shrink: 0;">—</span>'}
-            </div>
-        `;
+        const dpLinkHtml = d.link ? `
+            <a href="${escapeHtml(d.link)}" target="_blank" rel="noopener noreferrer" 
+               style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; background: rgba(22, 163, 74, 0.12); color: #16a34a; font-weight: 700; font-size: 11px; text-decoration: none; border: 1px solid rgba(22, 163, 74, 0.25); white-space: nowrap;" 
+               title="${escapeHtml(d.link)}">
+                🔗 DP Link
+            </a>
+        ` : '<span style="color: var(--text-dim); font-size: 12px; white-space: nowrap;">—</span>';
+
+        const ptLinkHtml = d.pt_link ? `
+            <a href="${escapeHtml(d.pt_link)}" target="_blank" rel="noopener noreferrer" 
+               style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; background: rgba(220, 38, 38, 0.12); color: #dc2626; font-weight: 700; font-size: 11px; text-decoration: none; border: 1px solid rgba(220, 38, 38, 0.25); white-space: nowrap;" 
+               title="${escapeHtml(d.pt_link)}">
+                🔗 PT Link
+            </a>
+        ` : '<span style="color: var(--text-dim); font-size: 12px; white-space: nowrap;">—</span>';
 
         // Sender & Publisher Avatars
         const senderAvatar = d.sender_avatar 
@@ -222,11 +225,24 @@ function renderProgrammingMatrix(dispatches) {
             ? `<img src="${escapeHtml(d.publisher_avatar)}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;" alt="">`
             : `<span style="width: 22px; height: 22px; border-radius: 50%; background: #15803d; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;">${(d.publisher_name || 'D').charAt(0).toUpperCase()}</span>`;
 
+        const isClaimable = canManage && (!d.publisher_id || !d.publisher_name || d.publisher_name === '—');
+        const publisherHtml = isClaimable ? `
+            <button type="button" class="btn-claim-story" onclick="claimProgStory(${d.id})" title="Claim this dispatch to your name and start digital production">
+                ⚡ Claim
+            </button>
+        ` : `
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
+                ${pubAvatar}
+                <span>${escapeHtml(d.publisher_name || '—')}</span>
+            </div>
+        `;
+
         // Status Elements: Interactive for Digital/Admin, Read-only Badges for Programming Staff
         const dpStatusHtml = canManage 
             ? `
                 <select class="prog-status-select" style="background: ${dpStyle.bg}; color: ${dpStyle.color};" onchange="quickUpdateProgStatus(${d.id}, 'dp_status', this.value)" title="Change DP Status">
                     <option value="" ${!d.dp_status ? 'selected' : ''} style="background: #334155; color: #f8fafc;">⏳ Pending</option>
+                    <option value="In Progress" ${d.dp_status === 'In Progress' ? 'selected' : ''} style="background: #d97706; color: #ffffff;">⚡ In Progress</option>
                     <option value="Published" ${d.dp_status === 'Published' ? 'selected' : ''} style="background: #16a34a; color: #ffffff;">🟢 Published</option>
                     <option value="Violation" ${d.dp_status === 'Violation' ? 'selected' : ''} style="background: #dc2626; color: #ffffff;">🔴 Violation</option>
                     <option value="Correction" ${d.dp_status === 'Correction' ? 'selected' : ''} style="background: #2563eb; color: #ffffff;">🔵 Correction</option>
@@ -247,6 +263,7 @@ function renderProgrammingMatrix(dispatches) {
             ? `
                 <select class="prog-status-select" style="background: ${ptStyle.bg}; color: ${ptStyle.color};" onchange="quickUpdateProgStatus(${d.id}, 'pt_status', this.value)" title="Change PT Status">
                     <option value="" ${!d.pt_status ? 'selected' : ''} style="background: #334155; color: #f8fafc;">⏳ Pending</option>
+                    <option value="In Progress" ${d.pt_status === 'In Progress' ? 'selected' : ''} style="background: #d97706; color: #ffffff;">⚡ In Progress</option>
                     <option value="Published" ${d.pt_status === 'Published' ? 'selected' : ''} style="background: #16a34a; color: #ffffff;">🟢 Published</option>
                     <option value="Violation" ${d.pt_status === 'Violation' ? 'selected' : ''} style="background: #dc2626; color: #ffffff;">🔴 Violation</option>
                     <option value="Correction" ${d.pt_status === 'Correction' ? 'selected' : ''} style="background: #2563eb; color: #ffffff;">🔵 Correction</option>
@@ -275,13 +292,13 @@ function renderProgrammingMatrix(dispatches) {
 
         html += `
             <tr style="border-bottom: 1px solid var(--border-color); background: ${idx % 2 === 0 ? 'transparent' : 'rgba(0,0,0,0.015)'};">
-                <!-- 1. Date -->
-                <td style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">
+                <!-- 1. Date (Sticky Column) -->
+                <td class="sticky-col-date" style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap;">
                     ${escapeHtml(dateFormatted)}
                 </td>
 
-                <!-- 2. Title -->
-                <td style="font-weight: 700; color: var(--text-main); font-size: 13px;">
+                <!-- 2. Title (Sticky Column) -->
+                <td class="sticky-col-title" style="font-weight: 700; color: var(--text-main); font-size: 13px;">
                     <div style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(d.title)}">
                         ${escapeHtml(d.title)}
                     </div>
@@ -319,9 +336,14 @@ function renderProgrammingMatrix(dispatches) {
                     ${escapeHtml(d.dispatch_time || '-')}
                 </td>
 
-                <!-- 7. Link (Border separator to Digital Zone) -->
-                <td style="text-align: center; border-right: 3px solid var(--border-color);">
-                    ${linkInputHtml}
+                <!-- 7. DP Link -->
+                <td style="text-align: center; vertical-align: middle; white-space: nowrap;">
+                    ${dpLinkHtml}
+                </td>
+
+                <!-- 8. PT Link (Border separator to Digital Zone) -->
+                <td style="text-align: center; vertical-align: middle; white-space: nowrap; border-right: 3px solid rgba(0,0,0,0.2);">
+                    ${ptLinkHtml}
                 </td>
 
                 <!-- 8. DP Status -->
@@ -344,12 +366,9 @@ function renderProgrammingMatrix(dispatches) {
                     ${escapeHtml(d.pt_time || '-')}
                 </td>
 
-                <!-- 12. Digital Publisher -->
+                <!-- 12. Digital Publisher / Claim Action -->
                 <td style="white-space: nowrap;">
-                    <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
-                        ${pubAvatar}
-                        <span>${escapeHtml(d.publisher_name || '—')}</span>
-                    </div>
+                    ${publisherHtml}
                 </td>
 
                 <!-- 13. Remarks -->
@@ -373,6 +392,28 @@ function renderProgrammingMatrix(dispatches) {
     });
 
     tbody.innerHTML = html;
+}
+
+// ⚡ 1-Click Dispatch Claim for Digital Desk
+async function claimProgStory(id) {
+    if (!id) return;
+    try {
+        const res = await fetch('api/programming.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'claim_story', id: id })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message || "Dispatch claimed successfully!", "success");
+            loadProgrammingDispatches(true);
+        } else {
+            showToast(data.message || "Failed to claim dispatch.", "error");
+        }
+    } catch (err) {
+        console.error("Error claiming dispatch:", err);
+        showToast("Network error claiming dispatch.", "error");
+    }
 }
 
 // 📋 Fast Clipboard Path Copying
@@ -423,7 +464,16 @@ async function quickUpdateProgStatus(id, field, value) {
 }
 
 // 🔗 1-Click / OnChange Quick Update for Published Story Link
-async function quickUpdateProgLink(id, value) {
+async function quickUpdateProgLink(id, field, value) {
+    if (!id) return;
+    let updateField = 'link';
+    let updateVal = value;
+    if (typeof field === 'string' && (field === 'link' || field === 'pt_link')) {
+        updateField = field;
+    } else if (typeof field === 'string') {
+        updateVal = field;
+    }
+
     try {
         const res = await fetch('api/programming.php', {
             method: 'POST',
@@ -431,13 +481,19 @@ async function quickUpdateProgLink(id, value) {
             body: JSON.stringify({
                 action: 'update_link',
                 id: id,
-                link: (value || '').trim()
+                field: updateField,
+                val: (updateVal || '').trim()
             })
         });
         const data = await res.json();
         if (data.success) {
-            showToast("Story link saved.", "success");
-            loadProgrammingDispatches();
+            showToast(`Story ${updateField === 'pt_link' ? 'PT' : 'DP'} link saved.`, "success");
+            const item = ProgState.dispatches.find(d => d.id == id);
+            if (item) {
+                if (updateField === 'pt_link') item.pt_link = (updateVal || '').trim();
+                else item.link = (updateVal || '').trim();
+                renderProgrammingMatrix(ProgState.dispatches);
+            }
         } else {
             showToast(data.message || "Failed to save link", "error");
         }
@@ -558,13 +614,17 @@ function openEditDispatchModal(id) {
 
     const linkInput = document.getElementById('edit-prog-link');
     if (linkInput) linkInput.value = item.link || '';
-    updateEditProgLinkButton(item.link || '');
+    updateEditProgLinkButton(item.link || '', 'edit-prog-link-btn');
+
+    const ptLinkInput = document.getElementById('edit-prog-pt-link');
+    if (ptLinkInput) ptLinkInput.value = item.pt_link || '';
+    updateEditProgLinkButton(item.pt_link || '', 'edit-prog-pt-link-btn');
 
     openModal('edit-dispatch-modal');
 }
 
-function updateEditProgLinkButton(val) {
-    const btn = document.getElementById('edit-prog-link-btn');
+function updateEditProgLinkButton(val, btnId = 'edit-prog-link-btn') {
+    const btn = document.getElementById(btnId);
     if (!btn) return;
     const clean = (val || '').trim();
     if (clean) {
@@ -617,6 +677,7 @@ async function handleEditDispatchSubmit(event) {
         sender_name: document.getElementById('edit-prog-sender')?.value.trim(),
         dispatch_time: document.getElementById('edit-prog-time')?.value.trim(),
         link: document.getElementById('edit-prog-link')?.value.trim(),
+        pt_link: document.getElementById('edit-prog-pt-link')?.value.trim(),
         dp_status: document.getElementById('edit-prog-dp-status')?.value,
         dp_time: document.getElementById('edit-prog-dp-time')?.value.trim(),
         pt_status: document.getElementById('edit-prog-pt-status')?.value,
@@ -730,7 +791,7 @@ function exportProgrammingCsv() {
     }
 
     const headers = [
-        "Date", "Title", "Path / WhatsApp", "Channel", "News Sender", "Dispatch Time", "Link",
+        "Date", "Title", "Path / WhatsApp", "Channel", "News Sender", "Dispatch Time", "DP Link", "PT Link",
         "DP Status", "DP Time", "PT Status", "PT Time", "Digital Publisher", "Remarks", "Rating"
     ];
 
@@ -742,6 +803,7 @@ function exportProgrammingCsv() {
         `"${d.sender_name || ''}"`,
         `"${d.dispatch_time || ''}"`,
         `"${d.link || ''}"`,
+        `"${d.pt_link || ''}"`,
         `"${d.dp_status || ''}"`,
         `"${d.dp_time || ''}"`,
         `"${d.pt_status || ''}"`,
