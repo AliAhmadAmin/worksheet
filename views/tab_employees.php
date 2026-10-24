@@ -60,12 +60,12 @@
                         <table class="interactive-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 21%;">Employee Name</th>
-                                    <th style="width: 16%;">Official Email</th>
+                                    <th style="width: 25%;">Employee Name</th>
+                                    <th style="width: 20%;">Official Email</th>
                                     <th style="width: 15%;">Role & Access</th>
-                                    <th style="width: 14%;">Designation</th>
-                                    <th style="width: 16%;">Department / Team</th>
-                                    <th style="width: 18%; text-align: right;">Actions</th>
+                                    <th style="width: 18%;">Designation</th>
+                                    <th style="width: 170px; max-width: 170px;">Department / Team</th>
+                                    <th style="width: 120px; text-align: right;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="employee-directory-tbody">

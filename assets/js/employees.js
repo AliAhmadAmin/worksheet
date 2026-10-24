@@ -268,10 +268,6 @@ function renderDirectoryTable(employees) {
             ? `<span class="badge" style="background: #fee2e2; color: #dc2626; font-size: 10px; font-weight: 700; white-space: nowrap;">⛔ Deactivated</span>`
             : '';
 
-        const salaryBadge = (parseFloat(emp.basic_salary) > 0 && (isSuperAdmin || isHr))
-            ? `<div style="font-size: 10.5px; color: #15803d; font-weight: 700; margin-top: 2px; white-space: nowrap;">💵 PKR ${Number(emp.basic_salary).toLocaleString()}</div>`
-            : '';
-
         let teamHtml = '';
         const managedDeptIds = (AppState.departments || []).map(d => parseInt(d.id, 10));
         const empDeptId = parseInt(emp.department_id || 0, 10);
@@ -289,7 +285,7 @@ function renderDirectoryTable(employees) {
         }
 
         if (emp.team_name) {
-            teamHtml = `<span style="font-size: 11px; color: var(--text-muted); font-weight: 600; white-space: nowrap;">👥 ${escapeHtml(emp.team_name)}</span>`;
+            teamHtml = `<span style="font-size: 11px; color: var(--text-muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 100%;">👥 ${escapeHtml(emp.team_name)}</span>`;
         } else {
             teamHtml = `
                 <span style="display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; color: #b45309; background: #fef3c7; padding: 1px 6px; border-radius: 4px; font-weight: 700; white-space: nowrap;">
@@ -329,16 +325,17 @@ function renderDirectoryTable(employees) {
             <td>${roleBadge}</td>
             <td>
                 <div style="font-weight: 500;">${escapeHtml(emp.designation || 'Staff')}</div>
-                ${salaryBadge}
             </td>
-            <td>
-                <div style="font-weight: 600; font-size: 12.5px; color: var(--text-main); white-space: nowrap;">
+            <td style="width: 170px; max-width: 170px; min-width: 150px; overflow: hidden;">
+                <div style="font-weight: 600; font-size: 12.5px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;" title="${escapeHtml(emp.department_name || 'General')}">
                     🏢 ${escapeHtml(emp.department_name || 'General')}
                 </div>
-                <div style="display: flex; align-items: center; gap: 5px; margin-top: 3px;">
-                    ${teamHtml}
+                <div style="display: flex; align-items: center; gap: 4px; margin-top: 3px; max-width: 100%; overflow: hidden;">
+                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;" title="${emp.team_name ? escapeHtml(emp.team_name) : 'Unassigned'}">
+                        ${teamHtml}
+                    </div>
                     ${canAssignThisEmp ? `
-                        <button type="button" class="btn btn-outline" style="padding: 1px 5px; font-size: 9.5px; border-radius: 4px; line-height: 1;" onclick="event.stopPropagation(); openDepartmentDrilldown(${emp.department_id || 0})" title="Manage team assignment in department">
+                        <button type="button" class="btn btn-outline" style="padding: 1px 5px; font-size: 9.5px; border-radius: 4px; line-height: 1; flex-shrink: 0;" onclick="event.stopPropagation(); openDepartmentDrilldown(${emp.department_id || 0})" title="Manage team assignment in department">
                             ⚙️
                         </button>
                     ` : ''}
@@ -346,11 +343,6 @@ function renderDirectoryTable(employees) {
             </td>
             <td>
                 <div style="display: flex; align-items: center; gap: 5px; justify-content: flex-end; flex-wrap: nowrap;">
-                    ${canEditThisEmp ? `
-                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--primary); border-color: rgba(59, 130, 246, 0.4);" onclick="event.stopPropagation(); openEditEmployeeModal(${emp.id})" title="Edit Employee Profile & Settings">
-                            ✏️ Edit
-                        </button>
-                    ` : ''}
                     ${(isSuperAdmin && hasLogin && isActive) ? `
                         <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(59, 130, 246, 0.4); color: var(--primary); white-space: nowrap;" onclick="event.stopPropagation(); openPermissionsModal(${emp.id})" title="Role & Access Delegation">
                             🛡️ Roles
@@ -359,22 +351,6 @@ function renderDirectoryTable(employees) {
                     ${(hasLogin && isActive && (isSuperAdmin || isHr || isManagedByHod)) ? `
                         <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; white-space: nowrap;" onclick="event.stopPropagation(); openPasswordModal(${emp.id})" title="Change Password">
                             🔑 Pwd
-                        </button>
-                    ` : ''}
-                    ${((isSuperAdmin || isHr) && !isSelf && emp.role !== 'super_admin' && emp.role !== 'admin') ? (
-                        isActive ? `
-                            <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; color: #d97706; border-color: rgba(217, 119, 6, 0.35); white-space: nowrap;" onclick="event.stopPropagation(); toggleEmployeeStatus(${emp.id}, 0)" title="Deactivate Employee (Preserves All History)">
-                                ⏸️ Deactivate
-                            </button>
-                        ` : `
-                            <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; color: #16a34a; border-color: rgba(22, 163, 74, 0.35); font-weight: 700; white-space: nowrap;" onclick="event.stopPropagation(); toggleEmployeeStatus(${emp.id}, 1)" title="Reactivate Employee Account">
-                                ▶️ Activate
-                            </button>
-                        `
-                    ) : ''}
-                    ${((isSuperAdmin || isHr) && !isSelf && emp.role !== 'super_admin') ? `
-                        <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; color: #dc2626; border-color: rgba(220, 38, 38, 0.35); white-space: nowrap;" onclick="event.stopPropagation(); deleteEmployeePermanent(${emp.id})" title="Permanently Delete Duplicate / Unwanted Employee">
-                            🗑️
                         </button>
                     ` : ''}
                 </div>
