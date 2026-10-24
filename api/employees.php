@@ -101,8 +101,10 @@ switch ($action) {
 
         $stmt = $pdo->prepare("
             SELECT e.*,
+                   COALESCE(e.shift_policy, p.shift_policy, 'fixed') as shift_policy,
+                   COALESCE(e.late_grace_minutes, 15) as late_grace_minutes,
                    p.emp_code, p.father_husband_name, p.cnic_no, p.bank_name, p.bank_account_no, p.fixed_allowance,
-                   p.basic_salary, p.hourly_rate, p.expected_hours, p.shift_policy, p.joining_date,
+                   p.basic_salary, p.hourly_rate, p.expected_hours, p.joining_date,
                    p.annual_leave_quota, p.casual_leave_quota, p.sick_leave_quota,
                    d.name as department_name, t.name as team_name 
             FROM employees e 
@@ -358,10 +360,12 @@ switch ($action) {
 
         $shiftTiming = trim($data['shift_timing'] ?? '10:00 AM TO 6:00 PM');
         $weeklyOff = trim($data['weekly_off'] ?? 'Sunday');
+        $shiftPolicy = trim($data['shift_policy'] ?? 'fixed');
+        $lateGraceMinutes = isset($data['late_grace_minutes']) ? max(0, (int)$data['late_grace_minutes']) : 15;
 
         $passwordHash = $canLogin ? password_hash($password, PASSWORD_DEFAULT) : null;
-        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, can_login, is_active, phone, whatsapp_number, emp_code, shift_timing, weekly_off) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $phone, $phone, $empCode, $shiftTiming, $weeklyOff]);
+        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, can_login, is_active, phone, whatsapp_number, emp_code, shift_timing, weekly_off, shift_policy, late_grace_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes]);
         $newEmpId = $pdo->lastInsertId();
 
         // Default employee code if empty
@@ -606,16 +610,18 @@ switch ($action) {
 
         $shiftTiming = trim($data['shift_timing'] ?? '');
         $weeklyOff = trim($data['weekly_off'] ?? '');
+        $shiftPolicy = trim($data['shift_policy'] ?? 'fixed');
+        $lateGraceMinutes = isset($data['late_grace_minutes']) ? max(0, (int)$data['late_grace_minutes']) : 15;
 
         if ($avatar === '__REMOVE__') {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = NULL, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off) WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = NULL, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off), shift_policy = ?, late_grace_minutes = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $id]);
         } elseif (!empty($avatar)) {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off) WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off), shift_policy = ?, late_grace_minutes = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off) WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off), shift_policy = ?, late_grace_minutes = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $id]);
         }
 
         // Update password if specified

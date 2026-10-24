@@ -30,6 +30,7 @@
                             <span id="hero-roster-pill" class="shift-chip" style="display: none; background: rgba(168, 85, 247, 0.12); color: #c084fc; border-color: rgba(168, 85, 247, 0.25);">
                                 📅 Shift: <span id="hero-roster-shift-text">--</span>
                             </span>
+                            <span id="hero-late-pill" class="shift-chip" style="display: none;"></span>
                             <span id="employee-sheet-lock-badge" class="badge-lock unlocked">🔓 Active</span>
                             <span id="employee-hod-check-badge" class="badge" style="display: none;"></span>
                         </div>
@@ -177,7 +178,7 @@
                             <span class="meta-separator" style="color: var(--border-color);">|</span>
                             <span class="admin-inspector-meta-item">👥 <span><strong>Team:</strong> <span id="admin-meta-team" style="color: var(--text-main); font-weight: 600;">Team</span></span></span>
                             <span class="meta-separator" style="color: var(--border-color);">|</span>
-                            <span class="admin-inspector-meta-item">🕒 <span><strong>Shift:</strong> In: <strong id="admin-meta-in" style="color: #0284c7;">--:--</strong> • Out: <strong id="admin-meta-out" style="color: #ea580c;">--:--</strong></span> <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 10.5px; border-radius: 12px; margin-left: 6px; font-weight: 600;" onclick="openAdminShiftModal()" title="Manually edit or backdate shift check-in and check-out times">✏️ Edit Shift</button></span>
+                            <span class="admin-inspector-meta-item">🕒 <span><strong>Shift:</strong> In: <strong id="admin-meta-in" style="color: #0284c7;">--:--</strong> • Out: <strong id="admin-meta-out" style="color: #ea580c;">--:--</strong></span> <span id="admin-meta-late-badge" style="display: none; margin-left: 6px;"></span> <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 10.5px; border-radius: 12px; margin-left: 6px; font-weight: 600;" onclick="openAdminShiftModal()" title="Manually edit or backdate shift check-in and check-out times">✏️ Edit Shift</button></span>
                         </div>
                     </div>
                 </div>

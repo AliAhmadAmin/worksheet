@@ -466,8 +466,33 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">⏱️ Shift Timing (Roster Hours)</label>
-                                <input type="text" id="add-emp-shift-timing" class="input-control" placeholder="e.g. 12:00 PM TO 8:00 PM" style="font-weight: 600;" value="10:00 AM TO 6:00 PM">
-                                <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
+                                <select id="add-emp-shift-timing-select" class="input-control" style="font-weight: 600;" onchange="handleShiftTimingPresetChange('add')">
+                                    <option value="10:00 AM TO 6:00 PM" selected>10:00 AM TO 6:00 PM (Regular Day • 8h)</option>
+                                    <option value="9:00 AM TO 5:00 PM">9:00 AM TO 5:00 PM (General Office • 8h)</option>
+                                    <option value="8:00 AM TO 4:00 PM">8:00 AM TO 4:00 PM (Early Morning • 8h)</option>
+                                    <option value="12:00 PM TO 8:00 PM">12:00 PM TO 8:00 PM (Mid Shift • 8h)</option>
+                                    <option value="1:00 PM TO 9:00 PM">1:00 PM TO 9:00 PM (Afternoon Shift • 8h)</option>
+                                    <option value="2:00 PM TO 10:00 PM">2:00 PM TO 10:00 PM (Evening Shift • 8h)</option>
+                                    <option value="4:00 PM TO 12:00 AM">4:00 PM TO 12:00 AM (Evening / Broadcast • 8h)</option>
+                                    <option value="6:00 PM TO 2:00 AM">6:00 PM TO 2:00 AM (Night Shift • 8h)</option>
+                                    <option value="11:00 PM TO 7:00 AM">11:00 PM TO 7:00 AM (Overnight • 8h)</option>
+                                    <option value="12:00 AM TO 8:00 AM">12:00 AM TO 8:00 AM (Graveyard Shift • 8h)</option>
+                                    <option value="Flexible Hours">🌐 Flexible / Open Timing (No fixed schedule)</option>
+                                    <option value="custom">✏️ Custom Timing...</option>
+                                </select>
+                                <div id="add-emp-custom-timing-box" style="display: none; margin-top: 6px; padding: 6px 10px; background: rgba(59, 130, 246, 0.05); border: 1px dashed var(--primary); border-radius: var(--radius-sm); gap: 8px; align-items: center;">
+                                    <div style="flex: 1;">
+                                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">Start Time</label>
+                                        <input type="time" id="add-emp-custom-start" class="input-control" style="font-size: 12px; padding: 4px 6px;" value="10:00" onchange="syncCustomShiftTiming('add')">
+                                    </div>
+                                    <span style="font-size: 11px; color: var(--text-muted); margin-top: 14px; font-weight: 700;">TO</span>
+                                    <div style="flex: 1;">
+                                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">End Time</label>
+                                        <input type="time" id="add-emp-custom-end" class="input-control" style="font-size: 12px; padding: 4px 6px;" value="18:00" onchange="syncCustomShiftTiming('add')">
+                                    </div>
+                                </div>
+                                <input type="hidden" id="add-emp-shift-timing" value="10:00 AM TO 6:00 PM">
+                                <small style="font-size: 10px; color: var(--text-muted);">Standardized shift timing for attendance & roster sync</small>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">🏖️ Weekly Off Day</label>
@@ -484,6 +509,23 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                     <option value="Saturday & Sunday">Saturday & Sunday</option>
                                 </select>
                                 <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2" style="margin-top: 10px;">
+                            <div class="form-group">
+                                <label class="form-label">🕒 Attendance & Late Policy</label>
+                                <select id="add-emp-shift-policy" class="input-control" style="font-weight: 600;" onchange="handleShiftPolicyChange('add', this.value)">
+                                    <option value="fixed" selected>⏱️ Fixed / Roster Shift (Count Lates from Shift Time)</option>
+                                    <option value="rotational">🔄 Rotational Shift (Auto-Match Nearest Shift)</option>
+                                    <option value="flexible">🟢 Flexible Hours (No Lateness Tracked • Exempt)</option>
+                                </select>
+                                <small style="font-size: 10px; color: var(--text-muted);">Flexible staff are exempt from late arrival tracking</small>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">⏱️ Late Grace Period (Minutes)</label>
+                                <input type="number" id="add-emp-late-grace" class="input-control" value="15" min="0" max="120" style="font-weight: 600;">
+                                <small style="font-size: 10px; color: var(--text-muted);">Grace buffer before late arrival is counted (e.g. 15 mins)</small>
                             </div>
                         </div>
                     </div>
@@ -524,25 +566,6 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                             <div class="form-group">
                                 <label class="form-label">Bank Account / IBAN No.</label>
                                 <input type="text" id="add-emp-bank-account" class="input-control" placeholder="e.g. 0123456789012 or PK00UNIL...">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Section 5: Leave Entitlements & Quotas -->
-                    <div class="modal-section" id="add-emp-leaves-section">
-                        <div class="modal-section-title">🏖️ Leave Entitlements & Quotas</div>
-                        <div class="form-grid-3">
-                            <div class="form-group">
-                                <label class="form-label" style="font-size: 11px;">Annual Leaves</label>
-                                <input type="number" id="add-emp-annual-quota" class="input-control" value="14" min="0" style="text-align: center; font-weight: 700;">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" style="font-size: 11px;">Casual Leaves</label>
-                                <input type="number" id="add-emp-casual-quota" class="input-control" value="10" min="0" style="text-align: center; font-weight: 700;">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" style="font-size: 11px;">Sick Leaves</label>
-                                <input type="number" id="add-emp-sick-quota" class="input-control" value="8" min="0" style="text-align: center; font-weight: 700;">
                             </div>
                         </div>
                     </div>
@@ -728,8 +751,33 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">⏱️ Shift Timing (Roster Hours)</label>
-                                <input type="text" id="edit-emp-shift-timing" class="input-control" placeholder="e.g. 12:00 PM TO 8:00 PM" style="font-weight: 600;">
-                                <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
+                                <select id="edit-emp-shift-timing-select" class="input-control" style="font-weight: 600;" onchange="handleShiftTimingPresetChange('edit')">
+                                    <option value="10:00 AM TO 6:00 PM">10:00 AM TO 6:00 PM (Regular Day • 8h)</option>
+                                    <option value="9:00 AM TO 5:00 PM">9:00 AM TO 5:00 PM (General Office • 8h)</option>
+                                    <option value="8:00 AM TO 4:00 PM">8:00 AM TO 4:00 PM (Early Morning • 8h)</option>
+                                    <option value="12:00 PM TO 8:00 PM">12:00 PM TO 8:00 PM (Mid Shift • 8h)</option>
+                                    <option value="1:00 PM TO 9:00 PM">1:00 PM TO 9:00 PM (Afternoon Shift • 8h)</option>
+                                    <option value="2:00 PM TO 10:00 PM">2:00 PM TO 10:00 PM (Evening Shift • 8h)</option>
+                                    <option value="4:00 PM TO 12:00 AM">4:00 PM TO 12:00 AM (Evening / Broadcast • 8h)</option>
+                                    <option value="6:00 PM TO 2:00 AM">6:00 PM TO 2:00 AM (Night Shift • 8h)</option>
+                                    <option value="11:00 PM TO 7:00 AM">11:00 PM TO 7:00 AM (Overnight • 8h)</option>
+                                    <option value="12:00 AM TO 8:00 AM">12:00 AM TO 8:00 AM (Graveyard Shift • 8h)</option>
+                                    <option value="Flexible Hours">🌐 Flexible / Open Timing (No fixed schedule)</option>
+                                    <option value="custom">✏️ Custom Timing...</option>
+                                </select>
+                                <div id="edit-emp-custom-timing-box" style="display: none; margin-top: 6px; padding: 6px 10px; background: rgba(59, 130, 246, 0.05); border: 1px dashed var(--primary); border-radius: var(--radius-sm); gap: 8px; align-items: center;">
+                                    <div style="flex: 1;">
+                                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">Start Time</label>
+                                        <input type="time" id="edit-emp-custom-start" class="input-control" style="font-size: 12px; padding: 4px 6px;" value="10:00" onchange="syncCustomShiftTiming('edit')">
+                                    </div>
+                                    <span style="font-size: 11px; color: var(--text-muted); margin-top: 14px; font-weight: 700;">TO</span>
+                                    <div style="flex: 1;">
+                                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">End Time</label>
+                                        <input type="time" id="edit-emp-custom-end" class="input-control" style="font-size: 12px; padding: 4px 6px;" value="18:00" onchange="syncCustomShiftTiming('edit')">
+                                    </div>
+                                </div>
+                                <input type="hidden" id="edit-emp-shift-timing" value="10:00 AM TO 6:00 PM">
+                                <small style="font-size: 10px; color: var(--text-muted);">Standardized shift timing for attendance & roster sync</small>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">🏖️ Weekly Off Day</label>
@@ -746,6 +794,23 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                     <option value="Saturday & Sunday">Saturday & Sunday</option>
                                 </select>
                                 <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2" style="margin-top: 10px;">
+                            <div class="form-group">
+                                <label class="form-label">🕒 Attendance & Late Policy</label>
+                                <select id="edit-emp-shift-policy" class="input-control" style="font-weight: 600;" onchange="handleShiftPolicyChange('edit', this.value)">
+                                    <option value="fixed">⏱️ Fixed / Roster Shift (Count Lates from Shift Time)</option>
+                                    <option value="rotational">🔄 Rotational Shift (Auto-Match Nearest Shift)</option>
+                                    <option value="flexible">🟢 Flexible Hours (No Lateness Tracked • Exempt)</option>
+                                </select>
+                                <small style="font-size: 10px; color: var(--text-muted);">Flexible staff are exempt from late arrival tracking</small>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">⏱️ Late Grace Period (Minutes)</label>
+                                <input type="number" id="edit-emp-late-grace" class="input-control" value="15" min="0" max="120" style="font-weight: 600;">
+                                <small style="font-size: 10px; color: var(--text-muted);">Grace buffer before late arrival is counted (e.g. 15 mins)</small>
                             </div>
                         </div>
                     </div>
@@ -786,25 +851,6 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                             <div class="form-group">
                                 <label class="form-label">Bank Account / IBAN No.</label>
                                 <input type="text" id="edit-emp-bank-account" class="input-control" placeholder="e.g. 0123456789012 or PK00UNIL...">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Section 5: Leave Entitlements & Quotas -->
-                    <div class="modal-section" id="edit-emp-leaves-section">
-                        <div class="modal-section-title">🏖️ Leave Entitlements & Quotas</div>
-                        <div class="form-grid-3">
-                            <div class="form-group">
-                                <label class="form-label" style="font-size: 11px;">Annual Leaves</label>
-                                <input type="number" id="edit-emp-annual-quota" class="input-control" value="14" min="0" style="text-align: center; font-weight: 700;">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" style="font-size: 11px;">Casual Leaves</label>
-                                <input type="number" id="edit-emp-casual-quota" class="input-control" value="10" min="0" style="text-align: center; font-weight: 700;">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label" style="font-size: 11px;">Sick Leaves</label>
-                                <input type="number" id="edit-emp-sick-quota" class="input-control" value="8" min="0" style="text-align: center; font-weight: 700;">
                             </div>
                         </div>
                     </div>
@@ -1313,6 +1359,23 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         </div>
                         <input type="text" id="admin-shift-out-time" class="input-control" placeholder="e.g. 06:00 PM (Leave empty if currently on duty)" autocomplete="off">
                         <small style="font-size: 11px; color: var(--text-dim);">Leave empty if employee is still currently on duty.</small>
+                    </div>
+
+                    <div id="admin-shift-late-section" style="margin-top: 14px; padding: 12px 14px; background: rgba(244, 63, 94, 0.05); border: 1px dashed rgba(244, 63, 94, 0.35); border-radius: var(--radius-md);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 13px; font-weight: 700; color: var(--text-main);">🛡️ Late Arrival & Excusal</span>
+                                <span id="admin-shift-late-badge" class="badge" style="font-size: 11px; padding: 2px 7px; border-radius: 4px; display: none;"></span>
+                            </div>
+                            <label for="admin-shift-late-excuse-toggle" style="font-size: 12px; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; user-select: none;">
+                                <input type="checkbox" id="admin-shift-late-excuse-toggle" style="width: 17px; height: 17px; accent-color: var(--primary); cursor: pointer;" onchange="toggleAdminShiftExcuseReason(this.checked)">
+                                Excuse / Waive Late
+                            </label>
+                        </div>
+                        <div id="admin-shift-late-reason-box" style="display: none; margin-top: 10px;">
+                            <label class="form-label" style="font-size: 11px; margin-bottom: 3px;">Excusal Note / Reason</label>
+                            <input type="text" id="admin-shift-late-excuse-reason" class="input-control" placeholder="e.g. Traffic Jam, Official Meeting, Rain / Weather, Approved by HOD" style="font-size: 12px;">
+                        </div>
                     </div>
                 </div>
                 </div>

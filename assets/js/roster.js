@@ -121,7 +121,10 @@ function renderDutyRoster(data) {
         '2:00 PM TO 12:00 AM',
         '3:00 PM TO 11:00 PM',
         '4:00 PM TO 12:00 AM',
+        '6:00 PM TO 2:00 AM',
         '11:00 PM TO 7:00 AM',
+        '12:00 AM TO 8:00 AM',
+        'Flexible Hours',
         'OFF'
     ];
 

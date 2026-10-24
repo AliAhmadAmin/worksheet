@@ -193,6 +193,7 @@ function updateLiveCardActiveStates(activeFilter) {
         'working': 'card-stat-working',
         'checked_out': 'card-stat-out',
         'absent': 'card-stat-absent-box',
+        'late': 'card-stat-late',
         'checked': 'card-stat-checked',
         'pending': 'card-stat-pending'
     };
@@ -225,6 +226,8 @@ function renderLiveAttendanceTable() {
         filteredEmployees = filteredEmployees.filter(e => e.status === 'checked_out');
     } else if (currentLiveAttendanceFilter === 'absent') {
         filteredEmployees = filteredEmployees.filter(e => e.status === 'not_arrived' || e.status === 'absent' || e.status === 'holiday');
+    } else if (currentLiveAttendanceFilter === 'late') {
+        filteredEmployees = filteredEmployees.filter(e => (e.is_late == 1 && !e.late_excused && e.check_in_time));
     } else if (currentLiveAttendanceFilter === 'checked') {
         filteredEmployees = filteredEmployees.filter(e => (e.is_hod_checked == 1 || e.sheet_status === 'checked'));
     } else if (currentLiveAttendanceFilter === 'pending') {
@@ -239,6 +242,7 @@ function renderLiveAttendanceTable() {
             'working': 'On Duty',
             'checked_out': 'Checked Out',
             'absent': 'Absent / Off',
+            'late': 'Late Arrivals',
             'checked': 'Verify',
             'pending': 'Pending Verify'
         };
@@ -299,6 +303,23 @@ function renderLiveAttendanceTable() {
             ? `<img src="${escapeHtml(emp.avatar)}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 30px; height: 30px; font-size: 11px;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
             : `<div class="user-avatar" style="width: 30px; height: 30px; font-size: 11px; flex-shrink: 0;">${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>`;
 
+        let lateBadge = '';
+        if (emp.check_in_time) {
+            if (emp.shift_policy === 'flexible') {
+                lateBadge = `<span class="badge" style="background: rgba(59, 130, 246, 0.1); color: #2563eb; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 10px; margin-left: 4px;" title="Flexible hours policy (exempt from lateness)">🟢 Flex</span>`;
+            } else if (emp.is_late == 1) {
+                if (emp.late_excused == 1) {
+                    lateBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #10b981; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 10px; margin-left: 4px;" title="Late excused: ${escapeHtml(emp.late_excused_reason || 'Approved')}">✓ Excused (${emp.late_minutes}m)</span>`;
+                } else {
+                    lateBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.12); color: #ef4444; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 10px; margin-left: 4px;" title="${emp.late_minutes}m late (Shift: ${escapeHtml(emp.effective_shift_timing || emp.shift_timing || 'Standard')})">⏱️ Late ${emp.late_minutes}m</span>`;
+                }
+            } else {
+                lateBadge = `<span class="badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 10px; margin-left: 4px;" title="On time for shift: ${escapeHtml(emp.effective_shift_timing || emp.shift_timing || 'Standard')}">✓ On Time</span>`;
+            }
+        }
+
+        const canExcuseLate = (isSuperOrHr || (AppState.currentUser && AppState.currentUser.role === 'hod')) && (emp.is_late == 1 && !emp.late_excused && emp.check_in_time);
+
         tr.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 8px; ${canInspect ? 'cursor: pointer;' : ''}" ${canInspect ? `onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')"` : ''} title="${canInspect ? 'Click to inspect ' + escapeHtml(emp.name) + '\'s worksheet' : ''}">
@@ -310,13 +331,18 @@ function renderLiveAttendanceTable() {
                 </div>
             </td>
             <td><span class="user-role-tag" style="background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">${escapeHtml(emp.department_name || 'Digital')}</span></td>
-            <td style="white-space: nowrap;"><code style="font-size: 12px; font-weight: 700; color: ${emp.check_in_time ? '#10b981' : 'var(--text-dim)'};">${escapeHtml(emp.check_in_time || '-')}</code></td>
+            <td style="white-space: nowrap;"><code style="font-size: 12px; font-weight: 700; color: ${emp.check_in_time ? '#10b981' : 'var(--text-dim)'};">${escapeHtml(emp.check_in_time || '-')}</code>${lateBadge}</td>
             <td style="white-space: nowrap;"><code style="font-size: 12px; font-weight: 700; color: ${emp.check_out_time ? '#3b82f6' : 'var(--text-dim)'};">${escapeHtml(emp.check_out_time || '-')}</code></td>
             <td style="white-space: nowrap;"><strong style="font-size: 13px; color: ${emp.total_duty_hours ? 'var(--text-main)' : 'var(--text-dim)'};">${escapeHtml(emp.total_duty_hours || '-')}</strong></td>
             <td style="white-space: nowrap;">${statusBadge}</td>
             ${sheetStatusTd}
             <td style="text-align: right; white-space: nowrap;">
                 <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px;">
+                    ${canExcuseLate ? `
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(239, 68, 68, 0.4); color: #ef4444; white-space: nowrap;" onclick="handleExcuseLate(${emp.employee_id}, '${targetDate}', '${escapeHtml(emp.name)}', ${emp.late_minutes})" title="Excuse late arrival for approved reason or shift swap">
+                            ⚡ Excuse
+                        </button>
+                    ` : ''}
                     ${canInspect ? `
                         <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(16, 185, 129, 0.4); color: #10b981; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;" onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')" title="Inspect & Check Employee Worksheet">
                             📝 Inspect
@@ -360,6 +386,7 @@ async function loadLiveAttendance() {
         const workingEl = document.getElementById('att-stat-working');
         const outEl = document.getElementById('att-stat-out');
         const absentEl = document.getElementById('att-stat-absent');
+        const lateEl = document.getElementById('att-stat-late');
         const checkedEl = document.getElementById('att-stat-checked') || document.getElementById('att-stat-verified');
         const pendingEl = document.getElementById('att-stat-pending');
 
@@ -367,6 +394,7 @@ async function loadLiveAttendance() {
         if (workingEl) workingEl.textContent = data.stats.checked_in;
         if (outEl) outEl.textContent = data.stats.checked_out;
         if (absentEl) absentEl.textContent = data.stats.not_arrived;
+        if (lateEl) lateEl.textContent = data.stats.late_count || 0;
         if (checkedEl) checkedEl.textContent = data.stats.sheets_checked ?? (data.stats.sheets_verified || 0);
         if (pendingEl) pendingEl.textContent = data.stats.sheets_pending || 0;
 
@@ -854,7 +882,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
         const isWeekendOff = (r.is_weekend && !r.check_in && !r.check_out && !isSwappedOff && !isAltOff);
         const isMergedDay = (isLeaveDay || isDayOff || isWeekendOff);
 
-        const adjustArgs = `${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0}, '${r.day_type || (isSwappedOff ? 'swapped_off' : (isAltOff ? 'alt_off' : (r.status === 'absent' ? 'absent' : '')))}', '${escapeHtml(r.holiday_reason || r.swapped_note || '')}', ${isSwappedOff ? 1 : 0}, '${escapeHtml(r.swapped_with_date || '')}'`;
+        const adjustArgs = `${emp.id}, '${r.date}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${r.check_in || ''}', '${r.check_out || ''}', ${r.is_locked ? 1 : 0}, '${r.day_type || (isSwappedOff ? 'swapped_off' : (isAltOff ? 'alt_off' : (r.status === 'absent' ? 'absent' : '')))}', '${escapeHtml(r.holiday_reason || r.swapped_note || '')}', ${isSwappedOff ? 1 : 0}, '${escapeHtml(r.swapped_with_date || '')}', ${r.is_late || 0}, ${r.late_minutes || 0}, ${r.late_excused || 0}, '${escapeHtml(r.late_excused_reason || '')}', '${escapeHtml(r.effective_shift_timing || '')}'`;
 
         if (isMergedDay) {
             let mergedContentHtml = '';
@@ -905,13 +933,31 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                 ? `<span style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 4px; white-space: nowrap;" title="Worked on scheduled weekly off / rest day (Earned compensatory day off credit)">⭐ Off Worked</span>`
                 : '';
 
+            let latePillHtml = '';
+            if (r.check_in) {
+                if (r.is_late) {
+                    if (r.late_excused) {
+                        latePillHtml = `<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 5px; cursor: pointer;" onclick="openAdminShiftModal(${adjustArgs})" title="Late arrival excused by ${escapeHtml(r.late_excused_by || 'Admin')}: ${escapeHtml(r.late_excused_reason || 'Approved')}">✓ Excused</span>`;
+                    } else {
+                        latePillHtml = `<span class="badge" style="background: rgba(244, 63, 94, 0.12); color: #e11d48; border: 1px solid rgba(244, 63, 94, 0.3); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 5px; cursor: pointer;" onclick="openAdminShiftModal(${adjustArgs})" title="Late arrival by ${r.late_minutes}m from shift timing (${escapeHtml(r.effective_shift_timing || '')}). Click to excuse or adjust.">⏱️ Late ${r.late_minutes}m</span>`;
+                    }
+                } else {
+                    latePillHtml = `<span class="badge" style="background: rgba(16, 185, 129, 0.08); color: #10b981; font-size: 10px; font-weight: 600; padding: 1px 4px; border-radius: 3px; margin-left: 5px;">✓ On Time</span>`;
+                }
+            }
+
             rowsHtml += `
                 <tr ${rowBg}>
                     <td style="white-space: nowrap;">
                         <strong style="font-size: 12.5px;">${r.date}</strong> 
                         <span style="font-size: 11px; color: ${r.is_weekend ? '#f59e0b' : 'var(--text-muted)'}; font-weight: 600; margin-left: 3px;">(${escapeHtml(fullDay)})</span>
                     </td>
-                    <td><code style="font-size: 12px; color: ${r.check_in ? '#10b981' : 'var(--text-dim)'}; font-weight: 700;">${r.check_in || '-'}</code></td>
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <code style="font-size: 12px; color: ${r.check_in ? '#10b981' : 'var(--text-dim)'}; font-weight: 700;">${r.check_in || '-'}</code>
+                            ${latePillHtml}
+                        </div>
+                    </td>
                     <td><code style="font-size: 12px; color: ${r.check_out ? '#3b82f6' : 'var(--text-dim)'}; font-weight: 700;">${r.check_out || '-'}</code></td>
                     <td><strong style="font-size: 13px; color: ${r.duty_seconds > 0 ? 'var(--text-main)' : 'var(--text-dim)'}; font-family: monospace;">${r.duty_formatted}</strong></td>
                     <td style="white-space: nowrap;">
@@ -920,7 +966,12 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                         </span>
                         ${offWorkedPill}
                     </td>
-                    <td style="text-align: right;">
+                    <td style="text-align: right; white-space: nowrap;">
+                        ${r.is_late && !r.late_excused ? `
+                            <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 10.5px; font-weight: 700; color: #059669; border-color: rgba(16, 185, 129, 0.4); margin-right: 4px;" onclick="handleExcuseLateQuick(${emp.id}, '${r.date}')" title="1-Click Excuse Late Arrival">
+                                🛡️ Excuse
+                            </button>
+                        ` : ''}
                         <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600;" onclick="openAdminShiftModal(${adjustArgs})" title="Adjust or Add Remarks to Shift Record">
                             ⏱️ Adjust
                         </button>
@@ -985,6 +1036,12 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                         <span><span style="color: #3b82f6; font-weight: 600;">Leaves:</span> <b style="color: #3b82f6;">${sum.approved_leaves}</b></span>
                         <span style="color: var(--border-color);">|</span>
                         <span><span style="color: #ef4444; font-weight: 600;">Absents:</span> <b style="color: #ef4444;">${(sum.absences || 0) + (sum.incomplete || 0)}</b></span>
+                        <span style="color: var(--border-color);">|</span>
+                        <span><span style="color: #f43f5e; font-weight: 600;">Lates:</span> <b style="color: #f43f5e;">${sum.late_days || 0}</b> <small style="color: var(--text-muted); font-size: 10px;">(${sum.late_minutes || 0}m)</small></span>
+                        ${(sum.late_excused_days || 0) > 0 ? `
+                            <span style="color: var(--border-color);">|</span>
+                            <span><span style="color: #10b981; font-weight: 600;">Excused:</span> <b style="color: #10b981;">${sum.late_excused_days}</b></span>
+                        ` : ''}
                     </div>
 
                     <div style="padding: 4px 10px; background: ${balanceBg}; border: 1px solid ${balanceBorder}; border-radius: 6px; font-size: 12px;">
@@ -1059,6 +1116,7 @@ function renderMultiEmployeeAttendanceMatrix(data) {
                 <td><strong style="color: #f97316; font-size: 13px;">${sum.half_leaves}</strong></td>
                 <td><strong style="color: #3b82f6; font-size: 13px;">${sum.approved_leaves}</strong></td>
                 <td><strong style="color: #ef4444; font-size: 13px;">${sum.absences + sum.incomplete}</strong></td>
+                <td><strong style="color: ${sum.late_days > 0 ? '#f43f5e' : 'var(--text-muted)'}; font-size: 13px;">${sum.late_days || 0}</strong> <small style="font-size: 10px; color: var(--text-muted);">${sum.late_minutes ? sum.late_minutes + 'm' : ''}</small></td>
                 <td><strong style="color: var(--primary); font-size: 13.5px;">${sum.duty_formatted}</strong></td>
                 <td><span style="font-size: 12px; color: var(--text-muted);">${sum.expected_duty_hours} hrs</span></td>
                 <td>
@@ -1094,6 +1152,7 @@ function renderMultiEmployeeAttendanceMatrix(data) {
                             <th title="Half Duty Shifts (~4h)">Half (4h)</th>
                             <th title="Official Approved Leaves">Leaves</th>
                             <th title="Absences / Minimal Duty">Absent</th>
+                            <th title="Late Arrivals count and minutes">Lates</th>
                             <th>Duty Hours</th>
                             <th>Expected</th>
                             <th>Balance</th>
@@ -1107,6 +1166,33 @@ function renderMultiEmployeeAttendanceMatrix(data) {
             </div>
         </div>
     `;
+}
+
+async function handleExcuseLateQuick(empId, date) {
+    const reason = prompt("Enter reason for excusing late arrival (e.g. Traffic, Rain, Official Work, Approved by HOD):", "Approved by HOD");
+    if (reason === null) return;
+
+    try {
+        const res = await fetch('api/attendance.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'excuse_late',
+                employee_id: empId,
+                date: date,
+                reason: reason.trim() || 'Approved by HOD'
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message || "Late arrival excused successfully.", "success");
+            loadAttendanceReport(empId);
+        } else {
+            showToast(data.message || "Failed to excuse late.", "error");
+        }
+    } catch (err) {
+        showToast("Error connecting to server.", "error");
+    }
 }
 
 function selectEmployeeForReport(empId) {
@@ -1130,7 +1216,7 @@ function exportAttendanceReportCsv() {
 
     if (hasDailyRecords) {
         // Detailed Timesheet CSV
-        csvContent += "Employee Name,Email,Designation,Department,Date,Day,Check In,Check Out,Duty Hours,Status,Leave Reason / Remarks\n";
+        csvContent += "Employee Name,Email,Designation,Department,Date,Day,Check In,Check Out,Duty Hours,Status,Is Late,Late Minutes,Late Excused,Leave Reason / Remarks\n";
 
         data.report_data.forEach(item => {
             const emp = item.employee;
@@ -1142,6 +1228,7 @@ function exportAttendanceReportCsv() {
                     note = r.status_label;
                 }
 
+                const lateStatusStr = r.is_late ? (r.late_excused ? 'Excused' : 'Yes') : 'No';
                 const row = [
                     `"${(emp.name || '').replace(/"/g, '""')}"`,
                     `"${(emp.email || '').replace(/"/g, '""')}"`,
@@ -1153,6 +1240,9 @@ function exportAttendanceReportCsv() {
                     `"${r.check_out || ''}"`,
                     `"${r.duty_formatted || '0:00:00'}"`,
                     `"${(r.status_label || '').replace(/"/g, '""')}"`,
+                    `"${r.is_late ? 'Yes' : 'No'}"`,
+                    `"${r.late_minutes || 0}"`,
+                    `"${r.late_excused ? 'Yes' : 'No'}"`,
                     `"${note.replace(/"/g, '""')}"`
                 ];
                 csvContent += row.join(",") + "\n";
@@ -1160,7 +1250,7 @@ function exportAttendanceReportCsv() {
         });
     } else {
         // Company-Wide Summary Matrix CSV
-        csvContent += "Employee Name,Email,Designation,Department,Full Shifts,Short Shifts (6h),Half Shifts (4h),Approved Leaves,Absent Days,Duty Hours,Expected Hours,Balance Hours\n";
+        csvContent += "Employee Name,Email,Designation,Department,Full Shifts,Short Shifts (6h),Half Shifts (4h),Approved Leaves,Absent Days,Late Arrivals,Late Minutes,Duty Hours,Expected Hours,Balance Hours\n";
 
         data.report_data.forEach(item => {
             const emp = item.employee;
@@ -1175,6 +1265,8 @@ function exportAttendanceReportCsv() {
                 `"${sum.half_leaves}"`,
                 `"${sum.approved_leaves}"`,
                 `"${sum.absences + sum.incomplete}"`,
+                `"${sum.late_days || 0}"`,
+                `"${sum.late_minutes || 0}"`,
                 `"${sum.duty_formatted}"`,
                 `"${sum.expected_duty_hours} hrs"`,
                 `"${sum.hour_balance >= 0 ? '+' + sum.hour_balance : sum.hour_balance}h"`
@@ -1309,7 +1401,13 @@ function printAttendanceReport() {
                         <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
                         <td style="white-space: nowrap; font-weight: 700;">${r.date}</td>
                         <td style="text-align: center; color: ${r.is_weekend ? '#d97706' : '#475569'}; font-weight: 600;">${escapeHtml(fullDay)}</td>
-                        <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${r.check_in ? '#059669' : '#94a3b8'};">${r.check_in || '-'}</td>
+                        <td style="text-align: center;">
+                            <span style="font-family: monospace; font-weight: 700; color: ${r.is_late && !r.late_excused ? '#b91c1c' : (r.check_in ? '#059669' : '#94a3b8')};">${r.check_in || '-'}</span>
+                            ${r.is_late ? (r.late_excused 
+                                ? `<div style="font-size: 8.5px; color: #059669; font-weight: 700;">Excused</div>` 
+                                : `<div style="font-size: 8.5px; color: #b91c1c; font-weight: 700;">Late (${r.late_minutes}m)</div>`) 
+                                : ''}
+                        </td>
                         <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${r.check_out ? '#2563eb' : '#94a3b8'};">${r.check_out || '-'}</td>
                         <td style="text-align: center; font-family: monospace; font-weight: 700;">${r.duty_formatted || '0:00:00'}</td>
                         <td style="text-align: center;"><span class="status-badge ${statusClass}">${escapeHtml(cleanStatusText)}</span></td>
@@ -1335,13 +1433,21 @@ function printAttendanceReport() {
                         <td class="meta-label">Report Period:</td>
                         <td class="meta-value" style="white-space: nowrap;"><strong>${escapeHtml(data.start_date)} to ${escapeHtml(data.end_date)}</strong></td>
                     </tr>
+                    <tr>
+                        <td class="meta-label">Shift Timing:</td>
+                        <td class="meta-value"><strong>${escapeHtml(emp.shift_timing || '10:00 AM TO 6:00 PM')}</strong></td>
+                        <td class="meta-label">Attendance Policy:</td>
+                        <td class="meta-value"><strong>${emp.shift_policy === 'flexible' ? 'Flexible Hours (Exempt)' : (emp.shift_policy === 'rotational' ? 'Rotational Shift' : 'Fixed Roster')}</strong></td>
+                        <td class="meta-label">Grace Buffer:</td>
+                        <td class="meta-value"><strong>${emp.shift_policy === 'flexible' ? 'N/A (Exempt)' : (emp.late_grace_minutes || 15) + ' Mins'}</strong></td>
+                    </tr>
                 </table>
             </div>
 
             <!-- Executive Metric Summary Grid -->
             <div class="kpi-container">
                 <div class="kpi-box">
-                    <div class="kpi-title">TOTAL DUTY HOURS</div>
+                    <div class="kpi-title">TOTAL DUTY</div>
                     <div class="kpi-val" style="color: #00b300;">${totalDutyHoursStr}</div>
                 </div>
                 <div class="kpi-box">
@@ -1349,12 +1455,21 @@ function printAttendanceReport() {
                     <div class="kpi-val" style="color: #059669;">${sum.full_days}</div>
                 </div>
                 <div class="kpi-box">
-                    <div class="kpi-title">SHORT / HALF LEAVES</div>
+                    <div class="kpi-title">SHORT / HALF</div>
                     <div class="kpi-val" style="color: #d97706;">${sum.short_leaves} / ${sum.half_leaves}</div>
                 </div>
                 <div class="kpi-box">
-                    <div class="kpi-title">APPROVED LEAVES</div>
+                    <div class="kpi-title">LEAVES</div>
                     <div class="kpi-val" style="color: #2563eb;">${sum.approved_leaves}</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-title">ABSENTS</div>
+                    <div class="kpi-val" style="color: #dc2626;">${(sum.absences || 0) + (sum.incomplete || 0)}</div>
+                </div>
+                <div class="kpi-box">
+                    <div class="kpi-title">LATE ARRIVALS</div>
+                    <div class="kpi-val" style="color: ${sum.late_days > 0 ? '#b91c1c' : '#64748b'};">${sum.late_days || 0}</div>
+                    <div class="kpi-sub">${sum.late_minutes || 0}m ${(sum.late_excused_days || 0) > 0 ? `• ${sum.late_excused_days} Excused` : ''}</div>
                 </div>
                 <div class="kpi-box">
                     <div class="kpi-title">HOURLY BALANCE</div>
@@ -1404,6 +1519,7 @@ function printAttendanceReport() {
                     <td style="text-align: center; font-weight: 700; color: #ea580c;">${sum.half_leaves}</td>
                     <td style="text-align: center; font-weight: 700; color: #2563eb;">${sum.approved_leaves}</td>
                     <td style="text-align: center; font-weight: 700; color: #dc2626;">${sum.absences + sum.incomplete}</td>
+                    <td style="text-align: center; font-weight: 700; color: ${sum.late_days > 0 ? '#b91c1c' : '#64748b'};">${sum.late_days || 0} ${sum.late_minutes ? `<span style="font-size: 9px; font-weight: normal;">(${sum.late_minutes}m)</span>` : ''}</td>
                     <td style="text-align: center; font-family: monospace; font-weight: 800; color: #00b300;">${sum.duty_formatted}</td>
                     <td style="text-align: center; font-weight: 800; color: ${balanceColor};">
                         ${isOvertime ? '+' : ''}${sum.hour_balance}h
@@ -1443,6 +1559,7 @@ function printAttendanceReport() {
                         <th style="text-align: center;">Half</th>
                         <th style="text-align: center;">Leaves</th>
                         <th style="text-align: center;">Absent</th>
+                        <th style="text-align: center;">Lates</th>
                         <th style="text-align: center;">Duty Hours</th>
                         <th style="text-align: center;">Balance</th>
                     </tr>
@@ -1545,8 +1662,8 @@ function printAttendanceReport() {
                 }
                 .kpi-container {
                     display: grid;
-                    grid-template-columns: repeat(5, 1fr);
-                    gap: 8px;
+                    grid-template-columns: repeat(7, 1fr);
+                    gap: 6px;
                     margin-bottom: 12px;
                 }
                 .kpi-box {
@@ -2532,6 +2649,36 @@ async function handleTrackingOptionDelete(id, name) {
     } catch (err) {
         console.error("Error deleting tracking option:", err);
         showToast("Error deleting tracking option", "error");
+    }
+}
+
+async function handleExcuseLate(empId, date, empName, lateMinutes) {
+    const reason = prompt(`Excuse late arrival for ${empName} (${lateMinutes} mins late)?\nEnter reason or press OK for default:`, "Approved shift swap / Official emergency");
+    if (reason === null) return;
+
+    try {
+        const res = await fetch('api/attendance.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'excuse_late',
+                employee_id: empId,
+                date: date,
+                reason: reason.trim() || 'Approved by supervisor'
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`Late arrival excused for ${empName}!`, "success");
+            loadLiveAttendance();
+            if (typeof loadCurrentSheet === 'function') {
+                loadCurrentSheet(false);
+            }
+        } else {
+            showToast(data.message || "Failed to excuse late arrival.", "error");
+        }
+    } catch (e) {
+        showToast("Error updating attendance status.", "error");
     }
 }
 

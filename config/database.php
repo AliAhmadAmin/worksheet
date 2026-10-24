@@ -159,6 +159,16 @@ function migratePermissionsSchema($pdo) {
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN monthly_off_days INT DEFAULT 4"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN shift_timing VARCHAR(100) NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN weekly_off VARCHAR(50) NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees ADD COLUMN shift_policy VARCHAR(50) DEFAULT 'fixed'"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees ADD COLUMN late_grace_minutes INT DEFAULT 15"); } catch (Exception $e) {}
+
+        // Shift late tracking and excusal schema for daily_sheets
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN is_late TINYINT DEFAULT 0"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN late_minutes INT DEFAULT 0"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN late_excused TINYINT DEFAULT 0"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN late_excused_by INT NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN late_excused_reason VARCHAR(255) NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN effective_shift_timing VARCHAR(100) NULL"); } catch (Exception $e) {}
 
         // HOD Verification and Digital Sign-off Schema for Daily Sheets
         try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN is_hod_checked TINYINT DEFAULT 0 AFTER is_locked"); } catch (Exception $e) {}

@@ -329,6 +329,43 @@ function renderWorksheetHero(sheet, empData, data = null) {
         }
         if (outEl) outEl.textContent = sheet?.check_out_time || '--:--';
 
+        // Render Inspector Late Arrival / Shift Status Badge
+        const lateBadgeEl = document.getElementById('admin-meta-late-badge');
+        if (lateBadgeEl) {
+            if (!sheet?.check_in_time) {
+                lateBadgeEl.style.display = 'none';
+            } else if (empData.shift_policy === 'flexible') {
+                lateBadgeEl.style.display = 'inline-flex';
+                lateBadgeEl.className = 'badge';
+                lateBadgeEl.style.background = 'rgba(59, 130, 246, 0.12)';
+                lateBadgeEl.style.color = '#2563eb';
+                lateBadgeEl.textContent = '🟢 Flexible';
+                lateBadgeEl.title = 'Flexible hours: exempt from lateness tracking';
+            } else if (sheet.is_late == 1) {
+                lateBadgeEl.style.display = 'inline-flex';
+                if (sheet.late_excused == 1) {
+                    lateBadgeEl.className = 'badge';
+                    lateBadgeEl.style.background = 'rgba(16, 185, 129, 0.12)';
+                    lateBadgeEl.style.color = '#10b981';
+                    lateBadgeEl.textContent = `✓ Excused (${sheet.late_minutes}m)`;
+                    lateBadgeEl.title = `Late excused: ${sheet.late_excused_reason || 'Approved'}`;
+                } else {
+                    lateBadgeEl.className = 'badge';
+                    lateBadgeEl.style.background = 'rgba(239, 68, 68, 0.12)';
+                    lateBadgeEl.style.color = '#ef4444';
+                    lateBadgeEl.innerHTML = `⏱️ Late ${sheet.late_minutes}m <button type="button" onclick="handleExcuseLate(${empData.id}, '${AppState.selectedDate}', '${escapeHtml(empData.name)}', ${sheet.late_minutes})" style="background: transparent; border: none; color: #ef4444; font-weight: 800; cursor: pointer; padding: 0 0 0 4px; text-decoration: underline;" title="Click to excuse late arrival">Excuse</button>`;
+                    lateBadgeEl.title = `Shift: ${sheet.effective_shift_timing || schedShift || 'Standard'}. Arrived late by ${sheet.late_minutes} minutes.`;
+                }
+            } else {
+                lateBadgeEl.style.display = 'inline-flex';
+                lateBadgeEl.className = 'badge';
+                lateBadgeEl.style.background = 'rgba(16, 185, 129, 0.12)';
+                lateBadgeEl.style.color = '#10b981';
+                lateBadgeEl.textContent = '✓ On Time';
+                lateBadgeEl.title = `On time for shift: ${sheet.effective_shift_timing || schedShift || 'Scheduled'}`;
+            }
+        }
+
         const checkIn = sheet ? sheet.check_in_time : null;
         const checkOut = sheet ? sheet.check_out_time : null;
         const isLocked = sheet ? (parseInt(sheet.is_locked) === 1) : false;
@@ -533,6 +570,44 @@ function renderWorksheetHero(sheet, empData, data = null) {
 
         if (checkInTimeEl) checkInTimeEl.textContent = checkIn || '--:--';
         if (checkOutTimeEl) checkOutTimeEl.textContent = checkOut || '--:--';
+
+        // Render Employee Late Arrival / Shift Status Pill
+        const heroLatePill = document.getElementById('hero-late-pill');
+        if (heroLatePill) {
+            const userPolicy = data?.employee?.shift_policy || AppState?.currentUser?.shift_policy || 'fixed';
+            if (!checkIn) {
+                heroLatePill.style.display = 'none';
+            } else if (userPolicy === 'flexible') {
+                heroLatePill.style.display = 'inline-flex';
+                heroLatePill.style.background = 'rgba(59, 130, 246, 0.12)';
+                heroLatePill.style.color = '#3b82f6';
+                heroLatePill.style.borderColor = 'rgba(59, 130, 246, 0.25)';
+                heroLatePill.textContent = '🟢 Flexible Hours';
+                heroLatePill.title = 'Flexible hours: exempt from lateness tracking';
+            } else if (sheet && sheet.is_late == 1) {
+                heroLatePill.style.display = 'inline-flex';
+                if (sheet.late_excused == 1) {
+                    heroLatePill.style.background = 'rgba(16, 185, 129, 0.12)';
+                    heroLatePill.style.color = '#10b981';
+                    heroLatePill.style.borderColor = 'rgba(16, 185, 129, 0.25)';
+                    heroLatePill.textContent = `✓ Late Excused (${sheet.late_minutes}m)`;
+                    heroLatePill.title = `Late arrival excused: ${sheet.late_excused_reason || 'Approved'}`;
+                } else {
+                    heroLatePill.style.background = 'rgba(239, 68, 68, 0.12)';
+                    heroLatePill.style.color = '#ef4444';
+                    heroLatePill.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+                    heroLatePill.textContent = `⏱️ Late by ${sheet.late_minutes}m`;
+                    heroLatePill.title = `Shift: ${sheet.effective_shift_timing || 'Standard'}. Arrived late by ${sheet.late_minutes} minutes.`;
+                }
+            } else {
+                heroLatePill.style.display = 'inline-flex';
+                heroLatePill.style.background = 'rgba(16, 185, 129, 0.12)';
+                heroLatePill.style.color = '#10b981';
+                heroLatePill.style.borderColor = 'rgba(16, 185, 129, 0.25)';
+                heroLatePill.textContent = '✓ On Time';
+                heroLatePill.title = `On time for shift: ${sheet?.effective_shift_timing || 'Scheduled'}`;
+            }
+        }
 
         // Update Employee HOD Verification Badge & Print Button State
         const empHodBadge = document.getElementById('employee-hod-check-badge');
@@ -1615,7 +1690,7 @@ async function handleAdminCheckOut() {
 }
 
 // Open Detailed Shift & Duty Modal for Admin / HR
-function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime, isLocked, dayType, holidayReason, isSwappedOff, swappedWithDate) {
+function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime, isLocked, dayType, holidayReason, isSwappedOff, swappedWithDate, isLate, lateMinutes, lateExcused, lateExcusedReason, effShift) {
     if (!empId) empId = getActiveWorksheetEmpId();
     if (!date) date = AppState.selectedDate || new Date().toISOString().split('T')[0];
     if (!empName) empName = document.getElementById('admin-emp-dropdown-selected-name')?.textContent || 'Employee';
@@ -1667,6 +1742,52 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
         reasonInput.value = defaultReason;
     }
 
+    // Late arrival and excusal section
+    const lateBadge = document.getElementById('admin-shift-late-badge');
+    const excuseToggle = document.getElementById('admin-shift-late-excuse-toggle');
+    const excuseReasonBox = document.getElementById('admin-shift-late-reason-box');
+    const excuseReasonInput = document.getElementById('admin-shift-late-excuse-reason');
+
+    const effectiveIsLate = isLate !== undefined ? parseInt(isLate, 10) : (AppState.currentSheet ? parseInt(AppState.currentSheet.is_late || 0, 10) : 0);
+    const effectiveLateMins = lateMinutes !== undefined ? parseInt(lateMinutes, 10) : (AppState.currentSheet ? parseInt(AppState.currentSheet.late_minutes || 0, 10) : 0);
+    const effectiveExcused = lateExcused !== undefined ? parseInt(lateExcused, 10) : (AppState.currentSheet ? parseInt(AppState.currentSheet.late_excused || 0, 10) : 0);
+    const effectiveExcusedReason = lateExcusedReason !== undefined ? lateExcusedReason : (AppState.currentSheet ? (AppState.currentSheet.late_excused_reason || '') : '');
+
+    if (lateBadge) {
+        if (effectiveIsLate === 1) {
+            lateBadge.style.display = 'inline-block';
+            if (effectiveExcused) {
+                lateBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+                lateBadge.style.color = '#059669';
+                lateBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                lateBadge.textContent = '✓ Late Excused';
+            } else {
+                lateBadge.style.background = 'rgba(244, 63, 94, 0.12)';
+                lateBadge.style.color = '#e11d48';
+                lateBadge.style.border = '1px solid rgba(244, 63, 94, 0.3)';
+                lateBadge.textContent = `⏱️ Late ${effectiveLateMins}m`;
+            }
+        } else if (currentIn) {
+            lateBadge.style.display = 'inline-block';
+            lateBadge.style.background = 'rgba(16, 185, 129, 0.1)';
+            lateBadge.style.color = '#10b981';
+            lateBadge.style.border = '1px solid rgba(16, 185, 129, 0.25)';
+            lateBadge.textContent = '✓ On Time';
+        } else {
+            lateBadge.style.display = 'none';
+        }
+    }
+
+    if (excuseToggle) {
+        excuseToggle.checked = Boolean(effectiveExcused);
+    }
+    if (excuseReasonBox) {
+        excuseReasonBox.style.display = effectiveExcused ? 'block' : 'none';
+    }
+    if (excuseReasonInput) {
+        excuseReasonInput.value = effectiveExcusedReason || '';
+    }
+
     handleAdminShiftDayTypeChange();
 
     if (avatarEl) {
@@ -1674,6 +1795,14 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
     }
 
     openModal('admin-shift-modal');
+}
+
+function toggleAdminShiftExcuseReason(checked) {
+    const box = document.getElementById('admin-shift-late-reason-box');
+    if (box) box.style.display = checked ? 'block' : 'none';
+    if (checked) {
+        document.getElementById('admin-shift-late-excuse-reason')?.focus();
+    }
 }
 
 // Day Type Selector Handler in Admin Shift Modal
@@ -1746,6 +1875,8 @@ async function handleAdminSaveShiftSubmit(e) {
         outTime = '';
     }
     const holidayReason = document.getElementById('admin-shift-holiday-reason')?.value.trim() || '';
+    const lateExcused = document.getElementById('admin-shift-late-excuse-toggle')?.checked ? 1 : 0;
+    const lateExcusedReason = document.getElementById('admin-shift-late-excuse-reason')?.value.trim() || '';
 
     try {
         const res = await fetch('api/attendance.php', {
@@ -1758,7 +1889,9 @@ async function handleAdminSaveShiftSubmit(e) {
                 check_in_time: inTime,
                 check_out_time: outTime,
                 day_type: dayType,
-                holiday_reason: holidayReason
+                holiday_reason: holidayReason,
+                late_excused: lateExcused,
+                late_excused_reason: lateExcusedReason
             })
         });
         const data = await res.json();

@@ -130,6 +130,13 @@ try {
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">⚪</span>
                         </div>
+                        <div id="card-stat-late" class="live-kpi-card" onclick="filterLiveRosterCards('late')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(239, 68, 68, 0.35); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by Late Arrivals today">
+                            <div>
+                                <span style="font-size: 9.5px; color: #ef4444; font-weight: 800; text-transform: uppercase;">⏱️ LATE TODAY</span>
+                                <h3 id="att-stat-late" style="font-size: 18px; color: #ef4444; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
+                            </div>
+                            <span style="font-size: 18px; opacity: 0.8;">⏱️</span>
+                        </div>
                         <div id="card-stat-checked" class="live-kpi-card" onclick="filterLiveRosterCards('checked')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid rgba(16, 185, 129, 0.3); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by Checked worksheets">
                             <div>
                                 <span style="font-size: 9.5px; color: #059669; font-weight: 800; text-transform: uppercase;">✅ Verified</span>

@@ -45,6 +45,117 @@ function formatDutyTime($seconds) {
     return sprintf('%d:%02d:%02d', $hours, $minutes, $secs);
 }
 
+function parseShiftStartTime($shiftStr) {
+    if (empty($shiftStr)) return null;
+    $parts = preg_split('/\s+(?:to|-)\s+/i', trim($shiftStr));
+    if (!empty($parts[0])) {
+        $ts = strtotime($parts[0]);
+        if ($ts !== false) {
+            return date('H:i:s', $ts);
+        }
+    }
+    return null;
+}
+
+function resolveEffectiveShiftAndLate($pdo, $empId, $date, $checkInTimeStr, $customShiftTiming = null) {
+    // 1. Fetch employee details
+    $stmt = $pdo->prepare("SELECT shift_policy, late_grace_minutes, shift_timing FROM employees WHERE id = ?");
+    $stmt->execute([$empId]);
+    $emp = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    $policy = $emp['shift_policy'] ?? 'fixed';
+    $graceMinutes = isset($emp['late_grace_minutes']) ? max(0, (int)$emp['late_grace_minutes']) : 15;
+
+    // Flexible hours: completely exempt from late tracking
+    if ($policy === 'flexible') {
+        return [
+            'is_late' => 0,
+            'late_minutes' => 0,
+            'effective_shift_timing' => 'Flexible Hours',
+            'shift_policy' => 'flexible'
+        ];
+    }
+
+    // 2. Scheduled shift timing: check custom, then monthly duty roster, then employee default
+    $scheduledTiming = $customShiftTiming;
+    if (empty($scheduledTiming)) {
+        $month = date('Y-m', strtotime($date));
+        $stmtR = $pdo->prepare("SELECT shift_timing FROM duty_rosters WHERE employee_id = ? AND roster_month = ?");
+        $stmtR->execute([$empId, $month]);
+        $rosterTiming = $stmtR->fetchColumn();
+        $scheduledTiming = !empty($rosterTiming) ? $rosterTiming : ($emp['shift_timing'] ?? '10:00 AM TO 6:00 PM');
+    }
+
+    $standardShifts = [
+        ['timing' => '8:00 AM TO 4:00 PM',   'start' => '08:00:00'],
+        ['timing' => '9:00 AM TO 5:00 PM',   'start' => '09:00:00'],
+        ['timing' => '10:00 AM TO 6:00 PM',  'start' => '10:00:00'],
+        ['timing' => '12:00 PM TO 8:00 PM',  'start' => '12:00:00'],
+        ['timing' => '1:00 PM TO 9:00 PM',   'start' => '13:00:00'],
+        ['timing' => '2:00 PM TO 10:00 PM',  'start' => '14:00:00'],
+        ['timing' => '4:00 PM TO 12:00 AM',  'start' => '16:00:00'],
+        ['timing' => '6:00 PM TO 2:00 AM',   'start' => '18:00:00'],
+        ['timing' => '12:00 AM TO 8:00 AM',  'start' => '00:00:00']
+    ];
+
+    $checkInTs = strtotime($checkInTimeStr);
+    if (!$checkInTs) {
+        return [
+            'is_late' => 0,
+            'late_minutes' => 0,
+            'effective_shift_timing' => $scheduledTiming,
+            'shift_policy' => $policy
+        ];
+    }
+
+    $effectiveTiming = $scheduledTiming;
+    $scheduledStart = parseShiftStartTime($scheduledTiming) ?: '10:00:00';
+    $scheduledStartTs = strtotime($scheduledStart);
+
+    // If policy is rotational or if check-in time is far (> 3.5 hours) from scheduled start,
+    // auto-detect if employee was called in for an alternative standard shift
+    $scheduledDiff = abs($checkInTs - $scheduledStartTs);
+    if ($policy === 'rotational' || $scheduledDiff > 12600) { // 3.5 hours
+        $bestDist = PHP_INT_MAX;
+        $bestShift = null;
+        foreach ($standardShifts as $s) {
+            $sTs = strtotime($s['start']);
+            $dist = abs($checkInTs - $sTs);
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $bestShift = $s;
+            }
+        }
+        // If closest standard shift is significantly closer than scheduled shift, adopt it
+        if ($bestShift && $bestDist < $scheduledDiff && $bestDist <= 7200) { // within 2 hours
+            $effectiveTiming = $bestShift['timing'];
+            $scheduledStart = $bestShift['start'];
+            $scheduledStartTs = strtotime($scheduledStart);
+        }
+    }
+
+    // Now calculate late status against effective shift start
+    $diffSeconds = $checkInTs - $scheduledStartTs;
+    $graceSeconds = $graceMinutes * 60;
+
+    if ($diffSeconds > $graceSeconds) {
+        $lateMins = (int)ceil($diffSeconds / 60);
+        return [
+            'is_late' => 1,
+            'late_minutes' => $lateMins,
+            'effective_shift_timing' => $effectiveTiming,
+            'shift_policy' => $policy
+        ];
+    }
+
+    return [
+        'is_late' => 0,
+        'late_minutes' => 0,
+        'effective_shift_timing' => $effectiveTiming,
+        'shift_policy' => $policy
+    ];
+}
+
 switch ($action) {
     case 'status':
         $empId = (int)($_GET['employee_id'] ?? $currentUserId);
@@ -64,6 +175,11 @@ switch ($action) {
         $stmt = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
         $stmt->execute([$empId, $date]);
         $sheet = $stmt->fetch();
+
+        // Get employee shift policy metadata
+        $stmtEmp = $pdo->prepare("SELECT shift_policy, late_grace_minutes, shift_timing FROM employees WHERE id = ?");
+        $stmtEmp->execute([$empId]);
+        $empMeta = $stmtEmp->fetch(PDO::FETCH_ASSOC) ?: [];
 
         $isCheckedIn = false;
         $isCheckedOut = false;
@@ -90,6 +206,12 @@ switch ($action) {
             'is_checked_in' => $isCheckedIn,
             'is_checked_out' => $isCheckedOut,
             'is_locked' => $sheet ? (int)$sheet['is_locked'] : 0,
+            'is_late' => $sheet ? (int)$sheet['is_late'] : 0,
+            'late_minutes' => $sheet ? (int)$sheet['late_minutes'] : 0,
+            'late_excused' => $sheet ? (int)$sheet['late_excused'] : 0,
+            'late_excused_reason' => $sheet['late_excused_reason'] ?? '',
+            'effective_shift_timing' => $sheet['effective_shift_timing'] ?? ($empMeta['shift_timing'] ?? ''),
+            'shift_policy' => $empMeta['shift_policy'] ?? 'fixed',
             'elapsed_seconds' => $elapsedSeconds,
             'elapsed_formatted' => formatDutyTime($elapsedSeconds)
         ]);
@@ -130,21 +252,30 @@ switch ($action) {
             exit;
         }
 
+        // Calculate intelligent shift matching and late arrival status
+        $lateInfo = resolveEffectiveShiftAndLate($pdo, $empId, $date, $customTime);
+        $isLate = (int)$lateInfo['is_late'];
+        $lateMinutes = (int)$lateInfo['late_minutes'];
+        $effShift = $lateInfo['effective_shift_timing'];
+
         if ($sheet) {
-            $update = $pdo->prepare("UPDATE daily_sheets SET check_in_time = ?, check_out_time = NULL, total_duty_hours = NULL, total_duty_seconds = 0, is_locked = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-            $update->execute([$customTime, $sheet['id']]);
+            $update = $pdo->prepare("UPDATE daily_sheets SET check_in_time = ?, check_out_time = NULL, total_duty_hours = NULL, total_duty_seconds = 0, is_late = ?, late_minutes = ?, effective_shift_timing = ?, is_locked = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $update->execute([$customTime, $isLate, $lateMinutes, $effShift, $sheet['id']]);
             $sheetId = $sheet['id'];
         } else {
-            $insert = $pdo->prepare("INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, is_locked) VALUES (?, ?, ?, 0)");
-            $insert->execute([$empId, $date, $customTime]);
+            $insert = $pdo->prepare("INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, is_late, late_minutes, effective_shift_timing, is_locked) VALUES (?, ?, ?, ?, ?, ?, 0)");
+            $insert->execute([$empId, $date, $customTime, $isLate, $lateMinutes, $effShift]);
             $sheetId = $pdo->lastInsertId();
         }
 
         echo json_encode([
             'success' => true,
-            'message' => 'Checked in successfully at ' . $customTime,
+            'message' => 'Checked in successfully at ' . $customTime . ($isLate ? " (⏱️ Late by {$lateMinutes} mins)" : ''),
             'sheet_id' => $sheetId,
-            'check_in_time' => $customTime
+            'check_in_time' => $customTime,
+            'is_late' => $isLate,
+            'late_minutes' => $lateMinutes,
+            'effective_shift_timing' => $effShift
         ]);
         break;
 
@@ -317,10 +448,20 @@ switch ($action) {
         $effectiveDayType = $dayType !== null ? $dayType : ($sheet['day_type'] ?? 'working');
         $effectiveReason = $holidayReason !== null ? $holidayReason : ($sheet['holiday_reason'] ?? null);
 
+        // Resolve shift and late status
+        $lateInfo = !empty($inTime) ? resolveEffectiveShiftAndLate($pdo, $empId, $date, $inTime) : null;
+        $isLate = $lateInfo ? (int)$lateInfo['is_late'] : 0;
+        $lateMinutes = $lateInfo ? (int)$lateInfo['late_minutes'] : 0;
+        $effShift = $lateInfo ? $lateInfo['effective_shift_timing'] : ($sheet['effective_shift_timing'] ?? null);
+
+        $lateExcused = isset($data['late_excused']) ? (int)$data['late_excused'] : ($sheet ? (int)$sheet['late_excused'] : 0);
+        $lateExcusedReason = isset($data['late_excused_reason']) ? trim($data['late_excused_reason']) : ($sheet['late_excused_reason'] ?? null);
+
         if ($sheet) {
             $update = $pdo->prepare("
                 UPDATE daily_sheets 
                 SET check_in_time = ?, check_out_time = ?, total_duty_hours = ?, total_duty_seconds = ?, 
+                    is_late = ?, late_minutes = ?, late_excused = ?, late_excused_reason = ?, effective_shift_timing = ?,
                     day_type = ?, holiday_reason = ?, holiday_marked_by = ?, is_locked = ?, updated_at = CURRENT_TIMESTAMP 
                 WHERE id = ?
             ");
@@ -329,6 +470,11 @@ switch ($action) {
                 !empty($outTime) ? $outTime : null,
                 $dutyFormatted,
                 $dutySeconds,
+                $isLate,
+                $lateMinutes,
+                $lateExcused,
+                $lateExcusedReason,
+                $effShift,
                 $effectiveDayType,
                 !empty($effectiveReason) ? $effectiveReason : null,
                 $currentUserId,
@@ -338,8 +484,8 @@ switch ($action) {
             $sheetId = $sheet['id'];
         } else {
             $insert = $pdo->prepare("
-                INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, check_out_time, total_duty_hours, total_duty_seconds, day_type, holiday_reason, holiday_marked_by, is_locked) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, check_out_time, total_duty_hours, total_duty_seconds, is_late, late_minutes, late_excused, late_excused_reason, effective_shift_timing, day_type, holiday_reason, holiday_marked_by, is_locked) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $insert->execute([
                 $empId,
@@ -348,6 +494,11 @@ switch ($action) {
                 !empty($outTime) ? $outTime : null,
                 $dutyFormatted,
                 $dutySeconds,
+                $isLate,
+                $lateMinutes,
+                $lateExcused,
+                $lateExcusedReason,
+                $effShift,
                 $effectiveDayType,
                 !empty($effectiveReason) ? $effectiveReason : null,
                 $currentUserId,
@@ -363,9 +514,47 @@ switch ($action) {
             'check_in_time' => $inTime,
             'check_out_time' => $outTime,
             'total_duty_hours' => $dutyFormatted,
+            'is_late' => $isLate,
+            'late_minutes' => $lateMinutes,
+            'late_excused' => $lateExcused,
+            'effective_shift_timing' => $effShift,
             'day_type' => $effectiveDayType,
             'holiday_reason' => $effectiveReason,
             'is_locked' => $isLocked
+        ]);
+        break;
+
+    case 'excuse_late':
+        $empId = (int)($data['employee_id'] ?? 0);
+        $date = $data['date'] ?? date('Y-m-d');
+        $reason = trim($data['reason'] ?? 'Approved by supervisor / Shift swap');
+
+        if (!$empId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Employee ID is required.']);
+            exit;
+        }
+
+        // Check HOD or Admin permission
+        $stmtEmpDept = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+        $stmtEmpDept->execute([$empId]);
+        $targetDeptId = (int)$stmtEmpDept->fetchColumn();
+
+        $canExcuse = $hasGlobalAttendance || ($isHod && in_array($targetDeptId, $managedDeptIds, true));
+        if (!$canExcuse) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized: Only Admin or HOD can excuse late arrivals.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("UPDATE daily_sheets SET late_excused = 1, late_excused_by = ?, late_excused_reason = ? WHERE employee_id = ? AND sheet_date = ?");
+        $stmt->execute([$currentUserId, $reason, $empId, $date]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Late arrival excused successfully.',
+            'late_excused' => 1,
+            'late_excused_reason' => $reason
         ]);
         break;
 
@@ -397,6 +586,9 @@ switch ($action) {
                 e.role,
                 e.avatar,
                 e.department_id,
+                e.shift_timing,
+                e.shift_policy,
+                e.late_grace_minutes,
                 d.name as department_name,
                 d.require_hod_sheet_check,
                 t.name as team_name,
@@ -405,6 +597,12 @@ switch ($action) {
                 s.check_out_time,
                 s.total_duty_hours,
                 s.is_locked,
+                s.is_late,
+                s.late_minutes,
+                s.late_excused,
+                s.late_excused_by,
+                s.late_excused_reason,
+                s.effective_shift_timing,
                 s.is_hod_checked,
                 s.hod_checked_by,
                 s.hod_checked_at,
@@ -443,6 +641,7 @@ switch ($action) {
             'checked_out' => 0,
             'day_off' => 0,
             'not_arrived' => 0,
+            'late_count' => 0,
             'sheets_checked' => 0,
             'sheets_verified' => 0,
             'sheets_pending' => 0,
@@ -451,6 +650,11 @@ switch ($action) {
         ];
 
         foreach ($rows as &$r) {
+            // Track late arrivals
+            if (!empty($r['check_in_time']) && !empty($r['is_late']) && empty($r['late_excused'])) {
+                $stats['late_count']++;
+            }
+
             if (($r['day_type'] ?? '') === 'holiday') {
                 $r['status'] = 'holiday';
                 $stats['day_off']++;
@@ -636,7 +840,8 @@ switch ($action) {
             $sheetSql = "
                 SELECT ds.id, ds.employee_id, ds.sheet_date, ds.check_in_time, ds.check_out_time, 
                        ds.total_duty_seconds, ds.is_locked, ds.work_summary, ds.remarks,
-                       ds.day_type, ds.holiday_reason
+                       ds.day_type, ds.holiday_reason,
+                       ds.is_late, ds.late_minutes, ds.late_excused, ds.late_excused_by, ds.late_excused_reason, ds.effective_shift_timing
                 FROM daily_sheets ds
                 WHERE ds.sheet_date BETWEEN ? AND ?
             ";
@@ -703,6 +908,9 @@ switch ($action) {
                 'total_half_leaves' => 0,
                 'total_approved_leaves' => 0,
                 'total_absences' => 0,
+                'total_late_days' => 0,
+                'total_late_minutes' => 0,
+                'total_late_excused_days' => 0,
                 'total_duty_seconds' => 0,
                 'total_duty_hours' => 0,
                 'total_expected_hours' => 0
@@ -724,6 +932,9 @@ switch ($action) {
                     'incomplete' => 0,
                     'approved_leaves' => 0,
                     'absences' => 0,
+                    'late_days' => 0,
+                    'late_minutes' => 0,
+                    'late_excused_days' => 0,
                     'total_duty_seconds' => 0,
                     'total_duty_hours' => 0,
                     'expected_duty_hours' => 0,
@@ -962,6 +1173,25 @@ switch ($action) {
                     $hasCheckIn = !empty($sheet['check_in_time']);
                     $hasCheckOut = !empty($sheet['check_out_time']);
 
+                    $isLateDay = $sheet ? (int)($sheet['is_late'] ?? 0) : 0;
+                    $lateMinutesDay = $sheet ? (int)($sheet['late_minutes'] ?? 0) : 0;
+                    $lateExcusedDay = $sheet ? (int)($sheet['late_excused'] ?? 0) : 0;
+                    $lateExcusedByDay = $sheet['late_excused_by'] ?? null;
+                    $lateExcusedReasonDay = $sheet['late_excused_reason'] ?? '';
+                    $effShiftDay = $sheet['effective_shift_timing'] ?? null;
+
+                    if (!$d['is_future'] && $isLateDay) {
+                        if ($lateExcusedDay) {
+                            $empSummary['late_excused_days']++;
+                            $grandTotals['total_late_excused_days']++;
+                        } else {
+                            $empSummary['late_days']++;
+                            $empSummary['late_minutes'] += $lateMinutesDay;
+                            $grandTotals['total_late_days']++;
+                            $grandTotals['total_late_minutes'] += $lateMinutesDay;
+                        }
+                    }
+
                     if (!$d['is_future']) {
                         $empSummary['total_duty_seconds'] += $dutySeconds;
                         $empSummary['total_duty_hours'] += $dutyHours;
@@ -1150,6 +1380,12 @@ switch ($action) {
                             'is_alt_off' => $isAltOff,
                             'swapped_note' => $swappedNote,
                             'swapped_with_date' => $autoSwappedMap[$dt]['swapped_with_date'] ?? ($pairedWorkedOffMap[$dt]['swapped_with_date'] ?? null),
+                            'is_late' => $isLateDay,
+                            'late_minutes' => $lateMinutesDay,
+                            'late_excused' => $lateExcusedDay,
+                            'late_excused_by' => $lateExcusedByDay,
+                            'late_excused_reason' => $lateExcusedReasonDay,
+                            'effective_shift_timing' => $effShiftDay,
                             'work_summary' => $sheet['work_summary'] ?? '',
                             'remarks' => $sheet['remarks'] ?? ''
                         ];

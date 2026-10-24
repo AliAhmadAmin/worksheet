@@ -1482,6 +1482,140 @@ function clearAvatarPreview(mode = 'add') {
     }
 }
 
+// ==========================================
+// Standardized Shift Timing & Policy Helpers
+// ==========================================
+function formatTime24to12(timeStr) {
+    if (!timeStr) return '';
+    const parts = timeStr.split(':');
+    let h = parseInt(parts[0], 10);
+    const m = parts[1] || '00';
+    if (isNaN(h)) return '';
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${h}:${m} ${ampm}`;
+}
+
+function formatTime12to24(timeStr) {
+    if (!timeStr) return '';
+    const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+    if (!match) return '';
+    let h = parseInt(match[1], 10);
+    const m = match[2];
+    const ampm = (match[3] || 'AM').toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${m}`;
+}
+
+function handleShiftTimingPresetChange(prefix) {
+    const select = document.getElementById(`${prefix}-emp-shift-timing-select`);
+    const customBox = document.getElementById(`${prefix}-emp-custom-timing-box`);
+    const hiddenInput = document.getElementById(`${prefix}-emp-shift-timing`);
+    const policySelect = document.getElementById(`${prefix}-emp-shift-policy`);
+    if (!select || !hiddenInput) return;
+
+    if (select.value === 'custom') {
+        if (customBox) customBox.style.display = 'flex';
+        syncCustomShiftTiming(prefix);
+    } else if (select.value === 'Flexible Hours') {
+        if (customBox) customBox.style.display = 'none';
+        hiddenInput.value = 'Flexible Hours';
+        if (policySelect && policySelect.value !== 'flexible') {
+            policySelect.value = 'flexible';
+        }
+    } else {
+        if (customBox) customBox.style.display = 'none';
+        hiddenInput.value = select.value;
+        if (policySelect && policySelect.value === 'flexible') {
+            policySelect.value = 'fixed';
+        }
+    }
+}
+
+function syncCustomShiftTiming(prefix) {
+    const startInput = document.getElementById(`${prefix}-emp-custom-start`);
+    const endInput = document.getElementById(`${prefix}-emp-custom-end`);
+    const hiddenInput = document.getElementById(`${prefix}-emp-shift-timing`);
+    if (!startInput || !endInput || !hiddenInput) return;
+
+    const startVal = startInput.value || '10:00';
+    const endVal = endInput.value || '18:00';
+
+    const start12 = formatTime24to12(startVal);
+    const end12 = formatTime24to12(endVal);
+
+    if (start12 && end12) {
+        hiddenInput.value = `${start12} TO ${end12}`;
+    }
+}
+
+function setShiftTimingDropdownValue(prefix, timingValue) {
+    const select = document.getElementById(`${prefix}-emp-shift-timing-select`);
+    const customBox = document.getElementById(`${prefix}-emp-custom-timing-box`);
+    const hiddenInput = document.getElementById(`${prefix}-emp-shift-timing`);
+    const startInput = document.getElementById(`${prefix}-emp-custom-start`);
+    const endInput = document.getElementById(`${prefix}-emp-custom-end`);
+    if (!select || !hiddenInput) return;
+
+    const val = (timingValue || '').trim();
+    hiddenInput.value = val || '10:00 AM TO 6:00 PM';
+
+    if (!val || val === '10:00 AM TO 6:00 PM') {
+        select.value = '10:00 AM TO 6:00 PM';
+        if (customBox) customBox.style.display = 'none';
+        return;
+    }
+
+    if (val.toLowerCase().includes('flex')) {
+        select.value = 'Flexible Hours';
+        if (customBox) customBox.style.display = 'none';
+        return;
+    }
+
+    let found = false;
+    for (let i = 0; i < select.options.length; i++) {
+        const optVal = select.options[i].value;
+        if (optVal.toLowerCase() === val.toLowerCase() || optVal.toUpperCase().replace(/\s+/g, ' ') === val.toUpperCase().replace(/\s+/g, ' ')) {
+            select.value = optVal;
+            found = true;
+            break;
+        }
+    }
+
+    if (found) {
+        if (customBox) customBox.style.display = 'none';
+    } else {
+        select.value = 'custom';
+        if (customBox) customBox.style.display = 'flex';
+
+        const parts = val.split(/\s+(?:TO|-)\s+/i);
+        if (parts.length === 2 && startInput && endInput) {
+            const start24 = formatTime12to24(parts[0].trim());
+            const end24 = formatTime12to24(parts[1].trim());
+            if (start24) startInput.value = start24;
+            if (end24) endInput.value = end24;
+        }
+    }
+}
+
+function handleShiftPolicyChange(prefix, policy) {
+    const timingSelect = document.getElementById(`${prefix}-emp-shift-timing-select`);
+    const hoursSelect = document.getElementById(`${prefix}-emp-shift-hours`);
+    if (policy === 'flexible') {
+        if (timingSelect) setShiftTimingDropdownValue(prefix, 'Flexible Hours');
+        if (hoursSelect && hoursSelect.value === '8.0') hoursSelect.value = '0.0';
+    } else {
+        if (timingSelect && timingSelect.value === 'Flexible Hours') {
+            setShiftTimingDropdownValue(prefix, '10:00 AM TO 6:00 PM');
+        }
+        if (hoursSelect && hoursSelect.value === '0.0') {
+            hoursSelect.value = '8.0';
+        }
+    }
+}
+
 function openAddEmployeeModal() {
     document.getElementById('add-employee-form')?.reset();
     populateModalDeptTeamSelects('add-emp-dept', 'add-emp-team', null, null);
@@ -1585,11 +1719,16 @@ function openAddEmployeeModal() {
     const sickInput = document.getElementById('add-emp-sick-quota');
     if (sickInput) sickInput.value = '8';
 
-    const timingInput = document.getElementById('add-emp-shift-timing');
-    if (timingInput) timingInput.value = '10:00 AM TO 6:00 PM';
-
     const offSelect = document.getElementById('add-emp-weekly-off');
     if (offSelect) offSelect.value = 'Sunday';
+
+    const policySelect = document.getElementById('add-emp-shift-policy');
+    if (policySelect) policySelect.value = 'fixed';
+
+    const graceInput = document.getElementById('add-emp-late-grace');
+    if (graceInput) graceInput.value = '15';
+
+    setShiftTimingDropdownValue('add', '10:00 AM TO 6:00 PM');
 
     openModal('add-employee-modal');
 }
@@ -1626,6 +1765,8 @@ async function handleAddEmployeeSubmit(e) {
     const expectedHours = parseFloat(document.getElementById('add-emp-shift-hours')?.value || '8.0');
     const basicSalary = parseFloat(document.getElementById('add-emp-salary')?.value || '0');
     const joiningDate = document.getElementById('add-emp-joining-date')?.value || '';
+    const shiftPolicy = document.getElementById('add-emp-shift-policy')?.value || 'fixed';
+    const lateGraceMinutes = parseInt(document.getElementById('add-emp-late-grace')?.value || '15', 10);
     const annualQuota = parseInt(document.getElementById('add-emp-annual-quota')?.value || '14', 10);
     const casualQuota = parseInt(document.getElementById('add-emp-casual-quota')?.value || '10', 10);
     const sickQuota = parseInt(document.getElementById('add-emp-sick-quota')?.value || '8', 10);
@@ -1664,6 +1805,8 @@ async function handleAddEmployeeSubmit(e) {
             avatar,
             shift_timing: shiftTiming,
             weekly_off: weeklyOff,
+            shift_policy: shiftPolicy,
+            late_grace_minutes: lateGraceMinutes,
             expected_hours: expectedHours,
             joining_date: joiningDate,
             annual_leave_quota: annualQuota,
@@ -1810,11 +1953,16 @@ function openEditEmployeeModal(empId) {
     const sickInput = document.getElementById('edit-emp-sick-quota');
     if (sickInput) sickInput.value = emp.sick_leave_quota !== undefined ? emp.sick_leave_quota : 8;
 
-    const timingInput = document.getElementById('edit-emp-shift-timing');
-    if (timingInput) timingInput.value = emp.shift_timing || '10:00 AM TO 6:00 PM';
-
     const offSelect = document.getElementById('edit-emp-weekly-off');
     if (offSelect) offSelect.value = emp.weekly_off || 'Sunday';
+
+    const policySelect = document.getElementById('edit-emp-shift-policy');
+    if (policySelect) policySelect.value = emp.shift_policy || 'fixed';
+
+    const graceInput = document.getElementById('edit-emp-late-grace');
+    if (graceInput) graceInput.value = emp.late_grace_minutes !== undefined ? emp.late_grace_minutes : 15;
+
+    setShiftTimingDropdownValue('edit', emp.shift_timing || '10:00 AM TO 6:00 PM');
 
     const statusSelect = document.getElementById('edit-emp-status');
     if (statusSelect) {
@@ -1878,6 +2026,8 @@ async function handleEditEmployeeSubmit(e) {
     const expectedHours = parseFloat(document.getElementById('edit-emp-shift-hours')?.value || '8.0');
     const basicSalary = parseFloat(document.getElementById('edit-emp-salary')?.value || '0');
     const joiningDate = document.getElementById('edit-emp-joining-date')?.value || '';
+    const shiftPolicy = document.getElementById('edit-emp-shift-policy')?.value || 'fixed';
+    const lateGraceMinutes = parseInt(document.getElementById('edit-emp-late-grace')?.value || '15', 10);
     const annualQuota = parseInt(document.getElementById('edit-emp-annual-quota')?.value || '14', 10);
     const casualQuota = parseInt(document.getElementById('edit-emp-casual-quota')?.value || '10', 10);
     const sickQuota = parseInt(document.getElementById('edit-emp-sick-quota')?.value || '8', 10);
@@ -1915,6 +2065,8 @@ async function handleEditEmployeeSubmit(e) {
             team_id: teamId || null,
             shift_timing: shiftTiming,
             weekly_off: weeklyOff,
+            shift_policy: shiftPolicy,
+            late_grace_minutes: lateGraceMinutes,
             expected_hours: expectedHours,
             joining_date: joiningDate,
             annual_leave_quota: annualQuota,
