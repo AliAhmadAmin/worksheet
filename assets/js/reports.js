@@ -2,6 +2,35 @@
  * Reports & Matrix Analytics: Replicating Google Sheets Cross-Tabulation & Performance Rosters
  */
 
+function formatTimeTo12h(timeStr) {
+    if (!timeStr) return '';
+    timeStr = String(timeStr).trim();
+    if (!timeStr || timeStr === '-') return '-';
+    if (/am|pm/i.test(timeStr)) {
+        return timeStr;
+    }
+    const m = timeStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return timeStr;
+    let h = parseInt(m[1], 10);
+    const mins = m[2];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    const hStr = h < 10 ? '0' + h : '' + h;
+    return `${hStr}:${mins} ${ampm}`;
+}
+window.formatTimeTo12h = formatTimeTo12h;
+
+function formatLateDuration(minutes) {
+    minutes = parseInt(minutes, 10) || 0;
+    if (minutes <= 0) return '0m';
+    if (minutes < 60) return `${minutes}m`;
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+}
+window.formatLateDuration = formatLateDuration;
+
 async function loadReports() {
     const startDate = document.getElementById('report-start-date')?.value || new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
     const endDate = document.getElementById('report-end-date')?.value || new Date().toISOString().split('T')[0];
@@ -939,7 +968,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                     if (r.late_excused) {
                         latePillHtml = `<span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 5px; cursor: pointer;" onclick="openAdminShiftModal(${adjustArgs})" title="Late arrival excused by ${escapeHtml(r.late_excused_by || 'Admin')}: ${escapeHtml(r.late_excused_reason || 'Approved')}">✓ Excused</span>`;
                     } else {
-                        latePillHtml = `<span class="badge" style="background: rgba(244, 63, 94, 0.12); color: #e11d48; border: 1px solid rgba(244, 63, 94, 0.3); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 5px; cursor: pointer;" onclick="openAdminShiftModal(${adjustArgs})" title="Late arrival by ${r.late_minutes}m from shift timing (${escapeHtml(r.effective_shift_timing || '')}). Click to excuse or adjust.">⏱️ Late ${r.late_minutes}m</span>`;
+                        latePillHtml = `<span class="badge" style="background: rgba(244, 63, 94, 0.12); color: #e11d48; border: 1px solid rgba(244, 63, 94, 0.3); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 5px; cursor: pointer;" onclick="openAdminShiftModal(${adjustArgs})" title="Late arrival by ${r.late_minutes} minutes (${formatLateDuration(r.late_minutes)}) from shift timing (${escapeHtml(r.effective_shift_timing || '')}). Click to excuse or adjust.">⏱️ Late ${formatLateDuration(r.late_minutes)}</span>`;
                     }
                 } else {
                     latePillHtml = `<span class="badge" style="background: rgba(16, 185, 129, 0.08); color: #10b981; font-size: 10px; font-weight: 600; padding: 1px 4px; border-radius: 3px; margin-left: 5px;">✓ On Time</span>`;
@@ -954,11 +983,11 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                     </td>
                     <td>
                         <div style="display: flex; align-items: center;">
-                            <code style="font-size: 12px; color: ${r.check_in ? '#10b981' : 'var(--text-dim)'}; font-weight: 700;">${r.check_in || '-'}</code>
+                            <code style="font-size: 12px; color: ${r.check_in ? '#10b981' : 'var(--text-dim)'}; font-weight: 700;">${r.check_in ? formatTimeTo12h(r.check_in) : '-'}</code>
                             ${latePillHtml}
                         </div>
                     </td>
-                    <td><code style="font-size: 12px; color: ${r.check_out ? '#3b82f6' : 'var(--text-dim)'}; font-weight: 700;">${r.check_out || '-'}</code></td>
+                    <td><code style="font-size: 12px; color: ${r.check_out ? '#3b82f6' : 'var(--text-dim)'}; font-weight: 700;">${r.check_out ? formatTimeTo12h(r.check_out) : '-'}</code></td>
                     <td><strong style="font-size: 13px; color: ${r.duty_seconds > 0 ? 'var(--text-main)' : 'var(--text-dim)'}; font-family: monospace;">${r.duty_formatted}</strong></td>
                     <td style="white-space: nowrap;">
                         <span style="padding: 3px 8px; border-radius: 6px; font-size: 11px; display: inline-flex; align-items: center; ${badgeStyle}">
@@ -1037,7 +1066,7 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                         <span style="color: var(--border-color);">|</span>
                         <span><span style="color: #ef4444; font-weight: 600;">Absents:</span> <b style="color: #ef4444;">${(sum.absences || 0) + (sum.incomplete || 0)}</b></span>
                         <span style="color: var(--border-color);">|</span>
-                        <span><span style="color: #f43f5e; font-weight: 600;">Lates:</span> <b style="color: #f43f5e;">${sum.late_days || 0}</b> <small style="color: var(--text-muted); font-size: 10px;">(${sum.late_minutes || 0}m)</small></span>
+                        <span><span style="color: #f43f5e; font-weight: 600;">Lates:</span> <b style="color: #f43f5e;">${sum.late_days || 0}</b> <small style="color: var(--text-muted); font-size: 10px;">(${formatLateDuration(sum.late_minutes || 0)})</small></span>
                         ${(sum.late_excused_days || 0) > 0 ? `
                             <span style="color: var(--border-color);">|</span>
                             <span><span style="color: #10b981; font-weight: 600;">Excused:</span> <b style="color: #10b981;">${sum.late_excused_days}</b></span>
@@ -1236,8 +1265,8 @@ function exportAttendanceReportCsv() {
                     `"${(emp.department_name || 'Digital').replace(/"/g, '""')}"`,
                     `"${r.date}"`,
                     `"${r.day}"`,
-                    `"${r.check_in || ''}"`,
-                    `"${r.check_out || ''}"`,
+                    `"${r.check_in ? formatTimeTo12h(r.check_in) : ''}"`,
+                    `"${r.check_out ? formatTimeTo12h(r.check_out) : ''}"`,
                     `"${r.duty_formatted || '0:00:00'}"`,
                     `"${(r.status_label || '').replace(/"/g, '""')}"`,
                     `"${r.is_late ? 'Yes' : 'No'}"`,
@@ -1402,13 +1431,13 @@ function printAttendanceReport() {
                         <td style="white-space: nowrap; font-weight: 700;">${r.date}</td>
                         <td style="text-align: center; color: ${r.is_weekend ? '#d97706' : '#475569'}; font-weight: 600;">${escapeHtml(fullDay)}</td>
                         <td style="text-align: center;">
-                            <span style="font-family: monospace; font-weight: 700; color: ${r.is_late && !r.late_excused ? '#b91c1c' : (r.check_in ? '#059669' : '#94a3b8')};">${r.check_in || '-'}</span>
+                            <span style="font-family: monospace; font-weight: 700; color: ${r.is_late && !r.late_excused ? '#b91c1c' : (r.check_in ? '#059669' : '#94a3b8')};">${r.check_in ? formatTimeTo12h(r.check_in) : '-'}</span>
                             ${r.is_late ? (r.late_excused 
                                 ? `<div style="font-size: 8.5px; color: #059669; font-weight: 700;">Excused</div>` 
-                                : `<div style="font-size: 8.5px; color: #b91c1c; font-weight: 700;">Late (${r.late_minutes}m)</div>`) 
+                                : `<div style="font-size: 8.5px; color: #b91c1c; font-weight: 700;">Late (${formatLateDuration(r.late_minutes)})</div>`) 
                                 : ''}
                         </td>
-                        <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${r.check_out ? '#2563eb' : '#94a3b8'};">${r.check_out || '-'}</td>
+                        <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${r.check_out ? '#2563eb' : '#94a3b8'};">${r.check_out ? formatTimeTo12h(r.check_out) : '-'}</td>
                         <td style="text-align: center; font-family: monospace; font-weight: 700;">${r.duty_formatted || '0:00:00'}</td>
                         <td style="text-align: center;"><span class="status-badge ${statusClass}">${escapeHtml(cleanStatusText)}</span></td>
                     </tr>
@@ -1519,7 +1548,7 @@ function printAttendanceReport() {
                     <td style="text-align: center; font-weight: 700; color: #ea580c;">${sum.half_leaves}</td>
                     <td style="text-align: center; font-weight: 700; color: #2563eb;">${sum.approved_leaves}</td>
                     <td style="text-align: center; font-weight: 700; color: #dc2626;">${sum.absences + sum.incomplete}</td>
-                    <td style="text-align: center; font-weight: 700; color: ${sum.late_days > 0 ? '#b91c1c' : '#64748b'};">${sum.late_days || 0} ${sum.late_minutes ? `<span style="font-size: 9px; font-weight: normal;">(${sum.late_minutes}m)</span>` : ''}</td>
+                    <td style="text-align: center; font-weight: 700; color: ${sum.late_days > 0 ? '#b91c1c' : '#64748b'};">${sum.late_days || 0} ${sum.late_minutes ? `<span style="font-size: 9px; font-weight: normal;">(${formatLateDuration(sum.late_minutes)})</span>` : ''}</td>
                     <td style="text-align: center; font-family: monospace; font-weight: 800; color: #00b300;">${sum.duty_formatted}</td>
                     <td style="text-align: center; font-weight: 800; color: ${balanceColor};">
                         ${isOvertime ? '+' : ''}${sum.hour_balance}h

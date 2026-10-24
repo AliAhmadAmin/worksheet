@@ -170,6 +170,79 @@ function migratePermissionsSchema($pdo) {
         try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN late_excused_reason VARCHAR(255) NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN effective_shift_timing VARCHAR(100) NULL"); } catch (Exception $e) {}
 
+        // One-time auto-backfill of late status for existing sheets that have check_in_time but missing effective_shift_timing
+        try {
+            $uncalculatedSheets = $pdo->query("
+                SELECT ds.id, ds.employee_id, ds.sheet_date, ds.check_in_time, ds.is_late, ds.late_excused,
+                       e.shift_timing, e.shift_policy, e.late_grace_minutes
+                FROM daily_sheets ds
+                JOIN employees e ON ds.employee_id = e.id
+                WHERE ds.check_in_time IS NOT NULL 
+                  AND ds.check_in_time != ''
+                  AND (ds.effective_shift_timing IS NULL OR ds.effective_shift_timing = '')
+                LIMIT 500
+            ")->fetchAll(PDO::FETCH_ASSOC);
+
+            if (!empty($uncalculatedSheets)) {
+                $upStmt = $pdo->prepare("UPDATE daily_sheets SET is_late = ?, late_minutes = ?, effective_shift_timing = ? WHERE id = ?");
+                foreach ($uncalculatedSheets as $ush) {
+                    $cIn = trim($ush['check_in_time']);
+                    $cInTs = strtotime($cIn);
+                    if (!$cInTs) continue;
+
+                    $empPolicy = $ush['shift_policy'] ?? 'fixed';
+                    $grace = isset($ush['late_grace_minutes']) ? max(0, (int)$ush['late_grace_minutes']) : 15;
+                    $timing = !empty($ush['shift_timing']) ? $ush['shift_timing'] : '10:00 AM TO 6:00 PM';
+
+                    if ($empPolicy === 'flexible') {
+                        $upStmt->execute([0, 0, 'Flexible Hours', $ush['id']]);
+                        continue;
+                    }
+
+                    $parts = preg_split('/\s+(?:to|-)\s+/i', trim($timing));
+                    $startTs = !empty($parts[0]) ? strtotime($parts[0]) : strtotime('10:00:00');
+                    if (!$startTs) $startTs = strtotime('10:00:00');
+
+                    $diffFromSched = abs($cInTs - $startTs);
+                    $effTiming = $timing;
+                    if ($empPolicy === 'rotational' || $diffFromSched > 12600) {
+                        $stdShifts = [
+                            ['timing' => '8:00 AM TO 4:00 PM',   'start' => '08:00:00'],
+                            ['timing' => '9:00 AM TO 5:00 PM',   'start' => '09:00:00'],
+                            ['timing' => '10:00 AM TO 6:00 PM',  'start' => '10:00:00'],
+                            ['timing' => '12:00 PM TO 8:00 PM',  'start' => '12:00:00'],
+                            ['timing' => '1:00 PM TO 9:00 PM',   'start' => '13:00:00'],
+                            ['timing' => '2:00 PM TO 10:00 PM',  'start' => '14:00:00'],
+                            ['timing' => '4:00 PM TO 12:00 AM',  'start' => '16:00:00'],
+                            ['timing' => '6:00 PM TO 2:00 AM',   'start' => '18:00:00'],
+                            ['timing' => '12:00 AM TO 8:00 AM',  'start' => '00:00:00']
+                        ];
+                        $bestD = PHP_INT_MAX;
+                        $bestS = null;
+                        foreach ($stdShifts as $st) {
+                            $dist = abs($cInTs - strtotime($st['start']));
+                            if ($dist < $bestD) {
+                                $bestD = $dist;
+                                $bestS = $st;
+                            }
+                        }
+                        if ($bestS && $bestD < $diffFromSched && $bestD <= 7200) {
+                            $effTiming = $bestS['timing'];
+                            $startTs = strtotime($bestS['start']);
+                        }
+                    }
+
+                    $diffSec = $cInTs - $startTs;
+                    $graceSec = $grace * 60;
+                    $isLate = ($diffSec > $graceSec) ? 1 : 0;
+                    $lateMins = $isLate ? (int)ceil($diffSec / 60) : 0;
+
+                    $upStmt->execute([$isLate, $lateMins, $effTiming, $ush['id']]);
+                }
+            }
+        } catch (Exception $e) {}
+
+
         // HOD Verification and Digital Sign-off Schema for Daily Sheets
         try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN is_hod_checked TINYINT DEFAULT 0 AFTER is_locked"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN hod_checked_by INT NULL AFTER is_hod_checked"); } catch (Exception $e) {}

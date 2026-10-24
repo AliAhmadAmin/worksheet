@@ -1716,8 +1716,24 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
     const inInput = document.getElementById('admin-shift-in-time');
     const outInput = document.getElementById('admin-shift-out-time');
 
-    if (inInput) inInput.value = currentIn;
-    if (outInput) outInput.value = currentOut;
+    const fmt12 = (val) => {
+        if (!val) return '';
+        val = String(val).trim();
+        if (/am|pm/i.test(val)) return val;
+        const m = val.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (!m) return val;
+        let h = parseInt(m[1], 10);
+        const mins = m[2];
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12;
+        if (h === 0) h = 12;
+        return `${h < 10 ? '0' + h : h}:${mins} ${ampm}`;
+    };
+
+    if (inInput) inInput.value = currentIn ? fmt12(currentIn) : '';
+    if (outInput) outInput.value = currentOut ? fmt12(currentOut) : '';
+
+    window._modalEffShift = effShift || '';
 
     // Day schedule type & notes
     const dayTypeSelect = document.getElementById('admin-shift-day-type');
@@ -1748,10 +1764,41 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
     const excuseReasonBox = document.getElementById('admin-shift-late-reason-box');
     const excuseReasonInput = document.getElementById('admin-shift-late-excuse-reason');
 
-    const effectiveIsLate = isLate !== undefined ? parseInt(isLate, 10) : (AppState.currentSheet ? parseInt(AppState.currentSheet.is_late || 0, 10) : 0);
-    const effectiveLateMins = lateMinutes !== undefined ? parseInt(lateMinutes, 10) : (AppState.currentSheet ? parseInt(AppState.currentSheet.late_minutes || 0, 10) : 0);
+    let effectiveIsLate = isLate !== undefined ? parseInt(isLate, 10) : (AppState.currentSheet ? parseInt(AppState.currentSheet.is_late || 0, 10) : 0);
+    let effectiveLateMins = lateMinutes !== undefined ? parseInt(lateMinutes, 10) : (AppState.currentSheet ? parseInt(AppState.currentSheet.late_minutes || 0, 10) : 0);
     const effectiveExcused = lateExcused !== undefined ? parseInt(lateExcused, 10) : (AppState.currentSheet ? parseInt(AppState.currentSheet.late_excused || 0, 10) : 0);
     const effectiveExcusedReason = lateExcusedReason !== undefined ? lateExcusedReason : (AppState.currentSheet ? (AppState.currentSheet.late_excused_reason || '') : '');
+
+    // Dynamic on-the-fly late calculation if shift timing is available and check-in time is entered
+    if (inInput && inInput.value) {
+        const parseMins = (tStr) => {
+            if (!tStr) return null;
+            const mat = tStr.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+            if (!mat) return null;
+            let hr = parseInt(mat[1], 10);
+            const mn = parseInt(mat[2], 10);
+            const ap = (mat[3] || '').toUpperCase();
+            if (ap === 'PM' && hr < 12) hr += 12;
+            if (ap === 'AM' && hr === 12) hr = 0;
+            return hr * 60 + mn;
+        };
+
+        const inMins = parseMins(inInput.value);
+        if (inMins !== null && window._modalEffShift) {
+            const shiftParts = window._modalEffShift.split(/\s+(?:to|-)\s+/i);
+            const startMins = parseMins(shiftParts[0]);
+            if (startMins !== null) {
+                const diff = inMins - startMins;
+                if (diff > 15) {
+                    effectiveIsLate = 1;
+                    effectiveLateMins = diff;
+                } else {
+                    effectiveIsLate = 0;
+                    effectiveLateMins = 0;
+                }
+            }
+        }
+    }
 
     if (lateBadge) {
         if (effectiveIsLate === 1) {
@@ -1764,8 +1811,8 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
             } else {
                 lateBadge.style.background = 'rgba(244, 63, 94, 0.12)';
                 lateBadge.style.color = '#e11d48';
-                lateBadge.style.border = '1px solid rgba(244, 63, 94, 0.3)';
-                lateBadge.textContent = `⏱️ Late ${effectiveLateMins}m`;
+                const lateDurStr = (window.formatLateDuration ? window.formatLateDuration(effectiveLateMins) : `${effectiveLateMins}m`);
+                lateBadge.textContent = `⏱️ Late ${lateDurStr}`;
             }
         } else if (currentIn) {
             lateBadge.style.display = 'inline-block';
@@ -1776,6 +1823,14 @@ function openAdminShiftModal(empId, date, empName, desig, dept, inTime, outTime,
         } else {
             lateBadge.style.display = 'none';
         }
+    }
+
+    // Attach real-time input listener to check-in time field
+    if (inInput && !inInput._hasLateListener) {
+        inInput._hasLateListener = true;
+        inInput.addEventListener('input', function() {
+            updateAdminShiftModalLateLive();
+        });
     }
 
     if (excuseToggle) {
@@ -1802,6 +1857,68 @@ function toggleAdminShiftExcuseReason(checked) {
     if (box) box.style.display = checked ? 'block' : 'none';
     if (checked) {
         document.getElementById('admin-shift-late-excuse-reason')?.focus();
+    }
+    updateAdminShiftModalLateLive();
+}
+
+function updateAdminShiftModalLateLive() {
+    const inInput = document.getElementById('admin-shift-in-time');
+    const lateBadge = document.getElementById('admin-shift-late-badge');
+    const excuseToggle = document.getElementById('admin-shift-late-excuse-toggle');
+    if (!inInput || !lateBadge) return;
+
+    const inVal = inInput.value.trim();
+    if (!inVal) {
+        lateBadge.style.display = 'none';
+        return;
+    }
+
+    const parseMins = (tStr) => {
+        if (!tStr) return null;
+        const mat = tStr.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/i);
+        if (!mat) return null;
+        let hr = parseInt(mat[1], 10);
+        const mn = parseInt(mat[2], 10);
+        const ap = (mat[3] || '').toUpperCase();
+        if (ap === 'PM' && hr < 12) hr += 12;
+        if (ap === 'AM' && hr === 12) hr = 0;
+        return hr * 60 + mn;
+    };
+
+    const inMins = parseMins(inVal);
+    if (inMins === null) return;
+
+    let effShiftTiming = window._modalEffShift || '';
+    let startMins = 600; // default 10:00 AM
+    if (effShiftTiming) {
+        const shiftParts = effShiftTiming.split(/\s+(?:to|-)\s+/i);
+        const p = parseMins(shiftParts[0]);
+        if (p !== null) startMins = p;
+    }
+
+    const diff = inMins - startMins;
+    const isLate = diff > 15;
+    const lateMins = isLate ? diff : 0;
+    const isExcused = excuseToggle ? excuseToggle.checked : false;
+
+    lateBadge.style.display = 'inline-block';
+    if (isLate) {
+        if (isExcused) {
+            lateBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+            lateBadge.style.color = '#059669';
+            lateBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+            lateBadge.textContent = '✓ Late Excused';
+        } else {
+            lateBadge.style.background = 'rgba(244, 63, 94, 0.12)';
+            lateBadge.style.color = '#e11d48';
+            const lateDurStr = (window.formatLateDuration ? window.formatLateDuration(lateMins) : `${lateMins}m`);
+            lateBadge.textContent = `⏱️ Late ${lateDurStr}`;
+        }
+    } else {
+        lateBadge.style.background = 'rgba(16, 185, 129, 0.1)';
+        lateBadge.style.color = '#10b981';
+        lateBadge.style.border = '1px solid rgba(16, 185, 129, 0.25)';
+        lateBadge.textContent = '✓ On Time';
     }
 }
 
@@ -1853,7 +1970,10 @@ function setShiftTimePreset(type, val) {
 
     if (type === 'in') {
         const inInput = document.getElementById('admin-shift-in-time');
-        if (inInput) inInput.value = finalVal;
+        if (inInput) {
+            inInput.value = finalVal;
+            updateAdminShiftModalLateLive();
+        }
     } else if (type === 'out') {
         const outInput = document.getElementById('admin-shift-out-time');
         if (outInput) {

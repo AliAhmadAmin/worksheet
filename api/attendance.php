@@ -425,16 +425,30 @@ switch ($action) {
         if ($dayType === 'absent') {
             $inTime = '';
             $outTime = '';
-        } elseif (!empty($inTime) && !empty($outTime)) {
-            $inTs = strtotime($inTime);
-            $outTs = strtotime($outTime);
-            if ($inTs && $outTs) {
-                if ($outTs >= $inTs) {
-                    $dutySeconds = $outTs - $inTs;
-                } else {
-                    $dutySeconds = ($outTs + 86400) - $inTs;
+        } else {
+            if (!empty($inTime)) {
+                $inTs = strtotime($inTime);
+                if ($inTs !== false) {
+                    $inTime = date('h:i A', $inTs);
                 }
-                $dutyFormatted = formatDutyTime($dutySeconds);
+            }
+            if (!empty($outTime)) {
+                $outTs = strtotime($outTime);
+                if ($outTs !== false) {
+                    $outTime = date('h:i A', $outTs);
+                }
+            }
+            if (!empty($inTime) && !empty($outTime)) {
+                $inTs = strtotime($inTime);
+                $outTs = strtotime($outTime);
+                if ($inTs && $outTs) {
+                    if ($outTs >= $inTs) {
+                        $dutySeconds = $outTs - $inTs;
+                    } else {
+                        $dutySeconds = ($outTs + 86400) - $inTs;
+                    }
+                    $dutyFormatted = formatDutyTime($dutySeconds);
+                }
             }
         }
 
@@ -779,6 +793,8 @@ switch ($action) {
 
             $empStmt = $pdo->prepare("
                 SELECT e.id, e.name, e.email, e.designation, e.role, e.avatar, e.department_id, e.weekly_off, e.created_at,
+                       e.shift_timing, e.late_grace_minutes,
+                       COALESCE(e.shift_policy, 'fixed') as emp_shift_policy,
                        p.joining_date,
                        COALESCE(p.expected_hours, 8.0) as expected_hours,
                        COALESCE(p.shift_policy, 'standard_8h') as shift_policy,
@@ -1009,6 +1025,9 @@ switch ($action) {
                     $scheduledWeeklyOff = !empty($empRoster['weekly_off']) 
                         ? trim($empRoster['weekly_off']) 
                         : (!empty($emp['weekly_off']) ? trim($emp['weekly_off']) : 'Sunday');
+                    $scheduledShiftTiming = !empty($empRoster['shift_timing']) 
+                        ? trim($empRoster['shift_timing']) 
+                        : (!empty($emp['shift_timing']) ? trim($emp['shift_timing']) : '10:00 AM TO 6:00 PM');
                     $empOffDates = !empty($empRoster['off_dates_json']) 
                         ? (json_decode($empRoster['off_dates_json'], true) ?: []) 
                         : [];
@@ -1179,6 +1198,21 @@ switch ($action) {
                     $lateExcusedByDay = $sheet['late_excused_by'] ?? null;
                     $lateExcusedReasonDay = $sheet['late_excused_reason'] ?? '';
                     $effShiftDay = $sheet['effective_shift_timing'] ?? null;
+
+                    // Dynamically evaluate late status if check-in exists and either uncalculated or sheet has null/outdated effective shift
+                    if ($sheet && $hasCheckIn && (empty($effShiftDay) || ($isLateDay === 0 && empty($lateExcusedDay)))) {
+                        $evalLate = resolveEffectiveShiftAndLate($pdo, $empId, $dt, $sheet['check_in_time'], $scheduledShiftTiming);
+                        if ($evalLate) {
+                            $isLateDay = (int)$evalLate['is_late'];
+                            $lateMinutesDay = (int)$evalLate['late_minutes'];
+                            $effShiftDay = $evalLate['effective_shift_timing'];
+                            // Persist so database and future queries are always aligned
+                            try {
+                                $stmtUpLate = $pdo->prepare("UPDATE daily_sheets SET is_late = ?, late_minutes = ?, effective_shift_timing = ? WHERE id = ?");
+                                $stmtUpLate->execute([$isLateDay, $lateMinutesDay, $effShiftDay, $sheet['id']]);
+                            } catch (Exception $e) {}
+                        }
+                    }
 
                     if (!$d['is_future'] && $isLateDay) {
                         if ($lateExcusedDay) {
