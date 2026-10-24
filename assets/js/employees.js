@@ -35,7 +35,7 @@ function renderEmployeeViewControls() {
     const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
     const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || AppState.currentUser.can_manage_hr);
     const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
-    const canManage = isSuperAdmin || isHr || (AppState.currentUser && AppState.currentUser.can_manage_employees);
+    const canManage = isSuperAdmin || isHr || isHod || (AppState.currentUser && AppState.currentUser.can_manage_employees);
 
     controls.innerHTML = '';
 
@@ -116,8 +116,13 @@ function populateDirectoryDeptFilter() {
 
     const isGlobalAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
     const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
+    const currentVal = filterDept.value;
 
-    filterDept.innerHTML = isGlobalAdmin ? '<option value="">🏢 All Departments</option>' : '';
+    if (isGlobalAdmin || (isHod && (AppState.departments || []).length > 1)) {
+        filterDept.innerHTML = '<option value="">🏢 ' + (isGlobalAdmin ? 'All Departments' : 'All My Departments') + '</option>';
+    } else {
+        filterDept.innerHTML = '';
+    }
 
     (AppState.departments || []).forEach(d => {
         const opt = document.createElement('option');
@@ -126,18 +131,16 @@ function populateDirectoryDeptFilter() {
         filterDept.appendChild(opt);
     });
 
-    if (isHod || !isGlobalAdmin) {
-        if (AppState.departments && AppState.departments.length > 0) {
-            filterDept.value = AppState.departments[0].id;
-            if (AppState.departments.length <= 1) {
-                filterDept.disabled = true;
-                filterDept.style.opacity = '0.85';
-                filterDept.title = 'Restricted to your department';
-            }
-        }
+    if (currentVal && (AppState.departments || []).some(d => String(d.id) === String(currentVal))) {
+        filterDept.value = currentVal;
+    } else if (isHod && (AppState.departments || []).length === 1) {
+        filterDept.value = AppState.departments[0].id;
+        filterDept.disabled = true;
+        filterDept.style.opacity = '0.85';
+        filterDept.title = 'Restricted to your department';
     } else {
-        const currentVal = filterDept.value;
-        if (currentVal) filterDept.value = currentVal;
+        filterDept.disabled = false;
+        filterDept.style.opacity = '1';
     }
 }
 
@@ -270,8 +273,11 @@ function renderDirectoryTable(employees) {
             : '';
 
         let teamHtml = '';
-        const canAssignThisEmp = isSuperAdmin || isHr || (isHod && parseInt(emp.department_id || 0, 10) === userDeptId);
-        const canEditThisEmp = isSuperAdmin || isHr || (isHod && parseInt(emp.department_id || 0, 10) === userDeptId);
+        const managedDeptIds = (AppState.departments || []).map(d => parseInt(d.id, 10));
+        const empDeptId = parseInt(emp.department_id || 0, 10);
+        const isManagedByHod = isHod && (empDeptId === userDeptId || managedDeptIds.includes(empDeptId));
+        const canAssignThisEmp = isSuperAdmin || isHr || isManagedByHod;
+        const canEditThisEmp = isSuperAdmin || isHr || isManagedByHod;
 
         if (canEditThisEmp) {
             tr.style.cursor = 'pointer';
@@ -340,12 +346,17 @@ function renderDirectoryTable(employees) {
             </td>
             <td>
                 <div style="display: flex; align-items: center; gap: 5px; justify-content: flex-end; flex-wrap: nowrap;">
+                    ${canEditThisEmp ? `
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--primary); border-color: rgba(59, 130, 246, 0.4);" onclick="event.stopPropagation(); openEditEmployeeModal(${emp.id})" title="Edit Employee Profile & Settings">
+                            ✏️ Edit
+                        </button>
+                    ` : ''}
                     ${(isSuperAdmin && hasLogin && isActive) ? `
                         <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(59, 130, 246, 0.4); color: var(--primary); white-space: nowrap;" onclick="event.stopPropagation(); openPermissionsModal(${emp.id})" title="Role & Access Delegation">
                             🛡️ Roles
                         </button>
                     ` : ''}
-                    ${(hasLogin && isActive) ? `
+                    ${(hasLogin && isActive && (isSuperAdmin || isHr || isManagedByHod)) ? `
                         <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; white-space: nowrap;" onclick="event.stopPropagation(); openPasswordModal(${emp.id})" title="Change Password">
                             🔑 Pwd
                         </button>
@@ -402,9 +413,11 @@ function renderDepartmentsView() {
     const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
     const userDeptId = AppState.currentUser ? parseInt(AppState.currentUser.department_id || 0, 10) : 0;
 
+    const managedDeptIds = (AppState.departments || []).map(d => parseInt(d.id, 10));
     departments.forEach(dept => {
         const deptTeams = (AppState.teams || []).filter(t => parseInt(t.department_id, 10) === parseInt(dept.id, 10));
-        const isMyDept = (isHod && userDeptId === parseInt(dept.id, 10)) || isSuperAdmin || isHr;
+        const deptIdNum = parseInt(dept.id, 10);
+        const isMyDept = isSuperAdmin || isHr || (isHod && (userDeptId === deptIdNum || managedDeptIds.includes(deptIdNum)));
 
         const card = document.createElement('div');
         card.className = 'worksheet-card';
@@ -460,8 +473,10 @@ function renderDepartmentsView() {
             <div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
                     <div>
-                        <h4 style="margin: 0; font-size: 16px; color: var(--text-main); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                        <h4 style="margin: 0; font-size: 16px; color: var(--text-main); font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                             🏢 ${escapeHtml(dept.name)}
+                            ${dept.parent_name ? `<span style="font-size: 10.5px; background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25); padding: 2px 7px; border-radius: 4px; font-weight: 700;">Sub-Unit of ${escapeHtml(dept.parent_name)}</span>` : ''}
+                            ${(!dept.parent_id && (dept.sub_dept_count || 0) > 0) ? `<span style="font-size: 10.5px; background: rgba(139, 92, 246, 0.12); color: #7c3aed; border: 1px solid rgba(139, 92, 246, 0.25); padding: 2px 7px; border-radius: 4px; font-weight: 700;">🏢 Parent Division (${dept.sub_dept_count} Sub-Units)</span>` : ''}
                         </h4>
                         ${dept.description ? `<p style="margin: 3px 0 0 0; font-size: 12px; color: var(--text-muted);">${escapeHtml(dept.description)}</p>` : ''}
                     </div>
@@ -527,7 +542,9 @@ function openDepartmentDrilldown(deptId) {
     const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr'));
     const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
     const userDeptId = AppState.currentUser ? parseInt(AppState.currentUser.department_id || 0, 10) : 0;
-    const canManageDept = isSuperAdmin || isHr || (isHod && userDeptId === parseInt(dept.id, 10));
+    const managedDeptIds = (AppState.departments || []).map(d => parseInt(d.id, 10));
+    const deptIdNum = parseInt(dept.id, 10);
+    const canManageDept = isSuperAdmin || isHr || (isHod && (userDeptId === deptIdNum || managedDeptIds.includes(deptIdNum)));
 
     document.getElementById('drilldown-dept-name').textContent = dept.name;
     document.getElementById('drilldown-dept-meta').textContent = `${dept.hod_name ? 'HOD: ' + dept.hod_name : 'No HOD appointed'} • ${dept.description || 'Departmental operational roster'}`;
@@ -1011,6 +1028,20 @@ function openAddDepartmentModal() {
     const form = document.getElementById('add-department-form');
     if (form) form.reset();
 
+    // Populate parent department dropdown
+    const parentSelect = document.getElementById('add-dept-parent');
+    if (parentSelect) {
+        parentSelect.innerHTML = '<option value="">🏢 None (Top-Level Division / Main Department)</option>';
+        (AppState.departments || []).forEach(d => {
+            if (!d.parent_id) {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = `🏢 ${d.name}`;
+                parentSelect.appendChild(opt);
+            }
+        });
+    }
+
     initAddDeptHodDropdown('');
 
     openModal('add-department-modal');
@@ -1027,6 +1058,7 @@ async function handleSaveDepartmentSubmit(e) {
     }
 
     const name = document.getElementById('add-dept-name')?.value.trim();
+    const parentId = document.getElementById('add-dept-parent')?.value;
     const description = document.getElementById('add-dept-description')?.value.trim();
     const hodId = document.getElementById('add-dept-hod')?.value;
 
@@ -1042,6 +1074,7 @@ async function handleSaveDepartmentSubmit(e) {
             body: JSON.stringify({
                 action: 'create_department',
                 name,
+                parent_id: parentId || null,
                 description,
                 hod_id: hodId || null
             })
@@ -1069,6 +1102,24 @@ function openEditDepartmentModal(deptId) {
     document.getElementById('edit-dept-name').value = dept.name;
     document.getElementById('edit-dept-description').value = dept.description || '';
 
+    // Populate parent department dropdown
+    const parentSelect = document.getElementById('edit-dept-parent');
+    if (parentSelect) {
+        parentSelect.innerHTML = '<option value="">🏢 None (Top-Level Division / Main Department)</option>';
+        (AppState.departments || []).forEach(d => {
+            // Cannot parent under itself or its own sub-units
+            if (parseInt(d.id, 10) !== parseInt(deptId, 10) && parseInt(d.parent_id || 0, 10) !== parseInt(deptId, 10)) {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = `🏢 ${d.name}`;
+                if (parseInt(dept.parent_id || 0, 10) === parseInt(d.id, 10)) {
+                    opt.selected = true;
+                }
+                parentSelect.appendChild(opt);
+            }
+        });
+    }
+
     initEditDeptHodDropdown(dept.hod_id || '');
 
     openModal('edit-department-modal');
@@ -1079,6 +1130,7 @@ async function handleEditDepartmentSubmit(e) {
 
     const id = document.getElementById('edit-dept-id')?.value;
     const name = document.getElementById('edit-dept-name')?.value.trim();
+    const parentId = document.getElementById('edit-dept-parent')?.value;
     const description = document.getElementById('edit-dept-description')?.value.trim();
     const hodId = document.getElementById('edit-dept-hod')?.value;
 
@@ -1095,6 +1147,7 @@ async function handleEditDepartmentSubmit(e) {
                 action: 'update_department',
                 id,
                 name,
+                parent_id: parentId || null,
                 description,
                 hod_id: hodId || null
             })
@@ -1163,16 +1216,19 @@ function openAddTeamModal(preselectedDeptId) {
         deptSelect.innerHTML = '';
         const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
         const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr'));
+        const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
         const userDeptId = AppState.currentUser ? parseInt(AppState.currentUser.department_id || 0, 10) : 0;
+        const managedDeptIds = (AppState.departments || []).map(d => parseInt(d.id, 10));
 
         (AppState.departments || []).forEach(d => {
-            if (isSuperAdmin || isHr || parseInt(d.id, 10) === userDeptId) {
+            const dId = parseInt(d.id, 10);
+            if (isSuperAdmin || isHr || (isHod && managedDeptIds.includes(dId)) || dId === userDeptId) {
                 const opt = document.createElement('option');
                 opt.value = d.id;
-                opt.textContent = d.name;
-                if (preselectedDeptId && parseInt(d.id, 10) === parseInt(preselectedDeptId, 10)) {
+                opt.textContent = d.parent_name ? `${d.name} (${d.parent_name} Sub-Unit)` : d.name;
+                if (preselectedDeptId && dId === parseInt(preselectedDeptId, 10)) {
                     opt.selected = true;
-                } else if (!preselectedDeptId && parseInt(d.id, 10) === userDeptId) {
+                } else if (!preselectedDeptId && dId === userDeptId) {
                     opt.selected = true;
                 }
                 deptSelect.appendChild(opt);
@@ -1236,14 +1292,23 @@ function openEditTeamModal(teamId) {
     const deptSelect = document.getElementById('edit-team-dept');
     if (deptSelect) {
         deptSelect.innerHTML = '';
+        const isSuperAdmin = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+        const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr'));
+        const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
+        const userDeptId = AppState.currentUser ? parseInt(AppState.currentUser.department_id || 0, 10) : 0;
+        const managedDeptIds = (AppState.departments || []).map(d => parseInt(d.id, 10));
+
         (AppState.departments || []).forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = d.id;
-            opt.textContent = d.name;
-            if (parseInt(d.id, 10) === parseInt(team.department_id, 10)) {
-                opt.selected = true;
+            const dId = parseInt(d.id, 10);
+            if (isSuperAdmin || isHr || (isHod && managedDeptIds.includes(dId)) || dId === userDeptId) {
+                const opt = document.createElement('option');
+                opt.value = d.id;
+                opt.textContent = d.parent_name ? `${d.name} (${d.parent_name} Sub-Unit)` : d.name;
+                if (dId === parseInt(team.department_id, 10)) {
+                    opt.selected = true;
+                }
+                deptSelect.appendChild(opt);
             }
-            deptSelect.appendChild(opt);
         });
     }
 
@@ -1347,7 +1412,7 @@ function populateModalDeptTeamSelects(deptSelectId, teamSelectId, selectedDeptId
         (AppState.departments || []).forEach(d => {
             const opt = document.createElement('option');
             opt.value = d.id;
-            opt.textContent = d.name;
+            opt.textContent = d.parent_name ? `🏢 ${d.name} (${d.parent_name} Sub-Unit)` : `🏢 ${d.name}`;
             if (selectedDeptId && parseInt(d.id, 10) === parseInt(selectedDeptId, 10)) {
                 opt.selected = true;
             }
@@ -1644,10 +1709,12 @@ function openAddEmployeeModal() {
             addRoleBadge.textContent = '👤 Staff Member';
         }
         if (addDeptSelect) {
-            if (AppState.currentUser.department_id) {
-                addDeptSelect.value = AppState.currentUser.department_id;
-            }
-            addDeptSelect.disabled = true;
+            const currentFilterDept = document.getElementById('emp-dir-filter-dept')?.value;
+            const defaultDeptId = (currentFilterDept && (AppState.departments || []).some(d => parseInt(d.id, 10) === parseInt(currentFilterDept, 10)))
+                ? currentFilterDept
+                : (AppState.currentUser.department_id || (AppState.departments[0] ? AppState.departments[0].id : ''));
+            addDeptSelect.value = defaultDeptId;
+            addDeptSelect.disabled = (AppState.departments || []).length <= 1;
             filterModalTeamsByDepartment(addDeptSelect.value, 'add-emp-team', null);
         }
     } else {
@@ -1901,7 +1968,7 @@ function openEditEmployeeModal(empId) {
     }
 
     if (deptSelect) {
-        deptSelect.disabled = isHodUser;
+        deptSelect.disabled = isHodUser && (AppState.departments || []).length <= 1;
     }
 
     document.getElementById('edit-emp-designation').value = emp.designation || '';

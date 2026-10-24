@@ -32,12 +32,7 @@ $canManageEmp = $isSuperAdmin || $isHr || !empty($currentUserObj['can_manage_emp
 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
 if ($isHod) {
-    $stmtManagedDepts = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
-    $stmtManagedDepts->execute([$currentUserId]);
-    $extraDepts = $stmtManagedDepts->fetchAll(PDO::FETCH_COLUMN);
-    if (!empty($extraDepts)) {
-        $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extraDepts)));
-    }
+    $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
 }
 
 if (in_array($action, ['list', 'get'])) {
@@ -63,15 +58,9 @@ switch ($action) {
         }
 
         if ($isHod) {
-            // HODs are strictly restricted to their own department (and any department they manage)
+            // HODs are strictly restricted to their own department (and any child sub-departments they manage)
             $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
-            $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
-            $stmtManagedDepts = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
-            $stmtManagedDepts->execute([$currentUserId]);
-            $extraDepts = $stmtManagedDepts->fetchAll(PDO::FETCH_COLUMN);
-            if (!empty($extraDepts)) {
-                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extraDepts)));
-            }
+            $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
 
             if (!empty($managedDeptIds)) {
                 $placeholders = implode(',', array_fill(0, count($managedDeptIds), '?'));
@@ -158,14 +147,17 @@ switch ($action) {
 
         $stmtDept = $pdo->prepare("
             SELECT d.*, 
+                   p.name as parent_name,
                    h.name as hod_name, h.email as hod_email, h.avatar as hod_avatar,
+                   (SELECT COUNT(*) FROM departments sub WHERE sub.parent_id = d.id AND sub.is_active = 1) as sub_dept_count,
                    (SELECT COUNT(*) FROM teams t WHERE t.department_id = d.id) as team_count,
                    (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id AND e.is_active = 1) as member_count,
                    (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id AND (e.team_id IS NULL OR e.team_id = 0) AND e.is_active = 1) as unassigned_count
             FROM departments d
+            LEFT JOIN departments p ON d.parent_id = p.id
             LEFT JOIN employees h ON d.hod_id = h.id
             {$deptWhere}
-            ORDER BY d.id ASC
+            ORDER BY COALESCE(d.parent_id, d.id) ASC, d.parent_id ASC, d.name ASC
         ");
         $stmtDept->execute($deptParams);
         $departments = $stmtDept->fetchAll();
@@ -526,15 +518,19 @@ switch ($action) {
 
             if (!$targetEmp || !in_array((int)$targetEmp['department_id'], $managedDeptIds, true)) {
                 http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Access denied: You can only edit employees in your department.']);
+                echo json_encode(['success' => false, 'message' => 'Access denied: You can only edit employees in your managed departments.']);
                 exit;
             }
 
             // HOD cannot reassign or change organizational role! Strictly preserve existing role
             $role = $targetEmp['role'] ?: 'employee';
 
-            // HOD cannot transfer employee out of department
-            $deptId = (int)$targetEmp['department_id'];
+            // HOD can assign employee between their managed departments (e.g. parent and sub-department)
+            if (empty($deptId) || !in_array((int)$deptId, $managedDeptIds, true)) {
+                $deptId = (int)$targetEmp['department_id'];
+            } else {
+                $deptId = (int)$deptId;
+            }
 
             // HOD cannot view or edit salary, allowances, or bank details! Preserve existing values from database
             $stmtCurrProf = $pdo->prepare("SELECT basic_salary, fixed_allowance, bank_name, bank_account_no FROM hr_employee_profiles WHERE employee_id = ?");
@@ -689,6 +685,7 @@ switch ($action) {
         $name = trim($data['name'] ?? '');
         $description = trim($data['description'] ?? '');
         $hodId = (!empty($data['hod_id']) && (int)$data['hod_id'] > 0) ? (int)$data['hod_id'] : null;
+        $parentId = (!empty($data['parent_id']) && (int)$data['parent_id'] > 0) ? (int)$data['parent_id'] : null;
 
         if (empty($name)) {
             echo json_encode(['success' => false, 'message' => 'Department name is required.']);
@@ -707,18 +704,18 @@ switch ($action) {
                     exit;
                 } else {
                     // Reactivate previously archived/deleted department
-                    $stmtReactivate = $pdo->prepare("UPDATE departments SET is_active = 1, description = ?, hod_id = ? WHERE id = ?");
-                    $stmtReactivate->execute([$description, $hodId, $existing['id']]);
+                    $stmtReactivate = $pdo->prepare("UPDATE departments SET is_active = 1, description = ?, hod_id = ?, parent_id = ? WHERE id = ?");
+                    $stmtReactivate->execute([$description, $hodId, $parentId, $existing['id']]);
                     $newDeptId = (int)$existing['id'];
                 }
             } else {
-                $stmtInsert = $pdo->prepare("INSERT INTO departments (name, description, hod_id, is_active) VALUES (?, ?, ?, 1)");
-                $stmtInsert->execute([$name, $description, $hodId]);
+                $stmtInsert = $pdo->prepare("INSERT INTO departments (name, description, hod_id, parent_id, is_active) VALUES (?, ?, ?, ?, 1)");
+                $stmtInsert->execute([$name, $description, $hodId, $parentId]);
                 $newDeptId = (int)$pdo->lastInsertId();
             }
 
             if ($hodId && $newDeptId) {
-                $stmtUpdateHod = $pdo->prepare("UPDATE employees SET role = 'hod', department_id = ? WHERE id = ?");
+                $stmtUpdateHod = $pdo->prepare("UPDATE employees SET role = 'hod', department_id = COALESCE(department_id, ?) WHERE id = ?");
                 $stmtUpdateHod->execute([$newDeptId, $hodId]);
             }
 
@@ -746,6 +743,12 @@ switch ($action) {
         $name = trim($data['name'] ?? '');
         $description = trim($data['description'] ?? '');
         $hodId = (!empty($data['hod_id']) && (int)$data['hod_id'] > 0) ? (int)$data['hod_id'] : null;
+        $parentId = (!empty($data['parent_id']) && (int)$data['parent_id'] > 0) ? (int)$data['parent_id'] : null;
+
+        // Prevent self-parenting
+        if ($parentId === $id) {
+            $parentId = null;
+        }
 
         if (!$id || empty($name)) {
             http_response_code(400);
@@ -761,11 +764,11 @@ switch ($action) {
             exit;
         }
 
-        $stmtUpdate = $pdo->prepare("UPDATE departments SET name = ?, description = ?, hod_id = ? WHERE id = ?");
-        $stmtUpdate->execute([$name, $description, $hodId, $id]);
+        $stmtUpdate = $pdo->prepare("UPDATE departments SET name = ?, description = ?, hod_id = ?, parent_id = ? WHERE id = ?");
+        $stmtUpdate->execute([$name, $description, $hodId, $parentId, $id]);
 
         if ($hodId) {
-            $stmtUpdateHod = $pdo->prepare("UPDATE employees SET role = 'hod', department_id = ? WHERE id = ?");
+            $stmtUpdateHod = $pdo->prepare("UPDATE employees SET role = 'hod', department_id = COALESCE(department_id, ?) WHERE id = ?");
             $stmtUpdateHod->execute([$id, $hodId]);
         }
 
@@ -803,11 +806,11 @@ switch ($action) {
         $deptId = (int)($data['department_id'] ?? 0);
         $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 
-        // HOD can create teams for their own department; Super Admin/HR can create for any department
+        // HOD can create teams for their managed departments; Super Admin/HR can create for any department
         if (!$isSuperAdmin && !$isHr && !$canManageEmp) {
-            if (!$isHod || $deptId !== $userDeptId) {
+            if (!$isHod || !in_array($deptId, $managedDeptIds, true)) {
                 http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Unauthorized: HODs can only create teams within their own department.']);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: HODs can only create teams within their managed departments.']);
                 exit;
             }
         }
@@ -865,14 +868,14 @@ switch ($action) {
         }
 
         if (!$isSuperAdmin && !$isHr && !$canManageEmp) {
-            if (!$isHod || (int)$existingTeam['department_id'] !== $userDeptId) {
+            if (!$isHod || !in_array((int)$existingTeam['department_id'], $managedDeptIds, true)) {
                 http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Unauthorized: You can only edit teams in your assigned department.']);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: You can only edit teams in your managed departments.']);
                 exit;
             }
         }
 
-        $targetDeptId = $deptId > 0 ? $deptId : (int)$existingTeam['department_id'];
+        $targetDeptId = ($deptId > 0 && in_array($deptId, $managedDeptIds, true)) ? $deptId : (int)$existingTeam['department_id'];
 
         $stmtUpdate = $pdo->prepare("UPDATE teams SET name = ?, department_id = ?, description = ? WHERE id = ?");
         $stmtUpdate->execute([$name, $targetDeptId, $description, $teamId]);
@@ -903,9 +906,9 @@ switch ($action) {
         }
 
         if (!$isSuperAdmin && !$isHr && !$canManageEmp) {
-            if (!$isHod || (int)$existingTeam['department_id'] !== $userDeptId) {
+            if (!$isHod || !in_array((int)$existingTeam['department_id'], $managedDeptIds, true)) {
                 http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Unauthorized: You can only delete teams in your assigned department.']);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: You can only delete teams in your managed departments.']);
                 exit;
             }
         }
@@ -945,9 +948,9 @@ switch ($action) {
 
         // Check HOD department boundary
         if (!$isSuperAdmin && !$isHr && !$canManageEmp) {
-            if (!$isHod || (int)$targetEmp['department_id'] !== $userDeptId) {
+            if (!$isHod || !in_array((int)$targetEmp['department_id'], $managedDeptIds, true)) {
                 http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Unauthorized: HOD can only assign team members within their own department.']);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: HOD can only assign team members within their managed departments.']);
                 exit;
             }
         }
@@ -962,10 +965,10 @@ switch ($action) {
                 echo json_encode(['success' => false, 'message' => 'Team not found.']);
                 exit;
             }
-            // If HOD, team must belong to their dept
-            if ($isHod && !$isSuperAdmin && !$isHr && (int)$targetTeam['department_id'] !== $userDeptId) {
+            // If HOD, team must belong to their managed depts
+            if ($isHod && !$isSuperAdmin && !$isHr && !in_array((int)$targetTeam['department_id'], $managedDeptIds, true)) {
                 http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'Cannot assign employee to a team outside your department.']);
+                echo json_encode(['success' => false, 'message' => 'Cannot assign employee to a team outside your managed departments.']);
                 exit;
             }
         }

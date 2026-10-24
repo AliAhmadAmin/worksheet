@@ -28,12 +28,7 @@ $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 
 $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
 if ($isHod) {
-    $stmtM = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
-    $stmtM->execute([$currentUserId]);
-    $extraDepts = $stmtM->fetchAll(PDO::FETCH_COLUMN);
-    if (!empty($extraDepts)) {
-        $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extraDepts)));
-    }
+    $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
 }
 
 // Helper to normalize content types for matching columns
@@ -50,7 +45,20 @@ function normalizeMatrixContentType($cType) {
 switch ($action) {
     case 'matrix':
         // Determine target department
-        $targetDeptId = (!$isSuperAdmin && !empty($managedDeptIds)) ? $managedDeptIds[0] : (isset($_GET['department_id']) && (int)$_GET['department_id'] > 0 ? (int)$_GET['department_id'] : $userDeptId);
+        $reqDept = $_GET['department_id'] ?? 'all';
+        $filterDeptId = null;
+        if ($reqDept !== 'all' && (int)$reqDept > 0) {
+            $reqDeptId = (int)$reqDept;
+            if ($isSuperAdmin || in_array($reqDeptId, $managedDeptIds)) {
+                $filterDeptId = $reqDeptId;
+            }
+        }
+
+        if ($filterDeptId) {
+            $targetDeptId = $filterDeptId;
+        } else {
+            $targetDeptId = (!empty($managedDeptIds)) ? $managedDeptIds[0] : (isset($_GET['department_id']) && (int)$_GET['department_id'] > 0 ? (int)$_GET['department_id'] : $userDeptId);
+        }
         if ($targetDeptId <= 0) $targetDeptId = 2;
 
         // 1. Fetch configured Tracking Departments (Rows) & Content Types (Columns) for this department
@@ -98,7 +106,10 @@ switch ($action) {
             WHERE ds.sheet_date BETWEEN ? AND ?
         ";
         $sqlParams = [$startDate, $endDate];
-        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+        if ($filterDeptId) {
+            $sql .= " AND e.department_id = ?";
+            $sqlParams[] = $filterDeptId;
+        } elseif (!$isSuperAdmin && !empty($managedDeptIds)) {
             $inD = implode(',', array_fill(0, count($managedDeptIds), '?'));
             $sql .= " AND e.department_id IN ($inD)";
             foreach ($managedDeptIds as $md) {
@@ -187,7 +198,9 @@ switch ($action) {
         }
 
         // 4. Build Team & Employee Breakdown
-        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+        if ($filterDeptId) {
+            $empWhere = "WHERE e.is_active = 1 AND e.department_id = " . intval($filterDeptId);
+        } elseif (!$isSuperAdmin && !empty($managedDeptIds)) {
             $inDStr = implode(',', array_map('intval', $managedDeptIds));
             $empWhere = "WHERE e.is_active = 1 AND e.department_id IN ({$inDStr})";
         } else {
@@ -260,7 +273,10 @@ switch ($action) {
             WHERE ds.sheet_date BETWEEN ? AND ?
         ";
         $dutyParams = [$startDate, $endDate];
-        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+        if ($filterDeptId) {
+            $dutySql .= " AND e.department_id = ?";
+            $dutyParams[] = $filterDeptId;
+        } elseif (!$isSuperAdmin && !empty($managedDeptIds)) {
             $inD = implode(',', array_fill(0, count($managedDeptIds), '?'));
             $dutySql .= " AND e.department_id IN ($inD)";
             foreach ($managedDeptIds as $md) {
@@ -272,7 +288,17 @@ switch ($action) {
         $dutySummary = $dutyStmt->fetch();
 
         // Total all-time content count in entire database
-        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+        if ($filterDeptId) {
+            $allTimeStmt = $pdo->prepare("
+                SELECT COALESCE(SUM(se.count_val), COUNT(*)) 
+                FROM sheet_entries se
+                JOIN daily_sheets ds ON se.sheet_id = ds.id
+                JOIN employees e ON ds.employee_id = e.id
+                WHERE e.department_id = ?
+            ");
+            $allTimeStmt->execute([$filterDeptId]);
+            $allTimeContent = (int)$allTimeStmt->fetchColumn();
+        } elseif (!$isSuperAdmin && !empty($managedDeptIds)) {
             $inD = implode(',', array_fill(0, count($managedDeptIds), '?'));
             $allTimeStmt = $pdo->prepare("
                 SELECT COALESCE(SUM(se.count_val), COUNT(*)) 
@@ -291,6 +317,8 @@ switch ($action) {
             'success' => true,
             'start_date' => $startDate,
             'end_date' => $endDate,
+            'target_department_id' => $targetDeptId,
+            'filter_department_id' => $filterDeptId,
             'content_types' => $contentTypes,
             'department_matrix' => array_values($deptMatrix),
             'column_totals' => $colTotals,
@@ -310,7 +338,20 @@ switch ($action) {
         header('Content-Disposition: attachment; filename=worksheet_report_' . $startDate . '_to_' . $endDate . '.csv');
         $output = fopen('php://output', 'w');
 
-        $targetDeptId = (!$isSuperAdmin && !empty($managedDeptIds)) ? $managedDeptIds[0] : (isset($_GET['department_id']) && (int)$_GET['department_id'] > 0 ? (int)$_GET['department_id'] : $userDeptId);
+        $reqDept = $_GET['department_id'] ?? 'all';
+        $filterDeptId = null;
+        if ($reqDept !== 'all' && (int)$reqDept > 0) {
+            $reqDeptId = (int)$reqDept;
+            if ($isSuperAdmin || in_array($reqDeptId, $managedDeptIds)) {
+                $filterDeptId = $reqDeptId;
+            }
+        }
+
+        if ($filterDeptId) {
+            $targetDeptId = $filterDeptId;
+        } else {
+            $targetDeptId = (!empty($managedDeptIds)) ? $managedDeptIds[0] : (isset($_GET['department_id']) && (int)$_GET['department_id'] > 0 ? (int)$_GET['department_id'] : $userDeptId);
+        }
         if ($targetDeptId <= 0) $targetDeptId = 2;
 
         $trackingDepts = [];
@@ -340,7 +381,10 @@ switch ($action) {
             WHERE ds.sheet_date BETWEEN ? AND ?
         ";
         $deptSqlParams = [$startDate, $endDate];
-        if (!$isSuperAdmin && !empty($managedDeptIds)) {
+        if ($filterDeptId) {
+            $deptSql .= " AND e.department_id = ?";
+            $deptSqlParams[] = $filterDeptId;
+        } elseif (!$isSuperAdmin && !empty($managedDeptIds)) {
             $inD = implode(',', array_fill(0, count($managedDeptIds), '?'));
             $deptSql .= " AND e.department_id IN ($inD)";
             foreach ($managedDeptIds as $md) {
@@ -415,7 +459,13 @@ switch ($action) {
         fputcsv($output, ['Team & Employee Performance Breakdown']);
         fputcsv($output, array_merge(['Team', 'Employee Name'], $contentTypes, ['Total']));
 
-        $empExportWhere = (!$isSuperAdmin && !empty($managedDeptIds)) ? "WHERE e.is_active = 1 AND e.department_id IN (" . implode(',', array_map('intval', $managedDeptIds)) . ")" : "WHERE e.is_active = 1";
+        if ($filterDeptId) {
+            $empExportWhere = "WHERE e.is_active = 1 AND e.department_id = " . intval($filterDeptId);
+        } elseif (!$isSuperAdmin && !empty($managedDeptIds)) {
+            $empExportWhere = "WHERE e.is_active = 1 AND e.department_id IN (" . implode(',', array_map('intval', $managedDeptIds)) . ")";
+        } else {
+            $empExportWhere = "WHERE e.is_active = 1";
+        }
         $empSql = "
             SELECT 
                 t.name as team_name,

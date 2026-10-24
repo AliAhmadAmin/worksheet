@@ -62,13 +62,7 @@ switch ($action) {
         $managedDeptIds = [];
         if ($isHod || !$isSuperAdmin) {
             $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
-            if ($userDeptId > 0) $managedDeptIds[] = $userDeptId;
-            $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
-            $stmtManaged->execute([$currentUserId]);
-            $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
-            if (!empty($extra)) {
-                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
-            }
+            $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
         }
 
         if ($isHod && $empId !== (int)$currentUserId && !$isSuperAdmin) {
@@ -212,6 +206,18 @@ switch ($action) {
             }
         }
 
+        // Look up Sub-HOD checker name if sheet is checked
+        $subHodCheckedByName = null;
+        if (!empty($sheet['sub_hod_checked_by'])) {
+            try {
+                $stName = $pdo->prepare("SELECT name FROM employees WHERE id = ?");
+                $stName->execute([(int)$sheet['sub_hod_checked_by']]);
+                $subHodCheckedByName = $stName->fetchColumn() ?: null;
+            } catch (Exception $e) {
+                $subHodCheckedByName = null;
+            }
+        }
+
         // Look up HOD checker name if sheet is checked
         $hodCheckedByName = null;
         if (!empty($sheet['hod_checked_by'])) {
@@ -224,24 +230,98 @@ switch ($action) {
             }
         }
 
-        // Fetch department HOD verification & print settings
+        // Fetch department metadata, hierarchy & HOD verification settings
+        $empDeptParentId = null;
+        $empDeptHodId = null;
+        $parentDeptName = null;
+        $parentDeptHodId = null;
         $deptRequireCheck = 0;
         $deptBlockPrint = 0;
+
         try {
             $deptSettingsStmt = $pdo->prepare("
-                SELECT require_hod_sheet_check, block_print_before_hod_check 
-                FROM departments 
-                WHERE id = ?
+                SELECT d.id, d.name, d.parent_id, d.hod_id, d.require_hod_sheet_check, d.block_print_before_hod_check,
+                       p.name as parent_name, p.hod_id as parent_hod_id, p.require_hod_sheet_check as parent_require_check, p.block_print_before_hod_check as parent_block_print
+                FROM departments d
+                LEFT JOIN departments p ON d.parent_id = p.id
+                WHERE d.id = ?
             ");
             $deptSettingsStmt->execute([$empDeptId]);
             $deptSettings = $deptSettingsStmt->fetch(PDO::FETCH_ASSOC);
             if ($deptSettings) {
-                $deptRequireCheck = (int)($deptSettings['require_hod_sheet_check'] ?? 0);
-                $deptBlockPrint = (int)($deptSettings['block_print_before_hod_check'] ?? 0);
+                $empDeptParentId = !empty($deptSettings['parent_id']) ? (int)$deptSettings['parent_id'] : null;
+                $empDeptHodId = !empty($deptSettings['hod_id']) ? (int)$deptSettings['hod_id'] : null;
+                $parentDeptName = $deptSettings['parent_name'] ?? null;
+                $parentDeptHodId = !empty($deptSettings['parent_hod_id']) ? (int)$deptSettings['parent_hod_id'] : null;
+
+                $deptRequireCheck = (int)($deptSettings['require_hod_sheet_check'] ?? $deptSettings['parent_require_check'] ?? 0);
+                $deptBlockPrint = (int)($deptSettings['block_print_before_hod_check'] ?? $deptSettings['parent_block_print'] ?? 0);
             }
         } catch (Exception $e) {}
 
+        // Determine if this worksheet requires Dual Approval:
+        // Employee belongs to a child department (parent_id > 0) AND employee is not the Sub-HOD himself
+        $isChildDept = ($empDeptParentId !== null && $empDeptParentId > 0);
+        $isEmpTheSubHod = ($isChildDept && $empId === $empDeptHodId);
+        $requiresDualApproval = ($isChildDept && !$isEmpTheSubHod);
+
+        $isSubHodChecked = !empty($sheet['is_sub_hod_checked']) ? 1 : 0;
         $isHodChecked = !empty($sheet['is_hod_checked']) ? 1 : 0;
+
+        // Permissions for current user (cannot verify self)
+        $isSelfInspection = ($currentUserId === $empId);
+
+        // Can mark Sub-HOD check:
+        $canMarkSubHodCheck = false;
+        if (!$isSelfInspection) {
+            if ($isSuperAdmin) {
+                $canMarkSubHodCheck = true;
+            } elseif ($isChildDept && $currentUserId === $empDeptHodId) {
+                $canMarkSubHodCheck = true;
+            } elseif ($isHod && in_array($empDeptId, $managedDeptIds, true)) {
+                $canMarkSubHodCheck = true;
+            }
+        }
+
+        // Can mark Final HOD check:
+        $canMarkFinalCheck = false;
+        if (!$isSelfInspection) {
+            if ($isSuperAdmin) {
+                $canMarkFinalCheck = true;
+            } elseif ($isChildDept) {
+                // For child department, only Parent HOD (or admin) can give final approval!
+                if ($parentDeptHodId && $currentUserId === $parentDeptHodId) {
+                    $canMarkFinalCheck = true;
+                } elseif ($isHod && in_array($empDeptParentId, $managedDeptIds, true)) {
+                    $canMarkFinalCheck = true;
+                }
+            } else {
+                // Standalone / parent department
+                if ($empDeptHodId && $currentUserId === $empDeptHodId) {
+                    $canMarkFinalCheck = true;
+                } elseif ($isHod && in_array($empDeptId, $managedDeptIds, true)) {
+                    $canMarkFinalCheck = true;
+                }
+            }
+        }
+
+        // Overall approval status
+        if ($requiresDualApproval) {
+            if ($isHodChecked === 1) {
+                $overallApprovalStatus = 'fully_approved';
+            } elseif ($isSubHodChecked === 1) {
+                $overallApprovalStatus = 'sub_hod_approved';
+            } else {
+                $overallApprovalStatus = 'pending_sub_hod';
+            }
+        } else {
+            if ($isHodChecked === 1) {
+                $overallApprovalStatus = 'fully_approved';
+            } else {
+                $overallApprovalStatus = 'pending_hod';
+            }
+        }
+
         $canPrint = ($isHodChecked === 1) || ($deptBlockPrint === 0) || $isAdminOrHod;
 
         echo json_encode([
@@ -251,10 +331,22 @@ switch ($action) {
             'entries' => $entries,
             'columns' => $columns,
             'is_locked' => $isLocked,
+            'requires_dual_approval' => $requiresDualApproval,
+            'is_child_department' => $isChildDept,
+            'is_sub_hod_employee' => $isEmpTheSubHod,
+            'overall_approval_status' => $overallApprovalStatus,
+            'is_sub_hod_checked' => $isSubHodChecked,
+            'sub_hod_checked_by' => $sheet['sub_hod_checked_by'] ?? null,
+            'sub_hod_checked_by_name' => $subHodCheckedByName,
+            'sub_hod_checked_at' => !empty($sheet['sub_hod_checked_at']) ? date('d-M-Y h:i A', strtotime($sheet['sub_hod_checked_at'])) : null,
+            'can_mark_sub_hod_check' => $canMarkSubHodCheck,
             'is_hod_checked' => $isHodChecked,
             'hod_checked_by' => $sheet['hod_checked_by'] ?? null,
             'hod_checked_by_name' => $hodCheckedByName,
             'hod_checked_at' => !empty($sheet['hod_checked_at']) ? date('d-M-Y h:i A', strtotime($sheet['hod_checked_at'])) : null,
+            'can_mark_check' => ($canMarkFinalCheck || $canMarkSubHodCheck),
+            'can_mark_final_check' => $canMarkFinalCheck,
+            'parent_department_name' => $parentDeptName,
             'department_settings' => [
                 'require_hod_sheet_check' => $deptRequireCheck,
                 'block_print_before_hod_check' => $deptBlockPrint
@@ -265,7 +357,6 @@ switch ($action) {
             'can_edit_after_lock' => $isSelf ? ($isLocked === 0) : $canManageOtherSheets,
             'is_read_only_inspection' => $isReadOnlyInspection,
             'can_unlock' => $canUnlock,
-            'can_mark_check' => ($isSuperAdmin || $isHod),
             'monthly_off_days_taken' => $monthlyOffDaysTaken,
             'monthly_off_days_allowed' => $monthlyOffDaysAllowed,
             'approved_leave' => $approvedLeave,
@@ -298,13 +389,7 @@ switch ($action) {
         $managedDeptIds = [];
         if ($isHod || !$isSuperAdmin) {
             $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
-            if ($userDeptId > 0) $managedDeptIds[] = $userDeptId;
-            $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
-            $stmtManaged->execute([$currentUserId]);
-            $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
-            if (!empty($extra)) {
-                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
-            }
+            $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
         }
 
         $isAdminOrHod = $isSuperAdmin || ($isHod && in_array($targetDeptId, $managedDeptIds, true));
@@ -530,13 +615,7 @@ switch ($action) {
                 $targetDeptId = (int)$empCheck->fetchColumn();
 
                 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
-                $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
-                $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
-                $stmtManaged->execute([$currentUserId]);
-                $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
-                if (!empty($extra)) {
-                    $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
-                }
+                $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
 
                 if (!in_array($targetDeptId, $managedDeptIds, true)) {
                     http_response_code(403);
@@ -565,10 +644,98 @@ switch ($action) {
         ]);
         break;
 
+    case 'toggle_sub_hod_check':
+        if (!$isSuperAdmin && !$isHod) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Only Sub-HOD, Department Head, and Admins can verify as Sub-HOD.']);
+            exit;
+        }
+
+        $sheetId = (int)($data['sheet_id'] ?? 0);
+        $empId = (int)($data['employee_id'] ?? 0);
+        $date = $data['date'] ?? date('Y-m-d');
+        $checkState = isset($data['is_checked']) ? (int)$data['is_checked'] : 1;
+        $notes = trim($data['notes'] ?? '');
+
+        $targetEmpId = $empId;
+        if (!$targetEmpId && $sheetId) {
+            $targetEmpId = (int)$pdo->query("SELECT employee_id FROM daily_sheets WHERE id = {$sheetId}")->fetchColumn();
+        }
+
+        if ($targetEmpId && $targetEmpId === (int)$currentUserId && !$isSuperAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'You cannot verify your own worksheet.']);
+            exit;
+        }
+
+        if ($isHod && !$isSuperAdmin && $targetEmpId) {
+            $empCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $empCheck->execute([$targetEmpId]);
+            $targetDeptId = (int)$empCheck->fetchColumn();
+
+            $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+            $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
+
+            if (!in_array($targetDeptId, $managedDeptIds, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'You do not have permission to verify worksheets for this department.']);
+                exit;
+            }
+        }
+
+        // Find or create sheet if it doesn't exist yet
+        if (!$sheetId && $empId && $date) {
+            $sCheck = $pdo->prepare("SELECT id FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
+            $sCheck->execute([$empId, $date]);
+            $sheetId = (int)$sCheck->fetchColumn();
+
+            if (!$sheetId) {
+                $sCreate = $pdo->prepare("INSERT INTO daily_sheets (employee_id, sheet_date, created_at) VALUES (?, ?, NOW())");
+                $sCreate->execute([$empId, $date]);
+                $sheetId = (int)$pdo->lastInsertId();
+            }
+        }
+
+        if (!$sheetId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Missing sheet identifier']);
+            exit;
+        }
+
+        $checkerName = $currentUserObj['name'] ?? 'Sub-HOD';
+
+        if ($checkState === 1) {
+            $stmt = $pdo->prepare("
+                UPDATE daily_sheets 
+                SET is_sub_hod_checked = 1, sub_hod_checked_by = ?, sub_hod_checked_at = NOW(), sub_hod_checked_notes = ?, updated_at = NOW() 
+                WHERE id = ?
+            ");
+            $stmt->execute([$currentUserId, $notes, $sheetId]);
+            $msg = 'Worksheet successfully marked as Verified by Sub-HOD.';
+        } else {
+            $stmt = $pdo->prepare("
+                UPDATE daily_sheets 
+                SET is_sub_hod_checked = 0, sub_hod_checked_by = NULL, sub_hod_checked_at = NULL, sub_hod_checked_notes = NULL, updated_at = NOW() 
+                WHERE id = ?
+            ");
+            $stmt->execute([$sheetId]);
+            $msg = 'Sub-HOD verification removed / reopened.';
+        }
+
+        echo json_encode([
+            'success' => true,
+            'is_sub_hod_checked' => $checkState,
+            'sub_hod_checked_by' => ($checkState ? (int)$currentUserId : null),
+            'sub_hod_checked_by_name' => ($checkState ? $checkerName : null),
+            'sub_hod_checked_at' => ($checkState ? date('d-M-Y h:i A') : null),
+            'message' => $msg
+        ]);
+        break;
+
     case 'toggle_hod_check':
         if (!$isSuperAdmin && !$isHod) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Only Department Heads (HOD) and Admins can mark worksheets as checked.']);
+            echo json_encode(['success' => false, 'message' => 'Only Department Heads (HOD) and Admins can mark worksheets as approved.']);
             exit;
         }
 
@@ -584,23 +751,41 @@ switch ($action) {
             $targetEmpId = (int)$pdo->query("SELECT employee_id FROM daily_sheets WHERE id = {$sheetId}")->fetchColumn();
         }
 
+        if ($targetEmpId && $targetEmpId === (int)$currentUserId && !$isSuperAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'You cannot approve your own worksheet.']);
+            exit;
+        }
+
         if ($isHod && !$isSuperAdmin && $targetEmpId) {
-            $empCheck = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $empCheck = $pdo->prepare("
+                SELECT e.department_id, d.parent_id, d.hod_id, p.hod_id as parent_hod_id 
+                FROM employees e 
+                JOIN departments d ON e.department_id = d.id 
+                LEFT JOIN departments p ON d.parent_id = p.id
+                WHERE e.id = ?
+            ");
             $empCheck->execute([$targetEmpId]);
-            $targetDeptId = (int)$empCheck->fetchColumn();
+            $deptInfo = $empCheck->fetch();
+            $targetDeptId = (int)($deptInfo['department_id'] ?? 0);
+            $parentId = !empty($deptInfo['parent_id']) ? (int)$deptInfo['parent_id'] : null;
+            $parentHodId = !empty($deptInfo['parent_hod_id']) ? (int)$deptInfo['parent_hod_id'] : null;
 
             $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
-            $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
-            $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
-            $stmtManaged->execute([$currentUserId]);
-            $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
-            if (!empty($extra)) {
-                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
+            $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
+
+            // If it's a child department: only Parent HOD can provide Final HOD Approval!
+            if ($parentId !== null && $parentId > 0) {
+                if ($currentUserId === (int)($deptInfo['hod_id'] ?? 0) && $currentUserId !== $parentHodId) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'message' => 'As Sub-HOD, please use "Sub-HOD Verification". Final HOD Approval is reserved for the Parent Department Head.']);
+                    exit;
+                }
             }
 
             if (!in_array($targetDeptId, $managedDeptIds, true)) {
                 http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'HODs can only verify worksheets for employees in their own department.']);
+                echo json_encode(['success' => false, 'message' => 'HODs can only approve worksheets for employees in their own department.']);
                 exit;
             }
         }
@@ -633,7 +818,7 @@ switch ($action) {
                 WHERE id = ?
             ");
             $stmt->execute([$currentUserId, $notes, $sheetId]);
-            $msg = 'Worksheet successfully marked as Checked and Verified by HOD.';
+            $msg = 'Worksheet successfully marked as Final Approved by HOD.';
         } else {
             $stmt = $pdo->prepare("
                 UPDATE daily_sheets 
@@ -641,7 +826,7 @@ switch ($action) {
                 WHERE id = ?
             ");
             $stmt->execute([$sheetId]);
-            $msg = 'Worksheet verification removed / reopened.';
+            $msg = 'Worksheet final approval removed / reopened.';
         }
 
         echo json_encode([
@@ -673,13 +858,7 @@ switch ($action) {
         $canToggle = ($empId === (int)$currentUserId) || $isSuperAdmin;
         if (!$canToggle && $isHod) {
             $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
-            $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
-            $stmtManaged = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
-            $stmtManaged->execute([$currentUserId]);
-            $extra = $stmtManaged->fetchAll(PDO::FETCH_COLUMN);
-            if (!empty($extra)) {
-                $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extra)));
-            }
+            $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
             if (in_array((int)$targetEmp['department_id'], $managedDeptIds, true)) {
                 $canToggle = true;
             }

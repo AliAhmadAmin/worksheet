@@ -1410,6 +1410,16 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                     </div>
 
                     <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">Parent Department (Optional - for Sub-Departments)</label>
+                        <select id="add-dept-parent" class="input-control" style="font-weight: 600;">
+                            <option value="">🏢 None (Top-Level Division / Main Department)</option>
+                        </select>
+                        <small style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">
+                            If this is an operational sub-unit (e.g. <em>Archive</em> or <em>NLE</em> under <em>Programming</em>), select its parent division.
+                        </small>
+                    </div>
+
+                    <div class="form-group">
                         <label class="form-label">Head of Department (HOD)</label>
                         <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
                             <div id="add-dept-hod-avatar" class="admin-inspector-avatar" style="width: 38px; height: 38px; font-size: 15px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700;">👤</div>
@@ -1463,6 +1473,16 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                     <div class="form-group">
                         <label class="form-label">Department Name *</label>
                         <input type="text" id="edit-dept-name" class="input-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight: 700;">Parent Department (Optional - for Sub-Departments)</label>
+                        <select id="edit-dept-parent" class="input-control" style="font-weight: 600;">
+                            <option value="">🏢 None (Top-Level Division / Main Department)</option>
+                        </select>
+                        <small style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">
+                            If this is an operational sub-unit (e.g. <em>Archive</em> or <em>NLE</em> under <em>Programming</em>), select its parent division.
+                        </small>
                     </div>
 
                     <div class="form-group">

@@ -1,5 +1,6 @@
 <!-- TAB: NEWS ROOM & DIGITAL HANDOVER PIPELINE -->
-<section id="tab-newsroom" class="tab-section <?= ($currentPortal === 'newsroom') ? 'active' : '' ?>">
+<?php $isHodNewsTab = in_array(strtolower($authUser['role'] ?? ''), ['hod', 'deputy_hod']); ?>
+<section id="tab-newsroom" class="tab-section <?= (!$isHodNewsTab && $currentPortal === 'newsroom') ? 'active' : '' ?>">
     <!-- Hero Header -->
     <div class="worksheet-card" style="margin-bottom: 18px; border-top: 4px solid #dc2626;">
         <div class="card-header-flex" style="flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;">

@@ -32,6 +32,7 @@
                             </span>
                             <span id="hero-late-pill" class="shift-chip" style="display: none;"></span>
                             <span id="employee-sheet-lock-badge" class="badge-lock unlocked">🔓 Active</span>
+                            <span id="employee-sub-hod-check-badge" class="badge" style="display: none;"></span>
                             <span id="employee-hod-check-badge" class="badge" style="display: none;"></span>
                         </div>
                     </div>
@@ -86,6 +87,7 @@
                         <div>
                             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                                 <h3 id="admin-inspector-title" style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 0;">Employee Worksheet Inspector & Live Editor</h3>
+                                <span id="admin-sub-hod-badge" class="badge" style="display: none; font-size: 11px; padding: 3px 10px; border-radius: 20px;"></span>
                                 <span id="admin-verified-header-badge" class="badge" style="display: none; font-size: 11px; padding: 3px 10px; border-radius: 20px;"></span>
                             </div>
                             <p id="admin-inspector-subtitle" style="font-size: 12.5px; color: var(--text-muted); margin-top: 3px;">Reviewing, editing, and managing daily work entries for team members.</p>
@@ -158,8 +160,11 @@
                                 <button type="button" id="admin-unlock-btn" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="toggleSheetLock()">
                                     🔒 Lock Sheet
                                 </button>
-                                <button type="button" id="admin-btn-hod-check" class="btn btn-success" style="padding: 6px 13px; font-size: 12px; font-weight: 700; display: none; align-items: center; gap: 5px;" onclick="handleToggleHodCheckSheet()" title="Mark this worksheet as Checked & Verified by HOD">
-                                    <span>✅</span> <span id="admin-btn-hod-check-text">Mark Checked</span>
+                                <button type="button" id="admin-btn-sub-hod-check" class="btn btn-outline" style="padding: 6px 13px; font-size: 12px; font-weight: 700; display: none; align-items: center; gap: 5px;" onclick="handleToggleSubHodCheckSheet()" title="Mark this worksheet as Verified by Sub-HOD">
+                                    <span>📝</span> <span id="admin-btn-sub-hod-check-text">Sub-HOD Verify</span>
+                                </button>
+                                <button type="button" id="admin-btn-hod-check" class="btn btn-success" style="padding: 6px 13px; font-size: 12px; font-weight: 700; display: none; align-items: center; gap: 5px;" onclick="handleToggleHodCheckSheet()" title="Mark this worksheet as Approved by Parent HOD">
+                                    <span>⭐</span> <span id="admin-btn-hod-check-text">HOD Approval</span>
                                 </button>
                                 <button type="button" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="openTrackingOptionsModal()" title="Customize Content Types & Tracking Departments">
                                     ⚙️ Options

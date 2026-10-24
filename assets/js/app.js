@@ -423,6 +423,79 @@ function togglePortalMenu() {
     }
 }
 
+function switchHodActiveDepartment(deptId, deptName) {
+    const menu = document.getElementById('hod-dept-dropdown-menu');
+    if (menu) menu.style.display = 'none';
+
+    const label = document.getElementById('current-active-dept-label');
+    if (label) label.textContent = deptName;
+
+    // Update active checkmarks in menu
+    const menuItems = menu?.querySelectorAll('.portal-menu-item');
+    if (menuItems) {
+        menuItems.forEach(item => item.classList.remove('active'));
+    }
+
+    localStorage.setItem('active_hod_department_id', deptId);
+    localStorage.setItem('active_hod_department_name', deptName);
+
+    // Update Live Attendance Roster department filter if present
+    const liveDeptFilter = document.getElementById('live-att-dept-filter');
+    if (liveDeptFilter) {
+        liveDeptFilter.value = deptId;
+        if (typeof loadLiveAttendance === 'function') {
+            loadLiveAttendance();
+        }
+    }
+
+    // Update Timesheet Report filter if present
+    const repDeptSelect = document.getElementById('report-dept-select');
+    if (repDeptSelect) {
+        repDeptSelect.value = (deptId === 'all') ? '' : deptId;
+        if (typeof loadDetailedAttendanceReport === 'function') {
+            loadDetailedAttendanceReport();
+        }
+    }
+
+    // Update Duty Roster filter if present
+    const rosterDeptSelect = document.getElementById('roster-dept-select');
+    if (rosterDeptSelect) {
+        rosterDeptSelect.value = (deptId === 'all') ? '' : deptId;
+        if (typeof loadRosterGrid === 'function') {
+            loadRosterGrid();
+        }
+    }
+
+    // Update Staff Directory filter if present
+    const empDeptFilter = document.getElementById('filter-dept');
+    if (empDeptFilter) {
+        empDeptFilter.value = (deptId === 'all') ? 'all' : deptId;
+        if (typeof filterEmployees === 'function') {
+            filterEmployees();
+        }
+    }
+
+    // Notify any custom listeners
+    window.dispatchEvent(new CustomEvent('departmentChanged', {
+        detail: { department_id: deptId, department_name: deptName }
+    }));
+
+    if (typeof showToast === 'function') {
+        showToast(`Switched active view to ${deptName}`, "info");
+    }
+}
+
+// Global outside-click listener for portal dropdown
+document.addEventListener('click', function(e) {
+    const portalBtn = document.getElementById('portal-switcher-btn');
+    const portalMenu = document.getElementById('portal-dropdown-menu');
+    if (portalMenu && portalMenu.style.display !== 'none') {
+        if (!portalMenu.contains(e.target) && !portalBtn?.contains(e.target)) {
+            portalMenu.style.display = 'none';
+        }
+    }
+});
+
 async function handleLoginSubmit(e) {
     if (e) e.preventDefault();
 
@@ -556,9 +629,14 @@ function applyRoleBasedVisibility(user) {
         el.style.display = (isDedicatedProg || isGlobal || (isProg && !isNews) || isDigital) ? '' : 'none';
     });
 
-    const portalSwitcher = document.querySelector('.portal-switcher-wrapper');
-    if (portalSwitcher && !portalSwitcher.classList.contains('static-portal')) {
-        portalSwitcher.style.display = (isSuperAdmin || user.role === 'admin') ? '' : 'none';
+    const adminPortalSwitcher = document.querySelector('.portal-switcher-wrapper.admin-only');
+    if (adminPortalSwitcher) {
+        adminPortalSwitcher.style.display = (isSuperAdmin || user.role === 'admin') ? '' : 'none';
+    }
+
+    const hodSwitcher = document.getElementById('hod-dept-switcher-wrapper');
+    if (hodSwitcher) {
+        hodSwitcher.style.display = '';
     }
 }
 
@@ -670,9 +748,34 @@ async function updateGlobalSidebarBadges() {
 
 function getInspectableEmployees() {
     let list = AppState.employees || [];
-    if (AppState.currentUser && AppState.currentUser.role === 'hod') {
-        const hodDeptId = parseInt(AppState.currentUser.department_id);
-        list = list.filter(emp => parseInt(emp.department_id) === hodDeptId || emp.id === AppState.currentUser.id);
+    const user = AppState.currentUser;
+    if (!user) return list;
+
+    const isGlobal = user.role === 'super_admin' || user.role === 'admin' || user.role === 'hr' || hasPermission('can_manage_hr');
+    if (isGlobal) return list;
+
+    if (user.role === 'hod' || hasPermission('can_inspect_sheets')) {
+        const userDeptId = parseInt(user.department_id || 0, 10);
+        const managedDeptIds = new Set();
+        if (userDeptId > 0) managedDeptIds.add(userDeptId);
+
+        // Include any department where user is HOD, and all child sub-departments of managed departments
+        (AppState.departments || []).forEach(d => {
+            const dId = parseInt(d.id, 10);
+            const pId = parseInt(d.parent_id || 0, 10);
+            const hId = parseInt(d.hod_id || 0, 10);
+            if (hId === user.id) managedDeptIds.add(dId);
+            if (pId > 0 && managedDeptIds.has(pId)) managedDeptIds.add(dId);
+        });
+
+        // Second pass for multi-tier sub-departments
+        (AppState.departments || []).forEach(d => {
+            const dId = parseInt(d.id, 10);
+            const pId = parseInt(d.parent_id || 0, 10);
+            if (pId > 0 && managedDeptIds.has(pId)) managedDeptIds.add(dId);
+        });
+
+        list = list.filter(emp => managedDeptIds.has(parseInt(emp.department_id || 0, 10)) || emp.id === user.id);
     }
     return list;
 }
@@ -687,7 +790,8 @@ function populateAdminEmployeeSelector() {
         inspectable.forEach(emp => {
             const opt = document.createElement('option');
             opt.value = emp.id;
-            opt.textContent = emp.name + (emp.id === AppState.currentUser?.id ? ' (My Sheet)' : '');
+            const deptTag = emp.department_name ? ` [${emp.department_name}]` : '';
+            opt.textContent = emp.name + deptTag + (emp.id === AppState.currentUser?.id ? ' (My Sheet)' : '');
             if (AppState.adminSelectedEmpId == emp.id) {
                 opt.selected = true;
             }
@@ -738,7 +842,10 @@ function renderAdminEmpDropdownList(employees) {
                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(emp.name)}</span>
                     ${roleBadge}
                 </div>
-                <div style="font-size: 10.5px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.designation || emp.team_name || emp.department_name || 'Staff')}</div>
+                <div style="font-size: 10.5px; color: var(--text-muted); font-weight: normal; display: flex; align-items: center; gap: 6px; margin-top: 1px;">
+                    <span>${escapeHtml(emp.designation || 'Staff')}</span>
+                    ${emp.department_name ? `<span style="font-size: 9.5px; background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 0.5px 5px; border-radius: 3px; font-weight: 700;">🏢 ${escapeHtml(emp.department_name)}</span>` : ''}
+                </div>
             </div>
             ${isSelected ? '<span style="color: var(--primary); font-size: 12px; font-weight: 800;">✓</span>' : ''}
         `;
@@ -843,9 +950,9 @@ document.addEventListener('click', (e) => {
         loginMenu.style.display = 'none';
     }
 
-    const portalWrapper = document.querySelector('.portal-switcher-wrapper');
     const portalMenu = document.getElementById('portal-dropdown-menu');
-    if (portalWrapper && portalMenu && !portalWrapper.contains(e.target)) {
+    const portalBtn = document.getElementById('portal-switcher-btn');
+    if (portalMenu && portalMenu.style.display !== 'none' && !portalMenu.contains(e.target) && !portalBtn?.contains(e.target)) {
         portalMenu.style.display = 'none';
     }
 });
@@ -1097,9 +1204,9 @@ function setupTabNavigation() {
             }
         }
 
-        // For HODs on Digital Portal: if no hash is provided, default to attendance (Team Dashboard)
-        const isDigitalPortal = !window.location.pathname.includes('newsroom') && !window.location.pathname.includes('programming') && !window.location.pathname.includes('hr');
-        if (!hash && isDigitalPortal && AppState.currentUser && (AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'deputy_hod')) {
+        // For HODs: if no hash is provided, default to attendance (Team Dashboard)
+        const isNonHrPortal = !window.location.pathname.includes('hr');
+        if (!hash && isNonHrPortal && AppState.currentUser && (AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'deputy_hod')) {
             navigateToTab('tab-attendance', false);
             return;
         }

@@ -12,15 +12,7 @@ try {
         $allDepts = $stmtDepts->fetchAll(PDO::FETCH_ASSOC);
 
         if (!$isGlobalAdminAtt && $userRoleAtt === 'hod') {
-            $managedIds = $userDeptIdAtt > 0 ? [$userDeptIdAtt] : [];
-            if (!empty($authUser['id'])) {
-                $stmtHDepts = $dbAtt->prepare("SELECT id FROM departments WHERE hod_id = ?");
-                $stmtHDepts->execute([$authUser['id']]);
-                $extraHDepts = $stmtHDepts->fetchAll(PDO::FETCH_COLUMN);
-                if (!empty($extraHDepts)) {
-                    $managedIds = array_unique(array_merge($managedIds, array_map('intval', $extraHDepts)));
-                }
-            }
+            $managedIds = getHodManagedDepartmentIds($dbAtt, (int)($authUser['id'] ?? 0), $userDeptIdAtt);
             $deptList = array_values(array_filter($allDepts, function($d) use ($managedIds) {
                 return in_array((int)$d['id'], $managedIds);
             }));
@@ -34,7 +26,7 @@ try {
         <?php
         $isHodAttSection = in_array($userRoleAtt, ['hod', 'deputy_hod']);
         ?>
-        <section id="tab-attendance" class="tab-section <?= ($isHodAttSection && ($currentPortal ?? '') === 'digital') ? 'active' : '' ?>">
+        <section id="tab-attendance" class="tab-section <?= ($isHodAttSection && ($currentPortal ?? '') !== 'hr') ? 'active' : '' ?>">
             <div class="worksheet-card">
                 <!-- Header with View Mode Switcher -->
                 <div class="card-header-flex" style="flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
@@ -84,8 +76,8 @@ try {
 
                             <!-- Dynamic Department Filter -->
                             <select id="live-att-dept-filter" class="input-control" onchange="loadLiveAttendance()" style="padding: 4px 8px; font-size: 11.5px; max-width: 180px; border-radius: var(--radius-md);" <?= (!$isGlobalAdminAtt && count($deptList) <= 1) ? 'disabled title="Restricted to your department"' : '' ?>>
-                                <?php if ($isGlobalAdminAtt): ?>
-                                    <option value="all">🏢 All Departments</option>
+                                <?php if ($isGlobalAdminAtt || count($deptList) > 1): ?>
+                                    <option value="all">🏢 All <?= $isGlobalAdminAtt ? 'Departments' : 'My Units' ?></option>
                                 <?php endif; ?>
                                 <?php foreach ($deptList as $d): ?>
                                     <option value="<?= htmlspecialchars($d['id']) ?>">🏢 <?= htmlspecialchars($d['name']) ?></option>

@@ -92,6 +92,19 @@ if (($blockPrintBeforeHodCheck || $requireHodCheck) && !$isHodChecked && !$isPri
 
 // Fetch HOD checker details
 $hodCheckerName = null;
+$isSubHodChecked = !empty($sheet['is_sub_hod_checked']) ? 1 : 0;
+$subHodCheckerName = '';
+$subHodCheckedFormatted = '';
+if ($isSubHodChecked && !empty($sheet['sub_hod_checked_by'])) {
+    $subHodStmt = $pdo->prepare("SELECT name, designation FROM employees WHERE id = ?");
+    $subHodStmt->execute([(int)$sheet['sub_hod_checked_by']]);
+    $subHodData = $subHodStmt->fetch();
+    if ($subHodData) {
+        $subHodCheckerName = $subHodData['name'];
+    }
+    $subHodCheckedFormatted = !empty($sheet['sub_hod_checked_at']) ? date('d-M-Y h:i A', strtotime($sheet['sub_hod_checked_at'])) : date('d-M-Y');
+}
+
 if ($isHodChecked && !empty($sheet['hod_checked_by'])) {
     $hodStmt = $pdo->prepare("SELECT name, designation FROM employees WHERE id = ?");
     $hodStmt->execute([(int)$sheet['hod_checked_by']]);
@@ -511,6 +524,24 @@ $emptyRowsNeeded = $entryCount < 8 ? (8 - $entryCount) : 0;
             page-break-inside: avoid;
         }
 
+        .official-approval-stamp.sub-hod-stamp {
+            border-color: #0284c7;
+            background: #f0f9ff;
+            box-shadow: 0 0 0 1px #0284c7;
+            transform: rotate(1deg);
+        }
+        .official-approval-stamp.sub-hod-stamp .stamp-inner {
+            border-color: #0284c7;
+        }
+        .official-approval-stamp.sub-hod-stamp .stamp-top-ribbon,
+        .official-approval-stamp.sub-hod-stamp .stamp-star,
+        .official-approval-stamp.sub-hod-stamp .stamp-check,
+        .official-approval-stamp.sub-hod-stamp .stamp-title,
+        .official-approval-stamp.sub-hod-stamp .stamp-bottom-seal {
+            color: #0284c7;
+            border-color: #0284c7;
+        }
+
         .stamp-inner {
             border: 1.2px dashed #047857;
             border-radius: 4px;
@@ -730,8 +761,52 @@ $emptyRowsNeeded = $entryCount < 8 ? (8 - $entryCount) : 0;
         </section>
 
         <!-- Corporate Authorization / Signatures Footer -->
-        <footer class="doc-footer <?= $isHodChecked ? 'verified-mode' : 'manual-mode' ?>">
-            <?php if ($isHodChecked): ?>
+        <footer class="doc-footer <?= ($isHodChecked || $isSubHodChecked) ? 'verified-mode' : 'manual-mode' ?>">
+            <?php if ($isHodChecked && $isSubHodChecked): ?>
+                <div style="display: flex; gap: 18px; align-items: center; justify-content: center; flex-wrap: wrap;">
+                    <!-- 1. Sub-HOD Verification Seal -->
+                    <div class="official-approval-stamp sub-hod-stamp">
+                        <div class="stamp-inner">
+                            <div class="stamp-top-ribbon">
+                                <span class="stamp-star">★</span>
+                                <span><?= strtoupper(htmlspecialchars($department['name'] ?? 'UNIT')) ?> VERIFICATION</span>
+                                <span class="stamp-star">★</span>
+                            </div>
+                            <div class="stamp-main-badge">
+                                <span class="stamp-check">✓</span>
+                                <span class="stamp-title">SUB-HOD VERIFIED</span>
+                            </div>
+                            <div class="stamp-meta">
+                                <span><strong>BY:</strong> <?= strtoupper(htmlspecialchars($subHodCheckerName ?: 'SUB-HOD')) ?></span>
+                                <span class="stamp-dot">•</span>
+                                <span><strong>DATE:</strong> <?= htmlspecialchars($subHodCheckedFormatted) ?></span>
+                            </div>
+                            <div class="stamp-bottom-seal">UNIT LEVEL VERIFICATION SEAL</div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Main HOD Final Corporate Approval Seal -->
+                    <div class="official-approval-stamp">
+                        <div class="stamp-inner">
+                            <div class="stamp-top-ribbon">
+                                <span class="stamp-star">★</span>
+                                <span>DISCOVER PAKISTAN UHD TV</span>
+                                <span class="stamp-star">★</span>
+                            </div>
+                            <div class="stamp-main-badge">
+                                <span class="stamp-check">✓</span>
+                                <span class="stamp-title">EXECUTIVE APPROVED</span>
+                            </div>
+                            <div class="stamp-meta">
+                                <span><strong>BY:</strong> <?= strtoupper(htmlspecialchars($hodCheckerName ?: 'HEAD OF DEPARTMENT')) ?></span>
+                                <span class="stamp-dot">•</span>
+                                <span><strong>DATE:</strong> <?= htmlspecialchars($hodCheckedFormatted) ?></span>
+                            </div>
+                            <div class="stamp-bottom-seal">OFFICIAL HOD APPROVAL SEAL</div>
+                        </div>
+                    </div>
+                </div>
+            <?php elseif ($isHodChecked): ?>
                 <div class="official-approval-stamp">
                     <div class="stamp-inner">
                         <div class="stamp-top-ribbon">
@@ -751,16 +826,43 @@ $emptyRowsNeeded = $entryCount < 8 ? (8 - $entryCount) : 0;
                         <div class="stamp-bottom-seal">OFFICIAL HOD VERIFICATION SEAL</div>
                     </div>
                 </div>
+            <?php elseif ($isSubHodChecked): ?>
+                <div class="official-approval-stamp sub-hod-stamp">
+                    <div class="stamp-inner">
+                        <div class="stamp-top-ribbon">
+                            <span class="stamp-star">★</span>
+                            <span><?= strtoupper(htmlspecialchars($department['name'] ?? 'UNIT')) ?> VERIFICATION</span>
+                            <span class="stamp-star">★</span>
+                        </div>
+                        <div class="stamp-main-badge">
+                            <span class="stamp-check">✓</span>
+                            <span class="stamp-title">SUB-HOD VERIFIED</span>
+                        </div>
+                        <div class="stamp-meta">
+                            <span><strong>BY:</strong> <?= strtoupper(htmlspecialchars($subHodCheckerName ?: 'SUB-HOD')) ?></span>
+                            <span class="stamp-dot">•</span>
+                            <span><strong>DATE:</strong> <?= htmlspecialchars($subHodCheckedFormatted) ?></span>
+                        </div>
+                        <div class="stamp-bottom-seal">AWAITING FINAL PARENT HOD APPROVAL</div>
+                    </div>
+                </div>
             <?php else: ?>
                 <div class="sig-card">
                     <div class="sig-line-box"></div>
                     <span class="sig-title">Employee Signature & Date</span>
                     <span class="sig-sub"><?= htmlspecialchars($employee['name']) ?></span>
                 </div>
+                <?php if (!empty($department['parent_id'])): ?>
                 <div class="sig-card">
                     <div class="sig-line-box"></div>
-                    <span class="sig-title">HOD / Supervisor Approval</span>
-                    <span class="sig-sub"><?= htmlspecialchars($employee['department_name'] ?: 'Digital Media') ?> Department</span>
+                    <span class="sig-title">Sub-HOD / Unit Supervisor</span>
+                    <span class="sig-sub"><?= htmlspecialchars($department['name'] ?? 'Unit') ?></span>
+                </div>
+                <?php endif; ?>
+                <div class="sig-card">
+                    <div class="sig-line-box"></div>
+                    <span class="sig-title">Head of Department / Director</span>
+                    <span class="sig-sub"><?= htmlspecialchars($department['name'] ?: 'Department') ?></span>
                 </div>
             <?php endif; ?>
         </footer>

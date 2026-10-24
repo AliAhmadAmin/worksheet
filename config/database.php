@@ -249,6 +249,11 @@ function migratePermissionsSchema($pdo) {
         try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN hod_checked_at DATETIME NULL AFTER hod_checked_by"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN hod_checked_notes VARCHAR(255) NULL AFTER hod_checked_at"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE daily_sheets ADD INDEX idx_sheet_hod_checked (is_hod_checked)"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN is_sub_hod_checked TINYINT DEFAULT 0 AFTER is_locked"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN sub_hod_checked_by INT NULL AFTER is_sub_hod_checked"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN sub_hod_checked_at DATETIME NULL AFTER sub_hod_checked_by"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD COLUMN sub_hod_checked_notes VARCHAR(255) NULL AFTER sub_hod_checked_at"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE daily_sheets ADD INDEX idx_sheet_sub_hod_checked (is_sub_hod_checked)"); } catch (Exception $e) {}
 
         // Department-level HOD verification & print restriction settings
         try { $pdo->exec("ALTER TABLE departments ADD COLUMN require_hod_sheet_check TINYINT DEFAULT 0"); } catch (Exception $e) {}
@@ -699,6 +704,8 @@ function ensureDepartmentAndTeamsSchema($pdo) {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        try { $pdo->exec("ALTER TABLE departments ADD COLUMN parent_id INT NULL AFTER name"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE departments ADD INDEX idx_dept_parent_id (parent_id)"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE departments ADD COLUMN description TEXT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE departments ADD COLUMN hod_id INT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE departments ADD COLUMN is_active TINYINT DEFAULT 1"); } catch (Exception $e) {}
@@ -973,4 +980,45 @@ function seedInitialData($pdo) {
         ");
         $stmtAdmin->execute(['System Administrator', 'admin@discoverpakistan.tv', $adminPassHash]);
     }
+}
+
+/**
+ * Retrieve all department IDs managed by a user (including child sub-departments).
+ * If user is HOD of a parent department (e.g. Programming), all child sub-departments
+ * (e.g. Archive, NLE, Bureaus) are automatically included.
+ */
+function getHodManagedDepartmentIds($pdo, $userId, $userDeptId = 0) {
+    $deptIds = ($userDeptId > 0) ? [(int)$userDeptId] : [];
+
+    if (!empty($userId)) {
+        // Departments where user is direct HOD
+        $stmt = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ? AND is_active = 1");
+        $stmt->execute([(int)$userId]);
+        $direct = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        if (!empty($direct)) {
+            $deptIds = array_merge($deptIds, array_map('intval', $direct));
+        }
+    }
+
+    $deptIds = array_values(array_unique(array_filter($deptIds)));
+
+    // Recursively resolve all child sub-departments (parent_id)
+    $toCheck = $deptIds;
+    while (!empty($toCheck)) {
+        $placeholders = implode(',', array_fill(0, count($toCheck), '?'));
+        $stmtChild = $pdo->prepare("SELECT id FROM departments WHERE parent_id IN ($placeholders) AND is_active = 1");
+        $stmtChild->execute($toCheck);
+        $newChildren = $stmtChild->fetchAll(PDO::FETCH_COLUMN);
+        $newFound = [];
+        foreach ($newChildren as $cid) {
+            $cid = (int)$cid;
+            if (!in_array($cid, $deptIds, true)) {
+                $deptIds[] = $cid;
+                $newFound[] = $cid;
+            }
+        }
+        $toCheck = $newFound;
+    }
+
+    return array_values(array_unique(array_filter($deptIds)));
 }

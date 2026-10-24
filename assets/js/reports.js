@@ -31,12 +31,43 @@ function formatLateDuration(minutes) {
 }
 window.formatLateDuration = formatLateDuration;
 
+function populateMatrixDeptFilter() {
+    const sel = document.getElementById('matrix-dept-filter');
+    if (!sel) return;
+
+    const depts = (typeof AppState !== 'undefined' && AppState.departments && AppState.departments.length > 0)
+        ? AppState.departments
+        : [];
+
+    const currentVal = sel.value;
+    const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
+    const allLabel = isHod ? '🏢 All Managed Units' : '🏢 All Departments';
+
+    let html = `<option value="all">${allLabel}</option>`;
+    depts.forEach(d => {
+        const isSub = d.parent_id && parseInt(d.parent_id, 10) > 0;
+        const prefix = isSub ? '  ↳ ' : '';
+        html += `<option value="${d.id}">${prefix}${escapeHtml(d.name)}</option>`;
+    });
+
+    sel.innerHTML = html;
+    if (currentVal && Array.from(sel.options).some(o => o.value === currentVal)) {
+        sel.value = currentVal;
+    }
+}
+window.populateMatrixDeptFilter = populateMatrixDeptFilter;
+
 async function loadReports() {
+    const deptSelect = document.getElementById('matrix-dept-filter');
+    if (deptSelect && deptSelect.options.length <= 1) {
+        populateMatrixDeptFilter();
+    }
+    const deptVal = deptSelect?.value || 'all';
     const startDate = document.getElementById('report-start-date')?.value || new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
     const endDate = document.getElementById('report-end-date')?.value || new Date().toISOString().split('T')[0];
 
     try {
-        const res = await fetch(`api/reports.php?action=matrix&start_date=${startDate}&end_date=${endDate}`);
+        const res = await fetch(`api/reports.php?action=matrix&department_id=${encodeURIComponent(deptVal)}&start_date=${startDate}&end_date=${endDate}`);
         const data = await res.json();
 
         if (!data.success) {
@@ -150,9 +181,10 @@ function renderDutyStats(summary) {
 
 // Export CSV trigger
 function exportReportCSV() {
+    const deptVal = document.getElementById('matrix-dept-filter')?.value || 'all';
     const startDate = document.getElementById('report-start-date')?.value || new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
     const endDate = document.getElementById('report-end-date')?.value || new Date().toISOString().split('T')[0];
-    window.location.href = `api/reports.php?action=export_csv&start_date=${startDate}&end_date=${endDate}`;
+    window.location.href = `api/reports.php?action=export_csv&department_id=${encodeURIComponent(deptVal)}&start_date=${startDate}&end_date=${endDate}`;
 }
 
 // Live Attendance Board & Timesheet Analytics System
@@ -1936,7 +1968,10 @@ let currentTrackingModalActiveTab = 'cols';
 
 async function openTrackingOptionsModal(deptId = null) {
     if (!deptId) {
-        if (AppState.worksheetColumnsDeptId) {
+        const matrixDept = document.getElementById('matrix-dept-filter')?.value;
+        if (matrixDept && matrixDept !== 'all' && parseInt(matrixDept, 10) > 0) {
+            deptId = parseInt(matrixDept, 10);
+        } else if (AppState.worksheetColumnsDeptId) {
             deptId = AppState.worksheetColumnsDeptId;
         } else if (AppState.trackingOptionsDeptId) {
             deptId = AppState.trackingOptionsDeptId;
@@ -1949,16 +1984,16 @@ async function openTrackingOptionsModal(deptId = null) {
     currentTrackingModalDeptId = parseInt(deptId) || 2;
 
     const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin');
+    const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
+    const availableDepts = (AppState.departments && AppState.departments.length > 0) ? AppState.departments : [];
     const adminPickerRow = document.getElementById('tracking-admin-dept-picker-row');
     const adminDeptSelect = document.getElementById('tracking-admin-dept-select');
 
-    if (isAdmin && adminPickerRow && adminDeptSelect) {
+    if ((isAdmin || (isHod && availableDepts.length > 1)) && adminPickerRow && adminDeptSelect) {
         adminPickerRow.style.display = 'flex';
-        if (AppState.departments && AppState.departments.length > 0) {
-            adminDeptSelect.innerHTML = AppState.departments.map(d =>
-                `<option value="${d.id}" ${parseInt(d.id) === currentTrackingModalDeptId ? 'selected' : ''}>${escapeHtml(d.name)}</option>`
-            ).join('');
-        }
+        adminDeptSelect.innerHTML = availableDepts.map(d =>
+            `<option value="${d.id}" ${parseInt(d.id, 10) === currentTrackingModalDeptId ? 'selected' : ''}>${d.parent_id ? '  ↳ ' : ''}${escapeHtml(d.name)}</option>`
+        ).join('');
     } else if (adminPickerRow) {
         adminPickerRow.style.display = 'none';
     }

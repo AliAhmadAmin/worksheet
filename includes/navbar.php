@@ -223,14 +223,27 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         </div>
 
     <?php elseif ($currentPortal === 'newsroom'): ?>
+        <?php $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); ?>
         <!-- News Room Operations Category -->
         <div class="sidebar-nav-group">
-            <div class="sidebar-nav-title">NEWS PIPELINE</div>
+            <div class="sidebar-nav-title">WORKSPACE</div>
+            <?php if ($isHodNav): ?>
+            <button type="button" class="nav-btn active" data-tab="tab-attendance" data-route="attendance">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Team Dashboard</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-newsroom" data-route="newsroom">
+                <span class="nav-icon">📺</span>
+                <span class="nav-label">Newsroom</span>
+                <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
+            </button>
+            <?php else: ?>
             <button type="button" class="nav-btn active" data-tab="tab-newsroom" data-route="newsroom">
                 <span class="nav-icon">📺</span>
                 <span class="nav-label">Newsroom</span>
                 <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
             </button>
+            <?php endif; ?>
             <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
@@ -287,10 +300,12 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Matrix Reports</span>
             </button>
+            <?php if (!$isHodNav): ?>
             <button type="button" class="nav-btn admin-only" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Live Attendance</span>
             </button>
+            <?php endif; ?>
             <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Manage Staff</span>
@@ -298,14 +313,27 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         </div>
 
     <?php elseif ($currentPortal === 'programming'): ?>
+        <?php $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); ?>
         <!-- Programming Operations Category -->
         <div class="sidebar-nav-group">
-            <div class="sidebar-nav-title">HANDOVER PIPELINE</div>
+            <div class="sidebar-nav-title">WORKSPACE</div>
+            <?php if ($isHodNav): ?>
+            <button type="button" class="nav-btn active" data-tab="tab-attendance" data-route="attendance">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Team Dashboard</span>
+            </button>
+            <button type="button" class="nav-btn" data-tab="tab-programming" data-route="programming">
+                <span class="nav-icon">📡</span>
+                <span class="nav-label">Programming</span>
+                <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
+            </button>
+            <?php else: ?>
             <button type="button" class="nav-btn active" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
                 <span class="nav-label">Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </button>
+            <?php endif; ?>
             <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
@@ -362,10 +390,12 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Matrix Reports</span>
             </button>
+            <?php if (!$isHodNav): ?>
             <button type="button" class="nav-btn admin-only" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Live Attendance</span>
             </button>
+            <?php endif; ?>
             <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Manage Staff</span>

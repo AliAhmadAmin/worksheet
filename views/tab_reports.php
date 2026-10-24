@@ -8,6 +8,10 @@
                 </div>
 
                 <div class="controls-group">
+                    <label style="font-size: 12.5px; color: var(--text-muted); font-weight: 600;">Department:</label>
+                    <select id="matrix-dept-filter" class="input-control" onchange="loadReports()" style="font-size: 12px; font-weight: 600; min-width: 170px;">
+                        <option value="all">🏢 All Managed Units</option>
+                    </select>
                     <label style="font-size: 12.5px; color: var(--text-muted);">From:</label>
                     <input type="date" id="report-start-date" class="input-control" value="<?= date('Y-m-d', strtotime('-7 days')) ?>">
                     <label style="font-size: 12.5px; color: var(--text-muted);">To:</label>

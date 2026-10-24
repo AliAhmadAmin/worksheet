@@ -447,89 +447,206 @@ function renderWorksheetHero(sheet, empData, data = null) {
             }
         }
 
-        // Update HOD Verification Button and Header Appearance in Inspector
+        // Update HOD Verification Buttons and Header Appearance in Inspector
+        const btnSubHodCheck = document.getElementById('admin-btn-sub-hod-check');
+        const btnSubHodCheckText = document.getElementById('admin-btn-sub-hod-check-text');
+        const subHodBadge = document.getElementById('admin-sub-hod-badge');
         const btnHodCheck = document.getElementById('admin-btn-hod-check');
         const btnHodCheckText = document.getElementById('admin-btn-hod-check-text');
         const verifiedHeaderBadge = document.getElementById('admin-verified-header-badge');
         const inspectorSubtitle = document.getElementById('admin-inspector-subtitle');
         const inspectorBox = document.getElementById('admin-inspector-box');
 
+        const requiresDualApproval = !!data?.requires_dual_approval;
+        const isSubHodChecked = parseInt(sheet?.is_sub_hod_checked || data?.is_sub_hod_checked) === 1;
         const isHodChecked = parseInt(sheet?.is_hod_checked || data?.is_hod_checked) === 1;
         const deptSettings = data?.department_settings || {};
         const requireCheck = parseInt(deptSettings.require_hod_sheet_check) === 1;
+        const subCheckerName = data?.sub_hod_checked_by_name || 'Sub-HOD';
+        const subCheckedAt = data?.sub_hod_checked_at || '';
         const checkerName = data?.hod_checked_by_name || 'HOD';
         const checkedAt = data?.hod_checked_at || '';
+        const canMarkSubHod = !!data?.can_mark_sub_hod_check;
+        const canMarkFinal = !!data?.can_mark_final_check;
 
-        // "Mark Checked" is specifically a task for HOD / Admin
-        // Only active if the department has enabled HOD sheet verification (require_hod_sheet_check = 1)
-        if (btnHodCheck && btnHodCheckText) {
-            if (canCheck && requireCheck) {
-                btnHodCheck.style.display = 'inline-flex';
+        if (requiresDualApproval) {
+            // 1. Sub-HOD Verification Button
+            if (btnSubHodCheck) {
+                if (canMarkSubHod) {
+                    btnSubHodCheck.style.display = 'inline-flex';
+                    if (isSubHodChecked) {
+                        btnSubHodCheck.className = 'btn btn-outline';
+                        btnSubHodCheck.style.borderColor = '#10b981';
+                        btnSubHodCheck.style.color = '#10b981';
+                        btnSubHodCheck.innerHTML = '<span>↩️</span> <span>Reopen Sub-HOD</span>';
+                        btnSubHodCheck.title = `Verified by ${subCheckerName} on ${subCheckedAt}. Click to reopen.`;
+                    } else {
+                        btnSubHodCheck.className = 'btn btn-outline';
+                        btnSubHodCheck.style.borderColor = '#0284c7';
+                        btnSubHodCheck.style.color = '#0284c7';
+                        btnSubHodCheck.innerHTML = '<span>📝</span> <span>Sub-HOD Verify</span>';
+                        btnSubHodCheck.title = 'Inspect entries and mark as Verified by Sub-HOD';
+                    }
+                } else {
+                    btnSubHodCheck.style.display = 'none';
+                }
+            }
+
+            // 2. Final Parent HOD Approval Button
+            if (btnHodCheck) {
+                if (canMarkFinal) {
+                    btnHodCheck.style.display = 'inline-flex';
+                    if (isHodChecked) {
+                        btnHodCheck.className = 'btn btn-outline';
+                        btnHodCheck.style.borderColor = '#d97706';
+                        btnHodCheck.style.color = '#d97706';
+                        btnHodCheck.innerHTML = '<span>↩️</span> <span>Reopen Final HOD</span>';
+                        btnHodCheck.title = `Approved by ${checkerName} on ${checkedAt}. Click to reopen.`;
+                    } else {
+                        btnHodCheck.className = 'btn btn-success';
+                        btnHodCheck.style.borderColor = '';
+                        btnHodCheck.style.color = '';
+                        btnHodCheck.innerHTML = '<span>⭐</span> <span>Final HOD Approval</span>';
+                        btnHodCheck.title = isSubHodChecked ? 'Grant final corporate approval for this verified sheet' : 'Final approval (Sub-HOD check still pending)';
+                    }
+                } else {
+                    btnHodCheck.style.display = 'none';
+                }
+            }
+
+            // 3. Status Badges in Inspector Header
+            if (subHodBadge) {
+                subHodBadge.style.display = 'inline-flex';
+                if (isSubHodChecked) {
+                    subHodBadge.className = 'badge badge-hod-checked';
+                    subHodBadge.textContent = '✓ Sub-HOD Verified';
+                    subHodBadge.title = `Verified by ${subCheckerName} on ${subCheckedAt}`;
+                } else {
+                    subHodBadge.className = 'badge badge-hod-pending';
+                    subHodBadge.textContent = '⏳ Pending Sub-HOD';
+                    subHodBadge.title = 'Awaiting verification by unit Sub-HOD';
+                }
+            }
+
+            if (verifiedHeaderBadge) {
+                verifiedHeaderBadge.style.display = 'inline-flex';
                 if (isHodChecked) {
-                    btnHodCheck.className = 'btn btn-outline';
-                    btnHodCheck.style.borderColor = '#10b981';
-                    btnHodCheck.style.color = '#10b981';
-                    btnHodCheck.innerHTML = '<span>↩️</span> <span id="admin-btn-hod-check-text">Reopen Review</span>';
-                    btnHodCheck.title = `Worksheet checked by ${checkerName} on ${checkedAt}. Click to reopen review.`;
+                    verifiedHeaderBadge.className = 'badge';
+                    verifiedHeaderBadge.style.background = '#047857';
+                    verifiedHeaderBadge.style.color = '#ffffff';
+                    verifiedHeaderBadge.textContent = '★ Fully Approved (HR Ready)';
+                    verifiedHeaderBadge.title = `Approved by ${checkerName} on ${checkedAt}`;
+                } else if (isSubHodChecked) {
+                    verifiedHeaderBadge.className = 'badge';
+                    verifiedHeaderBadge.style.background = '#fef3c7';
+                    verifiedHeaderBadge.style.color = '#92400e';
+                    verifiedHeaderBadge.style.border = '1px solid #fde68a';
+                    verifiedHeaderBadge.textContent = '⏳ Awaiting Parent HOD';
+                    verifiedHeaderBadge.title = 'Sub-HOD verified. Awaiting final Parent HOD approval.';
                 } else {
-                    btnHodCheck.className = 'btn btn-success';
-                    btnHodCheck.style.borderColor = '';
-                    btnHodCheck.style.color = '';
-                    btnHodCheck.innerHTML = '<span>✅</span> <span id="admin-btn-hod-check-text">Mark Checked</span>';
-                    btnHodCheck.title = 'Review entries and mark sheet as Checked by HOD';
+                    verifiedHeaderBadge.className = 'badge badge-hod-pending';
+                    verifiedHeaderBadge.style.background = '';
+                    verifiedHeaderBadge.style.color = '';
+                    verifiedHeaderBadge.style.border = '';
+                    verifiedHeaderBadge.textContent = '⚠️ Unverified';
                 }
-            } else {
-                btnHodCheck.style.display = 'none';
             }
-        }
 
-        // Visual header confirmation when marked checked (only if department has enabled HOD verification)
-        if (requireCheck && isHodChecked) {
-            if (verifiedHeaderBadge) {
-                verifiedHeaderBadge.style.display = 'inline-flex';
-                verifiedHeaderBadge.className = 'badge badge-hod-checked';
-                verifiedHeaderBadge.textContent = '✅ Checked by HOD';
-                verifiedHeaderBadge.title = `Checked & verified by ${checkerName} on ${checkedAt}`;
-            }
             if (inspectorSubtitle) {
-                inspectorSubtitle.innerHTML = `✅ <strong style="color: #10b981;">Checked & Approved</strong> by ${escapeHtml(checkerName)}${checkedAt ? ` on ${escapeHtml(checkedAt)}` : ''}. Ready for printing with official seal.`;
-            }
-            if (inspectorBox) {
-                inspectorBox.classList.add('is-verified');
-            }
-        } else if (requireCheck && !isHodChecked) {
-            if (verifiedHeaderBadge) {
-                verifiedHeaderBadge.style.display = 'inline-flex';
-                verifiedHeaderBadge.className = 'badge badge-hod-pending';
-                verifiedHeaderBadge.textContent = '⚠️ Not Verified';
-                verifiedHeaderBadge.title = 'Urgent: This worksheet is not verified by HOD yet.';
-            }
-            if (inspectorSubtitle) {
-                if (isReadOnlyInspection) {
-                    inspectorSubtitle.innerHTML = `👁️ <strong style="color: var(--primary);">Inspection Mode</strong>: You are reviewing this worksheet with read-only access. Editing entries requires "Lock & Unlock Sheets" access.`;
+                if (isHodChecked) {
+                    inspectorSubtitle.innerHTML = `★ <strong style="color: #047857;">Dual Approval Complete</strong>: Verified by ${escapeHtml(subCheckerName)} & Final Approved by ${escapeHtml(checkerName)}${checkedAt ? ` on ${escapeHtml(checkedAt)}` : ''}. Ready for HR.`;
+                } else if (isSubHodChecked) {
+                    inspectorSubtitle.innerHTML = `📝 <strong style="color: #0284c7;">Sub-HOD Verified</strong> by ${escapeHtml(subCheckerName)}. <em>Awaiting Final Parent HOD Approval.</em>`;
                 } else {
-                    inspectorSubtitle.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
+                    inspectorSubtitle.innerHTML = `⏳ <strong style="color: #ea580c;">Pending Verification</strong>: Sub-HOD review required before final sign-off.`;
                 }
             }
+
             if (inspectorBox) {
-                inspectorBox.classList.remove('is-verified');
+                if (isHodChecked) {
+                    inspectorBox.classList.add('is-verified');
+                } else {
+                    inspectorBox.classList.remove('is-verified');
+                }
             }
         } else {
-            // Department does NOT have HOD sheet check enabled -> hide badge and clear state completely
-            if (verifiedHeaderBadge) {
-                verifiedHeaderBadge.style.display = 'none';
-                verifiedHeaderBadge.className = 'badge';
-                verifiedHeaderBadge.textContent = '';
-            }
-            if (inspectorSubtitle) {
-                if (isReadOnlyInspection) {
-                    inspectorSubtitle.innerHTML = `👁️ <strong style="color: var(--primary);">Inspection Mode</strong>: You are reviewing this worksheet with read-only access. Editing entries requires "Lock & Unlock Sheets" access.`;
+            // Single-tier approval department
+            if (btnSubHodCheck) btnSubHodCheck.style.display = 'none';
+            if (subHodBadge) subHodBadge.style.display = 'none';
+
+            if (btnHodCheck && btnHodCheckText) {
+                if (canCheck && requireCheck) {
+                    btnHodCheck.style.display = 'inline-flex';
+                    if (isHodChecked) {
+                        btnHodCheck.className = 'btn btn-outline';
+                        btnHodCheck.style.borderColor = '#10b981';
+                        btnHodCheck.style.color = '#10b981';
+                        btnHodCheck.innerHTML = '<span>↩️</span> <span id="admin-btn-hod-check-text">Reopen Review</span>';
+                        btnHodCheck.title = `Worksheet checked by ${checkerName} on ${checkedAt}. Click to reopen review.`;
+                    } else {
+                        btnHodCheck.className = 'btn btn-success';
+                        btnHodCheck.style.borderColor = '';
+                        btnHodCheck.style.color = '';
+                        btnHodCheck.innerHTML = '<span>✅</span> <span id="admin-btn-hod-check-text">Mark Checked</span>';
+                        btnHodCheck.title = 'Review entries and mark sheet as Checked by HOD';
+                    }
                 } else {
-                    inspectorSubtitle.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
+                    btnHodCheck.style.display = 'none';
                 }
             }
-            if (inspectorBox) {
-                inspectorBox.classList.remove('is-verified');
+
+            if (requireCheck && isHodChecked) {
+                if (verifiedHeaderBadge) {
+                    verifiedHeaderBadge.style.display = 'inline-flex';
+                    verifiedHeaderBadge.className = 'badge badge-hod-checked';
+                    verifiedHeaderBadge.style.background = '';
+                    verifiedHeaderBadge.style.color = '';
+                    verifiedHeaderBadge.style.border = '';
+                    verifiedHeaderBadge.textContent = '✅ Checked by HOD';
+                    verifiedHeaderBadge.title = `Checked & verified by ${checkerName} on ${checkedAt}`;
+                }
+                if (inspectorSubtitle) {
+                    inspectorSubtitle.innerHTML = `✅ <strong style="color: #10b981;">Checked & Approved</strong> by ${escapeHtml(checkerName)}${checkedAt ? ` on ${escapeHtml(checkedAt)}` : ''}. Ready for printing with official seal.`;
+                }
+                if (inspectorBox) {
+                    inspectorBox.classList.add('is-verified');
+                }
+            } else if (requireCheck && !isHodChecked) {
+                if (verifiedHeaderBadge) {
+                    verifiedHeaderBadge.style.display = 'inline-flex';
+                    verifiedHeaderBadge.className = 'badge badge-hod-pending';
+                    verifiedHeaderBadge.style.background = '';
+                    verifiedHeaderBadge.style.color = '';
+                    verifiedHeaderBadge.style.border = '';
+                    verifiedHeaderBadge.textContent = '⚠️ Not Verified';
+                    verifiedHeaderBadge.title = 'Urgent: This worksheet is not verified by HOD yet.';
+                }
+                if (inspectorSubtitle) {
+                    if (isReadOnlyInspection) {
+                        inspectorSubtitle.innerHTML = `👁️ <strong style="color: var(--primary);">Inspection Mode</strong>: You are reviewing this worksheet with read-only access. Editing entries requires "Lock & Unlock Sheets" access.`;
+                    } else {
+                        inspectorSubtitle.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
+                    }
+                }
+                if (inspectorBox) {
+                    inspectorBox.classList.remove('is-verified');
+                }
+            } else {
+                if (verifiedHeaderBadge) {
+                    verifiedHeaderBadge.style.display = 'none';
+                    verifiedHeaderBadge.className = 'badge';
+                    verifiedHeaderBadge.textContent = '';
+                }
+                if (inspectorSubtitle) {
+                    if (isReadOnlyInspection) {
+                        inspectorSubtitle.innerHTML = `👁️ <strong style="color: var(--primary);">Inspection Mode</strong>: You are reviewing this worksheet with read-only access. Editing entries requires "Lock & Unlock Sheets" access.`;
+                    } else {
+                        inspectorSubtitle.textContent = 'Reviewing, editing, and managing daily work entries for team members.';
+                    }
+                }
+                if (inspectorBox) {
+                    inspectorBox.classList.remove('is-verified');
+                }
             }
         }
 
@@ -610,30 +727,77 @@ function renderWorksheetHero(sheet, empData, data = null) {
         }
 
         // Update Employee HOD Verification Badge & Print Button State
+        const empSubHodBadge = document.getElementById('employee-sub-hod-check-badge');
         const empHodBadge = document.getElementById('employee-hod-check-badge');
         const empPrintBtn = document.getElementById('btn-employee-print-sheet');
 
+        const requiresDualApproval = !!data?.requires_dual_approval;
+        const isSubHodChecked = parseInt(sheet?.is_sub_hod_checked || data?.is_sub_hod_checked) === 1;
         const isHodChecked = parseInt(sheet?.is_hod_checked || data?.is_hod_checked) === 1;
         const deptSettings = data?.department_settings || {};
         const requireCheck = parseInt(deptSettings.require_hod_sheet_check) === 1;
         const blockPrint = requireCheck && (parseInt(deptSettings.block_print_before_hod_check) === 1);
         const canBypassHodCheckEmp = hasPermission('can_print_unverified_sheets');
 
-        if (empHodBadge) {
-            if (requireCheck && isHodChecked) {
-                empHodBadge.style.display = 'inline-block';
-                empHodBadge.className = 'badge badge-hod-checked';
-                empHodBadge.textContent = `✓ HOD Verified`;
-                empHodBadge.title = `Verified by ${data?.hod_checked_by_name || 'HOD'} on ${data?.hod_checked_at || ''}`;
-            } else if (requireCheck && !isHodChecked) {
-                empHodBadge.style.display = 'inline-block';
-                empHodBadge.className = 'badge badge-hod-pending';
-                empHodBadge.textContent = '⚠️ Not Verified';
-                empHodBadge.title = 'Urgent: Awaiting review and verification by Head of Department';
-            } else {
-                empHodBadge.style.display = 'none';
-                empHodBadge.className = 'badge';
-                empHodBadge.textContent = '';
+        if (requiresDualApproval) {
+            if (empSubHodBadge) {
+                empSubHodBadge.style.display = 'inline-block';
+                if (isSubHodChecked) {
+                    empSubHodBadge.className = 'badge badge-hod-checked';
+                    empSubHodBadge.textContent = '✓ Sub-HOD Verified';
+                    empSubHodBadge.title = `Verified by ${data?.sub_hod_checked_by_name || 'Sub-HOD'} on ${data?.sub_hod_checked_at || ''}`;
+                } else {
+                    empSubHodBadge.className = 'badge badge-hod-pending';
+                    empSubHodBadge.textContent = '⏳ Pending Sub-HOD';
+                    empSubHodBadge.title = 'Awaiting review and verification by unit Sub-HOD';
+                }
+            }
+
+            if (empHodBadge) {
+                if (isHodChecked) {
+                    empHodBadge.style.display = 'inline-block';
+                    empHodBadge.className = 'badge';
+                    empHodBadge.style.background = '#047857';
+                    empHodBadge.style.color = '#ffffff';
+                    empHodBadge.textContent = '★ Fully Approved (HR Ready)';
+                    empHodBadge.title = `Final approval by ${data?.hod_checked_by_name || 'Parent HOD'} on ${data?.hod_checked_at || ''}`;
+                } else if (isSubHodChecked) {
+                    empHodBadge.style.display = 'inline-block';
+                    empHodBadge.className = 'badge';
+                    empHodBadge.style.background = '#fef3c7';
+                    empHodBadge.style.color = '#92400e';
+                    empHodBadge.style.border = '1px solid #fde68a';
+                    empHodBadge.textContent = '⏳ Awaiting Parent HOD';
+                    empHodBadge.title = 'Sub-HOD verified. Awaiting final Parent HOD approval.';
+                } else {
+                    empHodBadge.style.display = 'none';
+                }
+            }
+        } else {
+            if (empSubHodBadge) empSubHodBadge.style.display = 'none';
+
+            if (empHodBadge) {
+                if (requireCheck && isHodChecked) {
+                    empHodBadge.style.display = 'inline-block';
+                    empHodBadge.className = 'badge badge-hod-checked';
+                    empHodBadge.style.background = '';
+                    empHodBadge.style.color = '';
+                    empHodBadge.style.border = '';
+                    empHodBadge.textContent = `✓ HOD Verified`;
+                    empHodBadge.title = `Verified by ${data?.hod_checked_by_name || 'HOD'} on ${data?.hod_checked_at || ''}`;
+                } else if (requireCheck && !isHodChecked) {
+                    empHodBadge.style.display = 'inline-block';
+                    empHodBadge.className = 'badge badge-hod-pending';
+                    empHodBadge.style.background = '';
+                    empHodBadge.style.color = '';
+                    empHodBadge.style.border = '';
+                    empHodBadge.textContent = '⚠️ Not Verified';
+                    empHodBadge.title = 'Urgent: Awaiting review and verification by Head of Department';
+                } else {
+                    empHodBadge.style.display = 'none';
+                    empHodBadge.className = 'badge';
+                    empHodBadge.textContent = '';
+                }
             }
         }
 
@@ -2293,6 +2457,45 @@ function triggerPrintSheet() {
     document.body.appendChild(printIframe);
     printIframe.src = printUrl;
 }
+
+async function handleToggleSubHodCheckSheet() {
+    const empId = getActiveWorksheetEmpId();
+    const date = AppState.selectedDate;
+    const sheetId = AppState.currentSheet?.id || 0;
+    const currentChecked = parseInt(AppState.currentSheet?.is_sub_hod_checked || 0) === 1;
+    const nextState = currentChecked ? 0 : 1;
+
+    const btn = document.getElementById('admin-btn-sub-hod-check');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('api/sheets.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'toggle_sub_hod_check',
+                sheet_id: sheetId,
+                employee_id: empId,
+                date: date,
+                is_checked: nextState
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message, 'success');
+            await loadDailyWorksheet(false);
+        } else {
+            showToast(data.message || 'Failed to update Sub-HOD verification', 'error');
+        }
+    } catch (err) {
+        console.error('Error toggling Sub-HOD check:', err);
+        showToast('Error communicating with server.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+window.handleToggleSubHodCheckSheet = handleToggleSubHodCheckSheet;
 
 async function handleToggleHodCheckSheet() {
     if (!canMarkHodChecked()) {

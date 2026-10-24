@@ -35,12 +35,7 @@ $isHr = in_array($currentUserRole, ['hr']) || (!empty($currentUserObj['can_manag
 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
 if ($isHod) {
-    $stmtM = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ?");
-    $stmtM->execute([$currentUserId]);
-    $extraDepts = $stmtM->fetchAll(PDO::FETCH_COLUMN);
-    if (!empty($extraDepts)) {
-        $managedDeptIds = array_unique(array_merge($managedDeptIds, array_map('intval', $extraDepts)));
-    }
+    $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
 }
 
 switch ($action) {
