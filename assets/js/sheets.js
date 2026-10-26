@@ -213,6 +213,7 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
         if (input.value !== date) input.value = date;
     });
 
+    AppState.isLoadingSheet = true;
     try {
         const res = await fetch(`api/sheets.php?action=get_sheet&employee_id=${empId}&date=${date}`);
         const data = await res.json();
@@ -284,6 +285,8 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
     } catch (err) {
         console.error("Error loading worksheet:", err);
         showToast("Error retrieving worksheet data.", "error");
+    } finally {
+        AppState.isLoadingSheet = false;
     }
 }
 

@@ -360,7 +360,7 @@ async function initApp() {
         await Promise.all([masterPromise, userPromise]);
 
         if (AppState.currentUser) {
-            await loadUserData();
+            await loadUserData(false);
         }
 
         setupTabNavigation();
@@ -640,7 +640,7 @@ function applyRoleBasedVisibility(user) {
     }
 }
 
-async function loadUserData() {
+async function loadUserData(shouldLoadActiveTab = true) {
     if (!AppState.currentUser) return;
 
     applyRoleBasedVisibility(AppState.currentUser);
@@ -670,22 +670,9 @@ async function loadUserData() {
         AppState.adminSelectedEmpId = null;
     }
 
-    // Only eagerly load data for the currently visible tab to avoid network congestion and session blocking
-    const activeSection = document.querySelector('.tab-section.active');
-    const activeTabId = activeSection ? activeSection.id : 'tab-worksheet';
-
-    const loadPromises = [];
-    if (activeTabId === 'tab-worksheet') {
-        loadPromises.push(loadDailyWorksheet());
-    } else if (activeTabId === 'tab-tasks') {
-        loadPromises.push(loadAssignedTasks());
-    } else if (activeTabId === 'tab-newsroom') {
-        if (typeof initNewsroomModule === 'function') loadPromises.push(initNewsroomModule());
-    } else if (activeTabId === 'tab-programming') {
-        if (typeof initProgrammingModule === 'function') loadPromises.push(initProgrammingModule());
-    }
-    if (loadPromises.length > 0) {
-        await Promise.all(loadPromises);
+    if (shouldLoadActiveTab) {
+        const activeTabId = getActiveTargetTabId();
+        await navigateToTab(activeTabId, false);
     }
 
     // Asynchronously update badges without blocking UI rendering
@@ -1106,7 +1093,7 @@ function closeMobileSidebar() {
 }
 
 // Tab Navigation & URL Hash Routing
-function navigateToTab(tabId, updateHash = true) {
+async function navigateToTab(tabId, updateHash = true) {
     if (AppState.currentUser) {
         const uRole = (AppState.currentUser.role || '').toLowerCase();
         const uDept = (AppState.currentUser.department_name || '').toLowerCase();
@@ -1147,7 +1134,11 @@ function navigateToTab(tabId, updateHash = true) {
     document.querySelectorAll('.tab-section').forEach(sec => sec.classList.remove('active'));
     targetSection.classList.add('active');
 
-    if (tabId === 'tab-reports') {
+    if (tabId === 'tab-worksheet') {
+        if (typeof loadDailyWorksheet === 'function' && !AppState.isLoadingSheet) {
+            await loadDailyWorksheet();
+        }
+    } else if (tabId === 'tab-reports') {
         loadReports();
     } else if (tabId === 'tab-roster') {
         if (typeof loadDutyRoster === 'function') loadDutyRoster();
@@ -1181,6 +1172,35 @@ function navigateToTab(tabId, updateHash = true) {
     }
 }
 
+function getActiveTargetTabId() {
+    const hash = window.location.hash.replace('#', '').trim();
+    if (hash) {
+        const matchedBtn = document.querySelector(`.nav-btn[data-route="${hash}"]`) || document.querySelector(`.nav-btn[data-tab="tab-${hash}"]`);
+        if (matchedBtn) {
+            return matchedBtn.getAttribute('data-tab');
+        }
+        const directSection = document.getElementById(`tab-${hash}`) || document.getElementById(hash);
+        if (directSection && directSection.classList.contains('tab-section')) {
+            return directSection.id;
+        }
+    }
+
+    // For HODs: if no hash is provided, default to attendance (Team Dashboard)
+    const isNonHrPortal = !window.location.pathname.includes('hr');
+    if (!hash && isNonHrPortal && AppState.currentUser && (AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'deputy_hod')) {
+        return 'tab-attendance';
+    }
+
+    // Default: activate whichever tab button has .active on page render
+    const defaultActiveBtn = document.querySelector('.nav-btn.active');
+    if (defaultActiveBtn && defaultActiveBtn.getAttribute('data-tab')) {
+        return defaultActiveBtn.getAttribute('data-tab');
+    }
+
+    const activeSection = document.querySelector('.tab-section.active');
+    return activeSection ? activeSection.id : 'tab-worksheet';
+}
+
 function setupTabNavigation() {
     const tabButtons = document.querySelectorAll('.nav-btn');
     tabButtons.forEach(btn => {
@@ -1194,28 +1214,9 @@ function setupTabNavigation() {
 
     // Handle browser hash navigation (initial load & back/forward history)
     function handleHashChange() {
-        const hash = window.location.hash.replace('#', '').trim();
-        if (hash) {
-            const matchedBtn = document.querySelector(`.nav-btn[data-route="${hash}"]`) || document.querySelector(`.nav-btn[data-tab="tab-${hash}"]`);
-            if (matchedBtn) {
-                const tabId = matchedBtn.getAttribute('data-tab');
-                navigateToTab(tabId, false);
-                return;
-            }
-        }
-
-        // For HODs: if no hash is provided, default to attendance (Team Dashboard)
-        const isNonHrPortal = !window.location.pathname.includes('hr');
-        if (!hash && isNonHrPortal && AppState.currentUser && (AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'deputy_hod')) {
-            navigateToTab('tab-attendance', false);
-            return;
-        }
-
-        // Default: activate whichever tab button has .active on page render
-        const defaultActiveBtn = document.querySelector('.nav-btn.active');
-        if (defaultActiveBtn) {
-            const tabId = defaultActiveBtn.getAttribute('data-tab');
-            if (tabId) navigateToTab(tabId, false);
+        const targetTabId = getActiveTargetTabId();
+        if (targetTabId) {
+            navigateToTab(targetTabId, false);
         }
     }
 
