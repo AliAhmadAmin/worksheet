@@ -196,6 +196,10 @@ switch ($action) {
             }
         }
 
+        if (empty($senderId) || (int)$senderId <= 0) {
+            $senderId = null;
+        }
+
         $dispatchTime = !empty($data['dispatch_time']) ? trim($data['dispatch_time']) : date('h:i:s A');
         $link = trim($data['link'] ?? '');
         $ptLink = trim($data['pt_link'] ?? '');
@@ -211,19 +215,27 @@ switch ($action) {
             $initPtStatus = '';
         }
 
-        $stmt = $pdo->prepare("
-            INSERT INTO newsroom_dispatches 
-            (dispatch_date, title, path_whatsapp, channel, sender_id, sender_name, dispatch_time, link, pt_link, dp_status, pt_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([$dispatchDate, $title, $pathWhatsapp, $channel, $senderId, $senderName, $dispatchTime, $link, $ptLink, $initDpStatus, $initPtStatus]);
-        $newId = $pdo->lastInsertId();
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO newsroom_dispatches 
+                (dispatch_date, title, path_whatsapp, channel, sender_id, sender_name, dispatch_time, link, pt_link, dp_status, pt_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$dispatchDate, $title, $pathWhatsapp, $channel, $senderId, $senderName, $dispatchTime, $link, $ptLink, $initDpStatus, $initPtStatus]);
+            $newId = $pdo->lastInsertId();
 
-        echo json_encode([
-            'success' => true,
-            'message' => 'News content dispatched to Digital Department successfully.',
-            'id' => $newId
-        ]);
+            echo json_encode([
+                'success' => true,
+                'message' => 'News content dispatched to Digital Department successfully.',
+                'id' => $newId
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Database error dispatching story: ' . $e->getMessage()
+            ]);
+        }
         break;
 
     case 'update_status':
