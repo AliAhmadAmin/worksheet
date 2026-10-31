@@ -665,7 +665,20 @@ async function handleDispatchSubmit(event) {
                 link: link
             })
         });
-        const data = await res.json();
+
+        const rawText = await res.text();
+        let data = null;
+        try {
+            data = JSON.parse(rawText);
+        } catch (parseErr) {
+            console.error("Non-JSON server response:", rawText);
+            if (res.status === 401 || res.status === 403) {
+                showToast("Session expired or permission denied. Please refresh the page and log in again.", "error");
+            } else {
+                showToast(`Server returned an error (${res.status}). Please refresh and try again.`, "error");
+            }
+            return;
+        }
 
         if (data.success) {
             showToast(data.message, "success");
@@ -675,7 +688,8 @@ async function handleDispatchSubmit(event) {
             showToast(data.message || "Dispatch failed.", "error");
         }
     } catch (err) {
-        showToast("Network error creating dispatch.", "error");
+        console.error("Dispatch content fetch error:", err);
+        showToast("Cannot connect to Worksheet server. Please check your network connection.", "error");
     }
 }
 

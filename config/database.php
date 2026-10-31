@@ -513,9 +513,11 @@ function migratePermissionsSchema($pdo) {
             sender_name VARCHAR(150),
             dispatch_time VARCHAR(50),
             link TEXT,
+            pt_link TEXT NULL,
             dp_status VARCHAR(50) DEFAULT '',
             dp_time VARCHAR(50),
             pt_status VARCHAR(50) DEFAULT '',
+            moved_to_pt TINYINT(1) DEFAULT 0,
             pt_time VARCHAR(50),
             publisher_id INT NULL,
             publisher_name VARCHAR(150),
@@ -538,9 +540,11 @@ function migratePermissionsSchema($pdo) {
             sender_name VARCHAR(150),
             dispatch_time VARCHAR(50),
             link TEXT,
+            pt_link TEXT NULL,
             dp_status VARCHAR(50) DEFAULT '',
             dp_time VARCHAR(50),
             pt_status VARCHAR(50) DEFAULT '',
+            moved_to_pt TINYINT(1) DEFAULT 0,
             pt_time VARCHAR(50),
             publisher_id INT NULL,
             publisher_name VARCHAR(150),
@@ -574,12 +578,47 @@ function migratePermissionsSchema($pdo) {
               AND (dp_status = '' OR dp_status IS NULL OR dp_status = 'Pending')
         ");
 
-        // Ensure moved_to_pt column exists in dispatches
+        // Ensure pt_link and moved_to_pt columns exist in dispatches
+        try {
+            $pdo->exec("ALTER TABLE newsroom_dispatches ADD COLUMN pt_link TEXT NULL AFTER link");
+        } catch (Exception $e) {}
+        try {
+            $pdo->exec("ALTER TABLE programming_dispatches ADD COLUMN pt_link TEXT NULL AFTER link");
+        } catch (Exception $e) {}
         try {
             $pdo->exec("ALTER TABLE newsroom_dispatches ADD COLUMN moved_to_pt TINYINT(1) DEFAULT 0 AFTER pt_status");
         } catch (Exception $e) {}
         try {
             $pdo->exec("ALTER TABLE programming_dispatches ADD COLUMN moved_to_pt TINYINT(1) DEFAULT 0 AFTER pt_status");
+        } catch (Exception $e) {}
+
+        // Multi-Department Staff Assignment Schema (Shared Resources across departments)
+        $pdo->exec("
+        CREATE TABLE IF NOT EXISTS employee_departments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            department_id INT NOT NULL,
+            can_receive_tasks TINYINT(1) DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_emp_dept (employee_id, department_id),
+            FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+            FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Ensure tasks table has department_id for strict departmental isolation
+        try {
+            $pdo->exec("ALTER TABLE tasks ADD COLUMN department_id INT NULL AFTER department");
+        } catch (Exception $e) {}
+        try {
+            $pdo->exec("ALTER TABLE tasks ADD INDEX idx_task_dept_id (department_id)");
+        } catch (Exception $e) {}
+        try {
+            $pdo->exec("
+                UPDATE tasks t 
+                JOIN departments d ON LOWER(TRIM(t.department)) = LOWER(TRIM(d.name))
+                SET t.department_id = d.id
+                WHERE t.department_id IS NULL OR t.department_id = 0
+            ");
         } catch (Exception $e) {}
 
         // Auto-seed default hr_employee_profiles for any existing employees missing a profile without altering data
