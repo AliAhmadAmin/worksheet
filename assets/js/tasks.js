@@ -387,12 +387,17 @@ function renderAssignTaskEmpDropdownList(employees) {
             ? `<span style="display: inline-block; background: rgba(59, 130, 246, 0.12); color: var(--primary); font-family: monospace; font-size: 10.5px; padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: 6px;">${escapeHtml(codeVal)}</span>` 
             : '';
 
+        const sharedBadge = emp.is_shared_resource 
+            ? `<span style="display: inline-block; background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700; margin-left: 6px;">🏷️ Shared (${escapeHtml(emp.department_name || 'Cross-Dept')})</span>` 
+            : '';
+
         item.innerHTML = `
             ${avatarHtml}
             <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                <div style="color: var(--text-main); line-height: 1.2; display: flex; align-items: center;">
+                <div style="color: var(--text-main); line-height: 1.2; display: flex; align-items: center; flex-wrap: wrap;">
                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(emp.name)}</span>
                     ${empCodeBadge}
+                    ${sharedBadge}
                 </div>
                 <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.designation || 'Staff')} • ${escapeHtml(emp.team_name || emp.department_name || 'Team')}</div>
             </div>
@@ -410,8 +415,11 @@ function filterAssignTaskEmpDropdown(query) {
     }
     const filtered = (AppState.employees || []).filter(emp => {
         const code = (emp.emp_code || emp.employee_code || '').toLowerCase();
+        const isSharedMatch = emp.is_shared_resource && ('shared'.includes(q) || 'cross'.includes(q));
         return emp.name.toLowerCase().includes(q) || 
             code.includes(q) ||
+            isSharedMatch ||
+            (emp.designation && emp.designation.toLowerCase().includes(q)) ||
             (emp.email && emp.email.toLowerCase().includes(q)) ||
             (emp.phone && emp.phone.includes(q)) ||
             (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
@@ -450,7 +458,7 @@ function selectAssignTaskEmpFromDropdown(empId) {
     const avatarBox = document.getElementById('assign-task-emp-avatar');
 
     if (labelSpan && emp) {
-        labelSpan.textContent = emp.name;
+        labelSpan.textContent = emp.name + (emp.is_shared_resource ? ` [Shared from ${emp.department_name || 'Other'}]` : '');
     }
 
     if (avatarBox && emp) {
@@ -547,7 +555,7 @@ function selectEditTaskEmpFromDropdown(empId) {
     const avatarBox = document.getElementById('edit-task-emp-avatar');
 
     if (labelSpan && emp) {
-        labelSpan.textContent = emp.name;
+        labelSpan.textContent = emp.name + (emp.is_shared_resource ? ` [Shared from ${emp.department_name || 'Other'}]` : '');
     }
 
     if (avatarBox && emp) {
@@ -812,9 +820,14 @@ function renderAdminTaskList(tasks) {
             ? `<span title="${escapeHtml(t.whatsapp_status || 'Sent via WhatsApp')}" style="color: #10b981; font-size: 10px; font-weight: 700; background: rgba(16, 185, 129, 0.1); padding: 1px 5px; border-radius: 3px; display: inline-flex; align-items: center; gap: 3px;">💬 Sent</span>`
             : `<button type="button" onclick="event.stopPropagation(); resendTaskWhatsApp(${t.id})" class="btn btn-outline" style="padding: 1px 6px; font-size: 9.5px; border-color: rgba(16, 185, 129, 0.4); color: #10b981; border-radius: 3px;" title="Send WhatsApp notification now">💬 Send WA</button>`;
 
+        const deptBadge = t.department_name 
+            ? `<span style="display: inline-block; background: rgba(59, 130, 246, 0.1); color: var(--primary); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px;">🏢 ${escapeHtml(t.department_name)}</span>` 
+            : '';
+
         tr.innerHTML = `
             <td>
                 <strong style="color: var(--text-main); font-size: 12.5px;">${escapeHtml(t.employee_name || 'Unassigned')}</strong>
+                ${deptBadge ? `<div style="margin-top: 3px;">${deptBadge}</div>` : ''}
             </td>
             <td>
                 <div style="font-weight: 700; font-size: 13px; color: var(--primary); cursor: pointer; ${isCompleted ? 'text-decoration: line-through; opacity: 0.75;' : ''}" onclick="openViewTaskModal(${t.id})" title="Click to view complete details">

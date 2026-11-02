@@ -1947,6 +1947,25 @@ function openEditEmployeeModal(empId) {
         deptSelect.disabled = isHodUser && (AppState.departments || []).length <= 1;
     }
 
+    // Populate Shared Departments Checkboxes
+    const sharedContainer = document.getElementById('edit-emp-shared-depts-container');
+    if (sharedContainer) {
+        sharedContainer.innerHTML = '';
+        const currentSharedIds = emp.shared_dept_ids || [];
+        (AppState.departments || []).forEach(d => {
+            if (d.id != emp.department_id) {
+                const isChecked = currentSharedIds.includes(parseInt(d.id, 10));
+                const lbl = document.createElement('label');
+                lbl.style.cssText = 'display: inline-flex; align-items: center; gap: 5px; font-size: 12px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 4px 9px; border-radius: var(--radius-sm); cursor: pointer; user-select: none; font-weight: 600;';
+                lbl.innerHTML = `<input type="checkbox" class="edit-emp-shared-dept-chk" value="${d.id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; accent-color: var(--primary);"> <span>${escapeHtml(d.name)}</span>`;
+                sharedContainer.appendChild(lbl);
+            }
+        });
+        if (sharedContainer.children.length === 0) {
+            sharedContainer.innerHTML = '<span style="font-size: 11px; color: var(--text-muted); font-style: italic;">No other departments available</span>';
+        }
+    }
+
     document.getElementById('edit-emp-designation').value = emp.designation || '';
 
     const codeInput = document.getElementById('edit-emp-code');
@@ -2091,6 +2110,9 @@ async function handleEditEmployeeSubmit(e) {
         const isHr = AppState.currentUser && (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || AppState.currentUser.can_manage_hr);
         const canManageSalary = (isSuperAdmin || isHr) && !isHodUser;
 
+        const sharedDeptCheckboxes = document.querySelectorAll('.edit-emp-shared-dept-chk:checked');
+        const sharedDeptIds = Array.from(sharedDeptCheckboxes).map(c => parseInt(c.value, 10)).filter(v => v > 0);
+
         const payload = {
             action: 'update_employee',
             id,
@@ -2105,6 +2127,7 @@ async function handleEditEmployeeSubmit(e) {
             role,
             designation,
             department_id: deptId,
+            shared_department_ids: sharedDeptIds,
             team_id: teamId || null,
             shift_timing: shiftTiming,
             weekly_off: weeklyOff,

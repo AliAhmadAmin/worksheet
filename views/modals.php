@@ -718,10 +718,21 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 <input type="text" id="edit-emp-designation" class="input-control" placeholder="e.g. Content Creator, Video Editor">
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Department</label>
+                                <label class="form-label">Primary (Home) Department</label>
                                 <select id="edit-emp-dept" class="input-control">
                                     <!-- Populated dynamically -->
                                 </select>
+                            </div>
+                        </div>
+
+                        <!-- Shared / Cross-Department Task Assignment Access -->
+                        <div class="form-group" style="background: rgba(59, 130, 246, 0.05); border: 1px dashed rgba(59, 130, 246, 0.3); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 12px;">
+                            <label class="form-label" style="font-weight: 700; color: var(--primary); display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                <span>🏢 Shared / Cross-Department Task Access</span>
+                                <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">(Allows other HODs to assign tasks to this employee)</span>
+                            </label>
+                            <div id="edit-emp-shared-depts-container" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                <!-- Checkboxes populated dynamically -->
                             </div>
                         </div>
 
