@@ -294,6 +294,56 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
         </div>
     </div>
 
+    <!-- MODAL: PERSON'S TASKS LIST -->
+    <div id="person-tasks-modal" class="modal-overlay">
+        <div class="modal-card modal-card-xl" style="max-width: 1050px; width: 95%;">
+            <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding: 14px 20px; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div id="person-tasks-avatar" class="admin-inspector-avatar" style="width: 44px; height: 44px; font-size: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #3b82f6; color: #fff; font-weight: 700; flex-shrink: 0;">👤</div>
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <h3 id="person-tasks-name" style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-main);">Employee Name</h3>
+                            <span id="person-tasks-code-badge" style="background: rgba(59, 130, 246, 0.12); color: var(--primary); font-family: monospace; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">DP000</span>
+                            <span id="person-tasks-dept-badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Digital</span>
+                        </div>
+                        <div id="person-tasks-designation" style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Designation</div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 6px;" id="person-tasks-kpi-pills">
+                        <!-- KPI pills dynamically populated -->
+                    </div>
+                    <button type="button" class="btn btn-primary" id="btn-person-assign-task" style="padding: 6px 14px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                        ➕ Assign Task
+                    </button>
+                    <button type="button" class="btn-modal-close" onclick="closeModal('person-tasks-modal')">✕</button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding: 16px 20px;">
+                <div class="table-responsive">
+                    <table class="interactive-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 25%;">Task Title</th>
+                                <th style="width: 30%;">Description & Link</th>
+                                <th style="width: 12%;">Assigned</th>
+                                <th style="width: 12%;">Completed</th>
+                                <th style="width: 12%;">Status</th>
+                                <th style="width: 9%; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="person-tasks-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 10px 20px; display: flex; justify-content: flex-end;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('person-tasks-modal')">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: ADD EMPLOYEE -->
     <div id="add-employee-modal" class="modal-overlay">
         <div class="modal-card modal-card-lg" style="max-width: 740px;">

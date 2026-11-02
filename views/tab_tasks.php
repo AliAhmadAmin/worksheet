@@ -1,21 +1,39 @@
         <!-- TAB 2: DEDICATED FULL-PAGE ASSIGN TASK COMMAND CENTER -->
         <section id="tab-tasks" class="tab-section">
             <div class="worksheet-card">
-                <div class="card-header-flex">
+                <div class="card-header-flex" style="flex-wrap: wrap; gap: 12px;">
                     <div class="card-title-group">
-                        <h3 id="tasks-page-title">🎯 Assign Task Command Center</h3>
-                        <p id="tasks-page-desc">Assign specific tasks to individual team members, filter by status, and monitor real-time completion.</p>
+                        <h3 id="tasks-page-title" style="display: flex; align-items: center; gap: 8px;">
+                            <span>🎯</span> <span>Assign Task Command Center</span>
+                        </h3>
+                        <p id="tasks-page-desc">Monitor team member tasks, track progress in real-time, and drill down into individual task lists.</p>
                     </div>
-                    <div class="controls-group">
-                        <select id="task-filter-status" class="input-control" onchange="loadAssignedTasks()">
+                    <div class="controls-group" style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        <!-- Live Search Input for Team & Tasks -->
+                        <div style="position: relative;">
+                            <input type="text" id="task-search-input" class="input-control" placeholder="🔍 Search person, code, designation..." oninput="handleTaskSearchInput(this.value)" style="padding: 6px 10px; font-size: 12px; width: 190px;">
+                        </div>
+
+                        <!-- Status Filter -->
+                        <select id="task-filter-status" class="input-control" onchange="loadAssignedTasks()" style="font-size: 12px; padding: 6px 10px;">
                             <option value="">All Statuses</option>
                             <option value="pending">⏳ Pending</option>
                             <option value="in_progress">⚡ In Progress</option>
                             <option value="completed">✅ Completed</option>
                         </select>
 
+                        <!-- View Toggle: Team Members vs All Tasks -->
+                        <div class="admin-only" style="display: inline-flex; background: var(--bg-card-elevated); padding: 3px; border-radius: var(--radius-md); border: 1px solid var(--border-color); gap: 2px;">
+                            <button type="button" id="btn-tasks-view-team" class="btn btn-sm btn-primary" onclick="switchTasksView('team')" style="padding: 5px 12px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); border: none;">
+                                👥 By Team Member
+                            </button>
+                            <button type="button" id="btn-tasks-view-list" class="btn btn-sm btn-outline" onclick="switchTasksView('list')" style="padding: 5px 12px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); border: none;">
+                                📋 All Tasks
+                            </button>
+                        </div>
+
                         <!-- Searchable Employee Filter Combobox (Admin Only) -->
-                        <div class="searchable-dropdown-wrapper admin-only" id="task-emp-search-wrapper" style="position: relative; display: inline-block;">
+                        <div class="searchable-dropdown-wrapper admin-only" id="task-emp-search-wrapper" style="position: relative; display: none;">
                             <button type="button" id="task-emp-dropdown-btn" class="input-control" style="font-weight: 600; font-size: 13px; padding: 7px 12px; min-width: 140px; width: auto; max-width: 210px; border-color: var(--border-color); background: var(--bg-card); cursor: pointer; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;" onclick="toggleTaskEmpDropdown()">
                                 <span id="task-emp-dropdown-selected-name" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">All Employees</span>
                                 <span style="font-size: 10px; color: var(--text-muted);">▼</span>
@@ -37,11 +55,11 @@
                             </div>
                         </div>
 
-                        <button type="button" class="btn btn-outline admin-only" onclick="openHodWhatsAppModal()" title="Configure your personal OrbitSend WhatsApp credentials & AI Vision" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+                        <button type="button" class="btn btn-outline admin-only" onclick="openHodWhatsAppModal()" title="Configure your personal OrbitSend WhatsApp credentials & AI Vision" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; padding: 6px 12px;">
                             <span>💬</span> <span>WhatsApp & AI</span>
                         </button>
 
-                        <button type="button" class="btn btn-primary admin-only" onclick="openAssignTaskModal()">
+                        <button type="button" class="btn btn-primary admin-only" onclick="openAssignTaskModal()" style="font-weight: 700; font-size: 12px; padding: 6px 14px;">
                             ➕ Assign New Task
                         </button>
                     </div>
@@ -67,8 +85,28 @@
                     </div>
                 </div>
 
-                <!-- Tasks Master Table -->
-                <div class="table-responsive">
+                <!-- VIEW 1: Team Members Dashboard (Grouped by Person - Default) -->
+                <div id="tasks-team-view" class="table-responsive">
+                    <table class="interactive-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 28%;">Team Member</th>
+                                <th style="width: 14%;">Department</th>
+                                <th style="width: 10%; text-align: center;">Total Tasks</th>
+                                <th style="width: 11%; text-align: center;">Pending</th>
+                                <th style="width: 11%; text-align: center;">In Progress</th>
+                                <th style="width: 11%; text-align: center;">Completed</th>
+                                <th style="width: 15%; text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="team-tasks-tbody">
+                            <!-- Populated via tasks.js -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- VIEW 2: All Tasks Flat Table -->
+                <div id="tasks-list-view" class="table-responsive" style="display: none;">
                     <table class="interactive-table">
                         <thead>
                             <tr>

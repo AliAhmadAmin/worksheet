@@ -2,6 +2,12 @@
  * Task Assigner & Tracker: Dedicated Task Command Center & Employee Portal
  */
 
+const TaskState = {
+    currentView: 'team', // 'team' or 'list'
+    currentPersonId: null,
+    searchQuery: ''
+};
+
 function formatTaskDateTime(dateStr) {
     if (!dateStr) return null;
     try {
@@ -212,6 +218,17 @@ async function loadAssignedTasks() {
         // Render Dedicated Admin Task Table on Task Assigner tab
         if (adminTbody) {
             renderAdminTaskList(tasks);
+        }
+
+        // Render Team Members Task Dashboard (Grouped View)
+        const teamTbody = document.getElementById('team-tasks-tbody');
+        if (teamTbody) {
+            renderTeamTaskDashboard(tasks);
+        }
+
+        // Real-time refresh of person tasks modal if currently open
+        if (TaskState.currentPersonId && document.getElementById('person-tasks-modal')?.classList.contains('active')) {
+            refreshPersonTasksModal(TaskState.currentPersonId);
         }
 
     } catch (err) {
@@ -571,9 +588,9 @@ function selectEditTaskEmpFromDropdown(empId) {
 }
 
 // Admin Task Creation Modal & Actions
-function openAssignTaskModal() {
-    // Default to the currently inspected admin employee or the first available employee
-    const defaultEmpId = AppState.adminSelectedEmpId || (AppState.employees && AppState.employees[0] ? AppState.employees[0].id : '');
+function openAssignTaskModal(preSelectedEmpId = null) {
+    // Default to pre-selected employee or the currently inspected admin employee or the first available employee
+    const defaultEmpId = preSelectedEmpId || AppState.adminSelectedEmpId || (AppState.employees && AppState.employees[0] ? AppState.employees[0].id : '');
     
     const hiddenInput = document.getElementById('assign-task-emp-select');
     if (hiddenInput) hiddenInput.value = defaultEmpId;
@@ -798,19 +815,373 @@ function openViewTaskModal(taskId) {
     openModal('view-task-modal');
 }
 
+function switchTasksView(view) {
+    TaskState.currentView = view;
+    const btnTeam = document.getElementById('btn-tasks-view-team');
+    const btnList = document.getElementById('btn-tasks-view-list');
+    const viewTeam = document.getElementById('tasks-team-view');
+    const viewList = document.getElementById('tasks-list-view');
+
+    if (view === 'team') {
+        if (btnTeam) {
+            btnTeam.className = 'btn btn-sm btn-primary';
+            btnTeam.style.border = 'none';
+        }
+        if (btnList) {
+            btnList.className = 'btn btn-sm btn-outline';
+            btnList.style.border = 'none';
+        }
+        if (viewTeam) viewTeam.style.display = 'block';
+        if (viewList) viewList.style.display = 'none';
+        renderTeamTaskDashboard(AppState.tasks || []);
+    } else {
+        if (btnList) {
+            btnList.className = 'btn btn-sm btn-primary';
+            btnList.style.border = 'none';
+        }
+        if (btnTeam) {
+            btnTeam.className = 'btn btn-sm btn-outline';
+            btnTeam.style.border = 'none';
+        }
+        if (viewList) viewList.style.display = 'block';
+        if (viewTeam) viewTeam.style.display = 'none';
+        renderAdminTaskList(AppState.tasks || []);
+    }
+}
+
+function handleTaskSearchInput(query) {
+    TaskState.searchQuery = (query || '').trim().toLowerCase();
+    if (TaskState.currentView === 'team') {
+        renderTeamTaskDashboard(AppState.tasks || []);
+    } else {
+        renderAdminTaskList(AppState.tasks || []);
+    }
+}
+
+function renderTeamTaskDashboard(tasks) {
+    const tbody = document.getElementById('team-tasks-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    // Merge AppState.employees with any employee found in tasks
+    const empMap = new Map();
+    (AppState.employees || []).forEach(e => {
+        empMap.set(String(e.id), { ...e });
+    });
+
+    (tasks || []).forEach(t => {
+        if (t.assigned_to && !empMap.has(String(t.assigned_to))) {
+            empMap.set(String(t.assigned_to), {
+                id: t.assigned_to,
+                name: t.employee_name || 'Staff Member',
+                designation: t.employee_designation || 'Staff',
+                emp_code: t.employee_code || '',
+                department_name: t.department_name || t.department || 'Production',
+                avatar: null,
+                is_shared_resource: false
+            });
+        }
+    });
+
+    let empList = Array.from(empMap.values());
+    const statusFilter = document.getElementById('task-filter-status')?.value || '';
+    const q = TaskState.searchQuery;
+
+    // Calculate task counts per employee
+    empList = empList.map(emp => {
+        const empTasks = (tasks || []).filter(t => t.assigned_to == emp.id);
+        const pending = empTasks.filter(t => t.status === 'pending').length;
+        const progress = empTasks.filter(t => t.status === 'in_progress').length;
+        const completed = empTasks.filter(t => t.status === 'completed').length;
+        return {
+            ...emp,
+            tasks: empTasks,
+            totalCount: empTasks.length,
+            pendingCount: pending,
+            progressCount: progress,
+            completedCount: completed,
+            activeCount: pending + progress
+        };
+    });
+
+    // Filter by status if set
+    if (statusFilter === 'pending') {
+        empList = empList.filter(e => e.pendingCount > 0);
+    } else if (statusFilter === 'in_progress') {
+        empList = empList.filter(e => e.progressCount > 0);
+    } else if (statusFilter === 'completed') {
+        empList = empList.filter(e => e.completedCount > 0);
+    }
+
+    // Filter by search query
+    if (q) {
+        empList = empList.filter(e => {
+            const code = (e.emp_code || '').toLowerCase();
+            const hasTaskMatch = (e.tasks || []).some(t => (t.title && t.title.toLowerCase().includes(q)) || (t.description && t.description.toLowerCase().includes(q)));
+            return (e.name && e.name.toLowerCase().includes(q)) ||
+                   code.includes(q) ||
+                   (e.designation && e.designation.toLowerCase().includes(q)) ||
+                   (e.department_name && e.department_name.toLowerCase().includes(q)) ||
+                   (e.is_shared_resource && 'shared'.includes(q)) ||
+                   hasTaskMatch;
+        });
+    }
+
+    // Sort: Active tasks descending, then total tasks, then name
+    empList.sort((a, b) => {
+        if (b.activeCount !== a.activeCount) return b.activeCount - a.activeCount;
+        if (b.totalCount !== a.totalCount) return b.totalCount - a.totalCount;
+        return (a.name || '').localeCompare(b.name || '');
+    });
+
+    if (empList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 35px 20px;">No team members found matching your search or filters.</td></tr>';
+        return;
+    }
+
+    empList.forEach(emp => {
+        const tr = document.createElement('tr');
+        tr.className = 'team-task-row';
+        tr.style.cursor = 'pointer';
+        tr.onclick = () => openPersonTasksModal(emp.id);
+        tr.title = `Click to view all tasks for ${emp.name}`;
+
+        const initial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+        const avatarHtml = emp.avatar
+            ? `<img src="${escapeHtml(emp.avatar)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<div style=\\'width:32px;height:32px;border-radius:50%;background:#3b82f6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;\\'>${escapeHtml(initial)}</div>';">`
+            : `<div style="width: 32px; height: 32px; border-radius: 50%; background: #3b82f6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0;">${escapeHtml(initial)}</div>`;
+
+        const codeVal = emp.emp_code || '';
+        const empCodeBadge = codeVal 
+            ? `<span style="background: rgba(59, 130, 246, 0.12); color: var(--primary); font-family: monospace; font-size: 10px; padding: 1px 5px; border-radius: 4px; font-weight: 700;">${escapeHtml(codeVal)}</span>` 
+            : '';
+
+        const sharedBadge = emp.is_shared_resource 
+            ? `<span style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700; margin-left: 4px;">🏷️ Shared</span>` 
+            : '';
+
+        tr.innerHTML = `
+            <td>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    ${avatarHtml}
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <strong style="color: var(--text-main); font-size: 13.5px;">${escapeHtml(emp.name)}</strong>
+                            ${empCodeBadge}
+                        </div>
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+                            ${escapeHtml(emp.designation || 'Staff Member')}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span style="display: inline-block; background: rgba(59, 130, 246, 0.1); color: var(--primary); font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; text-transform: uppercase;">
+                    ${escapeHtml(emp.department_name || 'General')}
+                </span>
+                ${sharedBadge}
+            </td>
+            <td style="text-align: center;">
+                <span style="display: inline-block; min-width: 26px; padding: 2px 8px; border-radius: 12px; font-size: 12.5px; font-weight: 800; background: ${emp.totalCount > 0 ? 'var(--bg-card-elevated)' : 'transparent'}; color: ${emp.totalCount > 0 ? 'var(--text-main)' : 'var(--text-dim)'}; border: 1px solid ${emp.totalCount > 0 ? 'var(--border-color)' : 'transparent'};">
+                    ${emp.totalCount}
+                </span>
+            </td>
+            <td style="text-align: center;">
+                ${emp.pendingCount > 0 
+                    ? `<span style="display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 12px; background: rgba(234, 179, 8, 0.15); color: #ca8a04; border: 1px solid rgba(234, 179, 8, 0.3);">⏳ ${emp.pendingCount}</span>`
+                    : `<span style="color: var(--text-dim); font-size: 12px;">0</span>`}
+            </td>
+            <td style="text-align: center;">
+                ${emp.progressCount > 0 
+                    ? `<span style="display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 12px; background: rgba(59, 130, 246, 0.15); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.3);">⚡ ${emp.progressCount}</span>`
+                    : `<span style="color: var(--text-dim); font-size: 12px;">0</span>`}
+            </td>
+            <td style="text-align: center;">
+                ${emp.completedCount > 0 
+                    ? `<span style="display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-size: 11.5px; padding: 3px 9px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3);">✅ ${emp.completedCount}</span>`
+                    : `<span style="color: var(--text-dim); font-size: 12px;">0</span>`}
+            </td>
+            <td style="text-align: right;">
+                <button type="button" class="btn btn-outline" style="padding: 4px 11px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation(); openPersonTasksModal(${emp.id})">
+                    📋 View Tasks <span style="font-size: 10.5px; opacity: 0.8;">(${emp.totalCount})</span> →
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function openPersonTasksModal(empId) {
+    TaskState.currentPersonId = empId;
+    refreshPersonTasksModal(empId);
+    openModal('person-tasks-modal');
+}
+
+function refreshPersonTasksModal(empId) {
+    const nameEl = document.getElementById('person-tasks-name');
+    const desigEl = document.getElementById('person-tasks-designation');
+    const codeEl = document.getElementById('person-tasks-code-badge');
+    const deptEl = document.getElementById('person-tasks-dept-badge');
+    const avatarEl = document.getElementById('person-tasks-avatar');
+    const kpiEl = document.getElementById('person-tasks-kpi-pills');
+    const tbody = document.getElementById('person-tasks-tbody');
+    const assignBtn = document.getElementById('btn-person-assign-task');
+
+    if (!tbody) return;
+
+    const emp = (AppState.employees || []).find(e => e.id == empId) || {
+        id: empId,
+        name: 'Employee',
+        designation: 'Staff',
+        department_name: 'Production',
+        emp_code: `DP-${empId}`
+    };
+
+    if (nameEl) nameEl.textContent = emp.name || 'Employee';
+    if (desigEl) desigEl.textContent = emp.designation || 'Staff Member';
+    if (codeEl) {
+        codeEl.textContent = emp.emp_code || `DP-${emp.id}`;
+        codeEl.style.display = emp.emp_code ? 'inline-block' : 'none';
+    }
+    if (deptEl) {
+        deptEl.textContent = emp.department_name || 'Production';
+    }
+    if (avatarEl) {
+        const initial = emp.name ? emp.name.charAt(0).toUpperCase() : '👤';
+        if (emp.avatar) {
+            avatarEl.innerHTML = `<img src="${escapeHtml(emp.avatar)}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="${escapeHtml(emp.name)}" onerror="this.onerror=null; this.outerHTML='<span>${escapeHtml(initial)}</span>';">`;
+        } else {
+            avatarEl.innerHTML = `<span>${escapeHtml(initial)}</span>`;
+        }
+    }
+
+    if (assignBtn) {
+        assignBtn.onclick = () => {
+            closeModal('person-tasks-modal');
+            openAssignTaskModal(empId);
+        };
+    }
+
+    // Filter tasks for this employee
+    const allEmpTasks = (AppState.tasks || []).filter(t => t.assigned_to == empId);
+    const total = allEmpTasks.length;
+    const pending = allEmpTasks.filter(t => t.status === 'pending').length;
+    const progress = allEmpTasks.filter(t => t.status === 'in_progress').length;
+    const completed = allEmpTasks.filter(t => t.status === 'completed').length;
+
+    if (kpiEl) {
+        kpiEl.innerHTML = `
+            <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 10px; background: rgba(59, 130, 246, 0.12); color: var(--primary);">Total: ${total}</span>
+            <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 10px; background: rgba(234, 179, 8, 0.15); color: #ca8a04;">⏳ ${pending}</span>
+            <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 10px; background: rgba(59, 130, 246, 0.15); color: #2563eb;">⚡ ${progress}</span>
+            <span style="font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); color: #059669;">✅ ${completed}</span>
+        `;
+    }
+
+    const canEdit = hasPermission('can_edit_tasks');
+    tbody.innerHTML = '';
+
+    if (allEmpTasks.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-dim); padding: 40px 20px;">No tasks assigned to <strong>${escapeHtml(emp.name)}</strong> currently. Click "➕ Assign Task" above to assign one.</td></tr>`;
+        return;
+    }
+
+    allEmpTasks.forEach(t => {
+        const tr = document.createElement('tr');
+        const isCompleted = t.status === 'completed';
+        const assignedShort = formatTaskDateTimeShort(t.created_at);
+        const completedShort = formatTaskDateTimeShort(t.completed_at);
+
+        const waBadge = (t.whatsapp_sent == 1)
+            ? `<span title="${escapeHtml(t.whatsapp_status || 'Sent via WhatsApp')}" style="color: #10b981; font-size: 10px; font-weight: 700; background: rgba(16, 185, 129, 0.1); padding: 1px 5px; border-radius: 3px; display: inline-flex; align-items: center; gap: 3px;">💬 Sent</span>`
+            : `<button type="button" onclick="event.stopPropagation(); resendTaskWhatsApp(${t.id})" class="btn btn-outline" style="padding: 1px 6px; font-size: 9.5px; border-color: rgba(16, 185, 129, 0.4); color: #10b981; border-radius: 3px;" title="Send WhatsApp notification now">💬 Send WA</button>`;
+
+        tr.innerHTML = `
+            <td>
+                <div style="font-weight: 700; font-size: 13px; color: var(--primary); cursor: pointer; ${isCompleted ? 'text-decoration: line-through; opacity: 0.75;' : ''}" onclick="openViewTaskModal(${t.id})" title="Click to view complete details">
+                    ${escapeHtml(t.title)}
+                </div>
+            </td>
+            <td>
+                ${t.description ? `
+                    <div style="font-size: 12.5px; color: var(--text-main); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.35; cursor: pointer;" onclick="openViewTaskModal(${t.id})" title="Click to view full description: ${escapeHtml(t.description)}">
+                        ${escapeHtml(t.description)}
+                    </div>
+                ` : `<div style="color: var(--text-dim); font-size: 11.5px; font-style: italic;">No description</div>`}
+                ${t.link ? `<div style="margin-top: 6px;">${renderPathLinkHtml(t.link, false)}</div>` : ''}
+            </td>
+            <td>
+                ${assignedShort ? `
+                    <div style="line-height: 1.25;">
+                        <div style="font-weight: 700; font-size: 11.5px; color: var(--text-main);">${escapeHtml(assignedShort.date)}</div>
+                        <div style="font-size: 10.5px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace;">${escapeHtml(assignedShort.time)}</div>
+                    </div>
+                ` : `<span style="color: var(--text-dim); font-size: 11.5px;">—</span>`}
+            </td>
+            <td>
+                ${isCompleted && completedShort ? `
+                    <div style="line-height: 1.25; color: #10b981;">
+                        <div style="font-weight: 700; font-size: 11.5px;">${escapeHtml(completedShort.date)}</div>
+                        <div style="font-size: 10.5px; font-family: 'JetBrains Mono', monospace;">${escapeHtml(completedShort.time)}</div>
+                    </div>
+                ` : `
+                    <span style="font-size: 13px; color: var(--text-dim); font-weight: 600;">—</span>
+                `}
+            </td>
+            <td>
+                <select class="input-control" style="font-size: 11.5px; padding: 4px 8px; font-weight: 700; width: 100%; min-width: 115px; border-radius: var(--radius-sm); cursor: pointer;" onchange="updateTaskStatus(${t.id}, this.value)">
+                    <option value="pending" ${t.status === 'pending' ? 'selected' : ''}>⏳ Pending</option>
+                    <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>⚡ In Progress</option>
+                    <option value="completed" ${t.status === 'completed' ? 'selected' : ''}>✅ Completed</option>
+                </select>
+            </td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 4px; justify-content: center; white-space: nowrap;">
+                    ${waBadge}
+                    <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px;" onclick="openViewTaskModal(${t.id})" title="View Details">
+                        👁️
+                    </button>
+                    ${canEdit ? `
+                        <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px;" onclick="openEditTaskModal(${t.id})" title="Edit Task">
+                            ✏️
+                        </button>
+                        <button type="button" class="btn-icon-del" style="padding: 4px 6px; font-size: 11.5px;" onclick="deleteTask(${t.id})" title="Delete Task">
+                            🗑️
+                        </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
 function renderAdminTaskList(tasks) {
     const tbody = document.getElementById('admin-tasks-tbody');
     if (!tbody) return;
 
     const canEdit = hasPermission('can_edit_tasks');
 
+    const q = TaskState.searchQuery;
+    let filteredTasks = tasks || [];
+    if (q) {
+        filteredTasks = filteredTasks.filter(t => 
+            (t.title && t.title.toLowerCase().includes(q)) ||
+            (t.description && t.description.toLowerCase().includes(q)) ||
+            (t.employee_name && t.employee_name.toLowerCase().includes(q)) ||
+            (t.employee_code && t.employee_code.toLowerCase().includes(q)) ||
+            (t.department_name && t.department_name.toLowerCase().includes(q))
+        );
+    }
+
     tbody.innerHTML = '';
-    if (tasks.length === 0) {
+    if (filteredTasks.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim); padding: 30px;">No assigned tasks matching your filters.</td></tr>';
         return;
     }
 
-    tasks.forEach(t => {
+    filteredTasks.forEach(t => {
         const tr = document.createElement('tr');
         const isCompleted = t.status === 'completed';
         const assignedShort = formatTaskDateTimeShort(t.created_at);

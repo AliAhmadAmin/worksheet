@@ -30,10 +30,19 @@ $isHod = ($currentUserRole === 'hod');
 $canAssign = $isSuperAdmin || $isHod || !empty($currentUserObj['can_assign_tasks']);
 $canEdit = $isSuperAdmin || $isHod || !empty($currentUserObj['can_edit_tasks']);
 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
-$managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
-if ($isHod) {
-    $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
+
+// For task assigning and viewing, each HOD strictly manages tasks for their own direct department(s)
+// (Child sub-departments under parent departments have their own respective HODs and isolated task silos)
+$directDeptIds = ($userDeptId > 0) ? [$userDeptId] : [];
+if (!empty($currentUserId)) {
+    $stmtDirect = $pdo->prepare("SELECT id FROM departments WHERE hod_id = ? AND is_active = 1");
+    $stmtDirect->execute([(int)$currentUserId]);
+    $directDepts = $stmtDirect->fetchAll(PDO::FETCH_COLUMN);
+    if (!empty($directDepts)) {
+        $directDeptIds = array_merge($directDeptIds, array_map('intval', $directDepts));
+    }
 }
+$directDeptIds = array_values(array_unique(array_filter($directDeptIds)));
 
 if (in_array($action, ['get_tasks', 'get_task_details'])) {
     session_write_close();
@@ -61,13 +70,23 @@ switch ($action) {
             ";
             $params = [];
 
-            // Strict HOD & Department Isolation: Only show tasks created by this user or belonging to their department
-            if (!$isSuperAdmin && !empty($managedDeptIds)) {
-                $placeholders = implode(',', array_fill(0, count($managedDeptIds), '?'));
-                $sql .= " AND (t.assigned_by = ? OR t.department_id IN ($placeholders))";
-                $params[] = $currentUserId;
-                foreach ($managedDeptIds as $dId) {
-                    $params[] = $dId;
+            // Strict HOD & Department Isolation:
+            // An HOD can ONLY see tasks assigned by them OR tasks belonging to their direct department(s).
+            // Tasks belonging to other departments or other HODs are strictly excluded.
+            if (!$isSuperAdmin) {
+                if (!empty($directDeptIds)) {
+                    $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
+                    $sql .= " AND (t.assigned_by = ? OR (t.department_id IN ($placeholders) AND t.department_id > 0) OR (t.department_id IS NULL AND t.department IN (SELECT name FROM departments WHERE id IN ($placeholders))))";
+                    $params[] = $currentUserId;
+                    foreach ($directDeptIds as $dId) {
+                        $params[] = $dId;
+                    }
+                    foreach ($directDeptIds as $dId) {
+                        $params[] = $dId;
+                    }
+                } else {
+                    $sql .= " AND t.assigned_by = ?";
+                    $params[] = $currentUserId;
                 }
             }
 
@@ -147,13 +166,13 @@ switch ($action) {
 
         // Check if HOD is authorized to assign tasks to this employee (either primary dept or shared resource)
         if (!$isSuperAdmin) {
-            $isDirectDept = in_array($targetDeptId, $managedDeptIds, true);
+            $isDirectDept = in_array($targetDeptId, $directDeptIds, true);
             $isSharedDept = false;
 
-            if (!$isDirectDept && !empty($managedDeptIds)) {
-                $placeholders = implode(',', array_fill(0, count($managedDeptIds), '?'));
+            if (!$isDirectDept && !empty($directDeptIds)) {
+                $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
                 $stmtShared = $pdo->prepare("SELECT 1 FROM employee_departments WHERE employee_id = ? AND department_id IN ($placeholders) AND can_receive_tasks = 1 LIMIT 1");
-                $checkParams = array_merge([$assignedTo], $managedDeptIds);
+                $checkParams = array_merge([$assignedTo], $directDeptIds);
                 $stmtShared->execute($checkParams);
                 $isSharedDept = (bool)$stmtShared->fetchColumn();
             }
@@ -165,8 +184,15 @@ switch ($action) {
             }
         }
 
-        // Determine department for this task (the assigning HOD's department)
-        $taskDeptId = $userDeptId > 0 ? $userDeptId : (!empty($managedDeptIds) ? $managedDeptIds[0] : $targetDeptId);
+        // Determine department for this task:
+        // - For Super Admin: task belongs to target employee's department (or explicitly passed department_id)
+        // - For HOD: task belongs strictly to the assigning HOD's own department
+        if ($isSuperAdmin) {
+            $taskDeptId = !empty($data['department_id']) ? (int)$data['department_id'] : ($targetDeptId > 0 ? $targetDeptId : ($userDeptId > 0 ? $userDeptId : 1));
+        } else {
+            $taskDeptId = $userDeptId > 0 ? $userDeptId : (!empty($directDeptIds) ? $directDeptIds[0] : $targetDeptId);
+        }
+
         $stmtDeptName = $pdo->prepare("SELECT name FROM departments WHERE id = ?");
         $stmtDeptName->execute([$taskDeptId]);
         $deptName = $stmtDeptName->fetchColumn() ?: ($currentUserObj['department_name'] ?? 'Production');
@@ -259,7 +285,6 @@ switch ($action) {
         // Automatically strip surrounding quotes
         $link = trim($rawLink, " \t\n\r\0\x0B\"'");
         $contentType = trim($data['content_type'] ?? 'General');
-        $department = trim($data['department'] ?? 'Digital');
         $priority = $data['priority'] ?? 'medium';
         $status = $data['status'] ?? 'pending';
         $dueDate = !empty($data['due_date']) ? $data['due_date'] : null;
@@ -271,7 +296,7 @@ switch ($action) {
         }
 
         // Fetch current status to check completed_at
-        $checkStmt = $pdo->prepare("SELECT status, completed_at, assigned_by, department_id FROM tasks WHERE id = ?");
+        $checkStmt = $pdo->prepare("SELECT status, completed_at, assigned_by, department_id, department FROM tasks WHERE id = ?");
         $checkStmt->execute([$taskId]);
         $currentTask = $checkStmt->fetch();
 
@@ -281,10 +306,12 @@ switch ($action) {
             exit;
         }
 
+        $department = !empty($data['department']) ? trim($data['department']) : ($currentTask['department'] ?? 'General');
+
         // Strict HOD isolation: Only allow editing tasks created by this user or belonging to their department
         if (!$isSuperAdmin) {
             $isAssignedByMe = ((int)$currentTask['assigned_by'] === $currentUserId);
-            $isMyDeptTask = (!empty($managedDeptIds) && in_array((int)$currentTask['department_id'], $managedDeptIds, true));
+            $isMyDeptTask = (!empty($directDeptIds) && in_array((int)$currentTask['department_id'], $directDeptIds, true));
             if (!$isAssignedByMe && !$isMyDeptTask) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access Denied: You can only edit tasks created by your department.']);
@@ -328,7 +355,7 @@ switch ($action) {
                 exit;
             }
             $isAssignedByMe = ((int)$currentTask['assigned_by'] === $currentUserId);
-            $isMyDeptTask = (!empty($managedDeptIds) && in_array((int)$currentTask['department_id'], $managedDeptIds, true));
+            $isMyDeptTask = (!empty($directDeptIds) && in_array((int)$currentTask['department_id'], $directDeptIds, true));
             if (!$isAssignedByMe && !$isMyDeptTask) {
                 http_response_code(403);
                 echo json_encode(['success' => false, 'message' => 'Access Denied: You can only delete tasks created by your department.']);

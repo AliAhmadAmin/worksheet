@@ -1465,6 +1465,10 @@ body.sidebar-open .sidebar-backdrop {
     background: var(--bg-card-elevated);
 }
 
+.team-task-row:hover td {
+    background: rgba(59, 130, 246, 0.05) !important;
+}
+
 .interactive-table input, 
 .interactive-table select {
     width: 100%;
