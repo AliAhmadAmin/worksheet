@@ -60,10 +60,12 @@ switch ($action) {
                        COALESCE(e.designation, 'Staff') as employee_designation,
                        COALESCE(e.emp_code, t.emp_code, '') as employee_code,
                        COALESCE(e.whatsapp_number, e.phone, '') as employee_phone,
+                       COALESCE(edep.name, '') as employee_dept_name,
                        COALESCE(a.name, 'Admin') as assigner_name,
                        COALESCE(d.name, t.department, 'Production') as department_name
                 FROM tasks t
                 LEFT JOIN employees e ON t.assigned_to = e.id
+                LEFT JOIN departments edep ON e.department_id = edep.id
                 LEFT JOIN employees a ON t.assigned_by = a.id
                 LEFT JOIN departments d ON t.department_id = d.id
                 WHERE 1=1
@@ -71,13 +73,38 @@ switch ($action) {
             $params = [];
 
             // Strict HOD & Department Isolation:
-            // An HOD can ONLY see tasks assigned by them OR tasks belonging to their direct department(s).
-            // Tasks belonging to other departments or other HODs are strictly excluded.
+            // An HOD can ONLY see:
+            // 1. Tasks assigned by them (t.assigned_by = ?)
+            // OR
+            // 2. Tasks belonging to their direct department(s) for employees who belong to their department,
+            //    or staff shared with their department via employee_departments, or unassigned tasks.
+            // Tasks belonging to or assigned to unshared employees of other departments are strictly excluded.
             if (!$isSuperAdmin) {
                 if (!empty($directDeptIds)) {
                     $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
-                    $sql .= " AND (t.assigned_by = ? OR (t.department_id IN ($placeholders) AND t.department_id > 0) OR (t.department_id IS NULL AND t.department IN (SELECT name FROM departments WHERE id IN ($placeholders))))";
+                    $sql .= " AND (
+                        t.assigned_by = ? 
+                        OR (
+                            (t.department_id IN ($placeholders) OR (t.department_id IS NULL AND t.department IN (SELECT name FROM departments WHERE id IN ($placeholders))))
+                            AND (
+                                e.department_id IN ($placeholders)
+                                OR e.id IN (
+                                    SELECT ed.employee_id 
+                                    FROM employee_departments ed 
+                                    WHERE ed.department_id IN ($placeholders) AND ed.can_receive_tasks = 1
+                                )
+                                OR t.assigned_to = 0 
+                                OR t.assigned_to IS NULL
+                            )
+                        )
+                    )";
                     $params[] = $currentUserId;
+                    foreach ($directDeptIds as $dId) {
+                        $params[] = $dId;
+                    }
+                    foreach ($directDeptIds as $dId) {
+                        $params[] = $dId;
+                    }
                     foreach ($directDeptIds as $dId) {
                         $params[] = $dId;
                     }

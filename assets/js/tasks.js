@@ -870,19 +870,24 @@ function renderTeamTaskDashboard(tasks) {
         empMap.set(String(e.id), { ...e });
     });
 
-    (tasks || []).forEach(t => {
-        if (t.assigned_to && !empMap.has(String(t.assigned_to))) {
-            empMap.set(String(t.assigned_to), {
-                id: t.assigned_to,
-                name: t.employee_name || 'Staff Member',
-                designation: t.employee_designation || 'Staff',
-                emp_code: t.employee_code || '',
-                department_name: t.department_name || t.department || 'Production',
-                avatar: null,
-                is_shared_resource: false
-            });
-        }
-    });
+    // For HODs, strictly display their own team members and assigned shared resources.
+    // Unmanaged employees from other departments are never injected into an HOD's team dashboard.
+    const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
+    if (!isHod) {
+        (tasks || []).forEach(t => {
+            if (t.assigned_to && !empMap.has(String(t.assigned_to))) {
+                empMap.set(String(t.assigned_to), {
+                    id: t.assigned_to,
+                    name: t.employee_name || 'Staff Member',
+                    designation: t.employee_designation || 'Staff',
+                    emp_code: t.employee_code || '',
+                    department_name: t.employee_dept_name || t.department_name || 'General',
+                    avatar: null,
+                    is_shared_resource: false
+                });
+            }
+        });
+    }
 
     let empList = Array.from(empMap.values());
     const statusFilter = document.getElementById('task-filter-status')?.value || '';

@@ -621,6 +621,23 @@ function migratePermissionsSchema($pdo) {
             ");
         } catch (Exception $e) {}
 
+        // Fix legacy tasks where department previously defaulted to 'Digital' but the assigned employee belongs to another department and is NOT shared with Digital
+        try {
+            $pdo->exec("
+                UPDATE tasks t
+                JOIN employees e ON t.assigned_to = e.id
+                JOIN departments d ON e.department_id = d.id
+                LEFT JOIN employee_departments ed ON ed.employee_id = e.id AND ed.department_id = t.department_id
+                SET t.department_id = e.department_id,
+                    t.department = d.name
+                WHERE t.department_id = 2 
+                  AND e.department_id IS NOT NULL 
+                  AND e.department_id > 0 
+                  AND e.department_id != 2 
+                  AND ed.id IS NULL
+            ");
+        } catch (Exception $e) {}
+
         // Auto-seed default hr_employee_profiles for any existing employees missing a profile without altering data
         $pdo->exec("
             INSERT IGNORE INTO hr_employee_profiles (employee_id, joining_date, employment_type, basic_salary, expected_hours, shift_policy, annual_leave_quota, casual_leave_quota, sick_leave_quota)
