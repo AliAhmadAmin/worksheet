@@ -44,14 +44,30 @@ if (!empty($currentUserId)) {
 }
 $directDeptIds = array_values(array_unique(array_filter($directDeptIds)));
 
-if (in_array($action, ['get_tasks', 'get_task_details'])) {
+if (in_array($action, ['get_tasks', 'get_task_details', 'get_assignable_employees'])) {
     session_write_close();
 }
 
 switch ($action) {
+    case 'get_assignable_employees':
+        // Return all active organization employees for company-wide cross-department task assignment
+        $stmt = $pdo->query("
+            SELECT e.id, e.name, e.designation, e.emp_code, e.department_id, e.avatar,
+                   COALESCE(d.name, 'General') as department_name
+            FROM employees e
+            LEFT JOIN departments d ON e.department_id = d.id
+            WHERE e.is_active = 1
+            ORDER BY d.name ASC, e.name ASC
+        ");
+        $assignable = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode(['success' => true, 'employees' => $assignable]);
+        break;
+
     case 'get_tasks':
         $empFilter = $_GET['employee_id'] ?? null;
         $statusFilter = $_GET['status'] ?? null;
+        $deptFilter = $_GET['department_id'] ?? null;
+        $scope = $_GET['scope'] ?? 'my_dept'; // 'my_dept', 'assigned_by_me', 'all'
 
         if ($canAssign || $canEdit) {
             $sql = "
@@ -60,61 +76,46 @@ switch ($action) {
                        COALESCE(e.designation, 'Staff') as employee_designation,
                        COALESCE(e.emp_code, t.emp_code, '') as employee_code,
                        COALESCE(e.whatsapp_number, e.phone, '') as employee_phone,
-                       COALESCE(edep.name, '') as employee_dept_name,
+                       COALESCE(edep.name, 'General') as employee_dept_name,
                        COALESCE(a.name, 'Admin') as assigner_name,
+                       COALESCE(adep.name, 'Management') as assigner_dept_name,
                        COALESCE(d.name, t.department, 'Production') as department_name
                 FROM tasks t
                 LEFT JOIN employees e ON t.assigned_to = e.id
                 LEFT JOIN departments edep ON e.department_id = edep.id
                 LEFT JOIN employees a ON t.assigned_by = a.id
+                LEFT JOIN departments adep ON a.department_id = adep.id
                 LEFT JOIN departments d ON t.department_id = d.id
                 WHERE 1=1
             ";
             $params = [];
 
-            // Strict HOD & Department Isolation:
-            // An HOD can ONLY see:
-            // 1. Tasks assigned by them (t.assigned_by = ?)
-            // OR
-            // 2. Tasks belonging to their direct department(s) for employees who belong to their department,
-            //    or staff shared with their department via employee_departments, or unassigned tasks.
-            // Tasks belonging to or assigned to unshared employees of other departments are strictly excluded.
-            if (!$isSuperAdmin) {
-                if (!empty($directDeptIds)) {
+            // Scope Filtering:
+            // - 'others': Tasks assigned by this HOD to members OUTSIDE their primary departmental team (e.g. Hafiz Attique, Abid Ali, Babar Rasool)
+            // - 'my_dept': ALL tasks belonging to this HOD's direct departmental team members (Aroosa, Ali Ahmad, Sultan, Abaid, etc.)
+            if ($scope === 'others') {
+                if (!$isSuperAdmin && !empty($directDeptIds)) {
                     $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
-                    $sql .= " AND (
-                        t.assigned_by = ? 
-                        OR (
-                            (t.department_id IN ($placeholders) OR (t.department_id IS NULL AND t.department IN (SELECT name FROM departments WHERE id IN ($placeholders))))
-                            AND (
-                                e.department_id IN ($placeholders)
-                                OR e.id IN (
-                                    SELECT ed.employee_id 
-                                    FROM employee_departments ed 
-                                    WHERE ed.department_id IN ($placeholders) AND ed.can_receive_tasks = 1
-                                )
-                                OR t.assigned_to = 0 
-                                OR t.assigned_to IS NULL
-                            )
-                        )
-                    )";
+                    $sql .= " AND t.assigned_by = ? 
+                              AND (e.department_id NOT IN ($placeholders) OR e.department_id IS NULL)";
                     $params[] = $currentUserId;
-                    foreach ($directDeptIds as $dId) {
-                        $params[] = $dId;
-                    }
-                    foreach ($directDeptIds as $dId) {
-                        $params[] = $dId;
-                    }
-                    foreach ($directDeptIds as $dId) {
-                        $params[] = $dId;
-                    }
-                    foreach ($directDeptIds as $dId) {
-                        $params[] = $dId;
-                    }
+                    foreach ($directDeptIds as $dId) { $params[] = $dId; }
                 } else {
                     $sql .= " AND t.assigned_by = ?";
                     $params[] = $currentUserId;
                 }
+            } elseif ($scope === 'my_dept' && !$isSuperAdmin && !empty($directDeptIds)) {
+                $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
+                $sql .= " AND (
+                    e.department_id IN ($placeholders) 
+                    OR (t.department_id IN ($placeholders) AND (t.assigned_to = 0 OR t.assigned_to IS NULL))
+                )";
+                foreach ($directDeptIds as $dId) { $params[] = $dId; }
+                foreach ($directDeptIds as $dId) { $params[] = $dId; }
+            } elseif (!empty($deptFilter)) {
+                $sql .= " AND (t.department_id = ? OR e.department_id = ?)";
+                $params[] = (int)$deptFilter;
+                $params[] = (int)$deptFilter;
             }
 
             if ($empFilter) {
@@ -129,18 +130,22 @@ switch ($action) {
 
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
-            $tasks = $stmt->fetchAll();
+            $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } else {
-            // Employee view: ONLY tasks assigned to this employee (from any HOD / department)
+            // Employee view: ONLY tasks assigned to this employee (from any HOD / department across the organization)
             $sql = "
                 SELECT t.*, 
                        COALESCE(e.name, 'Unassigned') as employee_name,
                        COALESCE(e.emp_code, t.emp_code, '') as employee_code,
+                       COALESCE(edep.name, 'General') as employee_dept_name,
                        COALESCE(a.name, 'Admin') as assigner_name,
+                       COALESCE(adep.name, 'Management') as assigner_dept_name,
                        COALESCE(d.name, t.department, 'Production') as department_name
                 FROM tasks t
                 LEFT JOIN employees e ON t.assigned_to = e.id
+                LEFT JOIN departments edep ON e.department_id = edep.id
                 LEFT JOIN employees a ON t.assigned_by = a.id
+                LEFT JOIN departments adep ON a.department_id = adep.id
                 LEFT JOIN departments d ON t.department_id = d.id
                 WHERE t.assigned_to = ?
             ";
@@ -154,7 +159,7 @@ switch ($action) {
 
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
-            $tasks = $stmt->fetchAll();
+            $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         echo json_encode(['success' => true, 'tasks' => $tasks]);
@@ -188,36 +193,22 @@ switch ($action) {
         $checkEmp = $pdo->prepare("SELECT department_id, emp_code FROM employees WHERE id = ?");
         $checkEmp->execute([$assignedTo]);
         $empInfo = $checkEmp->fetch(PDO::FETCH_ASSOC);
+        if (!$empInfo) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Selected employee was not found.']);
+            exit;
+        }
         $targetDeptId = (int)($empInfo['department_id'] ?? 0);
         $empCode = $empInfo['emp_code'] ?? '';
 
-        // Check if HOD is authorized to assign tasks to this employee (either primary dept or shared resource)
-        if (!$isSuperAdmin) {
-            $isDirectDept = in_array($targetDeptId, $directDeptIds, true);
-            $isSharedDept = false;
-
-            if (!$isDirectDept && !empty($directDeptIds)) {
-                $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
-                $stmtShared = $pdo->prepare("SELECT 1 FROM employee_departments WHERE employee_id = ? AND department_id IN ($placeholders) AND can_receive_tasks = 1 LIMIT 1");
-                $checkParams = array_merge([$assignedTo], $directDeptIds);
-                $stmtShared->execute($checkParams);
-                $isSharedDept = (bool)$stmtShared->fetchColumn();
-            }
-
-            if (!$isDirectDept && !$isSharedDept) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'message' => 'You can only assign tasks to employees within your managed departments or staff shared with your department.']);
-                exit;
-            }
-        }
-
-        // Determine department for this task:
-        // - For Super Admin: task belongs to target employee's department (or explicitly passed department_id)
-        // - For HOD: task belongs strictly to the assigning HOD's own department
-        if ($isSuperAdmin) {
-            $taskDeptId = !empty($data['department_id']) ? (int)$data['department_id'] : ($targetDeptId > 0 ? $targetDeptId : ($userDeptId > 0 ? $userDeptId : 1));
+        // Company-wide cross-department task assignment:
+        // Any authorized assigner can assign tasks to any employee across the entire organization.
+        // By default, task belongs to the assigning department (e.g. Digital HOD requests a graphic from Creative Designer),
+        // or to the explicitly selected department.
+        if (!empty($data['department_id'])) {
+            $taskDeptId = (int)$data['department_id'];
         } else {
-            $taskDeptId = $userDeptId > 0 ? $userDeptId : (!empty($directDeptIds) ? $directDeptIds[0] : $targetDeptId);
+            $taskDeptId = $userDeptId > 0 ? $userDeptId : (!empty($directDeptIds) ? $directDeptIds[0] : ($targetDeptId > 0 ? $targetDeptId : 1));
         }
 
         $stmtDeptName = $pdo->prepare("SELECT name FROM departments WHERE id = ?");

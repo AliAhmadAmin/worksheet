@@ -22,13 +22,23 @@
                             <option value="completed">✅ Completed</option>
                         </select>
 
+                        <!-- Scope Selector Pills: My Team vs Other Departments -->
+                        <div class="admin-only" id="task-scope-toggle-group" style="display: inline-flex; background: var(--bg-card-elevated); padding: 3px; border-radius: var(--radius-md); border: 1px solid var(--border-color); gap: 2px;">
+                            <button type="button" id="btn-task-scope-my-team" class="btn btn-sm btn-primary" onclick="switchTaskScope('my_dept')" style="padding: 5px 12px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); border: none;" title="All tasks belonging to your team members">
+                                👥 My Team
+                            </button>
+                            <button type="button" id="btn-task-scope-others" class="btn btn-sm btn-outline" onclick="switchTaskScope('others')" style="padding: 5px 12px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); border: none;" title="Tasks you assigned to members outside your team (Other departments)">
+                                📤 Assigned to Others
+                            </button>
+                        </div>
+
                         <!-- View Toggle: Team Members vs All Tasks -->
                         <div class="admin-only" style="display: inline-flex; background: var(--bg-card-elevated); padding: 3px; border-radius: var(--radius-md); border: 1px solid var(--border-color); gap: 2px;">
                             <button type="button" id="btn-tasks-view-team" class="btn btn-sm btn-primary" onclick="switchTasksView('team')" style="padding: 5px 12px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); border: none;">
-                                👥 By Team Member
+                                👥 By Member
                             </button>
                             <button type="button" id="btn-tasks-view-list" class="btn btn-sm btn-outline" onclick="switchTasksView('list')" style="padding: 5px 12px; font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); border: none;">
-                                📋 All Tasks
+                                📋 Task List
                             </button>
                         </div>
 

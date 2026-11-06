@@ -4,9 +4,35 @@
 
 const TaskState = {
     currentView: 'team', // 'team' or 'list'
+    currentScope: 'my_dept', // 'my_dept', 'assigned_by_me', 'all'
     currentPersonId: null,
-    searchQuery: ''
+    searchQuery: '',
+    assignableEmployees: []
 };
+
+function switchTaskScope(scope) {
+    TaskState.currentScope = scope;
+    const btnMyTeam = document.getElementById('btn-task-scope-my-team');
+    const btnOthers = document.getElementById('btn-task-scope-others');
+
+    const buttons = [
+        { el: btnMyTeam, id: 'my_dept' },
+        { el: btnOthers, id: 'others' }
+    ];
+
+    buttons.forEach(b => {
+        if (!b.el) return;
+        if (b.id === scope) {
+            b.el.className = 'btn btn-sm btn-primary';
+            b.el.style.border = 'none';
+        } else {
+            b.el.className = 'btn btn-sm btn-outline';
+            b.el.style.border = 'none';
+        }
+    });
+
+    loadAssignedTasks();
+}
 
 function formatTaskDateTime(dateStr) {
     if (!dateStr) return null;
@@ -175,8 +201,9 @@ async function loadAssignedTasks() {
 
     const statusFilter = document.getElementById('task-filter-status')?.value || '';
     const empFilter = document.getElementById('task-filter-emp')?.value || '';
+    const scopeVal = TaskState.currentScope || 'my_dept';
 
-    let url = 'api/tasks.php?action=get_tasks';
+    let url = `api/tasks.php?action=get_tasks&scope=${encodeURIComponent(scopeVal)}`;
     if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
     if (empFilter) url += `&employee_id=${encodeURIComponent(empFilter)}`;
 
@@ -374,20 +401,38 @@ function setEditDueDateToday() {
     if (input) input.value = formatDateToYMD(new Date());
 }
 
+async function getAssignableEmployees() {
+    if (TaskState.assignableEmployees && TaskState.assignableEmployees.length > 0) {
+        return TaskState.assignableEmployees;
+    }
+    try {
+        const res = await fetch('api/tasks.php?action=get_assignable_employees');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.employees)) {
+            TaskState.assignableEmployees = data.employees;
+            return TaskState.assignableEmployees;
+        }
+    } catch (e) {
+        console.error("Error loading assignable employees:", e);
+    }
+    return AppState.employees || [];
+}
+
 // Searchable Employee Dropdown for Assign Task Modal
 function renderAssignTaskEmpDropdownList(employees) {
     const list = document.getElementById('assign-task-emp-dropdown-list');
     if (!list) return;
 
+    const empSource = employees || TaskState.assignableEmployees || AppState.employees || [];
     list.innerHTML = '';
-    if (!employees || employees.length === 0) {
+    if (!empSource || empSource.length === 0) {
         list.innerHTML = '<div style="padding: 10px; text-align: center; color: var(--text-muted); font-size: 12px;">No employee found</div>';
         return;
     }
 
     const currentVal = document.getElementById('assign-task-emp-select')?.value;
 
-    employees.forEach(emp => {
+    empSource.forEach(emp => {
         const isSelected = currentVal == emp.id;
         const item = document.createElement('div');
         item.className = `searchable-emp-item ${isSelected ? 'selected' : ''}`;
@@ -404,9 +449,8 @@ function renderAssignTaskEmpDropdownList(employees) {
             ? `<span style="display: inline-block; background: rgba(59, 130, 246, 0.12); color: var(--primary); font-family: monospace; font-size: 10.5px; padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: 6px;">${escapeHtml(codeVal)}</span>` 
             : '';
 
-        const sharedBadge = emp.is_shared_resource 
-            ? `<span style="display: inline-block; background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700; margin-left: 6px;">🏷️ Shared (${escapeHtml(emp.department_name || 'Cross-Dept')})</span>` 
-            : '';
+        const deptName = emp.department_name || emp.team_name || 'General';
+        const deptBadge = `<span style="display: inline-block; background: rgba(59, 130, 246, 0.1); color: var(--primary); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700; margin-left: 6px; text-transform: uppercase;">🏢 ${escapeHtml(deptName)}</span>`;
 
         item.innerHTML = `
             ${avatarHtml}
@@ -414,9 +458,9 @@ function renderAssignTaskEmpDropdownList(employees) {
                 <div style="color: var(--text-main); line-height: 1.2; display: flex; align-items: center; flex-wrap: wrap;">
                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(emp.name)}</span>
                     ${empCodeBadge}
-                    ${sharedBadge}
+                    ${deptBadge}
                 </div>
-                <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${escapeHtml(emp.designation || 'Staff')} • ${escapeHtml(emp.team_name || emp.department_name || 'Team')}</div>
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 2px;">${escapeHtml(emp.designation || 'Staff')}</div>
             </div>
             ${isSelected ? '<span style="color: var(--primary); font-size: 12px; font-weight: 800;">✓</span>' : ''}
         `;
@@ -426,21 +470,22 @@ function renderAssignTaskEmpDropdownList(employees) {
 
 function filterAssignTaskEmpDropdown(query) {
     const q = (query || '').trim().toLowerCase();
+    const source = (TaskState.assignableEmployees && TaskState.assignableEmployees.length > 0)
+        ? TaskState.assignableEmployees 
+        : (AppState.employees || []);
+
     if (!q) {
-        renderAssignTaskEmpDropdownList(AppState.employees);
+        renderAssignTaskEmpDropdownList(source);
         return;
     }
-    const filtered = (AppState.employees || []).filter(emp => {
+    const filtered = source.filter(emp => {
         const code = (emp.emp_code || emp.employee_code || '').toLowerCase();
-        const isSharedMatch = emp.is_shared_resource && ('shared'.includes(q) || 'cross'.includes(q));
-        return emp.name.toLowerCase().includes(q) || 
+        return (emp.name && emp.name.toLowerCase().includes(q)) || 
             code.includes(q) ||
-            isSharedMatch ||
             (emp.designation && emp.designation.toLowerCase().includes(q)) ||
+            (emp.department_name && emp.department_name.toLowerCase().includes(q)) ||
             (emp.email && emp.email.toLowerCase().includes(q)) ||
-            (emp.phone && emp.phone.includes(q)) ||
-            (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
-            (emp.department_name && emp.department_name.toLowerCase().includes(q));
+            (emp.phone && emp.phone.includes(q));
     });
     renderAssignTaskEmpDropdownList(filtered);
 }
@@ -455,11 +500,13 @@ function toggleAssignTaskEmpDropdown() {
         menu.style.display = 'none';
     } else {
         menu.style.display = 'block';
-        if (input) {
-            input.value = '';
-            filterAssignTaskEmpDropdown('');
-            setTimeout(() => input.focus(), 60);
-        }
+        getAssignableEmployees().then(employees => {
+            renderAssignTaskEmpDropdownList(employees);
+            if (input) {
+                input.value = '';
+                setTimeout(() => input.focus(), 60);
+            }
+        });
     }
 }
 
@@ -470,12 +517,15 @@ function selectAssignTaskEmpFromDropdown(empId) {
     const hiddenInput = document.getElementById('assign-task-emp-select');
     if (hiddenInput) hiddenInput.value = empId;
 
-    const emp = (AppState.employees || []).find(e => e.id == empId);
+    const source = (TaskState.assignableEmployees && TaskState.assignableEmployees.length > 0) 
+        ? TaskState.assignableEmployees 
+        : (AppState.employees || []);
+    const emp = source.find(e => e.id == empId);
     const labelSpan = document.getElementById('assign-task-emp-selected-name');
     const avatarBox = document.getElementById('assign-task-emp-avatar');
 
     if (labelSpan && emp) {
-        labelSpan.textContent = emp.name + (emp.is_shared_resource ? ` [Shared from ${emp.department_name || 'Other'}]` : '');
+        labelSpan.textContent = emp.name + (emp.department_name ? ` (${emp.department_name})` : '');
     }
 
     if (avatarBox && emp) {
@@ -487,7 +537,7 @@ function selectAssignTaskEmpFromDropdown(empId) {
         }
     }
 
-    renderAssignTaskEmpDropdownList(AppState.employees);
+    renderAssignTaskEmpDropdownList(source);
 }
 
 // Searchable Employee Dropdown for Edit Task Modal
@@ -588,9 +638,10 @@ function selectEditTaskEmpFromDropdown(empId) {
 }
 
 // Admin Task Creation Modal & Actions
-function openAssignTaskModal(preSelectedEmpId = null) {
+async function openAssignTaskModal(preSelectedEmpId = null) {
+    const employees = await getAssignableEmployees();
     // Default to pre-selected employee or the currently inspected admin employee or the first available employee
-    const defaultEmpId = preSelectedEmpId || AppState.adminSelectedEmpId || (AppState.employees && AppState.employees[0] ? AppState.employees[0].id : '');
+    const defaultEmpId = preSelectedEmpId || AppState.adminSelectedEmpId || (employees && employees[0] ? employees[0].id : '');
     
     const hiddenInput = document.getElementById('assign-task-emp-select');
     if (hiddenInput) hiddenInput.value = defaultEmpId;
@@ -616,7 +667,7 @@ function openAssignTaskModal(preSelectedEmpId = null) {
         if (avatarBox) avatarBox.innerHTML = '👤';
     }
 
-    renderAssignTaskEmpDropdownList(AppState.employees);
+    renderAssignTaskEmpDropdownList(employees);
     clearTaskImageScan();
     openModal('assign-task-modal');
 }
@@ -864,30 +915,30 @@ function renderTeamTaskDashboard(tasks) {
 
     tbody.innerHTML = '';
 
-    // Merge AppState.employees with any employee found in tasks
+    // Merge relevant employees based on active scope
     const empMap = new Map();
-    (AppState.employees || []).forEach(e => {
-        empMap.set(String(e.id), { ...e });
-    });
-
-    // For HODs, strictly display their own team members and assigned shared resources.
-    // Unmanaged employees from other departments are never injected into an HOD's team dashboard.
-    const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
-    if (!isHod) {
-        (tasks || []).forEach(t => {
-            if (t.assigned_to && !empMap.has(String(t.assigned_to))) {
-                empMap.set(String(t.assigned_to), {
-                    id: t.assigned_to,
-                    name: t.employee_name || 'Staff Member',
-                    designation: t.employee_designation || 'Staff',
-                    emp_code: t.employee_code || '',
-                    department_name: t.employee_dept_name || t.department_name || 'General',
-                    avatar: null,
-                    is_shared_resource: false
-                });
+    if (TaskState.currentScope === 'my_dept') {
+        (AppState.employees || []).forEach(e => {
+            // My Team strictly includes direct departmental staff (not external shared resources)
+            if (!e.is_shared_resource) {
+                empMap.set(String(e.id), { ...e });
             }
         });
     }
+
+    (tasks || []).forEach(t => {
+        if (t.assigned_to && !empMap.has(String(t.assigned_to))) {
+            empMap.set(String(t.assigned_to), {
+                id: t.assigned_to,
+                name: t.employee_name || 'Staff Member',
+                designation: t.employee_designation || 'Staff',
+                emp_code: t.employee_code || '',
+                department_name: t.employee_dept_name || t.department_name || 'General',
+                avatar: null,
+                is_shared_resource: false
+            });
+        }
+    });
 
     let empList = Array.from(empMap.values());
     const statusFilter = document.getElementById('task-filter-status')?.value || '';
@@ -909,6 +960,9 @@ function renderTeamTaskDashboard(tasks) {
             activeCount: pending + progress
         };
     });
+
+    // Only show team members who currently have assigned tasks (exclude members with 0 tasks)
+    empList = empList.filter(e => e.totalCount > 0);
 
     // Filter by status if set
     if (statusFilter === 'pending') {
@@ -1035,7 +1089,10 @@ function refreshPersonTasksModal(empId) {
 
     if (!tbody) return;
 
-    const emp = (AppState.employees || []).find(e => e.id == empId) || {
+    const allEmps = (TaskState.assignableEmployees && TaskState.assignableEmployees.length > 0)
+        ? TaskState.assignableEmployees 
+        : (AppState.employees || []);
+    const emp = allEmps.find(e => e.id == empId) || {
         id: empId,
         name: 'Employee',
         designation: 'Staff',
@@ -1196,14 +1253,19 @@ function renderAdminTaskList(tasks) {
             ? `<span title="${escapeHtml(t.whatsapp_status || 'Sent via WhatsApp')}" style="color: #10b981; font-size: 10px; font-weight: 700; background: rgba(16, 185, 129, 0.1); padding: 1px 5px; border-radius: 3px; display: inline-flex; align-items: center; gap: 3px;">💬 Sent</span>`
             : `<button type="button" onclick="event.stopPropagation(); resendTaskWhatsApp(${t.id})" class="btn btn-outline" style="padding: 1px 6px; font-size: 9.5px; border-color: rgba(16, 185, 129, 0.4); color: #10b981; border-radius: 3px;" title="Send WhatsApp notification now">💬 Send WA</button>`;
 
-        const deptBadge = t.department_name 
-            ? `<span style="display: inline-block; background: rgba(59, 130, 246, 0.1); color: var(--primary); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px;">🏢 ${escapeHtml(t.department_name)}</span>` 
+        const empDeptBadge = t.employee_dept_name 
+            ? `<span style="display: inline-block; background: rgba(59, 130, 246, 0.1); color: var(--primary); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; text-transform: uppercase;">🏢 ${escapeHtml(t.employee_dept_name)}</span>` 
+            : '';
+
+        const assignerBadge = t.assigner_name
+            ? `<div style="font-size: 10.5px; color: var(--text-dim); margin-top: 3px;">By: <strong style="color: var(--text-muted);">${escapeHtml(t.assigner_name)}</strong> <span style="opacity: 0.85;">(${escapeHtml(t.assigner_dept_name || t.department_name || 'Dept')})</span></div>`
             : '';
 
         tr.innerHTML = `
             <td>
-                <strong style="color: var(--text-main); font-size: 12.5px;">${escapeHtml(t.employee_name || 'Unassigned')}</strong>
-                ${deptBadge ? `<div style="margin-top: 3px;">${deptBadge}</div>` : ''}
+                <div style="font-weight: 700; color: var(--text-main); font-size: 12.5px;">${escapeHtml(t.employee_name || 'Unassigned')}</div>
+                ${empDeptBadge ? `<div style="margin-top: 3px;">${empDeptBadge}</div>` : ''}
+                ${assignerBadge}
             </td>
             <td>
                 <div style="font-weight: 700; font-size: 13px; color: var(--primary); cursor: pointer; ${isCompleted ? 'text-decoration: line-through; opacity: 0.75;' : ''}" onclick="openViewTaskModal(${t.id})" title="Click to view complete details">
