@@ -21,13 +21,25 @@
                 <!-- SUBVIEW 1: STAFF DIRECTORY -->
                 <div id="emp-subview-directory">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                        <!-- Left: Search Box -->
-                        <div style="position: relative; flex: 1; min-width: 220px; max-width: 320px;">
-                            <input type="text" id="emp-dir-search" class="input-control" placeholder="🔍 Search name, email, role..." style="width: 100%; padding: 7px 12px; font-size: 12.5px; border-radius: var(--radius-md);" oninput="applyDirectoryFilters()">
+                        <!-- Left: Search Box & Headcount Breakdown -->
+                        <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 260px;">
+                            <div style="position: relative; flex: 1; min-width: 180px; max-width: 300px;">
+                                <input type="text" id="emp-dir-search" class="input-control" placeholder="🔍 Search name, email, role..." style="width: 100%; padding: 7px 12px; font-size: 12.5px; border-radius: var(--radius-md);" oninput="applyDirectoryFilters()">
+                            </div>
+                            <div id="emp-dir-headcount-chip" style="font-size: 12px; font-weight: 700; background: var(--bg-card); padding: 6px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); white-space: nowrap; display: none;">
+                                <!-- Populated dynamically (e.g. 💼 19 Regular | 🎓 3 Internees) -->
+                            </div>
                         </div>
 
                         <!-- Right: Compact Filter Dropdowns & Reset -->
                         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                            <select id="emp-dir-filter-type" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); border-color: rgba(147, 51, 234, 0.35); color: #7c3aed;" onchange="applyDirectoryFilters()">
+                                <option value="all">👥 All Personnel</option>
+                                <option value="regular">💼 Regular Staff Only</option>
+                                <option value="internship">🎓 Internees / Trainees</option>
+                                <option value="contract">📄 Contractual Staff</option>
+                                <option value="probation">⏳ Probationary Staff</option>
+                            </select>
                             <select id="emp-dir-filter-dept" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyDirectoryFilters()">
                                 <option value="">🏢 All Departments</option>
                             </select>
@@ -41,7 +53,9 @@
                             <select id="emp-dir-filter-status" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyDirectoryFilters()">
                                 <option value="active">🟢 Active Staff</option>
                                 <option value="inactive">⛔ Deactivated</option>
-                                <option value="all">🌐 All Status</option>
+                                <option value="deleted">🗑️ Deleted / Archived Staff</option>
+                                <option value="all">👥 All Staff (Active & Deactivated)</option>
+                                <option value="all_with_deleted">🌐 Everything (Including Deleted)</option>
                             </select>
 
                             <select id="emp-dir-filter-login" class="input-control" style="width: auto; padding: 7px 11px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyDirectoryFilters()">

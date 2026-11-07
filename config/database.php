@@ -829,8 +829,10 @@ function ensureDepartmentAndTeamsSchema($pdo) {
             }
         } catch (Exception $e) {}
 
-        // Allow staff without login accounts
+        // Allow staff without login accounts & distinguish employment types (Regular vs Internees)
         try { $pdo->exec("ALTER TABLE employees ADD COLUMN can_login TINYINT DEFAULT 1"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees ADD COLUMN employment_type VARCHAR(50) DEFAULT 'full_time'"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE employees ADD COLUMN deleted_at DATETIME NULL DEFAULT NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE employees MODIFY COLUMN email VARCHAR(191) NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE employees MODIFY COLUMN password_hash VARCHAR(255) NULL"); } catch (Exception $e) {}
 

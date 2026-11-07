@@ -45,15 +45,23 @@ switch ($action) {
         $requestedDeptId = isset($_GET['department_id']) ? (int)$_GET['department_id'] : null;
         $statusFilter = $_GET['status'] ?? null;
         $includeInactive = isset($_GET['include_inactive']) && ($_GET['include_inactive'] === '1' || $_GET['include_inactive'] === 'true');
+        $includeDeleted = isset($_GET['include_deleted']) && ($_GET['include_deleted'] === '1' || $_GET['include_deleted'] === 'true');
 
         $whereClauses = [];
         $params = [];
 
-        if (!$includeInactive && $statusFilter !== 'all') {
-            if ($statusFilter === 'inactive') {
-                $whereClauses[] = "e.is_active = 0";
-            } else {
-                $whereClauses[] = "e.is_active = 1";
+        if ($statusFilter === 'deleted') {
+            $whereClauses[] = "e.deleted_at IS NOT NULL";
+        } else {
+            if (!$includeDeleted && $statusFilter !== 'all_with_deleted') {
+                $whereClauses[] = "e.deleted_at IS NULL";
+            }
+            if (!$includeInactive && $statusFilter !== 'all' && $statusFilter !== 'all_with_deleted') {
+                if ($statusFilter === 'inactive') {
+                    $whereClauses[] = "e.is_active = 0";
+                } else {
+                    $whereClauses[] = "e.is_active = 1";
+                }
             }
         }
 
@@ -90,6 +98,12 @@ switch ($action) {
 
         $stmt = $pdo->prepare("
             SELECT e.*,
+                   CASE 
+                       WHEN e.employment_type IS NOT NULL AND e.employment_type != '' THEN e.employment_type
+                       WHEN p.employment_type IS NOT NULL AND p.employment_type != '' THEN p.employment_type
+                       WHEN e.designation LIKE '%intern%' OR e.designation LIKE '%trainee%' THEN 'internship'
+                       ELSE 'full_time'
+                   END as employment_type,
                    COALESCE(e.shift_policy, p.shift_policy, 'fixed') as shift_policy,
                    COALESCE(e.late_grace_minutes, 15) as late_grace_minutes,
                    p.emp_code, p.father_husband_name, p.cnic_no, p.bank_name, p.bank_account_no, p.fixed_allowance,
@@ -341,8 +355,23 @@ switch ($action) {
         $basicSalary = isset($data['basic_salary']) ? (float)$data['basic_salary'] : 0.0;
         $joiningDate = !empty($data['joining_date']) ? $data['joining_date'] : date('Y-m-d');
         $annualQuota = isset($data['annual_leave_quota']) ? (int)$data['annual_leave_quota'] : 14;
+        $annualQuota = isset($data['annual_leave_quota']) ? (int)$data['annual_leave_quota'] : 14;
         $casualQuota = isset($data['casual_leave_quota']) ? (int)$data['casual_leave_quota'] : 10;
         $sickQuota = isset($data['sick_leave_quota']) ? (int)$data['sick_leave_quota'] : 8;
+
+        $employmentType = trim($data['employment_type'] ?? '');
+        if (empty($employmentType)) {
+            if (stripos($designation, 'intern') !== false || stripos($designation, 'trainee') !== false) {
+                $employmentType = 'internship';
+            } else {
+                $employmentType = 'full_time';
+            }
+        }
+        if ($employmentType === 'internship') {
+            if (!isset($data['annual_leave_quota'])) $annualQuota = 0;
+            if (!isset($data['casual_leave_quota'])) $casualQuota = 0;
+            if (!isset($data['sick_leave_quota'])) $sickQuota = 0;
+        }
 
         if (empty($name)) {
             http_response_code(400);
@@ -389,8 +418,8 @@ switch ($action) {
         $lateGraceMinutes = isset($data['late_grace_minutes']) ? max(0, (int)$data['late_grace_minutes']) : 15;
 
         $passwordHash = $canLogin ? password_hash($password, PASSWORD_DEFAULT) : null;
-        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, can_login, is_active, phone, whatsapp_number, emp_code, shift_timing, weekly_off, shift_policy, late_grace_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes]);
+        $stmt = $pdo->prepare("INSERT INTO employees (name, email, password_hash, role, designation, department_id, team_id, avatar, can_login, is_active, phone, whatsapp_number, emp_code, shift_timing, weekly_off, shift_policy, late_grace_minutes, employment_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $email, $passwordHash, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $employmentType]);
         $newEmpId = $pdo->lastInsertId();
 
         // Default employee code if empty
@@ -412,10 +441,10 @@ switch ($action) {
 
         // Create initial HR profile
         $stmtProf = $pdo->prepare("
-            INSERT INTO hr_employee_profiles (employee_id, emp_code, phone, whatsapp_number, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hr_employee_profiles (employee_id, emp_code, phone, whatsapp_number, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota, employment_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmtProf->execute([$newEmpId, $empCode, $phone, $phone, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
+        $stmtProf->execute([$newEmpId, $empCode, $phone, $phone, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota, $employmentType]);
 
         // Auto-sync into active monthly duty roster
         if ($deptId) {
@@ -601,8 +630,23 @@ switch ($action) {
         $basicSalary = isset($data['basic_salary']) ? (float)$data['basic_salary'] : 0.0;
         $joiningDate = !empty($data['joining_date']) ? $data['joining_date'] : null;
         $annualQuota = isset($data['annual_leave_quota']) ? (int)$data['annual_leave_quota'] : 14;
+        $annualQuota = isset($data['annual_leave_quota']) ? (int)$data['annual_leave_quota'] : 14;
         $casualQuota = isset($data['casual_leave_quota']) ? (int)$data['casual_leave_quota'] : 10;
         $sickQuota = isset($data['sick_leave_quota']) ? (int)$data['sick_leave_quota'] : 8;
+
+        $employmentType = trim($data['employment_type'] ?? '');
+        if (empty($employmentType)) {
+            if (stripos($designation, 'intern') !== false || stripos($designation, 'trainee') !== false) {
+                $employmentType = 'internship';
+            } else {
+                $employmentType = 'full_time';
+            }
+        }
+        if ($employmentType === 'internship') {
+            if (!isset($data['annual_leave_quota'])) $annualQuota = 0;
+            if (!isset($data['casual_leave_quota'])) $casualQuota = 0;
+            if (!isset($data['sick_leave_quota'])) $sickQuota = 0;
+        }
 
         if (!$id || empty($name)) {
             http_response_code(400);
@@ -654,14 +698,14 @@ switch ($action) {
         $lateGraceMinutes = isset($data['late_grace_minutes']) ? max(0, (int)$data['late_grace_minutes']) : 15;
 
         if ($avatar === '__REMOVE__') {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = NULL, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off), shift_policy = ?, late_grace_minutes = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = NULL, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off), shift_policy = ?, late_grace_minutes = ?, employment_type = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $employmentType, $id]);
         } elseif (!empty($avatar)) {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off), shift_policy = ?, late_grace_minutes = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, avatar = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off), shift_policy = ?, late_grace_minutes = ?, employment_type = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $avatar, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $employmentType, $id]);
         } else {
-            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off), shift_policy = ?, late_grace_minutes = ? WHERE id = ?");
-            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $id]);
+            $stmt = $pdo->prepare("UPDATE employees SET name = ?, email = ?, role = ?, designation = ?, department_id = ?, team_id = ?, can_login = ?, is_active = ?, phone = ?, whatsapp_number = ?, emp_code = ?, shift_timing = COALESCE(NULLIF(?, ''), shift_timing), weekly_off = COALESCE(NULLIF(?, ''), weekly_off), shift_policy = ?, late_grace_minutes = ?, employment_type = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $role, $designation, $deptId, $teamId, $canLogin, $isActive, $phone, $phone, $empCode, $shiftTiming, $weeklyOff, $shiftPolicy, $lateGraceMinutes, $employmentType, $id]);
         }
 
         // Update password if specified
@@ -688,8 +732,8 @@ switch ($action) {
 
         // Update / Insert into hr_employee_profiles
         $stmtProf = $pdo->prepare("
-            INSERT INTO hr_employee_profiles (employee_id, emp_code, phone, whatsapp_number, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hr_employee_profiles (employee_id, emp_code, phone, whatsapp_number, father_husband_name, cnic_no, bank_name, bank_account_no, fixed_allowance, basic_salary, expected_hours, shift_policy, joining_date, annual_leave_quota, casual_leave_quota, sick_leave_quota, employment_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 emp_code = VALUES(emp_code),
                 phone = VALUES(phone),
@@ -705,9 +749,10 @@ switch ($action) {
                 joining_date = COALESCE(VALUES(joining_date), joining_date),
                 annual_leave_quota = VALUES(annual_leave_quota),
                 casual_leave_quota = VALUES(casual_leave_quota),
-                sick_leave_quota = VALUES(sick_leave_quota)
+                sick_leave_quota = VALUES(sick_leave_quota),
+                employment_type = VALUES(employment_type)
         ");
-        $stmtProf->execute([$id, $empCode, $phone, $phone, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota]);
+        $stmtProf->execute([$id, $empCode, $phone, $phone, $fatherHusbandName, $cnicNo, $bankName, $bankAccountNo, $fixedAllowance, $basicSalary, $expectedHours, $shiftPolicy, $joiningDate, $annualQuota, $casualQuota, $sickQuota, $employmentType]);
 
         // Sync shared departments for cross-department task assignments
         if (isset($data['shared_department_ids']) && is_array($data['shared_department_ids'])) {
@@ -1105,10 +1150,9 @@ switch ($action) {
         break;
 
     case 'delete_employee':
-    case 'delete_employee_permanent':
-        if (!$canManageEmp && !$isSuperAdmin) {
+        if (!$canManageEmp && !$isSuperAdmin && !$isHod) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Super Admin or HR authorization required.']);
+            echo json_encode(['success' => false, 'message' => 'Super Admin, HR, or HOD authorization required.']);
             exit;
         }
 
@@ -1120,7 +1164,7 @@ switch ($action) {
             exit;
         }
 
-        // Prevent admin from deleting themselves
+        // Prevent user from deleting themselves
         if (($_SESSION['user_id'] ?? 0) === $id) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'You cannot delete your own logged-in account.']);
@@ -1128,14 +1172,25 @@ switch ($action) {
         }
 
         // Fetch employee info first to verify
-        $stmtCheck = $pdo->prepare("SELECT id, name, role FROM employees WHERE id = ?");
+        $stmtCheck = $pdo->prepare("SELECT id, name, role, department_id FROM employees WHERE id = ?");
         $stmtCheck->execute([$id]);
         $empToDelete = $stmtCheck->fetch();
 
         if (!$empToDelete) {
             http_response_code(404);
-            echo json_encode(['success' => false, 'message' => 'Employee not found or already deleted.']);
+            echo json_encode(['success' => false, 'message' => 'Employee not found.']);
             exit;
+        }
+
+        // HOD restriction check
+        if ($isHod) {
+            $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+            $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
+            if (!in_array((int)$empToDelete['department_id'], $managedDeptIds, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access denied: You can only delete employees in your managed departments.']);
+                exit;
+            }
         }
 
         if ($empToDelete['role'] === 'super_admin' && !$isSuperAdmin) {
@@ -1144,20 +1199,106 @@ switch ($action) {
             exit;
         }
 
+        // SOFT DELETE: Preserve all historical worksheets, attendance, and tasks safely!
+        $stmtDel = $pdo->prepare("UPDATE employees SET deleted_at = NOW(), is_active = 0, can_login = 0 WHERE id = ?");
+        $stmtDel->execute([$id]);
+
+        // If they were HOD of any department, unassign them
+        try {
+            $pdo->prepare("UPDATE departments SET hod_id = NULL WHERE hod_id = ?")->execute([$id]);
+        } catch (Exception $e) {}
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Employee "' . $empToDelete['name'] . '" moved to Deleted / Archive. All historical records, worksheets, and attendance have been safely preserved and can be restored anytime.'
+        ]);
+        break;
+
+    case 'restore_employee':
+        if (!$canManageEmp && !$isSuperAdmin && !$isHod) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Super Admin, HR, or HOD authorization required.']);
+            exit;
+        }
+
+        $id = (int)($data['id'] ?? 0);
+
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Employee ID is required.']);
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id, name, role, department_id FROM employees WHERE id = ?");
+        $stmtCheck->execute([$id]);
+        $empToRestore = $stmtCheck->fetch();
+
+        if (!$empToRestore) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Employee not found.']);
+            exit;
+        }
+
+        if ($isHod) {
+            $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
+            $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
+            if (!in_array((int)$empToRestore['department_id'], $managedDeptIds, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Access denied: You can only restore employees in your managed departments.']);
+                exit;
+            }
+        }
+
+        // RESTORE: clear deleted_at, reactivate
+        $stmtRest = $pdo->prepare("UPDATE employees SET deleted_at = NULL, is_active = 1 WHERE id = ?");
+        $stmtRest->execute([$id]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Employee "' . $empToRestore['name'] . '" has been successfully restored to Active Staff!'
+        ]);
+        break;
+
+    case 'delete_employee_permanent':
+        if (!$isSuperAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Super Admin authorization required for permanent record purge.']);
+            exit;
+        }
+
+        $id = (int)($data['id'] ?? 0);
+
+        if (!$id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Employee ID is required.']);
+            exit;
+        }
+
+        if (($_SESSION['user_id'] ?? 0) === $id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'You cannot purge your own logged-in account.']);
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id, name, role FROM employees WHERE id = ?");
+        $stmtCheck->execute([$id]);
+        $empToDelete = $stmtCheck->fetch();
+
+        if (!$empToDelete) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Employee not found or already purged.']);
+            exit;
+        }
+
         $pdo->beginTransaction();
         try {
-            // Disable foreign key checks for clean cascading deletion of duplicate/unwanted records
             try { $pdo->exec("SET FOREIGN_KEY_CHECKS = 0"); } catch (Exception $e) {}
 
-            // 1. Clean up hierarchy references
             try { $pdo->prepare("UPDATE departments SET hod_id = NULL WHERE hod_id = ?")->execute([$id]); } catch (Exception $e) {}
-
-            // 2. Clean up task references
             try { $pdo->prepare("UPDATE tasks SET assigned_to = NULL WHERE assigned_to = ?")->execute([$id]); } catch (Exception $e) {}
             try { $pdo->prepare("UPDATE tasks SET created_by = NULL WHERE created_by = ?")->execute([$id]); } catch (Exception $e) {}
             try { $pdo->prepare("UPDATE tasks SET approved_by = NULL WHERE approved_by = ?")->execute([$id]); } catch (Exception $e) {}
 
-            // 3. Clean up sheet entries and daily sheets
             try {
                 $sheetStmt = $pdo->prepare("SELECT id FROM daily_sheets WHERE employee_id = ?");
                 $sheetStmt->execute([$id]);
@@ -1169,28 +1310,23 @@ switch ($action) {
                 $pdo->prepare("DELETE FROM daily_sheets WHERE employee_id = ?")->execute([$id]);
             } catch (Exception $e) {}
 
-            // 4. Clean up HR records
             try { $pdo->prepare("DELETE FROM hr_claims WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
             try { $pdo->prepare("DELETE FROM hr_fines WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
             try { $pdo->prepare("DELETE FROM hr_loans WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
             try { $pdo->prepare("DELETE FROM hr_leaves WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
             try { $pdo->prepare("DELETE FROM hr_payroll WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
             try { $pdo->prepare("DELETE FROM hr_employee_profiles WHERE employee_id = ?")->execute([$id]); } catch (Exception $e) {}
-
-            // 5. Clean up Dispatches
             try { $pdo->prepare("DELETE FROM programming_dispatches WHERE submitted_by = ?")->execute([$id]); } catch (Exception $e) {}
             try { $pdo->prepare("DELETE FROM newsroom_dispatches WHERE submitted_by = ?")->execute([$id]); } catch (Exception $e) {}
 
-            // 6. Delete Employee
             $pdo->prepare("DELETE FROM employees WHERE id = ?")->execute([$id]);
 
             try { $pdo->exec("SET FOREIGN_KEY_CHECKS = 1"); } catch (Exception $e) {}
-
             $pdo->commit();
 
             echo json_encode([
                 'success' => true,
-                'message' => 'Employee "' . $empToDelete['name'] . '" deleted permanently.'
+                'message' => 'Employee "' . $empToDelete['name'] . '" permanently purged.'
             ]);
         } catch (Exception $e) {
             if ($pdo->inTransaction()) {
@@ -1198,10 +1334,7 @@ switch ($action) {
             }
             try { $pdo->exec("SET FOREIGN_KEY_CHECKS = 1"); } catch (Exception $e2) {}
             http_response_code(500);
-            echo json_encode([
-                'success' => false,
-                'message' => 'Failed to delete employee: ' . $e->getMessage()
-            ]);
+            echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
         }
         break;
 

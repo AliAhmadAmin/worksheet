@@ -483,14 +483,23 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 <input type="text" id="add-emp-designation" class="input-control" placeholder="e.g. Content Creator, Video Editor">
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Department</label>
-                                <select id="add-emp-dept" class="input-control">
-                                    <option value="">-- Select Department --</option>
+                                <label class="form-label">Employment Type</label>
+                                <select id="add-emp-employment-type" class="input-control" style="font-weight: 600;" onchange="handleEmploymentTypeChange('add', this.value)">
+                                    <option value="full_time" selected>💼 Regular Employee (Full-Time)</option>
+                                    <option value="internship">🎓 Internee / Trainee</option>
+                                    <option value="contract">📄 Contractual Staff</option>
+                                    <option value="probation">⏳ Probationary Staff</option>
                                 </select>
                             </div>
                         </div>
 
                         <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Department</label>
+                                <select id="add-emp-dept" class="input-control">
+                                    <option value="">-- Select Department --</option>
+                                </select>
+                            </div>
                             <div class="form-group">
                                 <label class="form-label">Assigned Team</label>
                                 <select id="add-emp-team" class="input-control">
@@ -499,6 +508,9 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 </select>
                                 <small style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; display: block;">Optional: HOD will assign team.</small>
                             </div>
+                        </div>
+
+                        <div class="form-grid-2">
                             <div class="form-group">
                                 <label class="form-label">Expected Shift / Duty Hours</label>
                                 <select id="add-emp-shift-hours" class="input-control" style="font-weight: 700; color: var(--primary);">
@@ -511,9 +523,6 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                     <option value="0.0">🌐 Flexible / Open Shift (No fixed hours)</option>
                                 </select>
                             </div>
-                        </div>
-
-                        <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">⏱️ Shift Timing (Roster Hours)</label>
                                 <select id="add-emp-shift-timing-select" class="input-control" style="font-weight: 600;" onchange="handleShiftTimingPresetChange('add')">
@@ -544,6 +553,9 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 <input type="hidden" id="add-emp-shift-timing" value="10:00 AM TO 6:00 PM">
                                 <small style="font-size: 10px; color: var(--text-muted);">Standardized shift timing for attendance & roster sync</small>
                             </div>
+                        </div>
+
+                        <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">🏖️ Weekly Off Day</label>
                                 <select id="add-emp-weekly-off" class="input-control" style="font-weight: 600;">
@@ -560,9 +572,6 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 </select>
                                 <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
                             </div>
-                        </div>
-
-                        <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">🕒 Attendance & Late Policy</label>
                                 <select id="add-emp-shift-policy" class="input-control" style="font-weight: 600;" onchange="handleShiftPolicyChange('add', this.value)">
@@ -572,6 +581,9 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 </select>
                                 <small style="font-size: 10px; color: var(--text-muted);">Flexible staff are exempt from late arrival tracking</small>
                             </div>
+                        </div>
+
+                        <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">⏱️ Late Grace Period (Minutes)</label>
                                 <input type="number" id="add-emp-late-grace" class="input-control" value="15" min="0" max="120" style="font-weight: 600;">
@@ -768,10 +780,30 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 <input type="text" id="edit-emp-designation" class="input-control" placeholder="e.g. Content Creator, Video Editor">
                             </div>
                             <div class="form-group">
+                                <label class="form-label">Employment Type</label>
+                                <select id="edit-emp-employment-type" class="input-control" style="font-weight: 600;" onchange="handleEmploymentTypeChange('edit', this.value)">
+                                    <option value="full_time">💼 Regular Employee (Full-Time)</option>
+                                    <option value="internship">🎓 Internee / Trainee</option>
+                                    <option value="contract">📄 Contractual Staff</option>
+                                    <option value="probation">⏳ Probationary Staff</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-grid-2">
+                            <div class="form-group">
                                 <label class="form-label">Primary (Home) Department</label>
                                 <select id="edit-emp-dept" class="input-control">
                                     <!-- Populated dynamically -->
                                 </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Assigned Team</label>
+                                <select id="edit-emp-team" class="input-control">
+                                    <option value="">-- Unassigned (To be assigned by HOD) --</option>
+                                    <!-- Populated dynamically -->
+                                </select>
+                                <small style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; display: block;">Optional: HOD can assign staff into teams.</small>
                             </div>
                         </div>
 
@@ -788,14 +820,6 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
 
                         <div class="form-grid-2">
                             <div class="form-group">
-                                <label class="form-label">Assigned Team</label>
-                                <select id="edit-emp-team" class="input-control">
-                                    <option value="">-- Unassigned (To be assigned by HOD) --</option>
-                                    <!-- Populated dynamically -->
-                                </select>
-                                <small style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; display: block;">Optional: HOD can assign staff into teams.</small>
-                            </div>
-                            <div class="form-group">
                                 <label class="form-label">Expected Shift / Duty Hours</label>
                                 <select id="edit-emp-shift-hours" class="input-control" style="font-weight: 700; color: var(--primary);">
                                     <option value="8.0">⏱️ 8.0 Hours / Day (Standard Shift)</option>
@@ -807,9 +831,6 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                     <option value="0.0">🌐 Flexible / Open Shift (No fixed hours)</option>
                                 </select>
                             </div>
-                        </div>
-
-                        <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">⏱️ Shift Timing (Roster Hours)</label>
                                 <select id="edit-emp-shift-timing-select" class="input-control" style="font-weight: 600;" onchange="handleShiftTimingPresetChange('edit')">
@@ -840,6 +861,9 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 <input type="hidden" id="edit-emp-shift-timing" value="10:00 AM TO 6:00 PM">
                                 <small style="font-size: 10px; color: var(--text-muted);">Standardized shift timing for attendance & roster sync</small>
                             </div>
+                        </div>
+
+                        <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">🏖️ Weekly Off Day</label>
                                 <select id="edit-emp-weekly-off" class="input-control" style="font-weight: 600;">
@@ -856,9 +880,6 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 </select>
                                 <small style="font-size: 10px; color: var(--text-muted);">Syncs with Monthly Duty Roster</small>
                             </div>
-                        </div>
-
-                        <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">🕒 Attendance & Late Policy</label>
                                 <select id="edit-emp-shift-policy" class="input-control" style="font-weight: 600;" onchange="handleShiftPolicyChange('edit', this.value)">
@@ -868,6 +889,9 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 </select>
                                 <small style="font-size: 10px; color: var(--text-muted);">Flexible staff are exempt from late arrival tracking</small>
                             </div>
+                        </div>
+
+                        <div class="form-grid-2" style="margin-top: 10px;">
                             <div class="form-group">
                                 <label class="form-label">⏱️ Late Grace Period (Minutes)</label>
                                 <input type="number" id="edit-emp-late-grace" class="input-control" value="15" min="0" max="120" style="font-weight: 600;">
@@ -917,7 +941,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                     </div>
                 </div>
                 <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-                    <button type="button" class="btn btn-outline" style="color: #dc2626; border-color: rgba(220, 38, 38, 0.4); font-weight: 700; padding: 8px 14px;" onclick="handleDeleteEmployeeFromModal()" title="Permanently delete duplicate or unwanted employee">
+                    <button type="button" id="btn-modal-delete-emp" class="btn btn-outline" style="color: #dc2626; border-color: rgba(220, 38, 38, 0.4); font-weight: 700; padding: 8px 14px;" onclick="handleDeleteEmployeeFromModal()" title="Archive / Delete employee">
                         🗑️ Delete Employee
                     </button>
                     <div style="display: flex; gap: 8px;">

@@ -77,7 +77,7 @@ function renderEmployeeViewControls() {
 
 async function loadEmployeeDirectory() {
     try {
-        const res = await fetch('api/employees.php?action=list&include_inactive=1');
+        const res = await fetch('api/employees.php?action=list&include_inactive=1&include_deleted=1');
         const data = await res.json();
 
         if (!data.success) return;
@@ -155,12 +155,14 @@ function resetDirectoryFilters() {
     const teamSelect = document.getElementById('emp-dir-filter-team');
     const statusSelect = document.getElementById('emp-dir-filter-status');
     const loginSelect = document.getElementById('emp-dir-filter-login');
+    const typeSelect = document.getElementById('emp-dir-filter-type');
 
     if (searchInput) searchInput.value = '';
     if (deptSelect) deptSelect.value = '';
     if (teamSelect) teamSelect.value = '';
     if (statusSelect) statusSelect.value = 'active';
     if (loginSelect) loginSelect.value = '';
+    if (typeSelect) typeSelect.value = 'all';
 
     applyDirectoryFilters();
 }
@@ -170,25 +172,42 @@ function applyDirectoryFilters() {
     const teamStatus = document.getElementById('emp-dir-filter-team')?.value;
     const statusVal = document.getElementById('emp-dir-filter-status')?.value || 'active';
     const loginStatus = document.getElementById('emp-dir-filter-login')?.value;
+    const typeFilter = document.getElementById('emp-dir-filter-type')?.value || 'all';
     const search = (document.getElementById('emp-dir-search')?.value || '').toLowerCase().trim();
 
     // Toggle reset button visibility
     const resetBtn = document.getElementById('emp-dir-reset-filters-btn');
     if (resetBtn) {
-        const isFiltered = !!(deptId || teamStatus || (statusVal && statusVal !== 'active') || loginStatus || search);
+        const isFiltered = !!(deptId || teamStatus || (statusVal && statusVal !== 'active') || (typeFilter && typeFilter !== 'all') || loginStatus || search);
         resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
     }
 
     let list = AppState.employees || [];
 
     if (statusVal === 'active') {
-        list = list.filter(e => e.is_active != 0);
+        list = list.filter(e => !e.deleted_at && e.is_active != 0);
     } else if (statusVal === 'inactive') {
-        list = list.filter(e => e.is_active == 0);
+        list = list.filter(e => !e.deleted_at && e.is_active == 0);
+    } else if (statusVal === 'deleted') {
+        list = list.filter(e => !!e.deleted_at);
+    } else if (statusVal === 'all') {
+        list = list.filter(e => !e.deleted_at);
+    } else if (statusVal === 'all_with_deleted') {
+        // keep all
     }
 
     if (deptId) {
         list = list.filter(e => String(e.department_id) === String(deptId));
+    }
+
+    if (typeFilter === 'regular') {
+        list = list.filter(e => (e.employment_type || 'full_time') !== 'internship');
+    } else if (typeFilter === 'internship') {
+        list = list.filter(e => e.employment_type === 'internship');
+    } else if (typeFilter === 'contract') {
+        list = list.filter(e => e.employment_type === 'contract');
+    } else if (typeFilter === 'probation') {
+        list = list.filter(e => e.employment_type === 'probation');
     }
 
     if (teamStatus === 'unassigned') {
@@ -215,12 +234,29 @@ function applyDirectoryFilters() {
 
     // Sync top pill badge to match active staff in currently selected department
     const totalBadge = document.getElementById('emp-total-badge');
+    const inViewEmployees = deptId 
+        ? (AppState.employees || []).filter(e => String(e.department_id) === String(deptId)) 
+        : (AppState.employees || []);
+    const activeInView = inViewEmployees.filter(e => !e.deleted_at && e.is_active != 0);
+    const deletedInView = inViewEmployees.filter(e => !!e.deleted_at);
+
     if (totalBadge) {
-        const activeInView = (deptId 
-            ? (AppState.employees || []).filter(e => String(e.department_id) === String(deptId)) 
-            : (AppState.employees || [])
-        ).filter(e => e.is_active != 0);
         totalBadge.textContent = activeInView.length;
+    }
+
+    // Update dynamic headcount chip (e.g. 💼 19 Regular Staff • 🎓 3 Internees • 🗑️ 2 Deleted)
+    const headcountChip = document.getElementById('emp-dir-headcount-chip');
+    if (headcountChip) {
+        const regularCount = activeInView.filter(e => (e.employment_type || 'full_time') !== 'internship').length;
+        const internCount = activeInView.filter(e => e.employment_type === 'internship').length;
+        const deletedCount = deletedInView.length;
+        headcountChip.style.display = 'inline-flex';
+        let chipHtml = `<span style="color: var(--text-main); font-weight: 700;">💼 ${regularCount} Regular Staff</span>` +
+            (internCount > 0 ? `<span style="color: var(--text-muted); margin: 0 4px;">•</span><span style="color: #9333ea; font-weight: 700;">🎓 ${internCount} Internee${internCount > 1 ? 's' : ''}</span>` : '');
+        if (deletedCount > 0) {
+            chipHtml += `<span style="color: var(--text-muted); margin: 0 4px;">•</span><span style="color: #dc2626; font-weight: 700; cursor: pointer;" onclick="document.getElementById('emp-dir-filter-status').value='deleted'; applyDirectoryFilters();" title="Click to view deleted staff">🗑️ ${deletedCount} Deleted</span>`;
+        }
+        headcountChip.innerHTML = chipHtml;
     }
 
     renderDirectoryTable(list);
@@ -244,10 +280,14 @@ function renderDirectoryTable(employees) {
     employees.forEach(emp => {
         const tr = document.createElement('tr');
         const isSelf = AppState.currentUser && AppState.currentUser.id === emp.id;
+        const isDeleted = !!emp.deleted_at;
         const hasLogin = (emp.can_login != 0 && emp.can_login !== '0');
-        const isActive = (emp.is_active != 0 && emp.is_active !== '0');
+        const isActive = !isDeleted && (emp.is_active != 0 && emp.is_active !== '0');
 
-        if (!isActive) {
+        if (isDeleted) {
+            tr.style.opacity = '0.72';
+            tr.style.background = 'rgba(239, 68, 68, 0.03)';
+        } else if (!isActive) {
             tr.style.opacity = '0.78';
             tr.style.background = 'rgba(0,0,0,0.015)';
         }
@@ -265,10 +305,17 @@ function renderDirectoryTable(employees) {
             employee: { label: '👤 Staff Member', bg: 'rgba(148, 163, 184, 0.15)', color: '#64748b' }
         };
 
+        const isInternee = (emp.employment_type === 'internship');
         const roleMeta = roleConfig[emp.role] || roleConfig.employee;
-        const roleBadge = hasLogin
+        let roleBadge = hasLogin
             ? `<span class="user-role-tag" style="background: ${roleMeta.bg}; color: ${roleMeta.color}; padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; white-space: nowrap; display: inline-block;">${roleMeta.label}</span>`
             : `<span class="user-role-tag" style="background: rgba(148, 163, 184, 0.15); color: #64748b; padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 11px; white-space: nowrap; display: inline-block;">👤 Roster Only</span>`;
+
+        if (isInternee) {
+            roleBadge = `<span class="user-role-tag" style="background: rgba(147, 51, 234, 0.12); color: #9333ea; border: 1px solid rgba(147, 51, 234, 0.25); padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; white-space: nowrap; display: inline-block;">🎓 INTERNEE</span>`;
+        } else if (emp.employment_type === 'contract') {
+            roleBadge = `<span class="user-role-tag" style="background: rgba(59, 130, 246, 0.12); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25); padding: 3px 8px; border-radius: 6px; font-weight: 700; font-size: 11px; white-space: nowrap; display: inline-block;">📄 CONTRACT</span>`;
+        }
 
         const avatarHtml = emp.avatar 
             ? `<img src="${escapeHtml(emp.avatar)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" alt="${escapeHtml(emp.name)}" onerror="this.outerHTML='<div class=\\'user-avatar\\' style=\\'width: 32px; height: 32px; font-size: 12px;\\'>${escapeHtml(emp.name.charAt(0).toUpperCase())}</div>';">`
@@ -279,9 +326,13 @@ function renderDirectoryTable(employees) {
             ? `<span style="display: inline-block; font-size: 10.5px; color: #0369a1; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap;">🌐 Flexible (Open)</span>`
             : `<span style="display: inline-block; font-size: 10.5px; color: #475569; background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap;">⏱️ ${parseFloat(emp.expected_hours || 8)}h Shift</span>`;
 
-        const statusBadge = !isActive 
-            ? `<span class="badge" style="background: #fee2e2; color: #dc2626; font-size: 10px; font-weight: 700; white-space: nowrap;">⛔ Deactivated</span>`
-            : '';
+        let statusBadge = '';
+        if (isDeleted) {
+            const delDate = emp.deleted_at ? emp.deleted_at.substring(0, 10) : '';
+            statusBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 10px; font-weight: 700; white-space: nowrap;" title="Archived on ${delDate}">🗑️ Deleted</span>`;
+        } else if (!isActive) {
+            statusBadge = `<span class="badge" style="background: #fee2e2; color: #dc2626; font-size: 10px; font-weight: 700; white-space: nowrap;">⛔ Deactivated</span>`;
+        }
 
         let teamHtml = '';
         const managedDeptIds = (AppState.departments || []).map(d => parseInt(d.id, 10));
@@ -339,7 +390,10 @@ function renderDirectoryTable(employees) {
             </td>
             <td>${roleBadge}</td>
             <td>
-                <div style="font-weight: 500;">${escapeHtml(emp.designation || 'Staff')}</div>
+                <div style="font-weight: 500;">
+                    ${escapeHtml(emp.designation || 'Staff')}
+                    ${isInternee ? `<span style="background: rgba(147, 51, 234, 0.12); color: #9333ea; border: 1px solid rgba(147, 51, 234, 0.25); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700; margin-left: 4px;">🎓 Internee</span>` : ''}
+                </div>
             </td>
             <td style="width: 170px; max-width: 170px; min-width: 150px; overflow: hidden;">
                 <div style="font-weight: 600; font-size: 12.5px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;" title="${escapeHtml(emp.department_name || 'General')}">
@@ -358,16 +412,29 @@ function renderDirectoryTable(employees) {
             </td>
             <td>
                 <div style="display: flex; align-items: center; gap: 5px; justify-content: flex-end; flex-wrap: nowrap;">
-                    ${(isSuperAdmin && hasLogin && isActive) ? `
-                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(59, 130, 246, 0.4); color: var(--primary); white-space: nowrap;" onclick="event.stopPropagation(); openPermissionsModal(${emp.id})" title="Role & Access Delegation">
-                            🛡️ Roles
-                        </button>
-                    ` : ''}
-                    ${(hasLogin && isActive && (isSuperAdmin || isHr || isManagedByHod)) ? `
-                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; white-space: nowrap;" onclick="event.stopPropagation(); openPasswordModal(${emp.id})" title="Change Password">
-                            🔑 Pwd
-                        </button>
-                    ` : ''}
+                    ${isDeleted ? `
+                        ${canEditThisEmp ? `
+                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(16, 185, 129, 0.4); color: #059669; white-space: nowrap;" onclick="event.stopPropagation(); restoreEmployee(${emp.id})" title="Restore Employee back to Active Staff">
+                                ♻️ Restore
+                            </button>
+                        ` : ''}
+                        ${isSuperAdmin ? `
+                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(220, 38, 38, 0.4); color: #dc2626; white-space: nowrap;" onclick="event.stopPropagation(); permanentPurgeEmployee(${emp.id})" title="Permanently Purge Record from DB">
+                                ❌ Purge
+                            </button>
+                        ` : ''}
+                    ` : `
+                        ${(isSuperAdmin && hasLogin && isActive) ? `
+                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(59, 130, 246, 0.4); color: var(--primary); white-space: nowrap;" onclick="event.stopPropagation(); openPermissionsModal(${emp.id})" title="Role & Access Delegation">
+                                🛡️ Roles
+                            </button>
+                        ` : ''}
+                        ${(hasLogin && isActive && (isSuperAdmin || isHr || isManagedByHod)) ? `
+                            <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; white-space: nowrap;" onclick="event.stopPropagation(); openPasswordModal(${emp.id})" title="Change Password">
+                                🔑 Pwd
+                            </button>
+                        ` : ''}
+                    `}
                 </div>
             </td>
         `;
@@ -1565,6 +1632,22 @@ function formatTime12to24(timeStr) {
     return `${String(h).padStart(2, '0')}:${m}`;
 }
 
+function handleEmploymentTypeChange(mode, val) {
+    const prefix = mode === 'add' ? 'add-emp-' : 'edit-emp-';
+    const annInput = document.getElementById(prefix + 'annual-quota');
+    const casInput = document.getElementById(prefix + 'casual-quota');
+    const sickInput = document.getElementById(prefix + 'sick-quota');
+    if (val === 'internship') {
+        if (annInput) annInput.value = 0;
+        if (casInput) casInput.value = 0;
+        if (sickInput) sickInput.value = 0;
+    } else if (val === 'full_time') {
+        if (annInput && parseInt(annInput.value, 10) === 0) annInput.value = 14;
+        if (casInput && parseInt(casInput.value, 10) === 0) casInput.value = 10;
+        if (sickInput && parseInt(sickInput.value, 10) === 0) sickInput.value = 8;
+    }
+}
+
 function handleShiftTimingPresetChange(prefix) {
     const select = document.getElementById(`${prefix}-emp-shift-timing-select`);
     const customBox = document.getElementById(`${prefix}-emp-custom-timing-box`);
@@ -1823,11 +1906,12 @@ async function handleAddEmployeeSubmit(e) {
     const expectedHours = parseFloat(document.getElementById('add-emp-shift-hours')?.value || '8.0');
     const basicSalary = parseFloat(document.getElementById('add-emp-salary')?.value || '0');
     const joiningDate = document.getElementById('add-emp-joining-date')?.value || '';
+    const employmentType = document.getElementById('add-emp-employment-type')?.value || 'full_time';
     const shiftPolicy = document.getElementById('add-emp-shift-policy')?.value || 'fixed';
     const lateGraceMinutes = parseInt(document.getElementById('add-emp-late-grace')?.value || '15', 10);
-    const annualQuota = parseInt(document.getElementById('add-emp-annual-quota')?.value || '14', 10);
-    const casualQuota = parseInt(document.getElementById('add-emp-casual-quota')?.value || '10', 10);
-    const sickQuota = parseInt(document.getElementById('add-emp-sick-quota')?.value || '8', 10);
+    const annualQuota = parseInt(document.getElementById('add-emp-annual-quota')?.value || (employmentType === 'internship' ? '0' : '14'), 10);
+    const casualQuota = parseInt(document.getElementById('add-emp-casual-quota')?.value || (employmentType === 'internship' ? '0' : '10'), 10);
+    const sickQuota = parseInt(document.getElementById('add-emp-sick-quota')?.value || (employmentType === 'internship' ? '0' : '8'), 10);
 
     if (!name) {
         showToast("Employee name is required.", "error");
@@ -1858,6 +1942,7 @@ async function handleAddEmployeeSubmit(e) {
             password,
             role,
             designation,
+            employment_type: employmentType,
             department_id: deptId,
             team_id: teamId || null,
             avatar,
@@ -1983,6 +2068,11 @@ function openEditEmployeeModal(empId) {
 
     document.getElementById('edit-emp-designation').value = emp.designation || '';
 
+    const empTypeSelect = document.getElementById('edit-emp-employment-type');
+    if (empTypeSelect) {
+        empTypeSelect.value = emp.employment_type || 'full_time';
+    }
+
     const codeInput = document.getElementById('edit-emp-code');
     if (codeInput) codeInput.value = emp.emp_code || `DP-${String(emp.id).padStart(3, '0')}`;
 
@@ -2066,6 +2156,23 @@ function openEditEmployeeModal(empId) {
         }
     }
 
+    const delBtn = document.getElementById('btn-modal-delete-emp');
+    if (delBtn) {
+        if (emp.deleted_at) {
+            delBtn.innerHTML = '♻️ Restore Employee';
+            delBtn.style.color = '#059669';
+            delBtn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+            delBtn.title = 'Restore this employee back to Active Staff';
+            delBtn.onclick = () => restoreEmployee(emp.id);
+        } else {
+            delBtn.innerHTML = '🗑️ Delete Employee';
+            delBtn.style.color = '#dc2626';
+            delBtn.style.borderColor = 'rgba(220, 38, 38, 0.4)';
+            delBtn.title = 'Archive / Delete employee (preserves historical worksheets & records)';
+            delBtn.onclick = () => handleDeleteEmployeeFromModal();
+        }
+    }
+
     openModal('edit-employee-modal');
 }
 
@@ -2103,11 +2210,12 @@ async function handleEditEmployeeSubmit(e) {
     const expectedHours = parseFloat(document.getElementById('edit-emp-shift-hours')?.value || '8.0');
     const basicSalary = parseFloat(document.getElementById('edit-emp-salary')?.value || '0');
     const joiningDate = document.getElementById('edit-emp-joining-date')?.value || '';
+    const employmentType = document.getElementById('edit-emp-employment-type')?.value || 'full_time';
     const shiftPolicy = document.getElementById('edit-emp-shift-policy')?.value || 'fixed';
     const lateGraceMinutes = parseInt(document.getElementById('edit-emp-late-grace')?.value || '15', 10);
-    const annualQuota = parseInt(document.getElementById('edit-emp-annual-quota')?.value || '14', 10);
-    const casualQuota = parseInt(document.getElementById('edit-emp-casual-quota')?.value || '10', 10);
-    const sickQuota = parseInt(document.getElementById('edit-emp-sick-quota')?.value || '8', 10);
+    const annualQuota = parseInt(document.getElementById('edit-emp-annual-quota')?.value || (employmentType === 'internship' ? '0' : '14'), 10);
+    const casualQuota = parseInt(document.getElementById('edit-emp-casual-quota')?.value || (employmentType === 'internship' ? '0' : '10'), 10);
+    const sickQuota = parseInt(document.getElementById('edit-emp-sick-quota')?.value || (employmentType === 'internship' ? '0' : '8'), 10);
 
     if (!id || !name) {
         showToast("ID and employee name are required.", "error");
@@ -2141,6 +2249,7 @@ async function handleEditEmployeeSubmit(e) {
             email: email || null,
             role,
             designation,
+            employment_type: employmentType,
             department_id: deptId,
             shared_department_ids: sharedDeptIds,
             team_id: teamId || null,
@@ -2285,14 +2394,10 @@ async function handleDeleteEmployeeFromModal() {
         showToast("No employee selected.", "error");
         return;
     }
-    await deleteEmployeePermanent(id);
+    await deleteEmployee(id);
 }
 
 async function deleteEmployee(empId) {
-    await deleteEmployeePermanent(empId);
-}
-
-async function deleteEmployeePermanent(empId) {
     const emp = (AppState.employees || []).find(e => e.id == empId);
     const empName = emp ? emp.name : 'this employee';
 
@@ -2302,10 +2407,10 @@ async function deleteEmployeePermanent(empId) {
     }
 
     const confirmed = await showConfirmDialog({
-        title: "Permanently Delete Employee",
-        message: `Permanently delete ${empName} (ID: ${empId})?`,
-        detail: "<strong>⚠️ Warning:</strong> This action is irreversible. All linked historical records (profiles, sheets, payroll entries, tasks, fines, loans) will be permanently deleted.",
-        confirmText: "Permanently Delete",
+        title: "Delete / Archive Employee",
+        message: `Move ${empName} (ID: ${empId}) to Deleted / Archive?`,
+        detail: "<strong>Enterprise Standard:</strong> In compliance with HR best practices, the employee record will be archived. All historical daily worksheets, attendance logs, tasks, and claims are completely preserved and can be restored at any time.",
+        confirmText: "🗑️ Move to Deleted Staff",
         cancelText: "Cancel",
         type: "danger",
         icon: "🗑️"
@@ -2324,7 +2429,7 @@ async function deleteEmployeePermanent(empId) {
         const data = await res.json();
 
         if (data.success) {
-            showToast(data.message || `Employee ${empName} deleted successfully.`, "success");
+            showToast(data.message || `Employee ${empName} moved to archive.`, "success");
             closeModal('edit-employee-modal');
             await loadEmployeeDirectory();
             populateEmailSelectors();
@@ -2337,6 +2442,97 @@ async function deleteEmployeePermanent(empId) {
         }
     } catch (err) {
         showToast("Network error deleting employee.", "error");
+    }
+}
+
+async function restoreEmployee(empId) {
+    const emp = (AppState.employees || []).find(e => e.id == empId);
+    const empName = emp ? emp.name : 'this employee';
+
+    const confirmed = await showConfirmDialog({
+        title: "Restore Employee",
+        message: `Restore ${empName} (ID: ${empId}) back to Active Staff?`,
+        detail: "The employee will be restored to their active working status with all historical records, profiles, and attendance preserved.",
+        confirmText: "♻️ Restore to Active Staff",
+        cancelText: "Cancel",
+        type: "primary",
+        icon: "♻️"
+    });
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch('api/employees.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'restore_employee',
+                id: empId
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message || `Employee ${empName} restored successfully.`, "success");
+            closeModal('edit-employee-modal');
+            await loadEmployeeDirectory();
+            populateEmailSelectors();
+            populateAdminEmployeeSelector();
+            if (typeof loadPayroll === 'function') {
+                loadPayroll();
+            }
+        } else {
+            showToast(data.message || "Failed to restore employee.", "error");
+        }
+    } catch (err) {
+        showToast("Network error restoring employee.", "error");
+    }
+}
+
+async function permanentPurgeEmployee(empId) {
+    const emp = (AppState.employees || []).find(e => e.id == empId);
+    const empName = emp ? emp.name : 'this employee';
+
+    if (AppState.currentUser && AppState.currentUser.id == empId) {
+        showToast("You cannot purge your own logged-in account.", "error");
+        return;
+    }
+
+    const confirmed = await showConfirmDialog({
+        title: "Permanently Purge Record",
+        message: `PERMANENTLY erase ${empName} (ID: ${empId}) from database?`,
+        detail: "<strong>⚠️ Irreversible Warning:</strong> This will completely purge the employee and all their linked daily sheets, worksheets, tasks, claims, and HR profiles from the database forever. Use this only for bogus/test records.",
+        confirmText: "❌ Purge Permanently",
+        cancelText: "Cancel",
+        type: "danger",
+        icon: "⚠️"
+    });
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch('api/employees.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'delete_employee_permanent',
+                id: empId
+            })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            showToast(data.message || `Employee permanently purged.`, "success");
+            closeModal('edit-employee-modal');
+            await loadEmployeeDirectory();
+            populateEmailSelectors();
+            populateAdminEmployeeSelector();
+            if (typeof loadPayroll === 'function') {
+                loadPayroll();
+            }
+        } else {
+            showToast(data.message || "Failed to purge employee.", "error");
+        }
+    } catch (err) {
+        showToast("Network error purging employee.", "error");
     }
 }
 

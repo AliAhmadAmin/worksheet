@@ -972,13 +972,15 @@ function renderTeamTaskDashboard(tasks) {
 
     (tasks || []).forEach(t => {
         if (t.assigned_to && !empMap.has(String(t.assigned_to))) {
+            const foundEmp = (AppState.employees || []).find(e => String(e.id) === String(t.assigned_to));
             empMap.set(String(t.assigned_to), {
                 id: t.assigned_to,
                 name: t.employee_name || 'Staff Member',
-                designation: t.employee_designation || 'Staff',
-                emp_code: t.employee_code || '',
+                designation: t.employee_designation || (foundEmp ? foundEmp.designation : 'Staff'),
+                employment_type: (foundEmp ? foundEmp.employment_type : 'full_time'),
+                emp_code: t.employee_code || (foundEmp ? foundEmp.emp_code : ''),
                 department_name: t.employee_dept_name || t.department_name || 'General',
-                avatar: null,
+                avatar: foundEmp ? foundEmp.avatar : null,
                 is_shared_resource: false
             });
         }
@@ -1064,6 +1066,9 @@ function renderTeamTaskDashboard(tasks) {
             ? `<span style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700; margin-left: 4px;">🏷️ Shared</span>` 
             : '';
 
+        const isInternee = (emp.employment_type === 'internship') || 
+            (emp.designation && (emp.designation.toLowerCase().includes('intern') || emp.designation.toLowerCase().includes('trainee')));
+
         tr.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -1073,8 +1078,9 @@ function renderTeamTaskDashboard(tasks) {
                             <strong style="color: var(--text-main); font-size: 13.5px;">${escapeHtml(emp.name)}</strong>
                             ${empCodeBadge}
                         </div>
-                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
-                            ${escapeHtml(emp.designation || 'Staff Member')}
+                        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap;">
+                            <span>${escapeHtml(emp.designation || 'Staff Member')}</span>
+                            ${isInternee ? `<span style="background: rgba(147, 51, 234, 0.12); color: #9333ea; border: 1px solid rgba(147, 51, 234, 0.25); font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 700;">🎓 Internee</span>` : ''}
                         </div>
                     </div>
                 </div>
