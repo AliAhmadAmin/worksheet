@@ -86,10 +86,15 @@ async function loadEmployeeDirectory() {
         AppState.departments = data.departments || [];
         AppState.teams = data.teams || [];
 
-        // Update counts (count active staff)
+        // Update counts (count active staff in current department/view)
         const totalBadge = document.getElementById('emp-total-badge');
         if (totalBadge) {
-            const activeCount = (AppState.employees || []).filter(e => e.is_active != 0).length;
+            const filterDept = document.getElementById('emp-dir-filter-dept');
+            const deptId = filterDept?.value;
+            const activeCount = (deptId 
+                ? (AppState.employees || []).filter(e => String(e.department_id) === String(deptId)) 
+                : (AppState.employees || [])
+            ).filter(e => e.is_active != 0).length;
             totalBadge.textContent = activeCount;
         }
 
@@ -206,6 +211,16 @@ function applyDirectoryFilters() {
             (e.department_name || '').toLowerCase().includes(search) ||
             (e.team_name || '').toLowerCase().includes(search)
         );
+    }
+
+    // Sync top pill badge to match active staff in currently selected department
+    const totalBadge = document.getElementById('emp-total-badge');
+    if (totalBadge) {
+        const activeInView = (deptId 
+            ? (AppState.employees || []).filter(e => String(e.department_id) === String(deptId)) 
+            : (AppState.employees || [])
+        ).filter(e => e.is_active != 0);
+        totalBadge.textContent = activeInView.length;
     }
 
     renderDirectoryTable(list);

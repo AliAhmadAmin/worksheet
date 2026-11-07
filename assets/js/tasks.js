@@ -242,7 +242,7 @@ async function loadAssignedTasks() {
             }
         }
 
-        // Render Dedicated Admin Task Table on Task Assigner tab
+        // Render Dedicated Admin / Employee Task Table on Task Assigner tab
         if (adminTbody) {
             renderAdminTaskList(tasks);
         }
@@ -251,6 +251,41 @@ async function loadAssignedTasks() {
         const teamTbody = document.getElementById('team-tasks-tbody');
         if (teamTbody) {
             renderTeamTaskDashboard(tasks);
+        }
+
+        // Auto-switch view for standard employees vs HOD/Admin:
+        // Regular employees directly see their task list; HODs/Admins default to team dashboard
+        const canAssign = AppState.currentUser && (
+            AppState.currentUser.role === 'admin' || 
+            AppState.currentUser.role === 'super_admin' || 
+            AppState.currentUser.role === 'hod' || 
+            hasPermission('can_assign_tasks') || 
+            hasPermission('can_edit_tasks')
+        );
+
+        const viewTeam = document.getElementById('tasks-team-view');
+        const viewList = document.getElementById('tasks-list-view');
+        const thPerson = document.getElementById('th-task-person');
+        const searchInput = document.getElementById('task-search-input');
+
+        if (!canAssign) {
+            TaskState.currentView = 'list';
+            if (viewTeam) viewTeam.style.display = 'none';
+            if (viewList) viewList.style.display = 'block';
+
+            if (thPerson) thPerson.textContent = 'Assigned By';
+            if (searchInput && searchInput.placeholder.includes('person')) {
+                searchInput.placeholder = '🔍 Search task title, link, assigner...';
+            }
+        } else {
+            if (thPerson) thPerson.textContent = 'Assigned To';
+            if (TaskState.currentView === 'list') {
+                if (viewTeam) viewTeam.style.display = 'none';
+                if (viewList) viewList.style.display = 'block';
+            } else {
+                if (viewTeam) viewTeam.style.display = 'block';
+                if (viewList) viewList.style.display = 'none';
+            }
         }
 
         // Real-time refresh of person tasks modal if currently open
@@ -313,7 +348,7 @@ function createTaskCard(task) {
         </div>
 
         <div class="task-footer-bar" style="margin-top: 10px; justify-content: flex-end;">
-            <button type="button" class="btn-convert-task" onclick="convertTaskToSheetEntry(${JSON.stringify(task).replace(/"/g, '&quot;')})">
+            <button type="button" class="btn-convert-task" onclick="convertTaskToSheetEntry(${task.id})">
                 + Add to Sheet
             </button>
         </div>
@@ -346,23 +381,32 @@ async function updateTaskStatus(taskId, newStatus) {
 }
 
 // 1-Click Convert Task into Daily Worksheet Row
-function convertTaskToSheetEntry(task) {
-    if (AppState.isLocked && AppState.currentUser.role !== 'admin') {
+function convertTaskToSheetEntry(taskOrId) {
+    let task = taskOrId;
+    if (typeof taskOrId === 'number' || typeof taskOrId === 'string') {
+        task = (AppState.tasks || []).find(t => t.id == taskOrId);
+    }
+    if (!task) return;
+
+    if (AppState.isLocked && AppState.currentUser && AppState.currentUser.role !== 'admin') {
         showToast("Cannot add entries because today's sheet is locked.", "error");
         return;
     }
 
     const cleanLink = sanitizePathString(task.link);
 
-    addTableRow({
-        time_slot: '',
-        content_type: '',
-        department: '',
-        link: cleanLink,
-        title: task.title
-    }, true);
-
-    showToast(`Added "${task.title}" to your daily worksheet!`, 'success');
+    if (typeof addTableRow === 'function') {
+        addTableRow({
+            time_slot: '',
+            content_type: '',
+            department: '',
+            link: cleanLink,
+            title: task.title
+        }, true);
+        showToast(`Added "${task.title}" to your daily worksheet!`, 'success');
+    } else {
+        showToast("Daily worksheet table not initialized.", "error");
+    }
 }
 
 // Helper: Format Date object to YYYY-MM-DD
@@ -1224,6 +1268,11 @@ function renderAdminTaskList(tasks) {
     if (!tbody) return;
 
     const canEdit = hasPermission('can_edit_tasks');
+    const canAssign = hasPermission('can_assign_tasks') || (AppState.currentUser && (
+        AppState.currentUser.role === 'admin' || 
+        AppState.currentUser.role === 'super_admin' || 
+        AppState.currentUser.role === 'hod'
+    ));
 
     const q = TaskState.searchQuery;
     let filteredTasks = tasks || [];
@@ -1233,7 +1282,10 @@ function renderAdminTaskList(tasks) {
             (t.description && t.description.toLowerCase().includes(q)) ||
             (t.employee_name && t.employee_name.toLowerCase().includes(q)) ||
             (t.employee_code && t.employee_code.toLowerCase().includes(q)) ||
-            (t.department_name && t.department_name.toLowerCase().includes(q))
+            (t.assigner_name && t.assigner_name.toLowerCase().includes(q)) ||
+            (t.assigner_dept_name && t.assigner_dept_name.toLowerCase().includes(q)) ||
+            (t.department_name && t.department_name.toLowerCase().includes(q)) ||
+            (t.link && t.link.toLowerCase().includes(q))
         );
     }
 
@@ -1261,12 +1313,48 @@ function renderAdminTaskList(tasks) {
             ? `<div style="font-size: 10.5px; color: var(--text-dim); margin-top: 3px;">By: <strong style="color: var(--text-muted);">${escapeHtml(t.assigner_name)}</strong> <span style="opacity: 0.85;">(${escapeHtml(t.assigner_dept_name || t.department_name || 'Dept')})</span></div>`
             : '';
 
+        // For regular employees: Display who assigned it (HOD / Admin)
+        // For Admin / HOD: Display who the task was assigned to
+        const personColHtml = !canAssign ? `
+            <div style="font-weight: 700; color: var(--text-main); font-size: 12.5px;">${escapeHtml(t.assigner_name || 'Management')}</div>
+            <div style="margin-top: 3px;">
+                <span style="display: inline-block; background: rgba(59, 130, 246, 0.1); color: var(--primary); font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px;">🏢 ${escapeHtml(t.assigner_dept_name || t.department_name || 'Management')}</span>
+            </div>
+        ` : `
+            <div style="font-weight: 700; color: var(--text-main); font-size: 12.5px;">${escapeHtml(t.employee_name || 'Unassigned')}</div>
+            ${empDeptBadge ? `<div style="margin-top: 3px;">${empDeptBadge}</div>` : ''}
+            ${assignerBadge}
+        `;
+
+        // Actions column: employee gets View + Add to Sheet; admin gets WA + View + Edit + Delete
+        const actionsHtml = !canAssign ? `
+            <div style="display: flex; align-items: center; gap: 6px; justify-content: center; white-space: nowrap;">
+                <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 3px;" onclick="openViewTaskModal(${t.id})" title="View Details">
+                    👁️ View
+                </button>
+                <button type="button" class="btn btn-primary" onclick="convertTaskToSheetEntry(${t.id})" style="padding: 4px 9px; font-size: 11px; font-weight: 700; border-radius: var(--radius-sm); white-space: nowrap;" title="Add task directly into today's worksheet">
+                    + Add to Sheet
+                </button>
+            </div>
+        ` : `
+            <div style="display: flex; align-items: center; gap: 4px; justify-content: center; white-space: nowrap;">
+                ${waBadge}
+                <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px;" onclick="openViewTaskModal(${t.id})" title="View Details">
+                    👁️
+                </button>
+                ${canEdit ? `
+                    <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px;" onclick="openEditTaskModal(${t.id})" title="Edit Task">
+                        ✏️
+                    </button>
+                    <button type="button" class="btn-icon-del" style="padding: 4px 6px; font-size: 11.5px;" onclick="deleteTask(${t.id})" title="Delete Task">
+                        🗑️
+                    </button>
+                ` : ''}
+            </div>
+        `;
+
         tr.innerHTML = `
-            <td>
-                <div style="font-weight: 700; color: var(--text-main); font-size: 12.5px;">${escapeHtml(t.employee_name || 'Unassigned')}</div>
-                ${empDeptBadge ? `<div style="margin-top: 3px;">${empDeptBadge}</div>` : ''}
-                ${assignerBadge}
-            </td>
+            <td>${personColHtml}</td>
             <td>
                 <div style="font-weight: 700; font-size: 13px; color: var(--primary); cursor: pointer; ${isCompleted ? 'text-decoration: line-through; opacity: 0.75;' : ''}" onclick="openViewTaskModal(${t.id})" title="Click to view complete details">
                     ${escapeHtml(t.title)}
@@ -1305,22 +1393,7 @@ function renderAdminTaskList(tasks) {
                     <option value="completed" ${t.status === 'completed' ? 'selected' : ''}>✅ Completed</option>
                 </select>
             </td>
-            <td>
-                <div style="display: flex; align-items: center; gap: 4px; justify-content: center; white-space: nowrap;">
-                    ${waBadge}
-                    <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px;" onclick="openViewTaskModal(${t.id})" title="View Details">
-                        👁️
-                    </button>
-                    ${canEdit ? `
-                        <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px;" onclick="openEditTaskModal(${t.id})" title="Edit Task">
-                            ✏️
-                        </button>
-                        <button type="button" class="btn-icon-del" style="padding: 4px 6px; font-size: 11.5px;" onclick="deleteTask(${t.id})" title="Delete Task">
-                            🗑️
-                        </button>
-                    ` : ''}
-                </div>
-            </td>
+            <td>${actionsHtml}</td>
         `;
         tbody.appendChild(tr);
     });

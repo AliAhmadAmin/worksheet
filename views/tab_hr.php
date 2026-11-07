@@ -521,16 +521,19 @@
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div>
                     <h2 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 2px;">
-                        ⛽ Fuel, Travel, Food & Incentive Allowances
+                        ⛽ <span class="admin-only" style="<?= $canIssueDisciplinary ? '' : 'display: none;' ?>">Fuel, Travel, Food & Incentive Allowances</span><span class="employee-only" style="<?= $canIssueDisciplinary ? 'display: none;' : '' ?>">My Fuel, Travel & Food Claims</span>
                     </h2>
-                    <p style="color: var(--text-muted); font-size: 12.5px; margin: 0;">
+                    <p class="admin-only" style="color: var(--text-muted); font-size: 12.5px; margin: 0; <?= $canIssueDisciplinary ? '' : 'display: none;' ?>">
                         Manage employee fuel allowances, travel expenses, food bills reimbursement, overtime meals, and performance incentives.
+                    </p>
+                    <p class="employee-only" style="color: var(--text-muted); font-size: 12.5px; margin: 0; <?= $canIssueDisciplinary ? 'display: none;' : '' ?>">
+                        Submit and track your official fuel, travel, and meal reimbursement claims awaiting HR approval.
                     </p>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <button type="button" class="btn btn-primary" onclick="openAddClaimModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
-                        + Add Allowance / Claim
+                        <span class="admin-only" style="<?= $canIssueDisciplinary ? '' : 'display: none;' ?>">+ Add Allowance / Claim</span><span class="employee-only" style="<?= $canIssueDisciplinary ? 'display: none;' : '' ?>">+ Submit Expense Claim</span>
                     </button>
                     <button type="button" class="btn btn-outline" onclick="loadHrClaims()" title="Reload claims">
                         🔄 Refresh
@@ -573,7 +576,7 @@
                 <div class="filter-row-primary">
                     <div class="filter-search-wrap">
                         <span class="search-icon">🔍</span>
-                        <input type="text" id="hr-claims-search" placeholder="Search employee, category, receipt, route, notes..." oninput="applyClaimsClientFilters()">
+                        <input type="text" id="hr-claims-search" placeholder="<?= $canIssueDisciplinary ? 'Search employee, category, receipt, route, notes...' : 'Search category, receipt, route, notes...' ?>" oninput="applyClaimsClientFilters()">
                     </div>
 
                     <div class="filter-date-group">
@@ -601,7 +604,7 @@
 
                 <!-- Row 2: Secondary Dropdown Filters -->
                 <div class="filter-row-secondary">
-                    <select id="hr-claims-dept-filter" onchange="applyClaimsClientFilters()">
+                    <select id="hr-claims-dept-filter" class="admin-only" style="<?= $canIssueDisciplinary ? '' : 'display: none;' ?>" onchange="applyClaimsClientFilters()">
                         <option value="">🏢 All Departments</option>
                     </select>
 
@@ -611,14 +614,14 @@
                         <option value="travel">✈️ Travel / Official Trip</option>
                         <option value="mobile">📱 Mobile / Internet</option>
                         <option value="food_bills">🍲 Food Bills & Meals</option>
-                        <option value="incentive">🏆 Incentive / Reward</option>
-                        <option value="bonus">🎁 Bonus & Others</option>
+                        <option value="incentive" class="admin-only">🏆 Incentive / Reward</option>
+                        <option value="bonus" class="admin-only">🎁 Bonus & Others</option>
                     </select>
 
                     <select id="hr-claims-status-filter" onchange="loadHrClaims()">
-                        <option value="all">All Statuses</option>
+                        <option value="all" selected>All Statuses</option>
                         <option value="pending">⏳ Pending Review</option>
-                        <option value="approved" selected>✅ Approved</option>
+                        <option value="approved">✅ Approved</option>
                         <option value="paid">💵 Paid</option>
                         <option value="rejected">❌ Rejected</option>
                     </select>
@@ -733,24 +736,34 @@
 <!-- ================= 5. DEDICATED DISCIPLINARY FINES & PENALTIES ================= -->
 <section id="tab-hr-fines" class="tab-section">
     <div class="worksheet-container">
+        <?php
+        $canIssueDisciplinary = !empty($authUser) && (
+            in_array($authUser['role'] ?? '', ['super_admin', 'admin', 'hod', 'deputy_hod', 'hr']) ||
+            !empty($authUser['can_manage_hr']) ||
+            !empty($authUser['can_manage_employees'])
+        );
+        ?>
 
         <!-- Fines & Disciplinary Header Card -->
         <div class="worksheet-card" style="margin-bottom: 18px;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div>
                     <h2 style="font-size: 18px; font-weight: 800; color: var(--text-main); margin-bottom: 2px; display: flex; align-items: center; gap: 8px;">
-                        ⚠️ Disciplinary & Show Cause Inquiry Center
+                        ⚠️ <span class="admin-only" style="<?= $canIssueDisciplinary ? '' : 'display: none;' ?>">Disciplinary & Show Cause Inquiry Center</span><span class="employee-only" style="<?= $canIssueDisciplinary ? 'display: none;' : '' ?>">My Disciplinary & Show Cause Notices</span>
                     </h2>
-                    <p style="color: var(--text-muted); font-size: 12.5px; margin: 0;">
+                    <p class="admin-only" style="color: var(--text-muted); font-size: 12.5px; margin: 0; <?= $canIssueDisciplinary ? '' : 'display: none;' ?>">
                         Issue formal show cause notices, receive employee explanations, conduct inquiry reviews, and enforce payroll fine deductions.
+                    </p>
+                    <p class="employee-only" style="color: var(--text-muted); font-size: 12.5px; margin: 0; <?= $canIssueDisciplinary ? 'display: none;' : '' ?>">
+                        Review formal show cause notices issued to you, submit your explanations with attachments, and track disciplinary records.
                     </p>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <button type="button" class="btn" onclick="openIssueShowCauseModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; background: #d97706; color: #ffffff; border: 1px solid #b45309; box-shadow: 0 1px 3px rgba(217, 119, 6, 0.3);">
+                    <button type="button" class="btn admin-only" onclick="openIssueShowCauseModal()" style="display: <?= $canIssueDisciplinary ? 'inline-flex' : 'none' ?>; align-items: center; gap: 6px; font-weight: 700; background: #d97706; color: #ffffff; border: 1px solid #b45309; box-shadow: 0 1px 3px rgba(217, 119, 6, 0.3);">
                         📜 Issue Show Cause Notice
                     </button>
-                    <button type="button" class="btn btn-primary" onclick="openIssueFineModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                    <button type="button" class="btn btn-primary admin-only" onclick="openIssueFineModal()" style="display: <?= $canIssueDisciplinary ? 'inline-flex' : 'none' ?>; align-items: center; gap: 6px; font-weight: 700;">
                         ➕ Issue Direct Fine
                     </button>
                     <button type="button" class="btn btn-outline" onclick="refreshDisciplinaryCenter()" title="Refresh All Disciplinary Records">
@@ -826,7 +839,7 @@
 
                     <input type="month" id="hr-sc-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrShowCauseNotices()">
 
-                    <select id="hr-sc-dept-filter" class="input-control" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyShowCauseClientFilters()">
+                    <select id="hr-sc-dept-filter" class="input-control admin-only" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); <?= $canIssueDisciplinary ? '' : 'display: none;' ?>" onchange="applyShowCauseClientFilters()">
                         <option value="">🏢 All Departments</option>
                     </select>
 
@@ -889,7 +902,7 @@
 
                     <input type="month" id="hr-fines-month-filter" class="input-control" style="width: auto; padding: 6px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" value="<?php echo date('Y-m'); ?>" onchange="loadHrFines()">
 
-                    <select id="hr-fines-dept-filter" class="input-control" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md);" onchange="applyFinesClientFilters()">
+                    <select id="hr-fines-dept-filter" class="input-control admin-only" style="width: auto; padding: 7px 10px; font-size: 12px; font-weight: 600; border-radius: var(--radius-md); <?= $canIssueDisciplinary ? '' : 'display: none;' ?>" onchange="applyFinesClientFilters()">
                         <option value="">🏢 All Departments</option>
                     </select>
 
@@ -1406,12 +1419,12 @@
 <div id="hr-add-claim-modal" class="modal-overlay">
     <div class="modal-card" style="max-width: 520px;">
         <div class="modal-header">
-            <h3 class="modal-title">⛽ Add Allowance / Expense Claim</h3>
+            <h3 class="modal-title" id="hr-claim-modal-title">⛽ Add Allowance / Expense Claim</h3>
             <button type="button" class="modal-close" onclick="closeModal('hr-add-claim-modal')">&times;</button>
         </div>
         <form id="hr-add-claim-form" onsubmit="handleSaveClaimSubmit(event)">
             <div class="modal-body">
-                <div class="form-group" style="margin-bottom: 14px;">
+                <div class="form-group" id="hr-claim-form-emp-wrapper" style="margin-bottom: 14px;">
                     <label class="form-label">Employee</label>
                     <select id="hr-claim-form-emp-id" class="input-control" style="width: 100%;" required>
                         <!-- Dynamic Staff List -->
@@ -1426,8 +1439,8 @@
                             <option value="travel">✈️ Travel / Official Trip</option>
                             <option value="mobile">📱 Mobile / Internet</option>
                             <option value="food_bills">🍲 Food Bills / Meals</option>
-                            <option value="incentive">🏆 Performance Incentive</option>
-                            <option value="bonus">🎁 Special Bonus</option>
+                            <option value="incentive" class="admin-only">🏆 Performance Incentive</option>
+                            <option value="bonus" class="admin-only">🎁 Special Bonus</option>
                             <option value="other">📝 Other Allowance</option>
                         </select>
                     </div>
@@ -1458,7 +1471,7 @@
                     <textarea id="hr-claim-form-reason" class="input-control" rows="3" placeholder="Provide full details, client visit, night shift meal, performance target..." style="width: 100%; resize: vertical;" required></textarea>
                 </div>
 
-                <div class="admin-only" style="margin-bottom: 10px;">
+                <div class="admin-only" id="hr-claim-form-auto-approve-wrapper" style="margin-bottom: 10px;">
                     <label style="font-size: 12.5px; display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-main);">
                         <input type="checkbox" id="hr-claim-form-auto-approve" value="1" checked>
                         <b>Directly approve and apply this allowance to payroll</b>
@@ -1467,7 +1480,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('hr-add-claim-modal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">💾 Save & Record Allowance</button>
+                <button type="submit" id="hr-claim-modal-submit-btn" class="btn btn-primary">💾 Save & Record Allowance</button>
             </div>
         </form>
     </div>

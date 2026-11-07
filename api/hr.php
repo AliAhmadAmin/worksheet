@@ -2114,8 +2114,19 @@ switch ($action) {
         break;
 
     case 'add_claim':
+        $isManager = $canManageHr || $isHod;
         $empId = (int)($data['employee_id'] ?? $currentUserId);
         $claimType = $data['claim_type'] ?? 'fuel';
+
+        // Staff members can ONLY submit expense reimbursement claims for themselves
+        if (!$isManager) {
+            $empId = $currentUserId;
+            if (in_array($claimType, ['incentive', 'bonus'])) {
+                echo json_encode(['success' => false, 'message' => 'Staff members cannot self-assign incentives or bonuses.']);
+                exit;
+            }
+        }
+
         $amount = (float)($data['amount'] ?? 0);
         $claimDate = !empty($data['claim_date']) ? $data['claim_date'] : date('Y-m-d');
         $salaryMonth = !empty($data['salary_month']) ? $data['salary_month'] : date('Y-m', strtotime($claimDate));

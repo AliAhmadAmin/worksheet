@@ -1724,13 +1724,25 @@ function renderHrClaimsTable(claims) {
         countLabel.textContent = `Showing ${claims.length} claim(s)`;
     }
 
+    const isManager = AppState.currentUser && (
+        AppState.currentUser.role === 'admin' || 
+        AppState.currentUser.role === 'super_admin' || 
+        AppState.currentUser.role === 'hr' || 
+        AppState.currentUser.role === 'hod' || 
+        !!(AppState.currentUser.can_manage_hr)
+    );
+
     if (!claims || claims.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
                     <div style="font-size: 32px; margin-bottom: 8px;">⛽</div>
                     <div style="font-weight: 700; font-size: 14px;">No claims or allowances found</div>
-                    <div style="font-size: 12px; margin-top: 4px;">Click "+ Add Allowance / Claim" above to record a new entry.</div>
+                    <div style="font-size: 12px; margin-top: 4px;">
+                        ${isManager 
+                            ? 'Click "+ Add Allowance / Claim" above to record a new entry.' 
+                            : 'Click "+ Submit Expense Claim" above to submit a new reimbursement claim.'}
+                    </div>
                 </td>
             </tr>
         `;
@@ -1839,6 +1851,47 @@ async function openAddClaimModal() {
     await populateHrEmployeeDropdowns();
     const today = new Date().toISOString().slice(0, 10);
     const month = today.slice(0, 7);
+
+    const currentUser = AppState.currentUser || {};
+    const isManager = currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'hr' || currentUser.role === 'hod' || !!(currentUser.can_manage_hr);
+
+    const empWrapper = document.getElementById('hr-claim-form-emp-wrapper');
+    const empSelect = document.getElementById('hr-claim-form-emp-id');
+    const autoApproveWrapper = document.getElementById('hr-claim-form-auto-approve-wrapper');
+    const autoApproveInput = document.getElementById('hr-claim-form-auto-approve');
+    const modalTitle = document.getElementById('hr-claim-modal-title');
+    const submitBtn = document.getElementById('hr-claim-modal-submit-btn');
+    const typeSelect = document.getElementById('hr-claim-form-type');
+
+    if (empWrapper) {
+        empWrapper.style.display = isManager ? 'block' : 'none';
+    }
+    if (empSelect && !isManager && currentUser.id) {
+        empSelect.value = currentUser.id;
+    }
+    if (autoApproveWrapper) {
+        autoApproveWrapper.style.display = isManager ? 'block' : 'none';
+    }
+    if (autoApproveInput) {
+        autoApproveInput.checked = isManager;
+    }
+    if (modalTitle) {
+        modalTitle.textContent = isManager ? "⛽ Add Allowance / Expense Claim" : "⛽ Submit Expense Reimbursement Claim";
+    }
+    if (submitBtn) {
+        submitBtn.textContent = isManager ? "💾 Save & Record Allowance" : "📤 Submit Expense Claim";
+    }
+
+    // Toggle management-only categories (Incentive, Bonus) for regular employees
+    if (typeSelect) {
+        const incentiveOpt = typeSelect.querySelector('option[value="incentive"]');
+        const bonusOpt = typeSelect.querySelector('option[value="bonus"]');
+        if (incentiveOpt) incentiveOpt.style.display = isManager ? '' : 'none';
+        if (bonusOpt) bonusOpt.style.display = isManager ? '' : 'none';
+        if (!isManager && (typeSelect.value === 'incentive' || typeSelect.value === 'bonus')) {
+            typeSelect.value = 'fuel';
+        }
+    }
 
     const dateInput = document.getElementById('hr-claim-form-date');
     const monthInput = document.getElementById('hr-claim-form-month');
@@ -2418,22 +2471,27 @@ function renderShowCauseTable(notices) {
         countLabel.textContent = `Showing ${notices.length} notice(s)`;
     }
 
+    const currentUserId = AppState.currentUser ? AppState.currentUser.id : null;
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
+    const isHod = AppState.currentUser && (AppState.currentUser.role === 'hod' || (AppState.currentUser.designation && AppState.currentUser.designation.toLowerCase().includes('hod')));
+    const canManage = (isAdmin || isHod);
+
     if (!notices || notices.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="8" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
                     <div style="font-size: 32px; margin-bottom: 8px;">📜</div>
                     <div style="font-weight: 700; font-size: 14px;">No Show Cause Inquiries Found</div>
-                    <div style="font-size: 12px; margin-top: 4px;">Click "📜 Issue Show Cause Notice" above to call for an employee explanation.</div>
+                    <div style="font-size: 12px; margin-top: 4px;">
+                        ${canManage 
+                            ? 'Click "📜 Issue Show Cause Notice" above to call for an employee explanation.' 
+                            : 'You have no active show cause notices or inquiries.'}
+                    </div>
                 </td>
             </tr>
         `;
         return;
     }
-
-    const currentUserId = AppState.currentUser ? AppState.currentUser.id : null;
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
-    const isHod = AppState.currentUser && (AppState.currentUser.role === 'hod' || (AppState.currentUser.designation && AppState.currentUser.designation.toLowerCase().includes('hod')));
 
     const categoryBadges = {
         late_arrival: { label: '⏱️ Late Arrival', bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706' },
@@ -2583,6 +2641,13 @@ function renderShowCauseTable(notices) {
 }
 
 async function openIssueShowCauseModal() {
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
+    const isHod = AppState.currentUser && (AppState.currentUser.role === 'hod' || (AppState.currentUser.designation && AppState.currentUser.designation.toLowerCase().includes('hod')));
+    if (!isAdmin && !isHod) {
+        showToast("Access denied: Only Admins, HR and HODs can issue show cause notices.", "error");
+        return;
+    }
+
     await populateHrEmployeeDropdowns();
     const today = new Date().toISOString().slice(0, 10);
     const deadlineDefault = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -3150,20 +3215,26 @@ function renderFinesTable(fines) {
         finesCountBadge.textContent = fines.length;
     }
 
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
+    const isHod = AppState.currentUser && (AppState.currentUser.role === 'hod' || (AppState.currentUser.designation && AppState.currentUser.designation.toLowerCase().includes('hod')));
+    const canManage = (isAdmin || isHod);
+
     if (!fines || fines.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="8" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
                     <div style="font-size: 32px; margin-bottom: 8px;">✨</div>
                     <div style="font-weight: 700; font-size: 14px;">No Disciplinary Fines Recorded</div>
-                    <div style="font-size: 12px; margin-top: 4px;">Click "+ Issue Direct Fine" above to log a penalty or violation.</div>
+                    <div style="font-size: 12px; margin-top: 4px;">
+                        ${canManage 
+                            ? 'Click "+ Issue Direct Fine" above to log a penalty or violation.' 
+                            : 'You have no disciplinary fines recorded.'}
+                    </div>
                 </td>
             </tr>
         `;
         return;
     }
-
-    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
 
     const categoryBadges = {
         late_arrival: { label: '⏱️ Late Arrival', bg: 'rgba(245, 158, 11, 0.12)', color: '#d97706' },
@@ -3261,6 +3332,13 @@ function renderFinesTable(fines) {
 }
 
 async function openIssueFineModal() {
+    const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
+    const isHod = AppState.currentUser && (AppState.currentUser.role === 'hod' || (AppState.currentUser.designation && AppState.currentUser.designation.toLowerCase().includes('hod')));
+    if (!isAdmin && !isHod) {
+        showToast("Access denied: Only Admins, HR and HODs can issue direct fines.", "error");
+        return;
+    }
+
     await populateHrEmployeeDropdowns();
     const today = new Date().toISOString().slice(0, 10);
     const currentMonth = today.slice(0, 7);

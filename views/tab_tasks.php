@@ -120,13 +120,13 @@
                     <table class="interactive-table">
                         <thead>
                             <tr>
-                                <th style="width: 15%;">Assigned To</th>
+                                <th style="width: 15%;" id="th-task-person">Assigned To</th>
                                 <th style="width: 20%;">Task Title</th>
-                                <th style="width: 26%;">Description & Link</th>
+                                <th style="width: 25%;">Description & Link</th>
                                 <th style="width: 10%;">Assigned</th>
                                 <th style="width: 10%;">Completed</th>
-                                <th style="width: 11%;">Status</th>
-                                <th style="width: 8%; text-align: center;">Actions</th>
+                                <th style="width: 10%;">Status</th>
+                                <th style="width: 10%; text-align: center;" id="th-task-actions">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="admin-tasks-tbody">
