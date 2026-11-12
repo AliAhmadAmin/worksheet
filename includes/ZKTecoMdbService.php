@@ -446,7 +446,7 @@ PS1;
 
         $result = $this->importPunches($mdbPath, $startWindow, null, 2000);
         if ($result['success']) {
-            $stmtMax = $this->pdo->query("SELECT MAX(punch_time) FROM zkteco_punch_logs");
+            $stmtMax = $this->pdo->query("SELECT MAX(punch_time) FROM zkteco_attendance_logs");
             $newestPunch = $stmtMax ? $stmtMax->fetchColumn() : null;
             $newestPunch = $newestPunch ?: ($lastPunch ?: date('Y-m-d H:i:s'));
 

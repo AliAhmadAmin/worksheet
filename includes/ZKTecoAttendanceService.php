@@ -12,6 +12,77 @@ class ZKTecoAttendanceService {
 
     public function __construct($pdo = null) {
         $this->pdo = $pdo ?: getDbConnection();
+        $this->ensureTablesExist();
+    }
+
+    /**
+     * Auto-create required ZKTeco database tables if they do not exist.
+     */
+    private function ensureTablesExist() {
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS `zkteco_settings` (
+                    `id` int(11) NOT NULL DEFAULT 1,
+                    `is_enabled` tinyint(1) NOT NULL DEFAULT 1,
+                    `auto_apply_sheet` tinyint(1) NOT NULL DEFAULT 1,
+                    `check_in_mode` enum('smart','first_punch','punch_state') NOT NULL DEFAULT 'smart',
+                    `check_out_mode` enum('smart','last_punch','punch_state') NOT NULL DEFAULT 'smart',
+                    `server_port` int(11) NOT NULL DEFAULT 80,
+                    `timezone_offset` int(11) NOT NULL DEFAULT 5,
+                    `push_interval_sec` int(11) NOT NULL DEFAULT 10,
+                    `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+                    `mdb_default_path` varchar(255) DEFAULT NULL,
+                    `mdb_auto_sync_enabled` tinyint(1) DEFAULT 1,
+                    `mdb_sync_interval_mins` int(11) DEFAULT 15,
+                    `mdb_last_sync_time` datetime DEFAULT NULL,
+                    `mdb_last_punch_time` datetime DEFAULT NULL,
+                    `mdb_last_sync_status` varchar(255) DEFAULT NULL,
+                    PRIMARY KEY (`id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+                INSERT IGNORE INTO `zkteco_settings` (`id`, `is_enabled`, `auto_apply_sheet`) VALUES (1, 1, 1);
+
+                CREATE TABLE IF NOT EXISTS `zkteco_devices` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `device_name` varchar(100) NOT NULL DEFAULT 'Main Office ZKTeco',
+                    `serial_number` varchar(100) DEFAULT NULL,
+                    `ip_address` varchar(45) DEFAULT NULL,
+                    `port` int(11) NOT NULL DEFAULT 4370,
+                    `comm_key` int(11) NOT NULL DEFAULT 0,
+                    `device_model` varchar(50) DEFAULT NULL,
+                    `firmware_version` varchar(50) DEFAULT NULL,
+                    `user_count` int(11) NOT NULL DEFAULT 0,
+                    `finger_count` int(11) NOT NULL DEFAULT 0,
+                    `log_count` int(11) NOT NULL DEFAULT 0,
+                    `status` enum('online','offline') NOT NULL DEFAULT 'offline',
+                    `last_activity` datetime DEFAULT NULL,
+                    `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+                    `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+                    PRIMARY KEY (`id`),
+                    UNIQUE KEY `serial_number` (`serial_number`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+                CREATE TABLE IF NOT EXISTS `zkteco_attendance_logs` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `device_sn` varchar(100) DEFAULT NULL,
+                    `device_user_id` varchar(50) NOT NULL COMMENT 'PIN / User ID on Machine',
+                    `employee_id` int(11) DEFAULT NULL,
+                    `punch_time` datetime NOT NULL,
+                    `punch_date` date NOT NULL,
+                    `punch_state` varchar(20) NOT NULL DEFAULT 'auto',
+                    `verify_type` varchar(20) NOT NULL DEFAULT 'fingerprint',
+                    `sheet_id` int(11) DEFAULT NULL,
+                    `status` enum('applied','unmatched','ignored','duplicate') NOT NULL DEFAULT 'applied',
+                    `remarks` text DEFAULT NULL,
+                    `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+                    PRIMARY KEY (`id`),
+                    KEY `idx_user_time` (`device_user_id`,`punch_time`),
+                    KEY `idx_emp_date` (`employee_id`,`punch_date`),
+                    KEY `idx_sheet` (`sheet_id`),
+                    KEY `idx_punch_time` (`punch_time`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ");
+        } catch (Exception $e) {}
     }
 
     /**
