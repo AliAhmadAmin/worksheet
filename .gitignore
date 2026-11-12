@@ -13,8 +13,12 @@ worksheet_export_*.sql
 # User-uploaded files (avatars, images)
 uploads/*
 !uploads/.gitkeep
+!uploads/avatars/
 uploads/avatars/*
 !uploads/avatars/.gitkeep
+!uploads/zkteco/
+uploads/zkteco/*
+!uploads/zkteco/.gitkeep
 
 # OS / IDE
 .DS_Store

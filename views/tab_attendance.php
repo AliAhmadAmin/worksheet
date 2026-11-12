@@ -620,6 +620,9 @@ try {
                     </p>
                 </div>
                 <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openMdbModal()">
+                        📂 Import from .MDB
+                    </button>
                     <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openSimModal()">
                         🧪 Test Simulator
                     </button>
@@ -840,6 +843,205 @@ try {
                         <button type="submit" class="btn btn-primary">⚡ Punch Biometric</button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- ================= MODAL: ZKTECO ACCESS .MDB DATABASE IMPORT ================= -->
+        <div id="zk-mdb-modal" class="modal-overlay">
+            <div class="modal-card" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+                        <span>📂</span> Import Punches from ZKTeco (.MDB File)
+                    </h3>
+                    <button type="button" class="modal-close" onclick="closeModal('zk-mdb-modal')">&times;</button>
+                </div>
+                <div class="modal-body" style="max-height: 80vh; overflow-y: auto;">
+                    <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5;">
+                        Directly read biometric logs from ZKTime / Attendance Management software Access database (<code>attBackup.mdb</code> or <code>att2000.mdb</code>). Punches will be mapped to employees and recorded into their daily duty timesheets.
+                    </p>
+
+                    <!-- Source Selection Tabs -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <button type="button" id="zk-mdb-tab-local" class="btn btn-primary" style="flex: 1; padding: 6px 10px; font-size: 12px; font-weight: 700;" onclick="ZKTecoAtt.switchMdbTab('local')">
+                            🖥️ Local / Server File Path
+                        </button>
+                        <button type="button" id="zk-mdb-tab-upload" class="btn btn-outline" style="flex: 1; padding: 6px 10px; font-size: 12px; font-weight: 700;" onclick="ZKTecoAtt.switchMdbTab('upload')">
+                            📤 Upload .MDB File
+                        </button>
+                    </div>
+
+                    <!-- Tab 1: Local Path -->
+                    <div id="zk-mdb-pane-local">
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label class="form-label" style="font-size: 11.5px; font-weight: 700;">
+                                .MDB File Full Path or Network Shared Path
+                            </label>
+                            <input type="text" id="zk-mdb-path-input" class="input-control" placeholder="\\10.0.0.x\share\attBackup.mdb or C:\ZKTeco\attBackup.mdb" style="width: 100%; font-family: monospace; font-size: 12px;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                                Enter local path (e.g. <code>C:\ZKTeco\attBackup.mdb</code>) or network shared folder path (e.g. <code>\\10.0.0.50\shared\attBackup.mdb</code>).
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Upload File -->
+                    <div id="zk-mdb-pane-upload" style="display: none;">
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label class="form-label" style="font-size: 11.5px; font-weight: 700;">
+                                Choose .MDB / .ACCDB File from your computer / Shared Folder
+                            </label>
+                            <input type="file" id="zk-mdb-file-input" class="input-control" accept=".mdb,.accdb" onchange="ZKTecoAtt.onMdbFileSelected()" style="width: 100%; padding: 7px;">
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                                Browse to your shared folder and select <code>attBackup.mdb</code> or <code>att2000.mdb</code>.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date Filtering Controls -->
+                    <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px;">
+                        <div style="font-size: 11.5px; font-weight: 800; color: var(--text-main); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                            <span>🗓️ Manual Date Range Import (Optional)</span>
+                            <div style="display: flex; gap: 4px;">
+                                <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 10.5px;" onclick="ZKTecoAtt.setMdbDatePreset('today')">Today</button>
+                                <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 10.5px;" onclick="ZKTecoAtt.setMdbDatePreset('month')">This Month</button>
+                                <button type="button" class="btn btn-outline" style="padding: 2px 7px; font-size: 10.5px;" onclick="ZKTecoAtt.setMdbDatePreset('all')">All Time</button>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px;">
+                            <div>
+                                <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">Start Date</label>
+                                <input type="date" id="zk-mdb-start-date" class="input-control" style="width: 100%; font-size: 12px;">
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px;">End Date</label>
+                                <input type="date" id="zk-mdb-end-date" class="input-control" style="width: 100%; font-size: 12px;">
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                            <label style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="zk-mdb-save-default" checked>
+                                Remember file path as default
+                            </label>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 11px; color: var(--text-muted);">Batch limit:</span>
+                                <select id="zk-mdb-limit" class="input-control" style="font-size: 11px; padding: 3px 6px;">
+                                    <option value="1000">1,000</option>
+                                    <option value="5000" selected>5,000</option>
+                                    <option value="10000">10,000</option>
+                                    <option value="0">All</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Automated Background Sync Configuration Card -->
+                    <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px;">
+                        <div style="font-size: 11.5px; font-weight: 800; color: var(--text-main); margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="display: flex; align-items: center; gap: 6px;">
+                                <span>⚡</span> Automated Background Sync Schedule
+                            </span>
+                            <span id="zk-auto-sync-status-pill" style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(5,150,105,0.12); color: #059669;">
+                                Enabled
+                            </span>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4;">
+                            Worksheet automatically checks your shared <code>attBackup.mdb</code> for new punches at your chosen interval without manual clicking.
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; margin-bottom: 10px;">
+                            <div>
+                                <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Sync Interval</label>
+                                <select id="zk-mdb-sync-interval" class="input-control" style="width: 100%; font-size: 11.5px; font-weight: 700;">
+                                    <option value="5">Every 5 Minutes</option>
+                                    <option value="10">Every 10 Minutes</option>
+                                    <option value="15" selected>Every 15 Minutes (Recommended)</option>
+                                    <option value="30">Every 30 Minutes</option>
+                                    <option value="60">Every 60 Minutes (1 Hour)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Background Auto-Sync</label>
+                                <div style="display: flex; gap: 6px; align-items: center; margin-top: 6px;">
+                                    <label style="font-size: 11.5px; color: var(--text-main); display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
+                                        <input type="checkbox" id="zk-mdb-auto-sync-toggle" checked onchange="ZKTecoAtt.toggleAutoSyncUI()">
+                                        Enable Auto-Sync
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-card); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 11px;">
+                            <div>
+                                <span style="color: var(--text-muted);">Last Sync:</span>
+                                <b id="zk-mdb-last-sync-time" style="color: var(--text-main); margin-left: 4px;">Never</b>
+                                <div id="zk-mdb-last-sync-status" style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;"></div>
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 10.5px; font-weight: 700;" onclick="ZKTecoAtt.saveAutoSyncSettings()">
+                                    💾 Save Schedule
+                                </button>
+                                <button type="button" id="zk-sync-now-btn" class="btn btn-outline" style="padding: 3px 8px; font-size: 10.5px; font-weight: 700; color: #059669; border-color: rgba(5,150,105,0.4);" onclick="ZKTecoAtt.triggerSyncNow()">
+                                    ⚡ Sync Now
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Windows Background Service Command Tooltip -->
+                        <div style="margin-top: 8px; font-size: 10.5px; color: var(--text-muted);">
+                            <details style="cursor: pointer;">
+                                <summary style="font-weight: 700; color: #3b82f6;">🖥️ How to run 24/7 in Windows Task Scheduler</summary>
+                                <div style="margin-top: 6px; padding: 6px 8px; background: var(--bg-card); border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: monospace; font-size: 10px; word-break: break-all;">
+                                    schtasks /create /tn "ZKTeco_Worksheet_Sync" /tr "C:\xampp\php\php.exe C:\xampp\htdocs\Worksheet\cron\sync_zkteco_mdb.php" /sc minute /mo 15 /ru SYSTEM /f
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+
+                    <!-- Inspection / Stats Result Card -->
+                    <div id="zk-mdb-stats-card" style="display: none; background: rgba(5, 150, 105, 0.08); border: 1px solid #10b981; border-radius: var(--radius-md); padding: 12px; margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <div style="font-size: 12px; font-weight: 800; color: #059669; display: flex; align-items: center; gap: 6px;">
+                                <span>✅</span> Database Validated Successfully
+                            </div>
+                            <span id="zk-mdb-method-badge" style="font-size: 10px; font-weight: 700; background: #059669; color: #fff; padding: 2px 7px; border-radius: 10px;">Windows ADODB</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+                            <div style="background: var(--bg-card-elevated); padding: 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Total Punches</div>
+                                <div id="zk-mdb-stat-punches" style="font-size: 15px; font-weight: 900; color: var(--text-main);">0</div>
+                            </div>
+                            <div style="background: var(--bg-card-elevated); padding: 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Total Users</div>
+                                <div id="zk-mdb-stat-users" style="font-size: 15px; font-weight: 900; color: var(--text-main);">0</div>
+                            </div>
+                            <div style="background: var(--bg-card-elevated); padding: 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Date Range</div>
+                                <div id="zk-mdb-stat-dates" style="font-size: 10.5px; font-weight: 800; color: var(--text-main); margin-top: 3px;">N/A</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress / Status Spinner -->
+                    <div id="zk-mdb-progress-box" style="display: none; padding: 14px; text-align: center; background: var(--bg-card-elevated); border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 14px;">
+                        <div style="display: inline-block; width: 22px; height: 22px; border: 3px solid rgba(5,150,105,0.2); border-top-color: #059669; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                        <div id="zk-mdb-progress-msg" style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-top: 8px;">
+                            Reading database records...
+                        </div>
+                    </div>
+
+                    <!-- Import Summary Alert -->
+                    <div id="zk-mdb-summary-box" style="display: none; padding: 12px; border-radius: var(--radius-md); margin-bottom: 14px;"></div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('zk-mdb-modal')">Close</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" id="zk-mdb-test-btn" class="btn btn-outline" style="font-weight: 700;" onclick="ZKTecoAtt.testMdbConnection()">
+                            🔍 Test & Inspect
+                        </button>
+                        <button type="button" id="zk-mdb-import-btn" class="btn btn-primary" style="font-weight: 700;" onclick="ZKTecoAtt.executeMdbImport()">
+                            🚀 Start Import
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 

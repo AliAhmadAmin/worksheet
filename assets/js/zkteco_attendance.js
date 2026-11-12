@@ -15,6 +15,21 @@ const ZKTecoAtt = {
         this.loadDevices();
         this.loadLogs();
         this.populateSimEmployees();
+        this.startAutoSyncPoller();
+    },
+
+    startAutoSyncPoller() {
+        // Lightweight background ping every 2 minutes: triggers sync if due
+        setInterval(async () => {
+            try {
+                const res = await fetch('api/zkteco_manage.php?action=trigger_auto_sync');
+                const data = await res.json();
+                if (data && data.success && !data.skipped) {
+                    console.log('ZKTeco Auto-Sync completed:', data);
+                    this.loadLogs();
+                }
+            } catch (e) {}
+        }, 120000); // 2 minutes
     },
 
     async loadSettings() {
@@ -201,7 +216,22 @@ const ZKTecoAtt = {
         if (!container) return;
 
         if (this.devices.length === 0) {
-            container.innerHTML = `<div style="font-size: 12px; color: var(--text-muted); padding: 8px;">No ZKTeco biometric devices registered yet.</div>`;
+            container.innerHTML = `
+                <div style="background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; grid-column: 1 / -1; width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 22px;">📟</span>
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: var(--text-main);">No Physical Biometric Machines Connected Yet</div>
+                            <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+                                Ready to receive live punches. Set Server IP in your K50 machine under <b>Comm. &rarr; Cloud Server / ADMS</b> or import logs via <b>📂 Import from .MDB</b>.
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openSetupModal()">
+                        ⚙️ View Setup Details
+                    </button>
+                </div>
+            `;
             return;
         }
 
@@ -232,11 +262,34 @@ const ZKTecoAtt = {
                         <div style="font-size: 11px; color: var(--text-muted);">
                             Last seen: <b>${d.last_activity ? escapeHtml(d.last_activity) : 'Never'}</b>
                         </div>
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; color: #dc2626; border-color: rgba(220,38,38,0.3);" title="Remove Device" onclick="ZKTecoAtt.deleteDevice(${d.id})">
+                            🗑️
+                        </button>
                     </div>
                 </div>
             `;
         });
         container.innerHTML = html;
+    },
+
+    async deleteDevice(id) {
+        if (!confirm('Are you sure you want to remove this device entry?')) return;
+        try {
+            const res = await fetch('api/zkteco_manage.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_device', id: id })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+                this.loadDevices();
+            } else {
+                showToast(data.message || 'Failed to remove device', 'error');
+            }
+        } catch (e) {
+            showToast('Error removing device: ' + e.message, 'error');
+        }
     },
 
     renderLogsTable() {
@@ -423,6 +476,411 @@ const ZKTecoAtt = {
         if (urlEl && urlEl.textContent) {
             navigator.clipboard.writeText(urlEl.textContent.trim());
             showToast('ADMS Webhook URL copied to clipboard!', 'success');
+        }
+    },
+
+    /* ==========================================================================
+       ZKTeco Access Database (.MDB) Import Handlers
+       ========================================================================== */
+    mdbMode: 'local',
+    uploadedMdbPath: '',
+    uploadedFileSignature: '',
+
+    async openMdbModal() {
+        openModal('zk-mdb-modal');
+        this.switchMdbTab(this.mdbMode || 'local');
+        this.uploadedMdbPath = '';
+        this.uploadedFileSignature = '';
+        
+        // Hide previous stats and summaries
+        const statsCard = document.getElementById('zk-mdb-stats-card');
+        const summaryBox = document.getElementById('zk-mdb-summary-box');
+        const progressBox = document.getElementById('zk-mdb-progress-box');
+        if (statsCard) statsCard.style.display = 'none';
+        if (summaryBox) summaryBox.style.display = 'none';
+        if (progressBox) progressBox.style.display = 'none';
+
+        // Load default/remembered database path and schedule settings
+        try {
+            const res = await fetch('api/zkteco_manage.php?action=get_default_mdb_path');
+            const data = await res.json();
+            if (data.success) {
+                if (data.default_path) {
+                    const pathInput = document.getElementById('zk-mdb-path-input');
+                    if (pathInput && !pathInput.value) {
+                        pathInput.value = data.default_path;
+                    }
+                }
+                this.populateAutoSyncSettings(data);
+            }
+        } catch (e) {
+            console.error('Error fetching default MDB path:', e);
+        }
+    },
+
+    populateAutoSyncSettings(data) {
+        const intervalSelect = document.getElementById('zk-mdb-sync-interval');
+        const toggle = document.getElementById('zk-mdb-auto-sync-toggle');
+        const lastSyncTimeEl = document.getElementById('zk-mdb-last-sync-time');
+        const lastSyncStatusEl = document.getElementById('zk-mdb-last-sync-status');
+
+        if (intervalSelect && data.sync_interval_mins) {
+            intervalSelect.value = String(data.sync_interval_mins);
+        }
+        if (toggle && typeof data.auto_sync_enabled !== 'undefined') {
+            toggle.checked = data.auto_sync_enabled !== 0;
+        }
+        if (lastSyncTimeEl) {
+            lastSyncTimeEl.textContent = data.last_sync_time ? data.last_sync_time : 'Never';
+        }
+        if (lastSyncStatusEl && data.last_sync_status) {
+            lastSyncStatusEl.textContent = data.last_sync_status;
+        }
+        this.toggleAutoSyncUI();
+    },
+
+    toggleAutoSyncUI() {
+        const toggle = document.getElementById('zk-mdb-auto-sync-toggle');
+        const pill = document.getElementById('zk-auto-sync-status-pill');
+        if (!pill || !toggle) return;
+
+        if (toggle.checked) {
+            pill.textContent = 'Enabled';
+            pill.style.background = 'rgba(5,150,105,0.12)';
+            pill.style.color = '#059669';
+        } else {
+            pill.textContent = 'Disabled';
+            pill.style.background = 'rgba(107,114,128,0.15)';
+            pill.style.color = '#6b7280';
+        }
+    },
+
+    async saveAutoSyncSettings() {
+        const toggle = document.getElementById('zk-mdb-auto-sync-toggle');
+        const intervalSelect = document.getElementById('zk-mdb-sync-interval');
+        const pathInput = document.getElementById('zk-mdb-path-input');
+
+        const isEnabled = toggle ? (toggle.checked ? 1 : 0) : 1;
+        const intervalMins = intervalSelect ? parseInt(intervalSelect.value, 10) : 15;
+        const mdbPath = pathInput ? pathInput.value.trim() : '';
+
+        try {
+            const res = await fetch('api/zkteco_manage.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'save_mdb_settings',
+                    auto_sync_enabled: isEnabled,
+                    sync_interval_mins: intervalMins,
+                    mdb_path: mdbPath
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+                this.toggleAutoSyncUI();
+            } else {
+                showToast(data.message || 'Failed to save settings', 'error');
+            }
+        } catch (e) {
+            showToast('Error saving auto-sync settings: ' + e.message, 'error');
+        }
+    },
+
+    async triggerSyncNow() {
+        const syncBtn = document.getElementById('zk-sync-now-btn');
+        const lastSyncTimeEl = document.getElementById('zk-mdb-last-sync-time');
+        const lastSyncStatusEl = document.getElementById('zk-mdb-last-sync-status');
+
+        if (syncBtn) {
+            syncBtn.disabled = true;
+            syncBtn.textContent = '⏳ Syncing...';
+        }
+
+        try {
+            const res = await fetch('api/zkteco_manage.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'trigger_auto_sync',
+                    force: true
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message || 'Auto-sync completed successfully!', 'success');
+                if (lastSyncTimeEl) {
+                    lastSyncTimeEl.textContent = data.last_sync || 'Just now';
+                }
+                if (lastSyncStatusEl && data.status_msg) {
+                    lastSyncStatusEl.textContent = data.status_msg;
+                }
+                this.loadLogs();
+            } else {
+                showToast(data.message || 'Sync failed', 'error');
+            }
+        } catch (e) {
+            showToast('Error triggering sync: ' + e.message, 'error');
+        } finally {
+            if (syncBtn) {
+                syncBtn.disabled = false;
+                syncBtn.textContent = '⚡ Sync Now';
+            }
+        }
+    },
+
+    switchMdbTab(tab) {
+        this.mdbMode = tab;
+        const tabLocal = document.getElementById('zk-mdb-tab-local');
+        const tabUpload = document.getElementById('zk-mdb-tab-upload');
+        const paneLocal = document.getElementById('zk-mdb-pane-local');
+        const paneUpload = document.getElementById('zk-mdb-pane-upload');
+
+        if (tab === 'local') {
+            if (tabLocal) { tabLocal.className = 'btn btn-primary'; }
+            if (tabUpload) { tabUpload.className = 'btn btn-outline'; }
+            if (paneLocal) paneLocal.style.display = 'block';
+            if (paneUpload) paneUpload.style.display = 'none';
+        } else {
+            if (tabLocal) { tabLocal.className = 'btn btn-outline'; }
+            if (tabUpload) { tabUpload.className = 'btn btn-primary'; }
+            if (paneLocal) paneLocal.style.display = 'none';
+            if (paneUpload) paneUpload.style.display = 'block';
+        }
+    },
+
+    onMdbFileSelected() {
+        this.uploadedMdbPath = '';
+        this.uploadedFileSignature = '';
+        const statsCard = document.getElementById('zk-mdb-stats-card');
+        const summaryBox = document.getElementById('zk-mdb-summary-box');
+        if (statsCard) statsCard.style.display = 'none';
+        if (summaryBox) summaryBox.style.display = 'none';
+        
+        // Auto-run inspect when a file is picked from disk or shared folder
+        this.testMdbConnection();
+    },
+
+    async ensureMdbUploaded() {
+        const fileInput = document.getElementById('zk-mdb-file-input');
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            throw new Error('Please select an .MDB file (e.g. attBackup.mdb) first.');
+        }
+
+        const file = fileInput.files[0];
+        const signature = file.name + '_' + file.size + '_' + file.lastModified;
+
+        // If already uploaded this exact file, return cached path
+        if (this.uploadedMdbPath && this.uploadedFileSignature === signature) {
+            return this.uploadedMdbPath;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'upload_mdb');
+        formData.append('mdb_file', file);
+
+        const res = await fetch('api/zkteco_manage.php', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (!data.success || !data.uploaded_path) {
+            throw new Error(data.message || 'File upload failed');
+        }
+
+        this.uploadedMdbPath = data.uploaded_path;
+        this.uploadedFileSignature = signature;
+        return this.uploadedMdbPath;
+    },
+
+    setMdbDatePreset(preset) {
+        const startInput = document.getElementById('zk-mdb-start-date');
+        const endInput = document.getElementById('zk-mdb-end-date');
+        if (!startInput || !endInput) return;
+
+        const now = new Date();
+        const formatDate = (d) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+
+        if (preset === 'today') {
+            const todayStr = formatDate(now);
+            startInput.value = todayStr;
+            endInput.value = todayStr;
+        } else if (preset === 'month') {
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            startInput.value = formatDate(firstDay);
+            endInput.value = formatDate(now);
+        } else if (preset === 'all') {
+            startInput.value = '';
+            endInput.value = '';
+        }
+    },
+
+    async testMdbConnection() {
+        const statsCard = document.getElementById('zk-mdb-stats-card');
+        const progressBox = document.getElementById('zk-mdb-progress-box');
+        const summaryBox = document.getElementById('zk-mdb-summary-box');
+        const testBtn = document.getElementById('zk-mdb-test-btn');
+
+        if (summaryBox) summaryBox.style.display = 'none';
+        if (progressBox) {
+            progressBox.style.display = 'block';
+            document.getElementById('zk-mdb-progress-msg').textContent = 'Connecting and reading .MDB database schema...';
+        }
+        if (testBtn) testBtn.disabled = true;
+
+        try {
+            let targetPath = '';
+            if (this.mdbMode === 'upload') {
+                targetPath = await this.ensureMdbUploaded();
+            } else {
+                const pathInput = document.getElementById('zk-mdb-path-input');
+                targetPath = pathInput ? pathInput.value.trim() : '';
+                if (!targetPath) {
+                    throw new Error('Please enter the full file path or shared network path.');
+                }
+            }
+
+            const res = await fetch(`api/zkteco_manage.php?action=test_mdb&mdb_path=${encodeURIComponent(targetPath)}`);
+            const data = await res.json();
+
+            if (data && data.success) {
+                if (statsCard) {
+                    statsCard.style.display = 'block';
+                    document.getElementById('zk-mdb-stat-punches').textContent = Number(data.total_punches || 0).toLocaleString();
+                    document.getElementById('zk-mdb-stat-users').textContent = Number(data.total_users || 0).toLocaleString();
+                    document.getElementById('zk-mdb-stat-dates').textContent = (data.min_date && data.max_date) ? `${data.min_date} to ${data.max_date}` : 'None';
+                    
+                    const badge = document.getElementById('zk-mdb-method-badge');
+                    if (badge) {
+                        const methodLabels = {
+                            'pdo_odbc': 'ODBC (PDO)',
+                            'native_odbc': 'Native ODBC',
+                            'windows_adodb_bridge': 'Windows ADODB (32-bit Jet)'
+                        };
+                        badge.textContent = methodLabels[data.method] || data.method || 'Connected';
+                    }
+                }
+                showToast(`Database verified: ${data.total_punches} records found!`, 'success');
+            } else {
+                if (statsCard) statsCard.style.display = 'none';
+                showToast(data.message || 'Failed to connect to .MDB file.', 'error');
+            }
+        } catch (err) {
+            if (statsCard) statsCard.style.display = 'none';
+            showToast(err.message, 'error');
+        } finally {
+            if (progressBox) progressBox.style.display = 'none';
+            if (testBtn) testBtn.disabled = false;
+        }
+    },
+
+    async executeMdbImport() {
+        const progressBox = document.getElementById('zk-mdb-progress-box');
+        const summaryBox = document.getElementById('zk-mdb-summary-box');
+        const importBtn = document.getElementById('zk-mdb-import-btn');
+
+        let targetMdbPath = '';
+        if (this.mdbMode === 'upload') {
+            if (progressBox) {
+                progressBox.style.display = 'block';
+                document.getElementById('zk-mdb-progress-msg').textContent = 'Uploading .MDB file...';
+            }
+            try {
+                targetMdbPath = await this.ensureMdbUploaded();
+            } catch (e) {
+                if (progressBox) progressBox.style.display = 'none';
+                showToast(e.message, 'error');
+                return;
+            }
+        } else {
+            const pathInput = document.getElementById('zk-mdb-path-input');
+            targetMdbPath = pathInput ? pathInput.value.trim() : '';
+            if (!targetMdbPath) {
+                showToast('Please enter the .MDB file path.', 'warning');
+                return;
+            }
+        }
+
+        const startDate = document.getElementById('zk-mdb-start-date') ? document.getElementById('zk-mdb-start-date').value : '';
+        const endDate = document.getElementById('zk-mdb-end-date') ? document.getElementById('zk-mdb-end-date').value : '';
+        const limit = document.getElementById('zk-mdb-limit') ? document.getElementById('zk-mdb-limit').value : 5000;
+        const saveDefault = document.getElementById('zk-mdb-save-default') ? document.getElementById('zk-mdb-save-default').checked : false;
+
+        if (progressBox) {
+            progressBox.style.display = 'block';
+            document.getElementById('zk-mdb-progress-msg').textContent = 'Reading records from database and syncing timesheets (may take a few moments)...';
+        }
+        if (summaryBox) summaryBox.style.display = 'none';
+        if (importBtn) {
+            importBtn.disabled = true;
+            importBtn.textContent = '⏳ Importing...';
+        }
+
+        try {
+            const res = await fetch('api/zkteco_manage.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'import_mdb',
+                    mdb_path: targetMdbPath,
+                    start_date: startDate,
+                    end_date: endDate,
+                    limit: parseInt(limit, 10),
+                    save_as_default: saveDefault
+                })
+            });
+
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (jsonErr) {
+                throw new Error('Server response error: ' + text.replace(/<[^>]*>?/gm, ' ').substring(0, 150));
+            }
+            if (data.success) {
+                const s = data.stats || {};
+                showToast(data.message, 'success');
+                if (summaryBox) {
+                    summaryBox.style.display = 'block';
+                    summaryBox.style.background = 'rgba(5, 150, 105, 0.1)';
+                    summaryBox.style.border = '1px solid #10b981';
+                    summaryBox.innerHTML = `
+                        <div style="font-weight: 800; color: #059669; font-size: 13px; margin-bottom: 6px;">🎉 Import Successful!</div>
+                        <div style="font-size: 12px; color: var(--text-main); line-height: 1.6;">
+                            <b>Total Read:</b> ${s.total_processed || 0} punches<br>
+                            <span style="color: #059669;">✔ <b>Applied to Timesheets:</b> ${s.applied || 0}</span><br>
+                            <span style="color: var(--text-muted);">⏭ <b>Duplicates Skipped:</b> ${s.duplicate || 0}</span><br>
+                            ${(s.unmatched > 0) ? `<span style="color: #d97706;">⚠️ <b>Unmatched PINs:</b> ${s.unmatched} (ensure employee PIN matches Badgenumber)</span>` : ''}
+                        </div>
+                    `;
+                }
+                // Refresh logs stream and statistics
+                this.loadLogs();
+            } else {
+                showToast(data.message || 'Failed to import from MDB.', 'error');
+                if (summaryBox) {
+                    summaryBox.style.display = 'block';
+                    summaryBox.style.background = 'rgba(239, 68, 68, 0.1)';
+                    summaryBox.style.border = '1px solid #ef4444';
+                    summaryBox.innerHTML = `
+                        <div style="font-weight: 800; color: #dc2626; font-size: 13px;">❌ Import Failed</div>
+                        <div style="font-size: 11.5px; color: var(--text-main); margin-top: 4px;">${escapeHtml(data.message || 'Unknown error')}</div>
+                    `;
+                }
+            }
+        } catch (err) {
+            showToast('Error executing MDB import: ' + err.message, 'error');
+        } finally {
+            if (progressBox) progressBox.style.display = 'none';
+            if (importBtn) {
+                importBtn.disabled = false;
+                importBtn.textContent = '🚀 Start Import';
+            }
         }
     }
 };

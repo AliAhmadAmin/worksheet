@@ -7,13 +7,17 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+set_time_limit(300);
+ini_set('memory_limit', '512M');
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
+require_once __DIR__ . '/../includes/ZKTecoMdbService.php';
 
 $pdo = getDbConnection();
 $service = new ZKTecoAttendanceService($pdo);
+$mdbService = new ZKTecoMdbService($pdo);
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 $data = [];
@@ -221,6 +225,152 @@ switch ($action) {
             'server_domain' => $host,
             'adms_cdata_url' => $protocol . $host . '/Worksheet/iclock/cdata.php'
         ]);
+        break;
+
+    case 'get_default_mdb_path':
+        $stmt = $pdo->query("SELECT mdb_default_path, mdb_auto_sync_enabled, mdb_sync_interval_mins, mdb_last_sync_time, mdb_last_sync_status FROM zkteco_settings WHERE id = 1");
+        $row = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : [];
+        $savedPath = $row['mdb_default_path'] ?? '';
+        
+        $candidates = [
+            'C:\\Program Files (x86)\\ZKTeco\\attBackup.mdb',
+            'C:\\Program Files (x86)\\ZKTeco\\att2000.mdb',
+            'C:\\Program Files\\ZKTeco\\attBackup.mdb',
+            'C:\\Program Files\\ZKTeco\\att2000.mdb',
+            'C:\\ZKTeco\\attBackup.mdb',
+            'C:\\ZKTeco\\att2000.mdb',
+            'C:\\attBackup.mdb',
+            'C:\\att2000.mdb'
+        ];
+        $detectedPath = '';
+        if (!empty($savedPath) && file_exists($savedPath)) {
+            $detectedPath = $savedPath;
+        } else {
+            foreach ($candidates as $cand) {
+                if (file_exists($cand)) {
+                    $detectedPath = $cand;
+                    break;
+                }
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'default_path' => $detectedPath ?: ($savedPath ?: 'C:\\Program Files (x86)\\ZKTeco\\attBackup.mdb'),
+            'saved_path' => $savedPath,
+            'file_exists' => !empty($detectedPath) && file_exists($detectedPath),
+            'auto_sync_enabled' => isset($row['mdb_auto_sync_enabled']) ? (int)$row['mdb_auto_sync_enabled'] : 1,
+            'sync_interval_mins' => isset($row['mdb_sync_interval_mins']) ? (int)$row['mdb_sync_interval_mins'] : 15,
+            'last_sync_time' => $row['mdb_last_sync_time'] ?? null,
+            'last_sync_status' => $row['mdb_last_sync_status'] ?? null
+        ]);
+        break;
+
+    case 'test_mdb':
+        $mdbPath = trim($data['mdb_path'] ?? ($_GET['mdb_path'] ?? ''));
+        if (empty($mdbPath)) {
+            echo json_encode(['success' => false, 'message' => 'Please provide a valid .mdb file path.']);
+            break;
+        }
+        $res = $mdbService->inspectDatabase($mdbPath);
+        echo json_encode($res);
+        break;
+
+    case 'upload_mdb':
+        if (empty($_FILES['mdb_file']) || $_FILES['mdb_file']['error'] !== UPLOAD_ERR_OK) {
+            $errCode = $_FILES['mdb_file']['error'] ?? 'no_file';
+            $errMsgs = [
+                UPLOAD_ERR_INI_SIZE   => 'Uploaded file exceeds upload_max_filesize directive in php.ini.',
+                UPLOAD_ERR_FORM_SIZE  => 'Uploaded file exceeds MAX_FILE_SIZE specified in form.',
+                UPLOAD_ERR_PARTIAL    => 'File was only partially uploaded.',
+                UPLOAD_ERR_NO_FILE    => 'No file was uploaded.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Missing a temporary folder on server.',
+                UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk.',
+                UPLOAD_ERR_EXTENSION  => 'A PHP extension stopped the file upload.'
+            ];
+            echo json_encode(['success' => false, 'message' => $errMsgs[$errCode] ?? 'Upload error occurred (code ' . $errCode . ').']);
+            break;
+        }
+        $file = $_FILES['mdb_file'];
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if ($ext !== 'mdb' && $ext !== 'accdb') {
+            echo json_encode(['success' => false, 'message' => 'Invalid file extension. Only .mdb (Microsoft Access) files are supported.']);
+            break;
+        }
+        $uploadDir = realpath(__DIR__ . '/../uploads/zkteco');
+        if (!$uploadDir) {
+            $uploadDir = __DIR__ . '/../uploads/zkteco';
+            @mkdir($uploadDir, 0777, true);
+            $uploadDir = realpath($uploadDir) ?: $uploadDir;
+        }
+        $safeFileName = 'zkteco_' . date('Ymd_His') . '_' . preg_replace('/[^a-zA-Z0-9_\.-]/', '_', $file['name']);
+        $targetPath = rtrim($uploadDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $safeFileName;
+        if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+            echo json_encode(['success' => false, 'message' => 'Failed to save uploaded file on server.']);
+            break;
+        }
+        $fullPath = realpath($targetPath) ?: $targetPath;
+        echo json_encode([
+            'success' => true,
+            'uploaded_path' => $fullPath,
+            'file_name' => $file['name'],
+            'file_size' => filesize($fullPath),
+            'message' => 'File uploaded successfully.'
+        ]);
+        break;
+
+    case 'import_mdb':
+        $mdbPath = trim($data['mdb_path'] ?? '');
+        $startDate = !empty($data['start_date']) ? trim($data['start_date']) : null;
+        $endDate = !empty($data['end_date']) ? trim($data['end_date']) : null;
+        $limit = isset($data['limit']) ? (int)$data['limit'] : 5000;
+        $saveAsDefault = !empty($data['save_as_default']);
+
+        if (empty($mdbPath)) {
+            echo json_encode(['success' => false, 'message' => 'Database path is required.']);
+            break;
+        }
+
+        if ($saveAsDefault) {
+            try {
+                $stmtSave = $pdo->prepare("UPDATE zkteco_settings SET mdb_default_path = ? WHERE id = 1");
+                $stmtSave->execute([$mdbPath]);
+            } catch (Exception $e) {}
+        }
+
+        $importResult = $mdbService->importPunches($mdbPath, $startDate, $endDate, $limit);
+        echo json_encode($importResult);
+        break;
+
+    case 'save_mdb_settings':
+        if (!$isAdmin) {
+            echo json_encode(['success' => false, 'message' => 'Admin privileges required.']);
+            exit;
+        }
+
+        $enabled = !empty($data['auto_sync_enabled']) ? 1 : 0;
+        $intervalMins = max(1, (int)($data['sync_interval_mins'] ?? 15));
+        $mdbPath = trim($data['mdb_path'] ?? '');
+
+        $stmtSave = $pdo->prepare("
+            UPDATE zkteco_settings 
+            SET mdb_auto_sync_enabled = ?,
+                mdb_sync_interval_mins = ?,
+                mdb_default_path = IF(? != '', ?, mdb_default_path)
+            WHERE id = 1
+        ");
+        $stmtSave->execute([$enabled, $intervalMins, $mdbPath, $mdbPath]);
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Settings saved successfully! Auto-sync is set to every {$intervalMins} minutes."
+        ]);
+        break;
+
+    case 'trigger_auto_sync':
+        $force = !empty($data['force']) || !empty($_GET['force']);
+        $res = $mdbService->syncIncremental($force);
+        echo json_encode($res);
         break;
 
     default:

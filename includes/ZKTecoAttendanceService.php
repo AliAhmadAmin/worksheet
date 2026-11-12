@@ -29,7 +29,13 @@ class ZKTecoAttendanceService {
             'check_out_mode' => $settings['check_out_mode'] ?? 'smart',
             'server_port' => isset($settings['server_port']) ? (int)$settings['server_port'] : 80,
             'timezone_offset' => isset($settings['timezone_offset']) ? (int)$settings['timezone_offset'] : 5,
-            'push_interval_sec' => isset($settings['push_interval_sec']) ? (int)$settings['push_interval_sec'] : 10
+            'push_interval_sec' => isset($settings['push_interval_sec']) ? (int)$settings['push_interval_sec'] : 10,
+            'mdb_default_path' => $settings['mdb_default_path'] ?? null,
+            'mdb_auto_sync_enabled' => isset($settings['mdb_auto_sync_enabled']) ? (int)$settings['mdb_auto_sync_enabled'] : 1,
+            'mdb_sync_interval_mins' => isset($settings['mdb_sync_interval_mins']) ? (int)$settings['mdb_sync_interval_mins'] : 15,
+            'mdb_last_sync_time' => $settings['mdb_last_sync_time'] ?? null,
+            'mdb_last_punch_time' => $settings['mdb_last_punch_time'] ?? null,
+            'mdb_last_sync_status' => $settings['mdb_last_sync_status'] ?? null
         ];
     }
 
@@ -373,9 +379,9 @@ class ZKTecoAttendanceService {
             // First punch of the day -> Create Check-In
             $stmtInsert = $this->pdo->prepare("
                 INSERT INTO daily_sheets 
-                    (employee_id, sheet_date, check_in_time, remarks, status)
+                    (employee_id, sheet_date, check_in_time, remarks, is_locked)
                 VALUES 
-                    (?, ?, ?, ?, 'draft')
+                    (?, ?, ?, ?, 0)
             ");
             $stmtInsert->execute([
                 $empId, 
@@ -424,16 +430,35 @@ class ZKTecoAttendanceService {
                     ];
                 }
 
-                // Update Check-Out Time
+                // Calculate duty hours
+                $dutyFormatted = null;
+                $dutySeconds = 0;
+                if ($inTs) {
+                    $outTs = strtotime($punchDate . ' ' . $punchTimeStr);
+                    if ($outTs < $inTs) {
+                        $outTs += 86400; // Overnight shift
+                    }
+                    $dutySeconds = max(0, $outTs - $inTs);
+                    $h = floor($dutySeconds / 3600);
+                    $m = floor(($dutySeconds % 3600) / 60);
+                    $dutyFormatted = sprintf('%02d:%02d:00', $h, $m);
+                }
+
+                // Update Check-Out Time and Duty Hours
                 $stmtUp = $this->pdo->prepare("
                     UPDATE daily_sheets 
                     SET check_out_time = ?,
+                        total_duty_hours = COALESCE(?, total_duty_hours),
+                        total_duty_seconds = IF(? > 0, ?, total_duty_seconds),
                         remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 ");
                 $stmtUp->execute([
-                    $punchTimeStr, 
+                    $punchTimeStr,
+                    $dutyFormatted,
+                    $dutySeconds,
+                    $dutySeconds,
                     "[Biometric {$verifyType}] Out at {$punchTimeStr}", 
                     $sheet['id']
                 ]);
@@ -441,7 +466,7 @@ class ZKTecoAttendanceService {
                 return [
                     'status' => 'applied',
                     'sheet_id' => $sheet['id'],
-                    'remarks' => "Recorded Check-Out at {$punchTimeStr} via Biometric {$verifyType} for {$employee['name']}."
+                    'remarks' => "Recorded Check-Out at {$punchTimeStr} (Duty: " . ($dutyFormatted ?: 'N/A') . ") via Biometric {$verifyType} for {$employee['name']}."
                 ];
             }
         }
