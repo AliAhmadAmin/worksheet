@@ -381,6 +381,22 @@ function renderLiveAttendanceTable() {
 
         const canExcuseLate = (isSuperOrHr || (AppState.currentUser && AppState.currentUser.role === 'hod')) && (emp.is_late == 1 && !emp.late_excused && emp.check_in_time);
 
+        let sourcesInBadge = '';
+        if (emp.biometric_in_time && emp.biometric_in_time !== emp.check_in_time) {
+            sourcesInBadge += `<div style="font-size: 10px; color: #0284c7; font-weight: 600;" title="Biometric Check-In">📟 ${escapeHtml(emp.biometric_in_time)}</div>`;
+        }
+        if (emp.whatsapp_in_time && emp.whatsapp_in_time !== emp.check_in_time) {
+            sourcesInBadge += `<div style="font-size: 10px; color: #16a34a; font-weight: 600;" title="WhatsApp Check-In">💬 ${escapeHtml(emp.whatsapp_in_time)}</div>`;
+        }
+
+        let sourcesOutBadge = '';
+        if (emp.biometric_out_time && emp.biometric_out_time !== emp.check_out_time) {
+            sourcesOutBadge += `<div style="font-size: 10px; color: #0284c7; font-weight: 600;" title="Biometric Check-Out">📟 ${escapeHtml(emp.biometric_out_time)}</div>`;
+        }
+        if (emp.whatsapp_out_time && emp.whatsapp_out_time !== emp.check_out_time) {
+            sourcesOutBadge += `<div style="font-size: 10px; color: #16a34a; font-weight: 600;" title="WhatsApp Check-Out">💬 ${escapeHtml(emp.whatsapp_out_time)}</div>`;
+        }
+
         tr.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 8px; ${canInspect ? 'cursor: pointer;' : ''}" ${canInspect ? `onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')"` : ''} title="${canInspect ? 'Click to inspect ' + escapeHtml(emp.name) + '\'s worksheet' : ''}">
@@ -392,8 +408,14 @@ function renderLiveAttendanceTable() {
                 </div>
             </td>
             <td><span class="user-role-tag" style="background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">${escapeHtml(emp.department_name || 'Digital')}</span></td>
-            <td style="white-space: nowrap;"><code style="font-size: 12px; font-weight: 700; color: ${emp.check_in_time ? '#10b981' : 'var(--text-dim)'};">${escapeHtml(emp.check_in_time || '-')}</code>${lateBadge}</td>
-            <td style="white-space: nowrap;"><code style="font-size: 12px; font-weight: 700; color: ${emp.check_out_time ? '#3b82f6' : 'var(--text-dim)'};">${escapeHtml(emp.check_out_time || '-')}</code></td>
+            <td style="white-space: nowrap;">
+                <div><code style="font-size: 12px; font-weight: 700; color: ${emp.check_in_time ? '#10b981' : 'var(--text-dim)'};">${escapeHtml(emp.check_in_time || '-')}</code>${lateBadge}</div>
+                ${sourcesInBadge}
+            </td>
+            <td style="white-space: nowrap;">
+                <div><code style="font-size: 12px; font-weight: 700; color: ${emp.check_out_time ? '#3b82f6' : 'var(--text-dim)'};">${escapeHtml(emp.check_out_time || '-')}</code></div>
+                ${sourcesOutBadge}
+            </td>
             <td style="white-space: nowrap;"><strong style="font-size: 13px; color: ${emp.total_duty_hours ? 'var(--text-main)' : 'var(--text-dim)'};">${escapeHtml(emp.total_duty_hours || '-')}</strong></td>
             <td style="white-space: nowrap;">${statusBadge}</td>
             ${sheetStatusTd}
@@ -1014,12 +1036,22 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                         <span style="font-size: 11px; color: ${r.is_weekend ? '#f59e0b' : 'var(--text-muted)'}; font-weight: 600; margin-left: 3px;">(${escapeHtml(fullDay)})</span>
                     </td>
                     <td>
-                        <div style="display: flex; align-items: center;">
-                            <code style="font-size: 12px; color: ${r.check_in ? '#10b981' : 'var(--text-dim)'}; font-weight: 700;">${r.check_in ? formatTimeTo12h(r.check_in) : '-'}</code>
-                            ${latePillHtml}
+                        <div style="display: flex; flex-direction: column;">
+                            <div style="display: flex; align-items: center;">
+                                <code style="font-size: 12px; color: ${r.check_in ? '#10b981' : 'var(--text-dim)'}; font-weight: 700;">${r.check_in ? formatTimeTo12h(r.check_in) : '-'}</code>
+                                ${latePillHtml}
+                            </div>
+                            ${r.biometric_in && r.biometric_in !== r.check_in ? `<span style="font-size: 10px; color: #0284c7; font-weight: 600;" title="Biometric Check-In">📟 ${escapeHtml(r.biometric_in)}</span>` : ''}
+                            ${r.whatsapp_in && r.whatsapp_in !== r.check_in ? `<span style="font-size: 10px; color: #16a34a; font-weight: 600;" title="WhatsApp Check-In">💬 ${escapeHtml(r.whatsapp_in)}</span>` : ''}
                         </div>
                     </td>
-                    <td><code style="font-size: 12px; color: ${r.check_out ? '#3b82f6' : 'var(--text-dim)'}; font-weight: 700;">${r.check_out ? formatTimeTo12h(r.check_out) : '-'}</code></td>
+                    <td>
+                        <div style="display: flex; flex-direction: column;">
+                            <code style="font-size: 12px; color: ${r.check_out ? '#3b82f6' : 'var(--text-dim)'}; font-weight: 700;">${r.check_out ? formatTimeTo12h(r.check_out) : '-'}</code>
+                            ${r.biometric_out && r.biometric_out !== r.check_out ? `<span style="font-size: 10px; color: #0284c7; font-weight: 600;" title="Biometric Check-Out">📟 ${escapeHtml(r.biometric_out)}</span>` : ''}
+                            ${r.whatsapp_out && r.whatsapp_out !== r.check_out ? `<span style="font-size: 10px; color: #16a34a; font-weight: 600;" title="WhatsApp Check-Out">💬 ${escapeHtml(r.whatsapp_out)}</span>` : ''}
+                        </div>
+                    </td>
                     <td><strong style="font-size: 13px; color: ${r.duty_seconds > 0 ? 'var(--text-main)' : 'var(--text-dim)'}; font-family: monospace;">${r.duty_formatted}</strong></td>
                     <td style="white-space: nowrap;">
                         <span style="padding: 3px 8px; border-radius: 6px; font-size: 11px; display: inline-flex; align-items: center; ${badgeStyle}">

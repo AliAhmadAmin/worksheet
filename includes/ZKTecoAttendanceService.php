@@ -82,6 +82,33 @@ class ZKTecoAttendanceService {
                     KEY `idx_punch_time` (`punch_time`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             ");
+
+            // Auto-migrate multi-source attendance tracking columns on daily_sheets
+            $columnsNeeded = [
+                'biometric_in_time' => 'VARCHAR(50) NULL',
+                'biometric_out_time' => 'VARCHAR(50) NULL',
+                'biometric_duty_hours' => 'VARCHAR(50) NULL',
+                'biometric_duty_seconds' => 'INT(11) DEFAULT 0',
+                'whatsapp_in_time' => 'VARCHAR(50) NULL',
+                'whatsapp_out_time' => 'VARCHAR(50) NULL',
+                'whatsapp_duty_hours' => 'VARCHAR(50) NULL',
+                'whatsapp_duty_seconds' => 'INT(11) DEFAULT 0',
+            ];
+            $existingCols = [];
+            try {
+                $colStmt = $this->pdo->query("SHOW COLUMNS FROM `daily_sheets`");
+                if ($colStmt) {
+                    $existingCols = $colStmt->fetchAll(PDO::FETCH_COLUMN);
+                }
+            } catch (Exception $e) {}
+
+            foreach ($columnsNeeded as $col => $def) {
+                if (!in_array($col, $existingCols, true)) {
+                    try {
+                        $this->pdo->exec("ALTER TABLE `daily_sheets` ADD COLUMN `{$col}` {$def}");
+                    } catch (Exception $e) {}
+                }
+            }
         } catch (Exception $e) {}
     }
 
@@ -437,19 +464,22 @@ class ZKTecoAttendanceService {
         $stmt->execute([$empId, $punchDate]);
         $sheet = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Smart In/Out Determination
+        // Multi-Source Attendance Isolation:
+        // Always track Biometric punches in dedicated columns (biometric_in_time, biometric_out_time, biometric_duty_hours).
+        // NEVER overwrite an existing Web Sheet or locked check-out time.
         if (!$sheet) {
             // First punch of the day -> Create Check-In
             $stmtInsert = $this->pdo->prepare("
                 INSERT INTO daily_sheets 
-                    (employee_id, sheet_date, check_in_time, remarks, is_locked)
+                    (employee_id, sheet_date, check_in_time, biometric_in_time, remarks, is_locked)
                 VALUES 
-                    (?, ?, ?, ?, 0)
+                    (?, ?, ?, ?, ?, 0)
             ");
             $stmtInsert->execute([
                 $empId, 
                 $punchDate, 
                 $punchTimeStr, 
+                $punchTimeStr,
                 "[Biometric {$verifyType}] In at {$punchTimeStr}"
             ]);
             $sheetId = $this->pdo->lastInsertId();
@@ -461,60 +491,44 @@ class ZKTecoAttendanceService {
             ];
         } else {
             // Existing sheet for today
-            if (!empty($sheet['is_locked'])) {
-                return [
-                    'status' => 'ignored',
-                    'sheet_id' => $sheet['id'],
-                    'remarks' => "Sheet is locked. Biometric punch ignored to protect existing attendance."
-                ];
-            }
-
-            if (empty($sheet['check_in_time'])) {
-                // Check-in was empty, populate it
-                $stmtUp = $this->pdo->prepare("
+            if (empty($sheet['biometric_in_time'])) {
+                // First biometric punch for today -> Record Biometric In
+                $needWebCheckIn = empty($sheet['check_in_time']);
+                $sql = "
                     UPDATE daily_sheets 
-                    SET check_in_time = ?,
+                    SET biometric_in_time = ?,
+                        " . ($needWebCheckIn ? "check_in_time = ?, " : "") . "
                         remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
-                ");
-                $stmtUp->execute([
-                    $punchTimeStr, 
-                    "[Biometric {$verifyType}] In at {$punchTimeStr}", 
-                    $sheet['id']
-                ]);
+                ";
+                $params = $needWebCheckIn 
+                    ? [$punchTimeStr, $punchTimeStr, "[Biometric {$verifyType}] In at {$punchTimeStr}", $sheet['id']]
+                    : [$punchTimeStr, "[Biometric {$verifyType}] In at {$punchTimeStr}", $sheet['id']];
+                
+                $stmtUp = $this->pdo->prepare($sql);
+                $stmtUp->execute($params);
 
                 return [
                     'status' => 'applied',
                     'sheet_id' => $sheet['id'],
-                    'remarks' => "Recorded Check-In at {$punchTimeStr} via Biometric {$verifyType} for {$employee['name']}."
+                    'remarks' => "Recorded Biometric In at {$punchTimeStr} via {$verifyType} for {$employee['name']}."
                 ];
             } else {
-                // If punch happens within 2 minutes of check-in, ignore as accidental double-tap
-                $inTs = strtotime($punchDate . ' ' . $sheet['check_in_time']);
+                // Biometric In already exists -> This is Biometric Check-Out
+                $inTs = strtotime($punchDate . ' ' . $sheet['biometric_in_time']);
                 $curTs = $punchData['timestamp'];
+                
+                // Prevent duplicate punch within 2 minutes of biometric in
                 if ($inTs && abs($curTs - $inTs) < 120) {
                     return [
                         'status' => 'duplicate',
                         'sheet_id' => $sheet['id'],
-                        'remarks' => "Ignored duplicate punch within 2 minutes of Check-In ({$sheet['check_in_time']})."
+                        'remarks' => "Ignored duplicate punch within 2 minutes of Biometric In ({$sheet['biometric_in_time']})."
                     ];
                 }
 
-                // If check-out is already set on the sheet, do not overwrite with an earlier punch
-                if (!empty($sheet['check_out_time'])) {
-                    $existingOutTs = strtotime($punchDate . ' ' . $sheet['check_out_time']);
-                    $newOutTs = strtotime($punchDate . ' ' . $punchTimeStr);
-                    if ($existingOutTs && $newOutTs && $newOutTs <= $existingOutTs) {
-                        return [
-                            'status' => 'ignored',
-                            'sheet_id' => $sheet['id'],
-                            'remarks' => "Preserved existing check-out ({$sheet['check_out_time']}); ignored earlier punch ({$punchTimeStr})."
-                        ];
-                    }
-                }
-
-                // Calculate duty hours
+                // Calculate biometric duty hours
                 $dutyFormatted = null;
                 $dutySeconds = 0;
                 if ($inTs) {
@@ -528,30 +542,65 @@ class ZKTecoAttendanceService {
                     $dutyFormatted = sprintf('%02d:%02d:00', $h, $m);
                 }
 
-                // Update Check-Out Time and Duty Hours
-                $stmtUp = $this->pdo->prepare("
-                    UPDATE daily_sheets 
-                    SET check_out_time = ?,
-                        total_duty_hours = COALESCE(?, total_duty_hours),
-                        total_duty_seconds = IF(? > 0, ?, total_duty_seconds),
-                        remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                ");
-                $stmtUp->execute([
-                    $punchTimeStr,
-                    $dutyFormatted,
-                    $dutySeconds,
-                    $dutySeconds,
-                    "[Biometric {$verifyType}] Out at {$punchTimeStr}", 
-                    $sheet['id']
-                ]);
+                // If sheet is locked OR web check_out_time already exists, PRESERVE web check_out_time!
+                $preserveWebCheckout = !empty($sheet['is_locked']) || !empty($sheet['check_out_time']);
 
-                return [
-                    'status' => 'applied',
-                    'sheet_id' => $sheet['id'],
-                    'remarks' => "Recorded Check-Out at {$punchTimeStr} (Duty: " . ($dutyFormatted ?: 'N/A') . ") via Biometric {$verifyType} for {$employee['name']}."
-                ];
+                if ($preserveWebCheckout) {
+                    // Update ONLY biometric columns; Leave manual/web checkout completely untouched!
+                    $stmtUp = $this->pdo->prepare("
+                        UPDATE daily_sheets 
+                        SET biometric_out_time = ?,
+                            biometric_duty_hours = ?,
+                            biometric_duty_seconds = ?,
+                            remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ");
+                    $stmtUp->execute([
+                        $punchTimeStr,
+                        $dutyFormatted,
+                        $dutySeconds,
+                        "[Biometric {$verifyType}] Out at {$punchTimeStr}", 
+                        $sheet['id']
+                    ]);
+
+                    return [
+                        'status' => 'applied',
+                        'sheet_id' => $sheet['id'],
+                        'remarks' => "Recorded Biometric Out at {$punchTimeStr} (Bio Duty: " . ($dutyFormatted ?: 'N/A') . ") via {$verifyType} for {$employee['name']}. Web sheet checkout preserved."
+                    ];
+                } else {
+                    // Unlocked sheet without web checkout -> Also populate web checkout as fallback
+                    $stmtUp = $this->pdo->prepare("
+                        UPDATE daily_sheets 
+                        SET biometric_out_time = ?,
+                            biometric_duty_hours = ?,
+                            biometric_duty_seconds = ?,
+                            check_out_time = ?,
+                            total_duty_hours = COALESCE(?, total_duty_hours),
+                            total_duty_seconds = IF(? > 0, ?, total_duty_seconds),
+                            remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ");
+                    $stmtUp->execute([
+                        $punchTimeStr,
+                        $dutyFormatted,
+                        $dutySeconds,
+                        $punchTimeStr,
+                        $dutyFormatted,
+                        $dutySeconds,
+                        $dutySeconds,
+                        "[Biometric {$verifyType}] Out at {$punchTimeStr}", 
+                        $sheet['id']
+                    ]);
+
+                    return [
+                        'status' => 'applied',
+                        'sheet_id' => $sheet['id'],
+                        'remarks' => "Recorded Biometric Out at {$punchTimeStr} (Duty: " . ($dutyFormatted ?: 'N/A') . ") via {$verifyType} for {$employee['name']}."
+                    ];
+                }
             }
         }
     }

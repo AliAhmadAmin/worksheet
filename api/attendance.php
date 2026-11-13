@@ -618,6 +618,14 @@ switch ($action) {
                 s.hod_checked_notes,
                 s.day_type,
                 s.holiday_reason,
+                s.biometric_in_time,
+                s.biometric_out_time,
+                s.biometric_duty_hours,
+                s.biometric_duty_seconds,
+                s.whatsapp_in_time,
+                s.whatsapp_out_time,
+                s.whatsapp_duty_hours,
+                s.whatsapp_duty_seconds,
                 (SELECT COUNT(*) FROM sheet_entries se WHERE se.sheet_id = s.id) as total_entries
             FROM employees e
             LEFT JOIN departments d ON e.department_id = d.id
@@ -852,7 +860,9 @@ switch ($action) {
                 SELECT ds.id, ds.employee_id, ds.sheet_date, ds.check_in_time, ds.check_out_time, 
                        ds.total_duty_seconds, ds.is_locked, ds.work_summary, ds.remarks,
                        ds.day_type, ds.holiday_reason,
-                       ds.is_late, ds.late_minutes, ds.late_excused, ds.late_excused_by, ds.late_excused_reason, ds.effective_shift_timing
+                       ds.is_late, ds.late_minutes, ds.late_excused, ds.late_excused_by, ds.late_excused_reason, ds.effective_shift_timing,
+                       ds.biometric_in_time, ds.biometric_out_time, ds.biometric_duty_hours, ds.biometric_duty_seconds,
+                       ds.whatsapp_in_time, ds.whatsapp_out_time, ds.whatsapp_duty_hours, ds.whatsapp_duty_seconds
                 FROM daily_sheets ds
                 WHERE ds.sheet_date BETWEEN ? AND ?
             ";
@@ -1393,6 +1403,12 @@ switch ($action) {
                             'is_today' => $d['is_today'],
                             'check_in' => $sheet['check_in_time'] ?? null,
                             'check_out' => $sheet['check_out_time'] ?? null,
+                            'biometric_in' => $sheet['biometric_in_time'] ?? null,
+                            'biometric_out' => $sheet['biometric_out_time'] ?? null,
+                            'biometric_duty' => $sheet['biometric_duty_hours'] ?? null,
+                            'whatsapp_in' => $sheet['whatsapp_in_time'] ?? null,
+                            'whatsapp_out' => $sheet['whatsapp_out_time'] ?? null,
+                            'whatsapp_duty' => $sheet['whatsapp_duty_hours'] ?? null,
                             'duty_seconds' => $dutySeconds,
                             'duty_hours' => $dutyHours,
                             'duty_formatted' => $dutySeconds > 0 ? formatDutyTime($dutySeconds) : '-',

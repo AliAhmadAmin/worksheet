@@ -13,6 +13,40 @@ class WhatsAppAttendanceService {
 
     public function __construct($pdo = null) {
         $this->pdo = $pdo ?: getDbConnection();
+        $this->ensureDatabaseSchema();
+    }
+
+    /**
+     * Ensure multi-source attendance columns exist on daily_sheets
+     */
+    private function ensureDatabaseSchema() {
+        try {
+            $columnsNeeded = [
+                'biometric_in_time' => 'VARCHAR(50) NULL',
+                'biometric_out_time' => 'VARCHAR(50) NULL',
+                'biometric_duty_hours' => 'VARCHAR(50) NULL',
+                'biometric_duty_seconds' => 'INT(11) DEFAULT 0',
+                'whatsapp_in_time' => 'VARCHAR(50) NULL',
+                'whatsapp_out_time' => 'VARCHAR(50) NULL',
+                'whatsapp_duty_hours' => 'VARCHAR(50) NULL',
+                'whatsapp_duty_seconds' => 'INT(11) DEFAULT 0',
+            ];
+            $existingCols = [];
+            try {
+                $colStmt = $this->pdo->query("SHOW COLUMNS FROM `daily_sheets`");
+                if ($colStmt) {
+                    $existingCols = $colStmt->fetchAll(PDO::FETCH_COLUMN);
+                }
+            } catch (Exception $e) {}
+
+            foreach ($columnsNeeded as $col => $def) {
+                if (!in_array($col, $existingCols, true)) {
+                    try {
+                        $this->pdo->exec("ALTER TABLE `daily_sheets` ADD COLUMN `{$col}` {$def}");
+                    } catch (Exception $e) {}
+                }
+            }
+        } catch (Exception $e) {}
     }
 
     /**
@@ -1055,30 +1089,37 @@ Output strictly valid JSON only:
         // 1. Check-In Action
         if ($action === 'check_in') {
             if ($sheet) {
-                $stmtUp = $this->pdo->prepare("
+                $needWebCheckIn = empty($sheet['check_in_time']);
+                $sql = "
                     UPDATE daily_sheets 
-                    SET check_in_time = COALESCE(check_in_time, ?),
+                    SET whatsapp_in_time = COALESCE(whatsapp_in_time, ?),
+                        " . ($needWebCheckIn ? "check_in_time = ?, " : "") . "
                         remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
-                ");
-                $stmtUp->execute([$timeStr, "[WhatsApp] In at {$timeStr}", $sheet['id']]);
+                ";
+                $params = $needWebCheckIn 
+                    ? [$timeStr, $timeStr, "[WhatsApp] In at {$timeStr}", $sheet['id']]
+                    : [$timeStr, "[WhatsApp] In at {$timeStr}", $sheet['id']];
+
+                $stmtUp = $this->pdo->prepare($sql);
+                $stmtUp->execute($params);
                 return [
                     'sheet_id' => $sheet['id'],
                     'status' => 'applied',
-                    'remarks' => "Checked In at {$timeStr} for {$employee['name']}."
+                    'remarks' => "Checked In at {$timeStr} via WhatsApp for {$employee['name']}."
                 ];
             } else {
                 $stmtIn = $this->pdo->prepare("
-                    INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, remarks, is_locked)
-                    VALUES (?, ?, ?, ?, 0)
+                    INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, whatsapp_in_time, remarks, is_locked)
+                    VALUES (?, ?, ?, ?, ?, 0)
                 ");
-                $stmtIn->execute([$empId, $date, $timeStr, "[WhatsApp] In at {$timeStr}"]);
+                $stmtIn->execute([$empId, $date, $timeStr, $timeStr, "[WhatsApp] In at {$timeStr}"]);
                 $newId = $this->pdo->lastInsertId();
                 return [
                     'sheet_id' => $newId,
                     'status' => 'applied',
-                    'remarks' => "Created Check-In at {$timeStr} for {$employee['name']}."
+                    'remarks' => "Created Check-In at {$timeStr} via WhatsApp for {$employee['name']}."
                 ];
             }
         }
@@ -1089,15 +1130,22 @@ Output strictly valid JSON only:
             $note = "[WhatsApp] 🚗 Field Visit at {$timeStr}: {$locationNote}";
 
             if ($sheet) {
-                $stmtUp = $this->pdo->prepare("
+                $needWebCheckIn = empty($sheet['check_in_time']);
+                $sql = "
                     UPDATE daily_sheets 
-                    SET check_in_time = COALESCE(check_in_time, ?),
+                    SET whatsapp_in_time = COALESCE(whatsapp_in_time, ?),
+                        " . ($needWebCheckIn ? "check_in_time = ?, " : "") . "
                         remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
                         work_summary = CONCAT(COALESCE(work_summary, ''), IF(work_summary IS NULL OR work_summary = '', '', ' | '), ?),
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
-                ");
-                $stmtUp->execute([$timeStr, $note, "Field Visit: {$locationNote}", $sheet['id']]);
+                ";
+                $params = $needWebCheckIn
+                    ? [$timeStr, $timeStr, $note, "Field Visit: {$locationNote}", $sheet['id']]
+                    : [$timeStr, $note, "Field Visit: {$locationNote}", $sheet['id']];
+
+                $stmtUp = $this->pdo->prepare($sql);
+                $stmtUp->execute($params);
                 return [
                     'sheet_id' => $sheet['id'],
                     'status' => 'applied',
@@ -1105,10 +1153,10 @@ Output strictly valid JSON only:
                 ];
             } else {
                 $stmtIn = $this->pdo->prepare("
-                    INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, remarks, work_summary, is_locked)
-                    VALUES (?, ?, ?, ?, ?, 0)
+                    INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, whatsapp_in_time, remarks, work_summary, is_locked)
+                    VALUES (?, ?, ?, ?, ?, ?, 0)
                 ");
-                $stmtIn->execute([$empId, $date, $timeStr, $note, "Field Visit: {$locationNote}"]);
+                $stmtIn->execute([$empId, $date, $timeStr, $timeStr, $note, "Field Visit: {$locationNote}"]);
                 $newId = $this->pdo->lastInsertId();
                 return [
                     'sheet_id' => $newId,
@@ -1136,10 +1184,10 @@ Output strictly valid JSON only:
                 ];
             } else {
                 $stmtIn = $this->pdo->prepare("
-                    INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, remarks, is_locked)
-                    VALUES (?, ?, ?, ?, 0)
+                    INSERT INTO daily_sheets (employee_id, sheet_date, check_in_time, whatsapp_in_time, remarks, is_locked)
+                    VALUES (?, ?, ?, ?, ?, 0)
                 ");
-                $stmtIn->execute([$empId, $date, $timeStr, $note]);
+                $stmtIn->execute([$empId, $date, $timeStr, $timeStr, $note]);
                 $newId = $this->pdo->lastInsertId();
                 return [
                     'sheet_id' => $newId,
@@ -1194,8 +1242,8 @@ Output strictly valid JSON only:
 
         // 5. Check-Out & Leaving Early Actions
         if ($action === 'check_out' || $action === 'leaving_early') {
-            $checkInTime = $sheet['check_in_time'] ?? '09:00 AM';
-            $inTs = strtotime($date . ' ' . $checkInTime);
+            $waInTime = !empty($sheet['whatsapp_in_time']) ? $sheet['whatsapp_in_time'] : (!empty($sheet['check_in_time']) ? $sheet['check_in_time'] : '09:00 AM');
+            $inTs = strtotime($date . ' ' . $waInTime);
             $outTs = strtotime($date . ' ' . $timeStr);
 
             if ($outTs < $inTs) {
@@ -1203,41 +1251,70 @@ Output strictly valid JSON only:
             }
 
             $dutySeconds = max(0, $outTs - $inTs);
-            $dutyFormatted = sprintf('%dh %02dm', floor($dutySeconds / 3600), floor(($dutySeconds % 3600) / 60));
+            $h = floor($dutySeconds / 3600);
+            $m = floor(($dutySeconds % 3600) / 60);
+            $dutyFormatted = sprintf('%02d:%02d:00', $h, $m);
 
             $note = ($action === 'leaving_early') 
                 ? "[WhatsApp] ⚠️ Early Leave at {$timeStr} ('{$rawText}')" 
                 : "[WhatsApp] Out at {$timeStr}";
 
             if ($sheet) {
-                $stmtUp = $this->pdo->prepare("
-                    UPDATE daily_sheets 
-                    SET check_out_time = ?,
-                        total_duty_hours = ?,
-                        total_duty_seconds = ?,
-                        remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                ");
-                $stmtUp->execute([$timeStr, $dutyFormatted, $dutySeconds, $note, $sheet['id']]);
-                return [
-                    'sheet_id' => $sheet['id'],
-                    'status' => 'applied',
-                    'remarks' => "Recorded Check-Out at {$timeStr} (Total Duty: {$dutyFormatted}) for {$employee['name']}."
-                ];
+                $preserveWebCheckout = !empty($sheet['is_locked']) || !empty($sheet['check_out_time']);
+
+                if ($preserveWebCheckout) {
+                    // Update ONLY WhatsApp fields; Leave web sheet checkout completely untouched!
+                    $stmtUp = $this->pdo->prepare("
+                        UPDATE daily_sheets 
+                        SET whatsapp_out_time = ?,
+                            whatsapp_duty_hours = ?,
+                            whatsapp_duty_seconds = ?,
+                            remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ");
+                    $stmtUp->execute([$timeStr, $dutyFormatted, $dutySeconds, $note, $sheet['id']]);
+
+                    return [
+                        'sheet_id' => $sheet['id'],
+                        'status' => 'applied',
+                        'remarks' => "Recorded WhatsApp Out at {$timeStr} (WA Duty: {$dutyFormatted}) for {$employee['name']}. Web sheet checkout preserved."
+                    ];
+                } else {
+                    // Unlocked sheet without web checkout -> Also populate web checkout as fallback
+                    $stmtUp = $this->pdo->prepare("
+                        UPDATE daily_sheets 
+                        SET whatsapp_out_time = ?,
+                            whatsapp_duty_hours = ?,
+                            whatsapp_duty_seconds = ?,
+                            check_out_time = ?,
+                            total_duty_hours = ?,
+                            total_duty_seconds = ?,
+                            remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    ");
+                    $stmtUp->execute([$timeStr, $dutyFormatted, $dutySeconds, $timeStr, $dutyFormatted, $dutySeconds, $note, $sheet['id']]);
+
+                    return [
+                        'sheet_id' => $sheet['id'],
+                        'status' => 'applied',
+                        'remarks' => "Recorded WhatsApp Out at {$timeStr} (Total Duty: {$dutyFormatted}) for {$employee['name']}."
+                    ];
+                }
             } else {
                 $stmtIn = $this->pdo->prepare("
                     INSERT INTO daily_sheets 
-                        (employee_id, sheet_date, check_in_time, check_out_time, total_duty_hours, total_duty_seconds, remarks, is_locked)
+                        (employee_id, sheet_date, check_in_time, check_out_time, total_duty_hours, total_duty_seconds, whatsapp_in_time, whatsapp_out_time, whatsapp_duty_hours, whatsapp_duty_seconds, remarks, is_locked)
                     VALUES 
-                        (?, ?, ?, ?, ?, ?, ?, 0)
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
                 ");
-                $stmtIn->execute([$empId, $date, $checkInTime, $timeStr, $dutyFormatted, $dutySeconds, $note]);
+                $stmtIn->execute([$empId, $date, $waInTime, $timeStr, $dutyFormatted, $dutySeconds, $waInTime, $timeStr, $dutyFormatted, $dutySeconds, $note]);
                 $newId = $this->pdo->lastInsertId();
                 return [
                     'sheet_id' => $newId,
                     'status' => 'applied',
-                    'remarks' => "Created Check-Out record at {$timeStr} (Duty: {$dutyFormatted}) for {$employee['name']}."
+                    'remarks' => "Created Check-Out record at {$timeStr} (Duty: {$dutyFormatted}) via WhatsApp for {$employee['name']}."
                 ];
             }
         }
