@@ -371,40 +371,32 @@ class ZKTecoAttendanceService {
 
     /**
      * Find Employee by Biometric PIN or Employee Code
+     * Strictly matches Employee Code (e.g. DP1124, 1124) or explicit biometric PIN.
+     * NEVER blindly matches database auto-increment ID (e.id).
      */
     public function findEmployeeByPin($pin) {
         if (empty($pin)) return null;
 
-        $cleanDigits = preg_replace('/[^\d]/', '', $pin);
-        $cleanCode = strtoupper(trim($pin));
+        $cleanPin = trim($pin);
+        $cleanDigits = preg_replace('/[^\d]/', '', $cleanPin);
+        $cleanCode = strtoupper($cleanPin);
 
-        // 1. Direct match by Employee ID
-        if (is_numeric($pin)) {
-            $stmt = $this->pdo->prepare("
-                SELECT e.*, d.name as department_name, t.name as team_name, p.emp_code as profile_code
-                FROM employees e
-                LEFT JOIN departments d ON e.department_id = d.id
-                LEFT JOIN teams t ON e.team_id = t.id
-                LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
-                WHERE e.is_active = 1 AND e.id = ?
-                LIMIT 1
-            ");
-            $stmt->execute([(int)$pin]);
-            $emp = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($emp) return $emp;
-        }
-
-        // 2. Match by Employee Code (e.g. DP-025, DP025, EMP-25)
-        $codeVariants = [
+        // Build exact and common prefix variants for employee code
+        $codeVariants = array_filter(array_unique([
             $cleanCode,
-            'DP-' . str_pad($cleanDigits, 3, '0', STR_PAD_LEFT),
-            'DP-' . (int)$cleanDigits,
-            'DP' . str_pad($cleanDigits, 3, '0', STR_PAD_LEFT),
-            'DP' . (int)$cleanDigits,
-            'EMP-' . str_pad($cleanDigits, 3, '0', STR_PAD_LEFT),
-            'EMP-' . (int)$cleanDigits,
-            (string)$cleanDigits
-        ];
+            $cleanPin,
+            !empty($cleanDigits) ? 'DP-' . $cleanDigits : null,
+            !empty($cleanDigits) ? 'DP' . $cleanDigits : null,
+            !empty($cleanDigits) ? 'DP-' . str_pad($cleanDigits, 3, '0', STR_PAD_LEFT) : null,
+            !empty($cleanDigits) ? 'DP' . str_pad($cleanDigits, 3, '0', STR_PAD_LEFT) : null,
+            !empty($cleanDigits) ? 'DP-' . str_pad($cleanDigits, 4, '0', STR_PAD_LEFT) : null,
+            !empty($cleanDigits) ? 'DP' . str_pad($cleanDigits, 4, '0', STR_PAD_LEFT) : null,
+            !empty($cleanDigits) ? 'EMP-' . $cleanDigits : null,
+            !empty($cleanDigits) ? 'EMP' . $cleanDigits : null,
+            !empty($cleanDigits) ? $cleanDigits : null
+        ]));
+
+        if (empty($codeVariants)) return null;
 
         $placeholders = implode(',', array_fill(0, count($codeVariants), '?'));
         $sql = "
@@ -469,6 +461,14 @@ class ZKTecoAttendanceService {
             ];
         } else {
             // Existing sheet for today
+            if (!empty($sheet['is_locked'])) {
+                return [
+                    'status' => 'ignored',
+                    'sheet_id' => $sheet['id'],
+                    'remarks' => "Sheet is locked. Biometric punch ignored to protect existing attendance."
+                ];
+            }
+
             if (empty($sheet['check_in_time'])) {
                 // Check-in was empty, populate it
                 $stmtUp = $this->pdo->prepare("
@@ -499,6 +499,19 @@ class ZKTecoAttendanceService {
                         'sheet_id' => $sheet['id'],
                         'remarks' => "Ignored duplicate punch within 2 minutes of Check-In ({$sheet['check_in_time']})."
                     ];
+                }
+
+                // If check-out is already set on the sheet, do not overwrite with an earlier punch
+                if (!empty($sheet['check_out_time'])) {
+                    $existingOutTs = strtotime($punchDate . ' ' . $sheet['check_out_time']);
+                    $newOutTs = strtotime($punchDate . ' ' . $punchTimeStr);
+                    if ($existingOutTs && $newOutTs && $newOutTs <= $existingOutTs) {
+                        return [
+                            'status' => 'ignored',
+                            'sheet_id' => $sheet['id'],
+                            'remarks' => "Preserved existing check-out ({$sheet['check_out_time']}); ignored earlier punch ({$punchTimeStr})."
+                        ];
+                    }
                 }
 
                 // Calculate duty hours
