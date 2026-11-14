@@ -19,7 +19,7 @@ const ZKTecoAtt = {
     },
 
     startAutoSyncPoller() {
-        // Lightweight background ping every 2 minutes: triggers sync if due
+        // Lightweight background ping every 60 seconds (1 minute): triggers sync if due
         setInterval(async () => {
             try {
                 const res = await fetch('api/zkteco_manage.php?action=trigger_auto_sync');
@@ -29,7 +29,7 @@ const ZKTecoAtt = {
                     this.loadLogs();
                 }
             } catch (e) {}
-        }, 120000); // 2 minutes
+        }, 60000); // 60 seconds
     },
 
     async loadSettings() {

@@ -951,6 +951,8 @@ try {
                             <div>
                                 <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">Sync Interval</label>
                                 <select id="zk-mdb-sync-interval" class="input-control" style="width: 100%; font-size: 11.5px; font-weight: 700;">
+                                    <option value="1">Every 1 Minute (Fastest Safe)</option>
+                                    <option value="2">Every 2 Minutes</option>
                                     <option value="5">Every 5 Minutes</option>
                                     <option value="10">Every 10 Minutes</option>
                                     <option value="15" selected>Every 15 Minutes (Recommended)</option>
