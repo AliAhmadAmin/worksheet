@@ -194,19 +194,23 @@ function switchAttendanceView(mode) {
     const liveSec = document.getElementById('att-view-live-section');
     const repSec = document.getElementById('att-view-report-section');
     const waSec = document.getElementById('att-view-whatsapp-section');
+    const zkSec = document.getElementById('att-view-zkteco-section');
 
     const btnLive = document.getElementById('btn-att-view-live');
     const btnReport = document.getElementById('btn-att-view-report');
     const btnWa = document.getElementById('btn-att-view-whatsapp');
+    const btnZk = document.getElementById('btn-att-view-zkteco');
 
     if (liveSec) liveSec.style.display = (mode === 'live') ? 'block' : 'none';
     if (repSec) repSec.style.display = (mode === 'report') ? 'block' : 'none';
     if (waSec) waSec.style.display = (mode === 'whatsapp') ? 'block' : 'none';
+    if (zkSec) zkSec.style.display = (mode === 'zkteco') ? 'block' : 'none';
 
     [
         { el: btnLive, active: mode === 'live' },
         { el: btnReport, active: mode === 'report' },
-        { el: btnWa, active: mode === 'whatsapp' }
+        { el: btnWa, active: mode === 'whatsapp' },
+        { el: btnZk, active: mode === 'zkteco' }
     ].forEach(b => {
         if (b.el) {
             if (b.active) {

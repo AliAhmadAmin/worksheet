@@ -443,6 +443,122 @@ try {
 
                 </div>
 
+                <!-- ================= VIEW 4: ZKTECO BIOMETRIC ATTENDANCE STREAM ================= -->
+                <div id="att-view-zkteco-section" style="display: none;">
+                    <!-- Connected Devices Banner & Action Bar -->
+                    <div style="background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: var(--shadow-sm);">
+                        <div>
+                            <h4 style="margin: 0; font-size: 14px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                                <span style="color: #059669;">●</span> ZKTeco Biometric Real-Time Stream
+                            </h4>
+                            <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--text-muted);">
+                                Instant Fingerprint & Face Recognition punches via ADMS Cloud Push Protocol.
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openMdbModal()">
+                                📂 Import from .MDB
+                            </button>
+                            <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openSimModal()">
+                                🧪 Test Simulator
+                            </button>
+                            <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openSetupModal()">
+                                ⚙️ ADMS Machine Setup
+                            </button>
+                            <button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.loadLogs()">
+                                🔄 Refresh Stream
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Connected Devices List -->
+                    <div id="zk-devices-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-bottom: 14px;">
+                        <!-- Populated dynamically by ZKTecoAtt.renderDevices() -->
+                    </div>
+
+                    <!-- Biometric Punch Stats KPI Badges -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px;">
+                        <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Punches</div>
+                                <div id="zk-stat-total" style="font-size: 18px; font-weight: 900; color: #059669; line-height: 1.2;">0</div>
+                            </div>
+                            <span style="font-size: 18px;">👆</span>
+                        </div>
+                        <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Applied</div>
+                                <div id="zk-stat-applied" style="font-size: 18px; font-weight: 900; color: #059669; line-height: 1.2;">0</div>
+                            </div>
+                            <span style="font-size: 18px; color: #059669;">●</span>
+                        </div>
+                        <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Unmatched</div>
+                                <div id="zk-stat-unmatched" style="font-size: 18px; font-weight: 900; color: #dc2626; line-height: 1.2;">0</div>
+                            </div>
+                            <span style="font-size: 18px; color: #dc2626;">⚠️</span>
+                        </div>
+                        <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Duplicates</div>
+                                <div id="zk-stat-duplicate" style="font-size: 18px; font-weight: 900; color: var(--text-muted); line-height: 1.2;">0</div>
+                            </div>
+                            <span style="font-size: 18px; opacity: 0.6;">⚪</span>
+                        </div>
+                    </div>
+
+                    <!-- Filter Controls Bar -->
+                    <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; box-shadow: var(--shadow-sm);">
+                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                            <!-- Date Stepper -->
+                            <div style="display: inline-flex; align-items: center; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1px 3px;">
+                                <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px; font-weight: 800; border: none; background: transparent; cursor: pointer;" onclick="ZKTecoAtt.stepDate(-1)" title="Previous Day">◀</button>
+                                <input type="date" id="zk-logs-date-filter" class="input-control" value="<?= date('Y-m-d') ?>" onchange="ZKTecoAtt.onDateChange()" style="padding: 4px 6px; font-size: 11.5px; font-weight: 700; border: none; background: transparent; width: 125px;">
+                                <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px; font-weight: 800; border: none; background: transparent; cursor: pointer;" onclick="ZKTecoAtt.stepDate(1)" title="Next Day">▶</button>
+                            </div>
+
+                            <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700;" onclick="ZKTecoAtt.jumpToday()" title="Jump to Today">⚡ Today</button>
+                            <button type="button" id="zk-btn-all-dates" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700;" onclick="ZKTecoAtt.toggleAllDates()" title="Show All Dates">🌐 All</button>
+
+                            <!-- Search Input -->
+                            <input type="text" id="zk-logs-search-filter" class="input-control" placeholder="🔍 Search PIN, name, code..." oninput="ZKTecoAtt.onSearchInput()" style="padding: 4px 8px; font-size: 11.5px; width: 170px;">
+
+                            <!-- Status Filter -->
+                            <select id="zk-logs-status-filter" class="input-control" onchange="ZKTecoAtt.loadLogs()" style="padding: 4px 8px; font-size: 11.5px; max-width: 130px;">
+                                <option value="all">📋 All Statuses</option>
+                                <option value="applied">Applied ✅</option>
+                                <option value="unmatched">Unmatched ⚠️</option>
+                                <option value="duplicate">Duplicates ⚪</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span id="zk-logs-count-badge" style="font-size: 11.5px; color: var(--text-muted);">Showing activity logs</span>
+                            <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700;" onclick="ZKTecoAtt.resetFilters()">🔄 Reset</button>
+                        </div>
+                    </div>
+
+                    <!-- Biometric Logs Table -->
+                    <div class="table-responsive" style="border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-card);">
+                        <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <thead>
+                                <tr style="background: var(--bg-header); border-bottom: 2px solid var(--border-color); text-align: left;">
+                                    <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); width: 110px;">Punch Time</th>
+                                    <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); width: 220px;">Employee / PIN</th>
+                                    <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); width: 130px;">Punch State</th>
+                                    <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); width: 140px;">Verification</th>
+                                    <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main);">Remarks & Sheet Record</th>
+                                    <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); text-align: center; width: 100px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="zk-logs-tbody">
+                                <!-- Populated dynamically by ZKTecoAtt.renderLogsTable() -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </section>
 
@@ -607,121 +723,7 @@ try {
             </div>
         </div>
 
-        <!-- ================= VIEW 4: ZKTECO BIOMETRIC ATTENDANCE STREAM ================= -->
-        <div id="att-view-zkteco-section" style="display: none;">
-            <!-- Connected Devices Banner & Action Bar -->
-            <div style="background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: var(--shadow-sm);">
-                <div>
-                    <h4 style="margin: 0; font-size: 14px; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
-                        <span style="color: #059669;">●</span> ZKTeco Biometric Real-Time Stream
-                    </h4>
-                    <p style="margin: 2px 0 0; font-size: 11.5px; color: var(--text-muted);">
-                        Instant Fingerprint & Face Recognition punches via ADMS Cloud Push Protocol.
-                    </p>
-                </div>
-                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                    <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openMdbModal()">
-                        📂 Import from .MDB
-                    </button>
-                    <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openSimModal()">
-                        🧪 Test Simulator
-                    </button>
-                    <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openSetupModal()">
-                        ⚙️ ADMS Machine Setup
-                    </button>
-                    <button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.loadLogs()">
-                        🔄 Refresh Stream
-                    </button>
-                </div>
-            </div>
 
-            <!-- Connected Devices List -->
-            <div id="zk-devices-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-bottom: 14px;">
-                <!-- Populated dynamically by ZKTecoAtt.renderDevices() -->
-            </div>
-
-            <!-- Biometric Punch Stats KPI Badges -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 14px;">
-                <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Total Punches</div>
-                        <div id="zk-stat-total" style="font-size: 18px; font-weight: 900; color: #059669; line-height: 1.2;">0</div>
-                    </div>
-                    <span style="font-size: 18px;">👆</span>
-                </div>
-                <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Applied</div>
-                        <div id="zk-stat-applied" style="font-size: 18px; font-weight: 900; color: #059669; line-height: 1.2;">0</div>
-                    </div>
-                    <span style="font-size: 18px; color: #059669;">●</span>
-                </div>
-                <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Unmatched</div>
-                        <div id="zk-stat-unmatched" style="font-size: 18px; font-weight: 900; color: #dc2626; line-height: 1.2;">0</div>
-                    </div>
-                    <span style="font-size: 18px; color: #dc2626;">⚠️</span>
-                </div>
-                <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Duplicates</div>
-                        <div id="zk-stat-duplicate" style="font-size: 18px; font-weight: 900; color: var(--text-muted); line-height: 1.2;">0</div>
-                    </div>
-                    <span style="font-size: 18px; opacity: 0.6;">⚪</span>
-                </div>
-            </div>
-
-            <!-- Filter Controls Bar -->
-            <div style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; box-shadow: var(--shadow-sm);">
-                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    <!-- Date Stepper -->
-                    <div style="display: inline-flex; align-items: center; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1px 3px;">
-                        <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px; font-weight: 800; border: none; background: transparent; cursor: pointer;" onclick="ZKTecoAtt.stepDate(-1)" title="Previous Day">◀</button>
-                        <input type="date" id="zk-logs-date-filter" class="input-control" value="<?= date('Y-m-d') ?>" onchange="ZKTecoAtt.onDateChange()" style="padding: 4px 6px; font-size: 11.5px; font-weight: 700; border: none; background: transparent; width: 125px;">
-                        <button type="button" class="btn btn-outline" style="padding: 4px 7px; font-size: 11px; font-weight: 800; border: none; background: transparent; cursor: pointer;" onclick="ZKTecoAtt.stepDate(1)" title="Next Day">▶</button>
-                    </div>
-
-                    <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700;" onclick="ZKTecoAtt.jumpToday()" title="Jump to Today">⚡ Today</button>
-                    <button type="button" id="zk-btn-all-dates" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700;" onclick="ZKTecoAtt.toggleAllDates()" title="Show All Dates">🌐 All</button>
-
-                    <!-- Search Input -->
-                    <input type="text" id="zk-logs-search-filter" class="input-control" placeholder="🔍 Search PIN, name, code..." oninput="ZKTecoAtt.onSearchInput()" style="padding: 4px 8px; font-size: 11.5px; width: 170px;">
-
-                    <!-- Status Filter -->
-                    <select id="zk-logs-status-filter" class="input-control" onchange="ZKTecoAtt.loadLogs()" style="padding: 4px 8px; font-size: 11.5px; max-width: 130px;">
-                        <option value="all">📋 All Statuses</option>
-                        <option value="applied">Applied ✅</option>
-                        <option value="unmatched">Unmatched ⚠️</option>
-                        <option value="duplicate">Duplicates ⚪</option>
-                    </select>
-                </div>
-
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span id="zk-logs-count-badge" style="font-size: 11.5px; color: var(--text-muted);">Showing activity logs</span>
-                    <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; font-weight: 700;" onclick="ZKTecoAtt.resetFilters()">🔄 Reset</button>
-                </div>
-            </div>
-
-            <!-- Biometric Logs Table -->
-            <div class="table-responsive" style="border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-card);">
-                <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                    <thead>
-                        <tr style="background: var(--bg-header); border-bottom: 2px solid var(--border-color); text-align: left;">
-                            <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); width: 110px;">Punch Time</th>
-                            <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); width: 220px;">Employee / PIN</th>
-                            <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); width: 130px;">Punch State</th>
-                            <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); width: 140px;">Verification</th>
-                            <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main);">Remarks & Sheet Record</th>
-                            <th style="padding: 9px 12px; font-weight: 800; color: var(--text-main); text-align: center; width: 100px;">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="zk-logs-tbody">
-                        <!-- Populated dynamically by ZKTecoAtt.renderLogsTable() -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
         <!-- ================= MODAL: ZKTECO ADMS SETUP ================= -->
         <div id="zk-setup-modal" class="modal-overlay">
