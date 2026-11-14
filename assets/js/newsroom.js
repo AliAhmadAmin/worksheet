@@ -89,9 +89,17 @@ async function loadNewsroomDispatches(isSilent = false) {
     const tbody = document.getElementById('news-matrix-tbody');
     if (!tbody) return;
 
+    const fromVal = document.getElementById('news-filter-from')?.value || '';
+    const toVal = document.getElementById('news-filter-to')?.value || '';
+
     let url = 'api/newsroom.php?action=list';
-    if (NewsState.selectedDate) url += `&date=${encodeURIComponent(NewsState.selectedDate)}`;
-    else if (NewsState.selectedMonth) url += `&month=${encodeURIComponent(NewsState.selectedMonth)}`;
+    if (fromVal && toVal) {
+        url += `&date_from=${encodeURIComponent(fromVal)}&date_to=${encodeURIComponent(toVal)}`;
+    } else if (fromVal) {
+        url += `&date_from=${encodeURIComponent(fromVal)}`;
+    } else if (toVal) {
+        url += `&date_to=${encodeURIComponent(toVal)}`;
+    }
 
     const channelVal = document.getElementById('news-filter-channel')?.value || 'all';
     if (channelVal !== 'all') url += `&channel=${encodeURIComponent(channelVal)}`;
@@ -101,6 +109,9 @@ async function loadNewsroomDispatches(isSilent = false) {
 
     const searchVal = document.getElementById('news-search-input')?.value.trim() || '';
     if (searchVal) url += `&search=${encodeURIComponent(searchVal)}`;
+
+    // Sync active KPI card style
+    highlightActiveNewsCard(statusVal);
 
     try {
         const res = await fetch(url);
@@ -140,17 +151,19 @@ function updateNewsKpis(stats) {
     const elMovePt = document.getElementById('news-stat-move-pt');
     const elCorr = document.getElementById('news-stat-corrections');
     const elPend = document.getElementById('news-stat-pending');
+    const elProg = document.getElementById('news-stat-inprogress');
 
     if (elTotal) elTotal.textContent = stats.total_dispatches || 0;
     if (elDp) elDp.textContent = stats.dp_published || 0;
     if (elPt) elPt.textContent = stats.pt_published || 0;
     if (elMovePt) elMovePt.textContent = stats.moved_to_pt_count || 0;
     if (elCorr) elCorr.textContent = stats.total_corrections || 0;
-    if (elPend) elPend.textContent = stats.pending_queue || 0;
+    if (elPend) elPend.textContent = (stats.pending_count !== undefined) ? stats.pending_count : (stats.pending_queue || 0);
+    if (elProg) elProg.textContent = stats.in_progress_count || 0;
 
     // Update sidebar badge for News Handover
     const newsBadges = [document.getElementById('pending-news-badge'), document.getElementById('pending-news-badge-nr')].filter(Boolean);
-    const count = parseInt(stats.pending_queue) || 0;
+    const count = parseInt(stats.pending_count !== undefined ? stats.pending_count : stats.pending_queue) || 0;
     newsBadges.forEach(badge => {
         badge.textContent = count;
         badge.style.display = count > 0 ? 'inline-block' : 'none';
@@ -876,20 +889,55 @@ async function deleteNewsDispatch() {
     }
 }
 
-// 🔍 Filter Controls
-function handleNewsFilterChange(type) {
-    if (type === 'date') {
-        NewsState.selectedDate = document.getElementById('news-filter-date').value;
-        NewsState.selectedMonth = '';
-        const mEl = document.getElementById('news-filter-month');
-        if (mEl) mEl.value = '';
-    } else if (type === 'month') {
-        NewsState.selectedMonth = document.getElementById('news-filter-month').value;
-        NewsState.selectedDate = '';
-        const dEl = document.getElementById('news-filter-date');
-        if (dEl) dEl.value = '';
+// 🔍 Filter Controls & Interactive KPI Card Clicking
+function filterNewsByCard(cardType) {
+    const statusSelect = document.getElementById('news-filter-status');
+    const channelSelect = document.getElementById('news-filter-channel');
+    if (!statusSelect) return;
+
+    if (cardType === 'all') {
+        statusSelect.value = 'all';
+    } else if (cardType === 'published_dp') {
+        statusSelect.value = 'published_dp';
+    } else if (cardType === 'published_pt') {
+        statusSelect.value = 'published_pt';
+    } else if (cardType === 'Move to PT') {
+        statusSelect.value = 'Move to PT';
+    } else if (cardType === 'Correction') {
+        statusSelect.value = 'Correction';
+    } else if (cardType === 'Pending' || cardType === 'pending') {
+        statusSelect.value = 'Pending';
+    } else if (cardType === 'In Progress' || cardType === 'in_progress') {
+        statusSelect.value = 'In Progress';
     }
+
+    highlightActiveNewsCard(statusSelect.value);
     loadNewsroomDispatches();
+}
+
+function handleNewsStatusSelectChange() {
+    const statusVal = document.getElementById('news-filter-status')?.value || 'all';
+    highlightActiveNewsCard(statusVal);
+    loadNewsroomDispatches();
+}
+
+function highlightActiveNewsCard(statusVal) {
+    const allCards = document.querySelectorAll('.news-kpi-card');
+    allCards.forEach(c => c.classList.remove('active-card'));
+
+    let activeCardId = null;
+    if (statusVal === 'all') activeCardId = 'card-news-stat-total';
+    else if (statusVal === 'published_dp') activeCardId = 'card-news-stat-dp';
+    else if (statusVal === 'published_pt') activeCardId = 'card-news-stat-pt';
+    else if (statusVal === 'Move to PT') activeCardId = 'card-news-stat-move-pt';
+    else if (statusVal === 'Correction' || statusVal === 'Violation') activeCardId = 'card-news-stat-corrections';
+    else if (statusVal === 'Pending' || statusVal === 'pending') activeCardId = 'card-news-stat-pending';
+    else if (statusVal === 'In Progress' || statusVal === 'in_progress') activeCardId = 'card-news-stat-inprogress';
+
+    if (activeCardId) {
+        const el = document.getElementById(activeCardId);
+        if (el) el.classList.add('active-card');
+    }
 }
 
 function debounceNewsSearch() {
@@ -900,18 +948,18 @@ function debounceNewsSearch() {
 }
 
 function resetNewsFilters() {
-    NewsState.selectedDate = '';
-    NewsState.selectedMonth = '';
-    const dEl = document.getElementById('news-filter-date');
-    if (dEl) dEl.value = '';
-    const mEl = document.getElementById('news-filter-month');
-    if (mEl) mEl.value = '';
+    const fromEl = document.getElementById('news-filter-from');
+    if (fromEl) fromEl.value = '';
+    const toEl = document.getElementById('news-filter-to');
+    if (toEl) toEl.value = '';
     const cEl = document.getElementById('news-filter-channel');
     if (cEl) cEl.value = 'all';
     const sEl = document.getElementById('news-filter-status');
     if (sEl) sEl.value = 'all';
     const qEl = document.getElementById('news-search-input');
     if (qEl) qEl.value = '';
+
+    highlightActiveNewsCard('all');
     loadNewsroomDispatches();
 }
 

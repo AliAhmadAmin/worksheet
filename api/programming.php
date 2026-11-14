@@ -57,18 +57,33 @@ if (in_array($action, ['list', 'get_meta'])) {
 
 switch ($action) {
     case 'list':
+        $dateFrom = $_GET['date_from'] ?? null;
+        $dateTo = $_GET['date_to'] ?? null;
         $date = $_GET['date'] ?? null;
         $month = $_GET['month'] ?? null;
         $channel = $_GET['channel'] ?? 'all';
         $status = $_GET['status'] ?? 'all';
         $search = trim($_GET['search'] ?? '');
 
+        // If date is passed instead of date_from/to, use it as both
+        if (!empty($date) && empty($dateFrom) && empty($dateTo)) {
+            $dateFrom = $date;
+            $dateTo = $date;
+        }
+
         $whereClauses = ["1=1"];
         $params = [];
 
-        if (!empty($date)) {
-            $whereClauses[] = "pd.dispatch_date = ?";
-            $params[] = $date;
+        if (!empty($dateFrom) && !empty($dateTo)) {
+            $whereClauses[] = "pd.dispatch_date BETWEEN ? AND ?";
+            $params[] = $dateFrom;
+            $params[] = $dateTo;
+        } elseif (!empty($dateFrom)) {
+            $whereClauses[] = "pd.dispatch_date >= ?";
+            $params[] = $dateFrom;
+        } elseif (!empty($dateTo)) {
+            $whereClauses[] = "pd.dispatch_date <= ?";
+            $params[] = $dateTo;
         } elseif (!empty($month)) {
             $whereClauses[] = "DATE_FORMAT(pd.dispatch_date, '%Y-%m') = ?";
             $params[] = $month;
@@ -80,10 +95,41 @@ switch ($action) {
         }
 
         if ($status !== 'all' && !empty($status)) {
-            if ($status === 'pending') {
-                $whereClauses[] = "((pd.dp_status = '' OR pd.dp_status IS NULL OR pd.dp_status = 'Pending' OR pd.dp_status = 'Move to PT') AND (pd.pt_status = '' OR pd.pt_status IS NULL OR pd.pt_status = 'Pending'))";
+            if ($status === 'pending' || $status === 'Pending') {
+                // Strictly Unclaimed Pending dispatches
+                $whereClauses[] = "(
+                    (
+                        ((pd.channel != 'Pakistan Today' AND (pd.moved_to_pt = 0 OR pd.moved_to_pt IS NULL))
+                         AND (pd.dp_status IS NULL OR pd.dp_status = '' OR pd.dp_status = 'Pending')
+                         AND pd.dp_status NOT IN ('In Progress', 'Published', 'Published on PT', 'Move to PT', 'Correction', 'Violation', 'Expire', 'Rejected'))
+                        OR
+                        ((pd.channel = 'Pakistan Today' OR pd.channel = 'All Channels' OR pd.channel = 'Both' OR pd.moved_to_pt = 1)
+                         AND (pd.pt_status IS NULL OR pd.pt_status = '' OR pd.pt_status = 'Pending')
+                         AND pd.pt_status NOT IN ('In Progress', 'Published', 'Move to PT', 'Correction', 'Violation', 'Expire', 'Rejected'))
+                    )
+                    AND (pd.dp_status != 'Published' AND pd.pt_status != 'Published' AND pd.dp_status != 'Published on PT')
+                )";
+            } elseif ($status === 'In Progress' || $status === 'in_progress') {
+                $whereClauses[] = "(
+                    (pd.dp_status = 'In Progress' OR pd.pt_status = 'In Progress')
+                    AND pd.dp_status NOT IN ('Published', 'Published on PT', 'Move to PT', 'Correction', 'Violation', 'Expire', 'Rejected')
+                    AND pd.pt_status NOT IN ('Published', 'Move to PT', 'Correction', 'Violation', 'Expire', 'Rejected')
+                )";
             } elseif ($status === 'published') {
                 $whereClauses[] = "(pd.dp_status = 'Published' OR pd.pt_status = 'Published' OR pd.dp_status = 'Published on PT')";
+            } elseif ($status === 'published_dp') {
+                $whereClauses[] = "(
+                    (pd.dp_status = 'Published' OR pd.pt_status = 'Published') 
+                    AND ((pd.channel != 'Pakistan Today' AND (pd.moved_to_pt = 0 OR pd.moved_to_pt IS NULL)) OR pd.channel = 'All Channels' OR pd.channel = 'Both')
+                )";
+            } elseif ($status === 'published_pt') {
+                $whereClauses[] = "(
+                    pd.pt_status = 'Published' OR pd.dp_status = 'Published on PT' OR (pd.dp_status = 'Published' AND (pd.channel = 'Pakistan Today' OR pd.moved_to_pt = 1))
+                )";
+            } elseif ($status === 'Move to PT') {
+                $whereClauses[] = "(pd.moved_to_pt = 1 OR pd.dp_status = 'Move to PT' OR pd.pt_status = 'Move to PT')";
+            } elseif ($status === 'Correction' || $status === 'corrections') {
+                $whereClauses[] = "(pd.dp_status IN ('Correction', 'Violation') OR pd.pt_status IN ('Correction', 'Violation'))";
             } elseif ($status === 'issues') {
                 $whereClauses[] = "(pd.dp_status IN ('Violation', 'Correction', 'Expire', 'Rejected') OR pd.pt_status IN ('Violation', 'Correction', 'Expire', 'Rejected'))";
             } else {
@@ -118,8 +164,33 @@ switch ($action) {
         $stmt->execute($params);
         $dispatches = $stmt->fetchAll();
 
-        // Calculate Overview Summary Stats
-        $statsStmt = $pdo->query("
+        // Summary Stats query scoped to the exact Date Range and Channel
+        $statsWhereClauses = ["1=1"];
+        $statsParams = [];
+
+        if (!empty($dateFrom) && !empty($dateTo)) {
+            $statsWhereClauses[] = "pd.dispatch_date BETWEEN ? AND ?";
+            $statsParams[] = $dateFrom;
+            $statsParams[] = $dateTo;
+        } elseif (!empty($dateFrom)) {
+            $statsWhereClauses[] = "pd.dispatch_date >= ?";
+            $statsParams[] = $dateFrom;
+        } elseif (!empty($dateTo)) {
+            $statsWhereClauses[] = "pd.dispatch_date <= ?";
+            $statsParams[] = $dateTo;
+        } elseif (!empty($month)) {
+            $statsWhereClauses[] = "DATE_FORMAT(pd.dispatch_date, '%Y-%m') = ?";
+            $statsParams[] = $month;
+        }
+
+        if ($channel !== 'all' && !empty($channel)) {
+            $statsWhereClauses[] = "pd.channel = ?";
+            $statsParams[] = $channel;
+        }
+
+        $statsWhereSql = implode(' AND ', $statsWhereClauses);
+
+        $statsStmt = $pdo->prepare("
             SELECT 
                 COUNT(*) as total_dispatches,
                 COALESCE(SUM(CASE 
@@ -134,17 +205,39 @@ switch ($action) {
                     THEN 1 ELSE 0 END), 0) as moved_to_pt_count,
                 COALESCE(SUM(CASE WHEN dp_status IN ('Correction', 'Violation') OR pt_status IN ('Correction', 'Violation') THEN 1 ELSE 0 END), 0) as total_corrections,
                 COALESCE(SUM(CASE 
-                    WHEN (dp_status NOT IN ('Published', 'Published on PT', 'Expire', 'Rejected', 'N/A') AND pt_status NOT IN ('Published', 'Expire', 'Rejected', 'N/A'))
-                    THEN 1 ELSE 0 END), 0) as pending_queue
-            FROM programming_dispatches
+                    WHEN (
+                        ((channel != 'Pakistan Today' AND (moved_to_pt = 0 OR moved_to_pt IS NULL))
+                         AND (dp_status IS NULL OR dp_status = '' OR dp_status = 'Pending')
+                         AND dp_status NOT IN ('In Progress', 'Published', 'Published on PT', 'Move to PT', 'Correction', 'Violation', 'Expire', 'Rejected'))
+                        OR
+                        ((channel = 'Pakistan Today' OR channel = 'All Channels' OR channel = 'Both' OR moved_to_pt = 1)
+                         AND (pt_status IS NULL OR pt_status = '' OR pt_status = 'Pending')
+                         AND pt_status NOT IN ('In Progress', 'Published', 'Move to PT', 'Correction', 'Violation', 'Expire', 'Rejected'))
+                    )
+                    AND (dp_status != 'Published' AND pt_status != 'Published' AND dp_status != 'Published on PT')
+                    THEN 1 ELSE 0 END), 0) as pending_count,
+                COALESCE(SUM(CASE 
+                    WHEN (dp_status = 'In Progress' OR pt_status = 'In Progress')
+                     AND (dp_status NOT IN ('Published', 'Published on PT', 'Move to PT', 'Correction', 'Violation', 'Expire', 'Rejected'))
+                     AND (pt_status NOT IN ('Published', 'Move to PT', 'Correction', 'Violation', 'Expire', 'Rejected'))
+                    THEN 1 ELSE 0 END), 0) as in_progress_count
+            FROM programming_dispatches pd
+            WHERE {$statsWhereSql}
         ");
-        $stats = $statsStmt->fetch() ?: [
-            'total_dispatches' => 0,
-            'dp_published' => 0,
-            'pt_published' => 0,
-            'moved_to_pt_count' => 0,
-            'total_corrections' => 0,
-            'pending_queue' => 0
+        $statsStmt->execute($statsParams);
+        $rawStats = $statsStmt->fetch() ?: [];
+        $pendingCount = (int)($rawStats['pending_count'] ?? 0);
+        $inProgressCount = (int)($rawStats['in_progress_count'] ?? 0);
+
+        $stats = [
+            'total_dispatches' => (int)($rawStats['total_dispatches'] ?? 0),
+            'dp_published' => (int)($rawStats['dp_published'] ?? 0),
+            'pt_published' => (int)($rawStats['pt_published'] ?? 0),
+            'moved_to_pt_count' => (int)($rawStats['moved_to_pt_count'] ?? 0),
+            'total_corrections' => (int)($rawStats['total_corrections'] ?? 0),
+            'pending_count' => $pendingCount,
+            'in_progress_count' => $inProgressCount,
+            'pending_queue' => ($pendingCount + $inProgressCount)
         ];
 
         echo json_encode([

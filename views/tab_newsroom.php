@@ -24,35 +24,55 @@
         </div>
 
         <!-- KPI Metrics Summary Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 16px;">
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #dc2626;">
+        <style>
+            .news-kpi-card {
+                cursor: pointer;
+                transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+                user-select: none;
+            }
+            .news-kpi-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            }
+            .news-kpi-card.active-card {
+                box-shadow: 0 0 0 2px var(--primary, #dc2626), 0 4px 14px rgba(0,0,0,0.12);
+                transform: translateY(-2px);
+            }
+        </style>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 16px;">
+            <div id="card-news-stat-total" class="news-kpi-card" onclick="filterNewsByCard('all')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #dc2626;" title="Click to view all stories">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">📺 Total Stories</div>
                 <div id="news-stat-total" style="font-size: 24px; font-weight: 800; color: #dc2626; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #16a34a;">
+            <div id="card-news-stat-dp" class="news-kpi-card" onclick="filterNewsByCard('published_dp')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #16a34a;" title="Click to filter DP Published">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🟢 DP Published</div>
                 <div id="news-stat-dp" style="font-size: 24px; font-weight: 800; color: #16a34a; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #dc2626;">
+            <div id="card-news-stat-pt" class="news-kpi-card" onclick="filterNewsByCard('published_pt')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #dc2626;" title="Click to filter PT Published">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🔴 PT Published</div>
                 <div id="news-stat-pt" style="font-size: 24px; font-weight: 800; color: #dc2626; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #b45309;">
+            <div id="card-news-stat-move-pt" class="news-kpi-card" onclick="filterNewsByCard('Move to PT')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #b45309;" title="Click to filter Move to PT">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🟤 Move to PT</div>
                 <div id="news-stat-move-pt" style="font-size: 24px; font-weight: 800; color: #b45309; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #2563eb;">
+            <div id="card-news-stat-corrections" class="news-kpi-card" onclick="filterNewsByCard('Correction')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #2563eb;" title="Click to filter Corrections & Violations">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🔵 Corrections</div>
                 <div id="news-stat-corrections" style="font-size: 24px; font-weight: 800; color: #2563eb; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #eab308;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">⏳ In Queue</div>
+            <div id="card-news-stat-pending" class="news-kpi-card" onclick="filterNewsByCard('Pending')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #eab308;" title="Click to filter Pending (Unclaimed)">
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">⏳ Pending</div>
                 <div id="news-stat-pending" style="font-size: 24px; font-weight: 800; color: #eab308; margin-top: 4px; line-height: 1;">0</div>
+            </div>
+
+            <div id="card-news-stat-inprogress" class="news-kpi-card" onclick="filterNewsByCard('In Progress')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #8b5cf6;" title="Click to filter In Progress">
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">⚡ In Progress</div>
+                <div id="news-stat-inprogress" style="font-size: 24px; font-weight: 800; color: #8b5cf6; margin-top: 4px; line-height: 1;">0</div>
             </div>
         </div>
     </div>
@@ -60,14 +80,14 @@
     <!-- Filters & Search Toolbar -->
     <div class="worksheet-card" style="margin-bottom: 18px; padding: 12px 18px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
         <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
-            <div style="flex: 0 0 140px;">
-                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📅 Date</label>
-                <input type="date" id="news-filter-date" class="input-control" value="<?= date('Y-m-d') ?>" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="handleNewsFilterChange('date')">
+            <div style="flex: 0 0 145px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📅 Date From</label>
+                <input type="date" id="news-filter-from" class="input-control" value="" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="loadNewsroomDispatches()">
             </div>
 
-            <div style="flex: 0 0 135px;">
-                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🗓️ Month</label>
-                <input type="month" id="news-filter-month" class="input-control" value="<?= date('Y-m') ?>" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="handleNewsFilterChange('month')">
+            <div style="flex: 0 0 145px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📅 Date To</label>
+                <input type="date" id="news-filter-to" class="input-control" value="" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="loadNewsroomDispatches()">
             </div>
 
             <div style="flex: 0 0 150px;">
@@ -80,16 +100,17 @@
                 </select>
             </div>
 
-            <div style="flex: 0 0 160px;">
+            <div style="flex: 0 0 175px;">
                 <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🏷️ Status</label>
-                <select id="news-filter-status" class="input-control" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="loadNewsroomDispatches()">
+                <select id="news-filter-status" class="input-control" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="handleNewsStatusSelectChange()">
                     <option value="all">All Statuses</option>
-                    <option value="pending">⏳ Pending Queue</option>
+                    <option value="Pending">⏳ Pending</option>
                     <option value="In Progress">⚡ In Progress</option>
-                    <option value="published">🟢 Published</option>
-                    <option value="Correction">🔵 Correction</option>
-                    <option value="Violation">🔴 Violation</option>
+                    <option value="published">🟢 Published (All)</option>
+                    <option value="published_dp">🟢 DP Published</option>
+                    <option value="published_pt">🔴 PT Published</option>
                     <option value="Move to PT">🟤 Move to PT</option>
+                    <option value="Correction">🔵 Corrections & Violations</option>
                     <option value="Expire">⛔ Expire</option>
                     <option value="Rejected">🟤 Rejected</option>
                 </select>

@@ -24,35 +24,55 @@
         </div>
 
         <!-- KPI Metrics Summary Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 16px;">
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #d97706;">
+        <style>
+            .prog-kpi-card {
+                cursor: pointer;
+                transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+                user-select: none;
+            }
+            .prog-kpi-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            }
+            .prog-kpi-card.active-card {
+                box-shadow: 0 0 0 2px var(--primary, #d97706), 0 4px 14px rgba(0,0,0,0.12);
+                transform: translateY(-2px);
+            }
+        </style>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 16px;">
+            <div id="card-prog-stat-total" class="prog-kpi-card" onclick="filterProgByCard('all')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #d97706;" title="Click to view all dispatches">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">📡 Total Dispatches</div>
                 <div id="prog-stat-total" style="font-size: 24px; font-weight: 800; color: #d97706; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #16a34a;">
+            <div id="card-prog-stat-dp" class="prog-kpi-card" onclick="filterProgByCard('published_dp')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #16a34a;" title="Click to filter DP Published">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🟢 DP Published</div>
                 <div id="prog-stat-dp" style="font-size: 24px; font-weight: 800; color: #16a34a; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #dc2626;">
+            <div id="card-prog-stat-pt" class="prog-kpi-card" onclick="filterProgByCard('published_pt')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #dc2626;" title="Click to filter PT Published">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🔴 PT Published</div>
                 <div id="prog-stat-pt" style="font-size: 24px; font-weight: 800; color: #dc2626; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #b45309;">
+            <div id="card-prog-stat-move-pt" class="prog-kpi-card" onclick="filterProgByCard('Move to PT')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #b45309;" title="Click to filter Move to PT">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🟤 Move to PT</div>
                 <div id="prog-stat-move-pt" style="font-size: 24px; font-weight: 800; color: #b45309; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #2563eb;">
+            <div id="card-prog-stat-corrections" class="prog-kpi-card" onclick="filterProgByCard('Correction')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #2563eb;" title="Click to filter Corrections & Violations">
                 <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">🔵 Corrections</div>
                 <div id="prog-stat-corrections" style="font-size: 24px; font-weight: 800; color: #2563eb; margin-top: 4px; line-height: 1;">0</div>
             </div>
 
-            <div style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 16px; border-left: 4px solid #eab308;">
-                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">⏳ In Queue</div>
+            <div id="card-prog-stat-pending" class="prog-kpi-card" onclick="filterProgByCard('Pending')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #eab308;" title="Click to filter Pending (Unclaimed)">
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">⏳ Pending</div>
                 <div id="prog-stat-pending" style="font-size: 24px; font-weight: 800; color: #eab308; margin-top: 4px; line-height: 1;">0</div>
+            </div>
+
+            <div id="card-prog-stat-inprogress" class="prog-kpi-card" onclick="filterProgByCard('In Progress')" style="background: var(--bg-card-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px 14px; border-left: 4px solid #8b5cf6;" title="Click to filter In Progress">
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">⚡ In Progress</div>
+                <div id="prog-stat-inprogress" style="font-size: 24px; font-weight: 800; color: #8b5cf6; margin-top: 4px; line-height: 1;">0</div>
             </div>
         </div>
     </div>
@@ -60,14 +80,14 @@
     <!-- Filters & Search Toolbar -->
     <div class="worksheet-card" style="margin-bottom: 18px; padding: 12px 18px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
         <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
-            <div style="flex: 0 0 140px;">
-                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📅 Date</label>
-                <input type="date" id="prog-filter-date" class="input-control" value="<?= date('Y-m-d') ?>" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="handleProgFilterChange('date')">
+            <div style="flex: 0 0 145px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📅 Date From</label>
+                <input type="date" id="prog-filter-from" class="input-control" value="" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="loadProgrammingDispatches()">
             </div>
 
-            <div style="flex: 0 0 135px;">
-                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🗓️ Month</label>
-                <input type="month" id="prog-filter-month" class="input-control" value="<?= date('Y-m') ?>" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="handleProgFilterChange('month')">
+            <div style="flex: 0 0 145px;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">📅 Date To</label>
+                <input type="date" id="prog-filter-to" class="input-control" value="" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="loadProgrammingDispatches()">
             </div>
 
             <div style="flex: 0 0 150px;">
@@ -80,16 +100,17 @@
                 </select>
             </div>
 
-            <div style="flex: 0 0 160px;">
+            <div style="flex: 0 0 175px;">
                 <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">🏷️ Status</label>
-                <select id="prog-filter-status" class="input-control" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="loadProgrammingDispatches()">
+                <select id="prog-filter-status" class="input-control" style="font-size: 12.5px; padding: 7px 10px; height: 38px; border-radius: 6px;" onchange="handleProgStatusSelectChange()">
                     <option value="all">All Statuses</option>
-                    <option value="pending">⏳ Pending Queue</option>
+                    <option value="Pending">⏳ Pending</option>
                     <option value="In Progress">⚡ In Progress</option>
-                    <option value="published">🟢 Published</option>
-                    <option value="Correction">🔵 Correction</option>
-                    <option value="Violation">🔴 Violation</option>
+                    <option value="published">🟢 Published (All)</option>
+                    <option value="published_dp">🟢 DP Published</option>
+                    <option value="published_pt">🔴 PT Published</option>
                     <option value="Move to PT">🟤 Move to PT</option>
+                    <option value="Correction">🔵 Corrections & Violations</option>
                     <option value="Expire">⛔ Expire</option>
                     <option value="Rejected">🟤 Rejected</option>
                 </select>

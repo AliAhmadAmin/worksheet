@@ -89,9 +89,17 @@ async function loadProgrammingDispatches() {
     const tbody = document.getElementById('prog-matrix-tbody');
     if (!tbody) return;
 
+    const fromVal = document.getElementById('prog-filter-from')?.value || '';
+    const toVal = document.getElementById('prog-filter-to')?.value || '';
+
     let url = 'api/programming.php?action=list';
-    if (ProgState.selectedDate) url += `&date=${encodeURIComponent(ProgState.selectedDate)}`;
-    else if (ProgState.selectedMonth) url += `&month=${encodeURIComponent(ProgState.selectedMonth)}`;
+    if (fromVal && toVal) {
+        url += `&date_from=${encodeURIComponent(fromVal)}&date_to=${encodeURIComponent(toVal)}`;
+    } else if (fromVal) {
+        url += `&date_from=${encodeURIComponent(fromVal)}`;
+    } else if (toVal) {
+        url += `&date_to=${encodeURIComponent(toVal)}`;
+    }
 
     const channelVal = document.getElementById('prog-filter-channel')?.value || 'all';
     if (channelVal !== 'all') url += `&channel=${encodeURIComponent(channelVal)}`;
@@ -101,6 +109,9 @@ async function loadProgrammingDispatches() {
 
     const searchVal = document.getElementById('prog-search-input')?.value.trim() || '';
     if (searchVal) url += `&search=${encodeURIComponent(searchVal)}`;
+
+    // Sync active KPI card style
+    highlightActiveProgCard(statusVal);
 
     try {
         const res = await fetch(url);
@@ -141,17 +152,19 @@ function updateProgKpis(stats) {
     const elMovePt = document.getElementById('prog-stat-move-pt');
     const elCorr = document.getElementById('prog-stat-corrections');
     const elPend = document.getElementById('prog-stat-pending');
+    const elProg = document.getElementById('prog-stat-inprogress');
 
     if (elTotal) elTotal.textContent = stats.total_dispatches || 0;
     if (elDp) elDp.textContent = stats.dp_published || 0;
     if (elPt) elPt.textContent = stats.pt_published || 0;
     if (elMovePt) elMovePt.textContent = stats.moved_to_pt_count || 0;
     if (elCorr) elCorr.textContent = stats.total_corrections || 0;
-    if (elPend) elPend.textContent = stats.pending_queue || 0;
+    if (elPend) elPend.textContent = (stats.pending_count !== undefined) ? stats.pending_count : (stats.pending_queue || 0);
+    if (elProg) elProg.textContent = stats.in_progress_count || 0;
 
     // Update sidebar badge for Programming Handover
     const progBadges = [document.getElementById('pending-programming-badge'), document.getElementById('pending-prog-badge-pg')].filter(Boolean);
-    const count = parseInt(stats.pending_queue) || 0;
+    const count = parseInt(stats.pending_count !== undefined ? stats.pending_count : stats.pending_queue) || 0;
     progBadges.forEach(badge => {
         badge.textContent = count;
         badge.style.display = count > 0 ? 'inline-block' : 'none';
@@ -885,29 +898,62 @@ async function deleteCurrentDispatch() {
     }
 }
 
-// Filter change handling
-function handleProgFilterChange(type) {
-    if (type === 'date') {
-        ProgState.selectedDate = document.getElementById('prog-filter-date')?.value || '';
-        ProgState.selectedMonth = '';
-        const monthInput = document.getElementById('prog-filter-month');
-        if (monthInput) monthInput.value = '';
-    } else if (type === 'month') {
-        ProgState.selectedMonth = document.getElementById('prog-filter-month')?.value || '';
-        ProgState.selectedDate = '';
-        const dateInput = document.getElementById('prog-filter-date');
-        if (dateInput) dateInput.value = '';
+// 🔍 Filter Controls & Interactive KPI Card Clicking
+function filterProgByCard(cardType) {
+    const statusSelect = document.getElementById('prog-filter-status');
+    const channelSelect = document.getElementById('prog-filter-channel');
+    if (!statusSelect) return;
+
+    if (cardType === 'all') {
+        statusSelect.value = 'all';
+    } else if (cardType === 'published_dp') {
+        statusSelect.value = 'published_dp';
+    } else if (cardType === 'published_pt') {
+        statusSelect.value = 'published_pt';
+    } else if (cardType === 'Move to PT') {
+        statusSelect.value = 'Move to PT';
+    } else if (cardType === 'Correction') {
+        statusSelect.value = 'Correction';
+    } else if (cardType === 'Pending' || cardType === 'pending') {
+        statusSelect.value = 'Pending';
+    } else if (cardType === 'In Progress' || cardType === 'in_progress') {
+        statusSelect.value = 'In Progress';
     }
+
+    highlightActiveProgCard(statusSelect.value);
     loadProgrammingDispatches();
 }
 
+function handleProgStatusSelectChange() {
+    const statusVal = document.getElementById('prog-filter-status')?.value || 'all';
+    highlightActiveProgCard(statusVal);
+    loadProgrammingDispatches();
+}
+
+function highlightActiveProgCard(statusVal) {
+    const allCards = document.querySelectorAll('.prog-kpi-card');
+    allCards.forEach(c => c.classList.remove('active-card'));
+
+    let activeCardId = null;
+    if (statusVal === 'all') activeCardId = 'card-prog-stat-total';
+    else if (statusVal === 'published_dp') activeCardId = 'card-prog-stat-dp';
+    else if (statusVal === 'published_pt') activeCardId = 'card-prog-stat-pt';
+    else if (statusVal === 'Move to PT') activeCardId = 'card-prog-stat-move-pt';
+    else if (statusVal === 'Correction' || statusVal === 'Violation') activeCardId = 'card-prog-stat-corrections';
+    else if (statusVal === 'Pending' || statusVal === 'pending') activeCardId = 'card-prog-stat-pending';
+    else if (statusVal === 'In Progress' || statusVal === 'in_progress') activeCardId = 'card-prog-stat-inprogress';
+
+    if (activeCardId) {
+        const el = document.getElementById(activeCardId);
+        if (el) el.classList.add('active-card');
+    }
+}
+
 function resetProgFilters() {
-    ProgState.selectedDate = '';
-    ProgState.selectedMonth = '';
-    const dateInput = document.getElementById('prog-filter-date');
-    if (dateInput) dateInput.value = '';
-    const monthInput = document.getElementById('prog-filter-month');
-    if (monthInput) monthInput.value = '';
+    const fromEl = document.getElementById('prog-filter-from');
+    if (fromEl) fromEl.value = '';
+    const toEl = document.getElementById('prog-filter-to');
+    if (toEl) toEl.value = '';
     const channelSelect = document.getElementById('prog-filter-channel');
     if (channelSelect) channelSelect.value = 'all';
     const statusSelect = document.getElementById('prog-filter-status');
@@ -915,6 +961,7 @@ function resetProgFilters() {
     const searchInput = document.getElementById('prog-search-input');
     if (searchInput) searchInput.value = '';
 
+    highlightActiveProgCard('all');
     loadProgrammingDispatches();
 }
 

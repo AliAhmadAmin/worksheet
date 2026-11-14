@@ -152,33 +152,38 @@ function populateDirectoryDeptFilter() {
 function resetDirectoryFilters() {
     const searchInput = document.getElementById('emp-dir-search');
     const deptSelect = document.getElementById('emp-dir-filter-dept');
-    const teamSelect = document.getElementById('emp-dir-filter-team');
     const statusSelect = document.getElementById('emp-dir-filter-status');
     const loginSelect = document.getElementById('emp-dir-filter-login');
-    const typeSelect = document.getElementById('emp-dir-filter-type');
 
     if (searchInput) searchInput.value = '';
     if (deptSelect) deptSelect.value = '';
-    if (teamSelect) teamSelect.value = '';
     if (statusSelect) statusSelect.value = 'active';
     if (loginSelect) loginSelect.value = '';
-    if (typeSelect) typeSelect.value = 'all';
 
+    applyDirectoryFilters();
+}
+
+function setDirectoryStatusFilter(val) {
+    const statusSelect = document.getElementById('emp-dir-filter-status');
+    if (!statusSelect) return;
+    if (statusSelect.value === val) {
+        statusSelect.value = 'active';
+    } else {
+        statusSelect.value = val;
+    }
     applyDirectoryFilters();
 }
 
 function applyDirectoryFilters() {
     const deptId = document.getElementById('emp-dir-filter-dept')?.value;
-    const teamStatus = document.getElementById('emp-dir-filter-team')?.value;
     const statusVal = document.getElementById('emp-dir-filter-status')?.value || 'active';
     const loginStatus = document.getElementById('emp-dir-filter-login')?.value;
-    const typeFilter = document.getElementById('emp-dir-filter-type')?.value || 'all';
     const search = (document.getElementById('emp-dir-search')?.value || '').toLowerCase().trim();
 
     // Toggle reset button visibility
     const resetBtn = document.getElementById('emp-dir-reset-filters-btn');
     if (resetBtn) {
-        const isFiltered = !!(deptId || teamStatus || (statusVal && statusVal !== 'active') || (typeFilter && typeFilter !== 'all') || loginStatus || search);
+        const isFiltered = !!(deptId || (statusVal && statusVal !== 'active') || loginStatus || search);
         resetBtn.style.display = isFiltered ? 'inline-flex' : 'none';
     }
 
@@ -186,34 +191,24 @@ function applyDirectoryFilters() {
 
     if (statusVal === 'active') {
         list = list.filter(e => !e.deleted_at && e.is_active != 0);
+    } else if (statusVal === 'regular') {
+        list = list.filter(e => !e.deleted_at && e.is_active != 0 && (e.employment_type || 'full_time') !== 'internship');
+    } else if (statusVal === 'internship') {
+        list = list.filter(e => !e.deleted_at && e.is_active != 0 && e.employment_type === 'internship');
+    } else if (statusVal === 'contract') {
+        list = list.filter(e => !e.deleted_at && e.is_active != 0 && e.employment_type === 'contract');
+    } else if (statusVal === 'probation') {
+        list = list.filter(e => !e.deleted_at && e.is_active != 0 && e.employment_type === 'probation');
     } else if (statusVal === 'inactive') {
         list = list.filter(e => !e.deleted_at && e.is_active == 0);
     } else if (statusVal === 'deleted') {
         list = list.filter(e => !!e.deleted_at);
     } else if (statusVal === 'all') {
         list = list.filter(e => !e.deleted_at);
-    } else if (statusVal === 'all_with_deleted') {
-        // keep all
     }
 
     if (deptId) {
         list = list.filter(e => String(e.department_id) === String(deptId));
-    }
-
-    if (typeFilter === 'regular') {
-        list = list.filter(e => (e.employment_type || 'full_time') !== 'internship');
-    } else if (typeFilter === 'internship') {
-        list = list.filter(e => e.employment_type === 'internship');
-    } else if (typeFilter === 'contract') {
-        list = list.filter(e => e.employment_type === 'contract');
-    } else if (typeFilter === 'probation') {
-        list = list.filter(e => e.employment_type === 'probation');
-    }
-
-    if (teamStatus === 'unassigned') {
-        list = list.filter(e => !e.team_id || e.team_id == 0);
-    } else if (teamStatus === 'assigned') {
-        list = list.filter(e => e.team_id && e.team_id > 0);
     }
 
     if (loginStatus === 'login_enabled') {
@@ -238,25 +233,36 @@ function applyDirectoryFilters() {
         ? (AppState.employees || []).filter(e => String(e.department_id) === String(deptId)) 
         : (AppState.employees || []);
     const activeInView = inViewEmployees.filter(e => !e.deleted_at && e.is_active != 0);
-    const deletedInView = inViewEmployees.filter(e => !!e.deleted_at);
 
     if (totalBadge) {
         totalBadge.textContent = activeInView.length;
     }
 
-    // Update dynamic headcount chip (e.g. 💼 19 Regular Staff • 🎓 3 Internees • 🗑️ 2 Deleted)
-    const headcountChip = document.getElementById('emp-dir-headcount-chip');
-    if (headcountChip) {
-        const regularCount = activeInView.filter(e => (e.employment_type || 'full_time') !== 'internship').length;
-        const internCount = activeInView.filter(e => e.employment_type === 'internship').length;
-        const deletedCount = deletedInView.length;
-        headcountChip.style.display = 'inline-flex';
-        let chipHtml = `<span style="color: var(--text-main); font-weight: 700;">💼 ${regularCount} Regular Staff</span>` +
-            (internCount > 0 ? `<span style="color: var(--text-muted); margin: 0 4px;">•</span><span style="color: #9333ea; font-weight: 700;">🎓 ${internCount} Internee${internCount > 1 ? 's' : ''}</span>` : '');
-        if (deletedCount > 0) {
-            chipHtml += `<span style="color: var(--text-muted); margin: 0 4px;">•</span><span style="color: #dc2626; font-weight: 700; cursor: pointer;" onclick="document.getElementById('emp-dir-filter-status').value='deleted'; applyDirectoryFilters();" title="Click to view deleted staff">🗑️ ${deletedCount} Deleted</span>`;
-        }
-        headcountChip.innerHTML = chipHtml;
+    // Dynamically update numbers in the Status / Personnel filter dropdown
+    const statusSelect = document.getElementById('emp-dir-filter-status');
+    if (statusSelect) {
+        const activeCount = activeInView.length;
+        const regularCount = inViewEmployees.filter(e => !e.deleted_at && e.is_active != 0 && (e.employment_type || 'full_time') !== 'internship').length;
+        const internCount = inViewEmployees.filter(e => !e.deleted_at && e.is_active != 0 && e.employment_type === 'internship').length;
+        const contractCount = inViewEmployees.filter(e => !e.deleted_at && e.is_active != 0 && e.employment_type === 'contract').length;
+        const probationCount = inViewEmployees.filter(e => !e.deleted_at && e.is_active != 0 && e.employment_type === 'probation').length;
+        const inactiveCount = inViewEmployees.filter(e => !e.deleted_at && e.is_active == 0).length;
+        const deletedCount = inViewEmployees.filter(e => !!e.deleted_at).length;
+        const allCount = inViewEmployees.length;
+
+        const updateOpt = (val, label) => {
+            const opt = statusSelect.querySelector(`option[value="${val}"]`);
+            if (opt) opt.textContent = label;
+        };
+
+        updateOpt('active', `🟢 Active Staff (${activeCount})`);
+        updateOpt('regular', `💼 Regular Staff (${regularCount})`);
+        updateOpt('internship', `🎓 Internees (${internCount})`);
+        updateOpt('contract', `📄 Contractual Staff (${contractCount})`);
+        updateOpt('probation', `⏳ Probationary Staff (${probationCount})`);
+        updateOpt('inactive', `⛔ Deactivated (${inactiveCount})`);
+        updateOpt('deleted', `🗑️ Deleted (${deletedCount})`);
+        updateOpt('all', `👥 All Staff (${allCount})`);
     }
 
     renderDirectoryTable(list);
@@ -398,16 +404,6 @@ function renderDirectoryTable(employees) {
             <td style="width: 170px; max-width: 170px; min-width: 150px; overflow: hidden;">
                 <div style="font-weight: 600; font-size: 12.5px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;" title="${escapeHtml(emp.department_name || 'General')}">
                     🏢 ${escapeHtml(emp.department_name || 'General')}
-                </div>
-                <div style="display: flex; align-items: center; gap: 4px; margin-top: 3px; max-width: 100%; overflow: hidden;">
-                    <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;" title="${emp.team_name ? escapeHtml(emp.team_name) : 'Unassigned'}">
-                        ${teamHtml}
-                    </div>
-                    ${canAssignThisEmp ? `
-                        <button type="button" class="btn btn-outline" style="padding: 1px 5px; font-size: 9.5px; border-radius: 4px; line-height: 1; flex-shrink: 0;" onclick="event.stopPropagation(); openDepartmentDrilldown(${emp.department_id || 0})" title="Manage team assignment in department">
-                            ⚙️
-                        </button>
-                    ` : ''}
                 </div>
             </td>
             <td>
