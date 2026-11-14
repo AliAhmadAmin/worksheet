@@ -201,11 +201,23 @@ async function loadAssignedTasks() {
 
     const statusFilter = document.getElementById('task-filter-status')?.value || '';
     const empFilter = document.getElementById('task-filter-emp')?.value || '';
+    const dateFrom = document.getElementById('task-filter-from')?.value || '';
+    const dateTo = document.getElementById('task-filter-to')?.value || '';
     const scopeVal = TaskState.currentScope || 'my_dept';
+
+    // Synchronize active KPI card highlight
+    highlightActiveTaskCard(statusFilter);
 
     let url = `api/tasks.php?action=get_tasks&scope=${encodeURIComponent(scopeVal)}`;
     if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
     if (empFilter) url += `&employee_id=${encodeURIComponent(empFilter)}`;
+    if (dateFrom && dateTo) {
+        url += `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`;
+    } else if (dateFrom) {
+        url += `&date_from=${encodeURIComponent(dateFrom)}`;
+    } else if (dateTo) {
+        url += `&date_to=${encodeURIComponent(dateTo)}`;
+    }
 
     try {
         const res = await fetch(url);
@@ -227,8 +239,8 @@ async function loadAssignedTasks() {
             b.style.display = pendingTasks.length > 0 ? 'inline-block' : 'none';
         });
 
-        // Render KPI counters on Task Assigner page
-        renderTaskMetrics(tasks);
+        // Render KPI counters on Task Assigner page using persistent API stats
+        renderTaskMetrics(tasks, data.stats);
 
         // Render Employee Sidebar View on Worksheet tab
         if (listContainer) {
@@ -298,7 +310,7 @@ async function loadAssignedTasks() {
     }
 }
 
-function renderTaskMetrics(tasks) {
+function renderTaskMetrics(tasks, stats = null) {
     const totalEl = document.getElementById('task-metric-total');
     const pendingEl = document.getElementById('task-metric-pending');
     const progressEl = document.getElementById('task-metric-progress');
@@ -306,10 +318,18 @@ function renderTaskMetrics(tasks) {
 
     if (!totalEl) return;
 
-    const total = tasks.length;
-    const pending = tasks.filter(t => t.status === 'pending').length;
-    const progress = tasks.filter(t => t.status === 'in_progress').length;
-    const completed = tasks.filter(t => t.status === 'completed').length;
+    let total, pending, progress, completed;
+    if (stats && stats.total !== undefined) {
+        total = stats.total || 0;
+        pending = stats.pending || 0;
+        progress = stats.in_progress || 0;
+        completed = stats.completed || 0;
+    } else {
+        total = tasks.length;
+        pending = tasks.filter(t => t.status === 'pending').length;
+        progress = tasks.filter(t => t.status === 'in_progress').length;
+        completed = tasks.filter(t => t.status === 'completed').length;
+    }
 
     totalEl.textContent = total;
     if (pendingEl) pendingEl.textContent = pending;
@@ -320,6 +340,75 @@ function renderTaskMetrics(tasks) {
     if (dashTasks) {
         dashTasks.textContent = `${pending + progress} Active`;
     }
+}
+
+// 🎯 Interactive KPI Card Clicking & Filter Synchronization
+function filterTasksByCard(statusVal) {
+    const statusSelect = document.getElementById('task-filter-status');
+    if (!statusSelect) return;
+
+    if (statusVal === 'all') {
+        statusSelect.value = '';
+    } else {
+        // Toggle if already selected, or set to target
+        if (statusSelect.value === statusVal) {
+            statusSelect.value = '';
+        } else {
+            statusSelect.value = statusVal;
+        }
+    }
+
+    highlightActiveTaskCard(statusSelect.value);
+    loadAssignedTasks();
+}
+
+function handleTaskStatusDropdownChange() {
+    const statusVal = document.getElementById('task-filter-status')?.value || '';
+    highlightActiveTaskCard(statusVal);
+    loadAssignedTasks();
+}
+
+function highlightActiveTaskCard(statusVal) {
+    const allCards = document.querySelectorAll('.task-kpi-card');
+    allCards.forEach(c => c.classList.remove('active-card'));
+
+    let activeCardId = null;
+    if (!statusVal || statusVal === 'all') {
+        activeCardId = 'card-task-total';
+    } else if (statusVal === 'pending') {
+        activeCardId = 'card-task-pending';
+    } else if (statusVal === 'in_progress') {
+        activeCardId = 'card-task-progress';
+    } else if (statusVal === 'completed') {
+        activeCardId = 'card-task-completed';
+    }
+
+    if (activeCardId) {
+        const el = document.getElementById(activeCardId);
+        if (el) el.classList.add('active-card');
+    }
+}
+
+function resetTaskFilters() {
+    const searchInput = document.getElementById('task-search-input');
+    if (searchInput) searchInput.value = '';
+    TaskState.searchQuery = '';
+
+    const fromEl = document.getElementById('task-filter-from');
+    if (fromEl) fromEl.value = '';
+    const toEl = document.getElementById('task-filter-to');
+    if (toEl) toEl.value = '';
+
+    const statusSelect = document.getElementById('task-filter-status');
+    if (statusSelect) statusSelect.value = '';
+
+    const empSelect = document.getElementById('task-filter-emp');
+    if (empSelect) empSelect.value = '';
+    const empLabel = document.getElementById('task-emp-dropdown-selected-name');
+    if (empLabel) empLabel.textContent = 'All Employees';
+
+    highlightActiveTaskCard('all');
+    loadAssignedTasks();
 }
 
 function createTaskCard(task) {

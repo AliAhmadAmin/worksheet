@@ -68,8 +68,93 @@ switch ($action) {
         $statusFilter = $_GET['status'] ?? null;
         $deptFilter = $_GET['department_id'] ?? null;
         $scope = $_GET['scope'] ?? 'my_dept'; // 'my_dept', 'assigned_by_me', 'all'
+        $dateFrom = $_GET['date_from'] ?? null;
+        $dateTo = $_GET['date_to'] ?? null;
+        $search = trim($_GET['search'] ?? '');
 
         if ($canAssign || $canEdit) {
+            $baseWhere = "1=1";
+            $baseParams = [];
+
+            // Scope Filtering:
+            // - 'others': Tasks assigned by this HOD to members OUTSIDE their primary departmental team
+            // - 'my_dept': ALL tasks belonging to this HOD's direct departmental team members
+            if ($scope === 'others') {
+                if (!$isSuperAdmin && !empty($directDeptIds)) {
+                    $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
+                    $baseWhere .= " AND t.assigned_by = ? 
+                              AND (e.department_id NOT IN ($placeholders) OR e.department_id IS NULL)";
+                    $baseParams[] = $currentUserId;
+                    foreach ($directDeptIds as $dId) { $baseParams[] = $dId; }
+                } else {
+                    $baseWhere .= " AND t.assigned_by = ?";
+                    $baseParams[] = $currentUserId;
+                }
+            } elseif (!$isSuperAdmin && !empty($directDeptIds)) {
+                $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
+                $baseWhere .= " AND (
+                    e.department_id IN ($placeholders) 
+                    OR (t.department_id IN ($placeholders) AND (t.assigned_to = 0 OR t.assigned_to IS NULL))
+                    OR t.assigned_by = ?
+                )";
+                foreach ($directDeptIds as $dId) { $baseParams[] = $dId; }
+                foreach ($directDeptIds as $dId) { $baseParams[] = $dId; }
+                $baseParams[] = $currentUserId;
+            } elseif (!empty($deptFilter)) {
+                $baseWhere .= " AND (t.department_id = ? OR e.department_id = ?)";
+                $baseParams[] = (int)$deptFilter;
+                $baseParams[] = (int)$deptFilter;
+            }
+
+            if ($empFilter) {
+                $baseWhere .= " AND t.assigned_to = ?";
+                $baseParams[] = $empFilter;
+            }
+
+            if (!empty($dateFrom) && !empty($dateTo)) {
+                $baseWhere .= " AND DATE(t.created_at) BETWEEN ? AND ?";
+                $baseParams[] = $dateFrom;
+                $baseParams[] = $dateTo;
+            } elseif (!empty($dateFrom)) {
+                $baseWhere .= " AND DATE(t.created_at) >= ?";
+                $baseParams[] = $dateFrom;
+            } elseif (!empty($dateTo)) {
+                $baseWhere .= " AND DATE(t.created_at) <= ?";
+                $baseParams[] = $dateTo;
+            }
+
+            if (!empty($search)) {
+                $baseWhere .= " AND (t.title LIKE ? OR t.description LIKE ? OR e.name LIKE ? OR e.emp_code LIKE ? OR e.designation LIKE ?)";
+                $searchWild = "%$search%";
+                $baseParams[] = $searchWild;
+                $baseParams[] = $searchWild;
+                $baseParams[] = $searchWild;
+                $baseParams[] = $searchWild;
+                $baseParams[] = $searchWild;
+            }
+
+            // Summary Stats across the current scope/date range
+            $statsStmt = $pdo->prepare("
+                SELECT 
+                    COUNT(*) as total,
+                    COALESCE(SUM(CASE WHEN t.status = 'pending' THEN 1 ELSE 0 END), 0) as pending,
+                    COALESCE(SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END), 0) as in_progress,
+                    COALESCE(SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END), 0) as completed
+                FROM tasks t
+                LEFT JOIN employees e ON t.assigned_to = e.id
+                WHERE {$baseWhere}
+            ");
+            $statsStmt->execute($baseParams);
+            $stats = $statsStmt->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'pending' => 0, 'in_progress' => 0, 'completed' => 0];
+
+            // Filtered tasks query
+            $taskWhere = $baseWhere;
+            $taskParams = $baseParams;
+            if ($statusFilter) {
+                $taskWhere .= " AND t.status = ?";
+                $taskParams[] = $statusFilter;
+            }
+
             $sql = "
                 SELECT t.*, 
                        COALESCE(e.name, 'Unassigned') as employee_name, 
@@ -86,56 +171,59 @@ switch ($action) {
                 LEFT JOIN employees a ON t.assigned_by = a.id
                 LEFT JOIN departments adep ON a.department_id = adep.id
                 LEFT JOIN departments d ON t.department_id = d.id
-                WHERE 1=1
+                WHERE {$taskWhere}
+                ORDER BY CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.created_at DESC
             ";
-            $params = [];
-
-            // Scope Filtering:
-            // - 'others': Tasks assigned by this HOD to members OUTSIDE their primary departmental team (e.g. Hafiz Attique, Abid Ali, Babar Rasool)
-            // - 'my_dept': ALL tasks belonging to this HOD's direct departmental team members (Aroosa, Ali Ahmad, Sultan, Abaid, etc.)
-            if ($scope === 'others') {
-                if (!$isSuperAdmin && !empty($directDeptIds)) {
-                    $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
-                    $sql .= " AND t.assigned_by = ? 
-                              AND (e.department_id NOT IN ($placeholders) OR e.department_id IS NULL)";
-                    $params[] = $currentUserId;
-                    foreach ($directDeptIds as $dId) { $params[] = $dId; }
-                } else {
-                    $sql .= " AND t.assigned_by = ?";
-                    $params[] = $currentUserId;
-                }
-            } elseif ($scope === 'my_dept' && !$isSuperAdmin && !empty($directDeptIds)) {
-                $placeholders = implode(',', array_fill(0, count($directDeptIds), '?'));
-                $sql .= " AND (
-                    e.department_id IN ($placeholders) 
-                    OR (t.department_id IN ($placeholders) AND (t.assigned_to = 0 OR t.assigned_to IS NULL))
-                )";
-                foreach ($directDeptIds as $dId) { $params[] = $dId; }
-                foreach ($directDeptIds as $dId) { $params[] = $dId; }
-            } elseif (!empty($deptFilter)) {
-                $sql .= " AND (t.department_id = ? OR e.department_id = ?)";
-                $params[] = (int)$deptFilter;
-                $params[] = (int)$deptFilter;
-            }
-
-            if ($empFilter) {
-                $sql .= " AND t.assigned_to = ?";
-                $params[] = $empFilter;
-            }
-            if ($statusFilter) {
-                $sql .= " AND t.status = ?";
-                $params[] = $statusFilter;
-            }
-            $sql .= " ORDER BY CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.created_at DESC";
 
             $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
+            $stmt->execute($taskParams);
             $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } else {
             // Employee view: ONLY tasks assigned to this employee (from any HOD / department across the organization)
+            $baseWhere = "t.assigned_to = ?";
+            $baseParams = [$currentUserId];
+
+            if (!empty($dateFrom) && !empty($dateTo)) {
+                $baseWhere .= " AND DATE(t.created_at) BETWEEN ? AND ?";
+                $baseParams[] = $dateFrom;
+                $baseParams[] = $dateTo;
+            } elseif (!empty($dateFrom)) {
+                $baseWhere .= " AND DATE(t.created_at) >= ?";
+                $baseParams[] = $dateFrom;
+            } elseif (!empty($dateTo)) {
+                $baseWhere .= " AND DATE(t.created_at) <= ?";
+                $baseParams[] = $dateTo;
+            }
+
+            if (!empty($search)) {
+                $baseWhere .= " AND (t.title LIKE ? OR t.description LIKE ?)";
+                $searchWild = "%$search%";
+                $baseParams[] = $searchWild;
+                $baseParams[] = $searchWild;
+            }
+
+            $statsStmt = $pdo->prepare("
+                SELECT 
+                    COUNT(*) as total,
+                    COALESCE(SUM(CASE WHEN t.status = 'pending' THEN 1 ELSE 0 END), 0) as pending,
+                    COALESCE(SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END), 0) as in_progress,
+                    COALESCE(SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END), 0) as completed
+                FROM tasks t
+                WHERE {$baseWhere}
+            ");
+            $statsStmt->execute($baseParams);
+            $stats = $statsStmt->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'pending' => 0, 'in_progress' => 0, 'completed' => 0];
+
+            $taskWhere = $baseWhere;
+            $taskParams = $baseParams;
+            if ($statusFilter) {
+                $taskWhere .= " AND t.status = ?";
+                $taskParams[] = $statusFilter;
+            }
+
             $sql = "
                 SELECT t.*, 
-                       COALESCE(e.name, 'Unassigned') as employee_name,
+                       COALESCE(e.name, 'Unassigned') as employee_name, 
                        COALESCE(e.emp_code, t.emp_code, '') as employee_code,
                        COALESCE(edep.name, 'General') as employee_dept_name,
                        COALESCE(a.name, 'Admin') as assigner_name,
@@ -147,22 +235,25 @@ switch ($action) {
                 LEFT JOIN employees a ON t.assigned_by = a.id
                 LEFT JOIN departments adep ON a.department_id = adep.id
                 LEFT JOIN departments d ON t.department_id = d.id
-                WHERE t.assigned_to = ?
+                WHERE {$taskWhere}
+                ORDER BY CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.created_at DESC
             ";
-            $params = [$currentUserId];
-
-            if ($statusFilter) {
-                $sql .= " AND t.status = ?";
-                $params[] = $statusFilter;
-            }
-            $sql .= " ORDER BY CASE t.priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.created_at DESC";
 
             $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
+            $stmt->execute($taskParams);
             $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        echo json_encode(['success' => true, 'tasks' => $tasks]);
+        echo json_encode([
+            'success' => true,
+            'tasks' => $tasks,
+            'stats' => [
+                'total' => (int)($stats['total'] ?? 0),
+                'pending' => (int)($stats['pending'] ?? 0),
+                'in_progress' => (int)($stats['in_progress'] ?? 0),
+                'completed' => (int)($stats['completed'] ?? 0)
+            ]
+        ]);
         break;
 
     case 'create_task':
