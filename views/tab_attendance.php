@@ -26,7 +26,7 @@ try {
         <?php
         $isHodAttSection = in_array($userRoleAtt, ['hod', 'deputy_hod']);
         ?>
-        <section id="tab-attendance" class="tab-section <?= ($isHodAttSection && ($currentPortal ?? '') !== 'hr') ? 'active' : '' ?>">
+        <section id="tab-attendance" class="tab-section <?= (($currentPage ?? '') === 'attendance' || ($isHodAttSection && ($currentPortal ?? '') !== 'hr')) ? 'active' : '' ?>">
             <div class="worksheet-card">
                 <!-- Header with View Mode Switcher -->
                 <div class="card-header-flex" style="flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">

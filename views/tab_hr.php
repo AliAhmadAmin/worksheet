@@ -6,7 +6,7 @@
 ?>
 
 <!-- ================= 1. HR EXECUTIVE DASHBOARD ================= -->
-<section id="tab-hr" class="tab-section">
+<section id="tab-hr" class="tab-section <?= (($currentPage ?? '') === 'hr' || ($currentPortal ?? '') === 'hr') ? 'active' : '' ?>">
     <div class="worksheet-container">
 
         <!-- Executive Hero Header -->

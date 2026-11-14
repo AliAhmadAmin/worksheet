@@ -1092,6 +1092,24 @@ function closeMobileSidebar() {
     document.body.classList.remove('sidebar-open');
 }
 
+const PAGE_ROUTE_MAP = {
+    'tab-worksheet': 'index.php',
+    'tab-tasks': 'tasks.php',
+    'tab-newsroom': 'newsroom.php',
+    'tab-programming': 'programming.php',
+    'tab-attendance': 'attendance.php',
+    'tab-employees': 'employees.php',
+    'tab-roster': 'roster.php',
+    'tab-reports': 'reports.php',
+    'tab-hr': 'hr.php',
+    'tab-hr-leaves': 'hr.php#leaves',
+    'tab-hr-loans': 'hr.php#loans',
+    'tab-hr-claims': 'hr.php#claims',
+    'tab-hr-notices': 'hr.php#notices',
+    'tab-hr-fines': 'hr.php#fines',
+    'tab-hr-payroll': 'hr.php#payroll'
+};
+
 // Tab Navigation & URL Hash Routing
 async function navigateToTab(tabId, updateHash = true) {
     if (AppState.currentUser) {
@@ -1113,8 +1131,15 @@ async function navigateToTab(tabId, updateHash = true) {
         }
     }
 
-    const targetSection = document.getElementById(tabId);
-    if (!targetSection) return;
+    const normalizedTabId = tabId.startsWith('tab-') ? tabId : ('tab-' + tabId);
+    const targetSection = document.getElementById(tabId) || document.getElementById(normalizedTabId);
+    if (!targetSection) {
+        const dest = PAGE_ROUTE_MAP[tabId] || PAGE_ROUTE_MAP[normalizedTabId];
+        if (dest) {
+            window.location.href = dest;
+        }
+        return;
+    }
 
     closeMobileSidebar();
 
@@ -1185,12 +1210,6 @@ function getActiveTargetTabId() {
         }
     }
 
-    // For HODs: if no hash is provided, default to attendance (Team Dashboard)
-    const isNonHrPortal = !window.location.pathname.includes('hr');
-    if (!hash && isNonHrPortal && AppState.currentUser && (AppState.currentUser.role === 'hod' || AppState.currentUser.role === 'deputy_hod')) {
-        return 'tab-attendance';
-    }
-
     // Default: activate whichever tab button has .active on page render
     const defaultActiveBtn = document.querySelector('.nav-btn.active');
     if (defaultActiveBtn && defaultActiveBtn.getAttribute('data-tab')) {
@@ -1204,13 +1223,47 @@ function getActiveTargetTabId() {
 function setupTabNavigation() {
     const tabButtons = document.querySelectorAll('.nav-btn');
     tabButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+            closeMobileSidebar();
+
+            // Allow native behavior for modifier keys (Ctrl/Cmd/middle click for new tab)
+            if (e.ctrlKey || e.metaKey || e.button === 1) return;
+
             const targetTab = btn.getAttribute('data-tab');
+            const href = btn.getAttribute('href');
+
+            // If the target section exists in the current page DOM, switch smoothly without full reload
             if (targetTab) {
-                navigateToTab(targetTab, true);
+                const targetSection = document.getElementById(targetTab);
+                if (targetSection) {
+                    e.preventDefault();
+                    navigateToTab(targetTab, true);
+                    return;
+                }
+            }
+
+            // If target is not on current page, allow standard link navigation or route using PAGE_ROUTE_MAP
+            if (href && !href.startsWith('#')) {
+                return; // Let browser follow href natively
+            }
+
+            if (targetTab && PAGE_ROUTE_MAP[targetTab]) {
+                e.preventDefault();
+                window.location.href = PAGE_ROUTE_MAP[targetTab];
             }
         });
     });
+
+    // Auto-redirect if a hash was opened on a page that doesn't contain that section
+    const hash = window.location.hash.replace('#', '').trim();
+    if (hash) {
+        const hashTargetId = `tab-${hash}`;
+        const targetSection = document.getElementById(hashTargetId) || document.getElementById(hash);
+        if (!targetSection && PAGE_ROUTE_MAP[hashTargetId]) {
+            window.location.replace(PAGE_ROUTE_MAP[hashTargetId]);
+            return;
+        }
+    }
 
     // Handle browser hash navigation (initial load & back/forward history)
     function handleHashChange() {

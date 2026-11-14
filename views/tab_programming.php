@@ -1,6 +1,6 @@
 <!-- TAB: PROGRAMMING & DIGITAL HANDOVER PIPELINE -->
 <?php $isHodProgTab = in_array(strtolower($authUser['role'] ?? ''), ['hod', 'deputy_hod']); ?>
-<section id="tab-programming" class="tab-section <?= (!$isHodProgTab && $currentPortal === 'programming') ? 'active' : '' ?>">
+<section id="tab-programming" class="tab-section <?= (($currentPage ?? '') === 'programming' || (!$isHodProgTab && $currentPortal === 'programming')) ? 'active' : '' ?>">
     <!-- Hero Header -->
     <div class="worksheet-card" style="margin-bottom: 18px; border-top: 4px solid #d97706;">
         <div class="card-header-flex" style="flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;">

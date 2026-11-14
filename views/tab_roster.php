@@ -43,7 +43,7 @@ if (!$deptMatchFound && !empty($rosterDepartments)) {
     $selectedRosterDeptId = (int)$rosterDepartments[0]['id'];
 }
 ?>
-<section id="tab-roster" class="tab-section">
+<section id="tab-roster" class="tab-section <?= (($currentPage ?? '') === 'roster' || !isset($currentPage)) ? 'active' : '' ?>">
     <!-- Top Action Card / Controls -->
     <div class="worksheet-card mb-4 no-print" style="margin-bottom: 20px;">
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">

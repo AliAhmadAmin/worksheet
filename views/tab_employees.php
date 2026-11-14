@@ -1,5 +1,5 @@
         <!-- TAB 5: EMPLOYEE & DEPARTMENT HIERARCHY MANAGEMENT -->
-        <section id="tab-employees" class="tab-section">
+        <section id="tab-employees" class="tab-section <?= (($currentPage ?? '') === 'employees' || !isset($currentPage)) ? 'active' : '' ?>">
             <div class="worksheet-card">
                 <!-- Sub-Navigation Switcher -->
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">

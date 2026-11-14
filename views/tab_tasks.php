@@ -1,5 +1,5 @@
         <!-- TAB 2: DEDICATED FULL-PAGE ASSIGN TASK COMMAND CENTER -->
-        <section id="tab-tasks" class="tab-section">
+        <section id="tab-tasks" class="tab-section <?= (($currentPage ?? '') === 'tasks' || !isset($currentPage)) ? 'active' : '' ?>">
             <div class="worksheet-card">
                 <!-- Header with Title and Primary Actions -->
                 <div class="card-header-flex" style="flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between; margin-bottom: 16px;">

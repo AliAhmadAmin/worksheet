@@ -1,5 +1,21 @@
 <?php
-$currentPortal = $currentPortal ?? 'digital';
+if (empty($currentPortal)) {
+    if (!empty($_SESSION['active_portal'])) {
+        $currentPortal = $_SESSION['active_portal'];
+    } else {
+        $userRolePortal = strtolower($authUser['role'] ?? '');
+        $userDeptPortal = strtolower($authUser['department_name'] ?? '');
+        if ($userRolePortal === 'hr' || stripos($userDeptPortal, 'hr') !== false) {
+            $currentPortal = 'hr';
+        } elseif (stripos($userDeptPortal, 'news') !== false) {
+            $currentPortal = 'newsroom';
+        } elseif (stripos($userDeptPortal, 'prog') !== false) {
+            $currentPortal = 'programming';
+        } else {
+            $currentPortal = 'digital';
+        }
+    }
+}
 
 $navUserName = htmlspecialchars($authUser['name'] ?? 'Employee');
 $navInitial = !empty($authUser['name']) ? strtoupper(mb_substr($authUser['name'], 0, 1)) : '👤';
@@ -132,333 +148,343 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
     <!-- Navigation Menu Scrollable Area -->
     <nav class="sidebar-nav">
     <?php if ($currentPortal === 'digital'): ?>
-        <?php $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); ?>
+        <?php 
+        $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); 
+        $activeNavPage = $currentPage ?? ($isHodNav ? 'attendance' : 'worksheet');
+        ?>
         <!-- Workspace Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">WORKSPACE</div>
             <?php if ($isHodNav): ?>
-            <button type="button" class="nav-btn active" data-tab="tab-attendance" data-route="attendance">
+            <a href="attendance.php" class="nav-btn <?= ($activeNavPage === 'attendance') ? 'active' : '' ?>" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Team Dashboard</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
+            </a>
+            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
-            </button>
+            </a>
             <?php else: ?>
-            <button type="button" class="nav-btn active" data-tab="tab-worksheet" data-route="worksheet">
+            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
-            </button>
+            </a>
             <?php endif; ?>
-            <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
+            <a href="tasks.php" class="nav-btn <?= ($activeNavPage === 'tasks') ? 'active' : '' ?>" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
                 <span class="nav-label" id="tasks-nav-tab-label">Assign Task</span>
                 <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
-            </button>
+            </a>
             <?php if ($canViewNewsHandover): ?>
-            <button type="button" class="nav-btn" data-tab="tab-newsroom" data-route="newsroom">
+            <a href="newsroom.php" class="nav-btn <?= ($activeNavPage === 'newsroom') ? 'active' : '' ?>" data-tab="tab-newsroom" data-route="newsroom">
                 <span class="nav-icon">📺</span>
                 <span class="nav-label">Newsroom</span>
                 <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
-            </button>
+            </a>
             <?php endif; ?>
             <?php if ($canViewProgHandover): ?>
-            <button type="button" class="nav-btn" data-tab="tab-programming" data-route="programming">
+            <a href="programming.php" class="nav-btn <?= ($activeNavPage === 'programming') ? 'active' : '' ?>" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
                 <span class="nav-label">Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
-            </button>
+            </a>
             <?php endif; ?>
         </div>
 
         <!-- People & Services Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">PEOPLE & SERVICES</div>
-            <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
+            <a href="hr.php#leaves" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
                 <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+            </a>
+            <a href="hr.php#loans" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
                 <span class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+            </a>
+            <a href="hr.php#claims" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
                 <span class="nav-label">Fuel, Travel & Food</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+            </a>
+            <a href="hr.php#notices" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+            </a>
+            <a href="hr.php#fines" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
                 <span class="nav-label">Disciplinary & Fines</span>
-            </button>
+            </a>
         </div>
 
         <!-- Department Management Category -->
         <div class="sidebar-nav-group admin-only" style="<?= $canViewManagement ? '' : 'display: none;' ?>">
             <div class="sidebar-nav-title">MANAGEMENT</div>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
+            <a href="roster.php" class="nav-btn admin-only <?= ($activeNavPage === 'roster') ? 'active' : '' ?>" data-tab="tab-roster" data-route="roster">
                 <span class="nav-icon">📅</span>
                 <span class="nav-label">Duty Roster</span>
-            </button>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-reports" data-route="reports">
+            </a>
+            <a href="reports.php" class="nav-btn admin-only <?= ($activeNavPage === 'reports') ? 'active' : '' ?>" data-tab="tab-reports" data-route="reports">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Matrix Reports</span>
-            </button>
+            </a>
             <?php if (!$isHodNav): ?>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-attendance" data-route="attendance">
+            <a href="attendance.php" class="nav-btn admin-only <?= ($activeNavPage === 'attendance') ? 'active' : '' ?>" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Live Attendance</span>
-            </button>
+            </a>
             <?php endif; ?>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
+            <a href="employees.php" class="nav-btn admin-only <?= ($activeNavPage === 'employees') ? 'active' : '' ?>" data-tab="tab-employees" data-route="employees">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Manage Staff</span>
-            </button>
+            </a>
         </div>
 
     <?php elseif ($currentPortal === 'newsroom'): ?>
-        <?php $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); ?>
+        <?php 
+        $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); 
+        $activeNavPage = $currentPage ?? ($isHodNav ? 'attendance' : 'newsroom');
+        ?>
         <!-- News Room Operations Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">WORKSPACE</div>
             <?php if ($isHodNav): ?>
-            <button type="button" class="nav-btn active" data-tab="tab-attendance" data-route="attendance">
+            <a href="attendance.php" class="nav-btn <?= ($activeNavPage === 'attendance') ? 'active' : '' ?>" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Team Dashboard</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-newsroom" data-route="newsroom">
+            </a>
+            <a href="newsroom.php" class="nav-btn <?= ($activeNavPage === 'newsroom') ? 'active' : '' ?>" data-tab="tab-newsroom" data-route="newsroom">
                 <span class="nav-icon">📺</span>
                 <span class="nav-label">Newsroom</span>
                 <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
-            </button>
+            </a>
             <?php else: ?>
-            <button type="button" class="nav-btn active" data-tab="tab-newsroom" data-route="newsroom">
+            <a href="newsroom.php" class="nav-btn <?= ($activeNavPage === 'newsroom') ? 'active' : '' ?>" data-tab="tab-newsroom" data-route="newsroom">
                 <span class="nav-icon">📺</span>
                 <span class="nav-label">Newsroom</span>
                 <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
-            </button>
+            </a>
             <?php endif; ?>
-            <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
+            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
+            </a>
+            <a href="tasks.php" class="nav-btn <?= ($activeNavPage === 'tasks') ? 'active' : '' ?>" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
                 <span class="nav-label" id="tasks-nav-tab-label">Assign Task</span>
                 <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
-            </button>
+            </a>
             <?php if ($canViewProgHandover): ?>
-            <button type="button" class="nav-btn" data-tab="tab-programming" data-route="programming">
+            <a href="programming.php" class="nav-btn" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
                 <span class="nav-label">Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
-            </button>
+            </a>
             <?php endif; ?>
         </div>
 
         <!-- People & Services Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">PEOPLE & SERVICES</div>
-            <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
+            <a href="hr.php#leaves" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
                 <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+            </a>
+            <a href="hr.php#loans" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
                 <span class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+            </a>
+            <a href="hr.php#claims" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
                 <span class="nav-label">Fuel, Travel & Food</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+            </a>
+            <a href="hr.php#notices" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+            </a>
+            <a href="hr.php#fines" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
                 <span class="nav-label">Disciplinary & Fines</span>
-            </button>
+            </a>
         </div>
 
         <!-- Department Management Category -->
         <div class="sidebar-nav-group admin-only" style="<?= $canViewManagement ? '' : 'display: none;' ?>">
             <div class="sidebar-nav-title">MANAGEMENT</div>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
+            <a href="roster.php" class="nav-btn admin-only <?= ($activeNavPage === 'roster') ? 'active' : '' ?>" data-tab="tab-roster" data-route="roster">
                 <span class="nav-icon">📅</span>
                 <span class="nav-label">Duty Roster</span>
-            </button>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-reports" data-route="reports">
+            </a>
+            <a href="reports.php" class="nav-btn admin-only <?= ($activeNavPage === 'reports') ? 'active' : '' ?>" data-tab="tab-reports" data-route="reports">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Matrix Reports</span>
-            </button>
+            </a>
             <?php if (!$isHodNav): ?>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-attendance" data-route="attendance">
+            <a href="attendance.php" class="nav-btn admin-only <?= ($activeNavPage === 'attendance') ? 'active' : '' ?>" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Live Attendance</span>
-            </button>
+            </a>
             <?php endif; ?>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
+            <a href="employees.php" class="nav-btn admin-only <?= ($activeNavPage === 'employees') ? 'active' : '' ?>" data-tab="tab-employees" data-route="employees">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Manage Staff</span>
-            </button>
+            </a>
         </div>
 
     <?php elseif ($currentPortal === 'programming'): ?>
-        <?php $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); ?>
+        <?php 
+        $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); 
+        $activeNavPage = $currentPage ?? ($isHodNav ? 'attendance' : 'programming');
+        ?>
         <!-- Programming Operations Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">WORKSPACE</div>
             <?php if ($isHodNav): ?>
-            <button type="button" class="nav-btn active" data-tab="tab-attendance" data-route="attendance">
+            <a href="attendance.php" class="nav-btn <?= ($activeNavPage === 'attendance') ? 'active' : '' ?>" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Team Dashboard</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-programming" data-route="programming">
+            </a>
+            <a href="programming.php" class="nav-btn <?= ($activeNavPage === 'programming') ? 'active' : '' ?>" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
                 <span class="nav-label">Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
-            </button>
+            </a>
             <?php else: ?>
-            <button type="button" class="nav-btn active" data-tab="tab-programming" data-route="programming">
+            <a href="programming.php" class="nav-btn <?= ($activeNavPage === 'programming') ? 'active' : '' ?>" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
                 <span class="nav-label">Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
-            </button>
+            </a>
             <?php endif; ?>
-            <button type="button" class="nav-btn" data-tab="tab-worksheet" data-route="worksheet">
+            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-tasks" data-route="tasks">
+            </a>
+            <a href="tasks.php" class="nav-btn <?= ($activeNavPage === 'tasks') ? 'active' : '' ?>" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
                 <span class="nav-label" id="tasks-nav-tab-label">Assign Task</span>
                 <span id="pending-task-badge" class="nav-badge" style="display: none;">0</span>
-            </button>
+            </a>
             <?php if ($canViewNewsHandover): ?>
-            <button type="button" class="nav-btn" data-tab="tab-newsroom" data-route="newsroom">
+            <a href="newsroom.php" class="nav-btn" data-tab="tab-newsroom" data-route="newsroom">
                 <span class="nav-icon">📺</span>
                 <span class="nav-label">Newsroom</span>
                 <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
-            </button>
+            </a>
             <?php endif; ?>
         </div>
 
         <!-- People & Services Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">PEOPLE & SERVICES</div>
-            <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
+            <a href="hr.php#leaves" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
                 <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+            </a>
+            <a href="hr.php#loans" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
                 <span class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+            </a>
+            <a href="hr.php#claims" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
                 <span class="nav-label">Fuel, Travel & Food</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+            </a>
+            <a href="hr.php#notices" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+            </a>
+            <a href="hr.php#fines" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
                 <span class="nav-label">Disciplinary & Fines</span>
-            </button>
+            </a>
         </div>
 
         <!-- Department Management Category -->
         <div class="sidebar-nav-group admin-only" style="<?= $canViewManagement ? '' : 'display: none;' ?>">
             <div class="sidebar-nav-title">MANAGEMENT</div>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-roster" data-route="roster">
+            <a href="roster.php" class="nav-btn admin-only <?= ($activeNavPage === 'roster') ? 'active' : '' ?>" data-tab="tab-roster" data-route="roster">
                 <span class="nav-icon">📅</span>
                 <span class="nav-label">Duty Roster</span>
-            </button>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-reports" data-route="reports">
+            </a>
+            <a href="reports.php" class="nav-btn admin-only <?= ($activeNavPage === 'reports') ? 'active' : '' ?>" data-tab="tab-reports" data-route="reports">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Matrix Reports</span>
-            </button>
+            </a>
             <?php if (!$isHodNav): ?>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-attendance" data-route="attendance">
+            <a href="attendance.php" class="nav-btn admin-only <?= ($activeNavPage === 'attendance') ? 'active' : '' ?>" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Live Attendance</span>
-            </button>
+            </a>
             <?php endif; ?>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
+            <a href="employees.php" class="nav-btn admin-only <?= ($activeNavPage === 'employees') ? 'active' : '' ?>" data-tab="tab-employees" data-route="employees">
                 <span class="nav-icon">⚙️</span>
                 <span class="nav-label">Manage Staff</span>
-            </button>
+            </a>
         </div>
 
     <?php elseif ($currentPortal === 'hr'): ?>
+        <?php $activeNavPage = $currentPage ?? 'hr'; ?>
         <!-- Executive HR Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">EXECUTIVE</div>
-            <button type="button" class="nav-btn active" data-tab="tab-hr" data-route="hr">
+            <a href="hr.php" class="nav-btn <?= ($activeNavPage === 'hr') ? 'active' : '' ?>" data-tab="tab-hr" data-route="hr">
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">HR Dashboard</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-roster" data-route="roster">
+            </a>
+            <a href="roster.php" class="nav-btn <?= ($activeNavPage === 'roster') ? 'active' : '' ?>" data-tab="tab-roster" data-route="roster">
                 <span class="nav-icon">📅</span>
                 <span class="nav-label">Duty Roster</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-attendance" data-route="attendance">
+            </a>
+            <a href="attendance.php" class="nav-btn <?= ($activeNavPage === 'attendance') ? 'active' : '' ?>" data-tab="tab-attendance" data-route="attendance">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Staff Attendance</span>
-            </button>
+            </a>
         </div>
 
         <!-- Requests & Notices Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">REQUESTS & NOTICES</div>
-            <button type="button" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
+            <a href="hr.php#leaves" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Requests</span>
                 <span id="pending-leaves-badge" class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+            </a>
+            <a href="hr.php#loans" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
                 <span id="pending-loans-badge" class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+            </a>
+            <a href="hr.php#claims" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
                 <span class="nav-label">Fuel, Travel & Food</span>
                 <span id="pending-claims-badge" class="nav-badge badge-info" style="display: none;">0</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+            </a>
+            <a href="hr.php#notices" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
-            </button>
-            <button type="button" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+            </a>
+            <a href="hr.php#fines" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
                 <span class="nav-label">Disciplinary & Fines</span>
-            </button>
+            </a>
         </div>
 
         <!-- People & Payroll Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">PEOPLE & FINANCE</div>
-            <button type="button" class="nav-btn" data-tab="tab-hr-payroll" data-route="payroll">
+            <a href="hr.php#payroll" class="nav-btn" data-tab="tab-hr-payroll" data-route="payroll">
                 <span class="nav-icon">💰</span>
                 <span class="nav-label">Payroll & Salaries</span>
-            </button>
-            <button type="button" class="nav-btn admin-only" data-tab="tab-employees" data-route="employees">
+            </a>
+            <a href="employees.php" class="nav-btn admin-only <?= ($activeNavPage === 'employees') ? 'active' : '' ?>" data-tab="tab-employees" data-route="employees">
                 <span class="nav-icon">📁</span>
                 <span class="nav-label">Staff Directory</span>
-            </button>
+            </a>
         </div>
     <?php endif; ?>
     </nav>

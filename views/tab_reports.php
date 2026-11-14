@@ -1,5 +1,5 @@
         <!-- TAB 3: MATRIX REPORTS & ANALYTICS -->
-        <section id="tab-reports" class="tab-section">
+        <section id="tab-reports" class="tab-section <?= (($currentPage ?? '') === 'reports' || !isset($currentPage)) ? 'active' : '' ?>">
             <!-- Filter Bar -->
             <div class="report-header-banner">
                 <div class="card-title-group">
