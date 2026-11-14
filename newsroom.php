@@ -17,9 +17,6 @@ if (!$isGlobalAdminNr && !$isNewsMemberNr) {
 
 $currentPage = 'newsroom';
 $currentPortal = 'newsroom';
-if (session_status() === PHP_SESSION_ACTIVE) {
-    $_SESSION['active_portal'] = 'newsroom';
-}
 
 // Page-specific script loading
 $pageScripts = ['assets/js/newsroom.js'];

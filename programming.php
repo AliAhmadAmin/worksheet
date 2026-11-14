@@ -17,9 +17,6 @@ if (!$isGlobalAdminPg && !$isProgMemberPg) {
 
 $currentPage = 'programming';
 $currentPortal = 'programming';
-if (session_status() === PHP_SESSION_ACTIVE) {
-    $_SESSION['active_portal'] = 'programming';
-}
 
 // Page-specific script loading
 $pageScripts = ['assets/js/programming.js'];

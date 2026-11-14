@@ -4,7 +4,7 @@
         $canInspectWs = in_array($userRoleWs, ['super_admin', 'admin', 'hod']) || !empty($authUser['can_inspect_sheets']);
         $isHodWs = in_array($userRoleWs, ['hod', 'deputy_hod']);
         ?>
-        <section id="tab-worksheet" class="tab-section <?= (($currentPage ?? '') === 'worksheet' || (!$isHodWs && ($currentPortal ?? '') === 'digital')) ? 'active' : '' ?>">
+        <section id="tab-worksheet" class="tab-section <?= (!$isHodWs && ($currentPortal ?? '') === 'digital') ? 'active' : '' ?>">
             <!-- EMPLOYEE PERSONAL SHIFT HERO (Hidden for Admin) -->
             <!-- EMPLOYEE PERSONAL SHIFT HERO (Hidden for Admin) -->
             <div id="hero-employee-container" class="shift-hero-card employee-only" style="<?= $canInspectWs ? 'display: none;' : '' ?>">

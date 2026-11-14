@@ -6,6 +6,7 @@
 require_once __DIR__ . '/includes/auth_check.php';
 
 $currentPage = 'roster';
+$currentPortal = 'digital';
 
 // Page-specific script loading
 $pageScripts = ['assets/js/roster.js'];

@@ -14,6 +14,7 @@ if (!$canAccessEmployees) {
 }
 
 $currentPage = 'employees';
+$currentPortal = 'digital';
 
 // Page-specific script loading
 $pageScripts = ['assets/js/employees.js'];
