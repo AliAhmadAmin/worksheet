@@ -1238,6 +1238,15 @@ function setupTabNavigation() {
             const targetTab = btn.getAttribute('data-tab');
             const href = btn.getAttribute('href');
 
+            // If the link has an explicit page URL that is different from current page, follow the URL!
+            if (href && !href.startsWith('#')) {
+                const currentFile = (window.location.pathname.split('/').pop() || 'index.php').split('?')[0];
+                const targetFile = href.split('#')[0].split('?')[0];
+                if (targetFile && targetFile !== currentFile) {
+                    return; // Let browser follow href natively to the dedicated page!
+                }
+            }
+
             // If the target section exists in the current page DOM, switch smoothly without full reload
             if (targetTab) {
                 const targetSection = document.getElementById(targetTab);

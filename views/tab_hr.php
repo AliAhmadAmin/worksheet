@@ -3,10 +3,12 @@
  * Professional HR & People Operations Command Center
  * Executive views for HR Dashboard, Leave Requests, Advance/Loans, Notices, and Monthly Payroll
  */
+$activeHrTab = $currentPage ?? 'hr';
 ?>
 
+<?php if ($activeHrTab === 'hr'): ?>
 <!-- ================= 1. HR EXECUTIVE DASHBOARD ================= -->
-<section id="tab-hr" class="tab-section <?= (($currentPage ?? '') === 'hr') ? 'active' : '' ?>">
+<section id="tab-hr" class="tab-section active">
     <div class="worksheet-container">
 
         <!-- Executive Hero Header -->
@@ -285,10 +287,12 @@
 
     </div>
 </section>
+<?php endif; ?>
 
 
+<?php if ($activeHrTab === 'leaves'): ?>
 <!-- ================= 2. DEDICATED LEAVE MANAGEMENT CENTER ================= -->
-<section id="tab-hr-leaves" class="tab-section <?= (($currentPage ?? '') === 'leaves') ? 'active' : '' ?>">
+<section id="tab-hr-leaves" class="tab-section active">
     <div class="worksheet-container">
         
         <div class="worksheet-card" style="margin-bottom: 18px;">
@@ -400,10 +404,12 @@
 
     </div>
 </section>
+<?php endif; ?>
 
 
+<?php if ($activeHrTab === 'loans'): ?>
 <!-- ================= 3. DEDICATED SALARY ADVANCE & LOANS CENTER ================= -->
-<section id="tab-hr-loans" class="tab-section <?= (($currentPage ?? '') === 'loans') ? 'active' : '' ?>">
+<section id="tab-hr-loans" class="tab-section active">
     <div class="worksheet-container">
         
         <div class="worksheet-card" style="margin-bottom: 18px;">
@@ -515,10 +521,12 @@
 
     </div>
 </section>
+<?php endif; ?>
 
 
+<?php if ($activeHrTab === 'claims'): ?>
 <!-- ================= 3. FUEL, TRAVEL, FOOD & INCENTIVE CLAIMS ================= -->
-<section id="tab-hr-claims" class="tab-section <?= (($currentPage ?? '') === 'claims') ? 'active' : '' ?>">
+<section id="tab-hr-claims" class="tab-section active">
     <div class="worksheet-container">
         
         <div class="worksheet-card" style="margin-bottom: 18px;">
@@ -665,10 +673,12 @@
 
     </div>
 </section>
+<?php endif; ?>
 
 
+<?php if ($activeHrTab === 'notices'): ?>
 <!-- ================= 4. DEDICATED COMPANY NOTICE BOARD ================= -->
-<section id="tab-hr-notices" class="tab-section <?= (($currentPage ?? '') === 'notices') ? 'active' : '' ?>">
+<section id="tab-hr-notices" class="tab-section active">
     <div class="worksheet-container">
         
         <div class="worksheet-card" style="margin-bottom: 20px;">
@@ -737,10 +747,12 @@
 
     </div>
 </section>
+<?php endif; ?>
 
 
+<?php if ($activeHrTab === 'fines'): ?>
 <!-- ================= 5. DEDICATED DISCIPLINARY FINES & PENALTIES ================= -->
-<section id="tab-hr-fines" class="tab-section <?= (($currentPage ?? '') === 'fines') ? 'active' : '' ?>">
+<section id="tab-hr-fines" class="tab-section active">
     <div class="worksheet-container">
         <?php
         $canIssueDisciplinary = !empty($authUser) && (
@@ -961,10 +973,12 @@
 
     </div>
 </section>
+<?php endif; ?>
 
 
+<?php if ($activeHrTab === 'hr' || $activeHrTab === 'payroll'): ?>
 <!-- ================= 6. DEDICATED MONTHLY PAYROLL & SALARIES ================= -->
-<section id="tab-hr-payroll" class="tab-section <?= (($currentPage ?? '') === 'payroll') ? 'active' : '' ?>">
+<section id="tab-hr-payroll" class="tab-section <?= ($activeHrTab === 'payroll') ? 'active' : '' ?>">
     <div class="worksheet-container">
 
         <div class="worksheet-card" style="margin-bottom: 18px;">
@@ -1083,6 +1097,7 @@
 
     </div>
 </section>
+<?php endif; ?>
 
 
 <!-- ================= MODALS FOR HR OPERATIONS ================= -->
