@@ -24,6 +24,9 @@ if (!$isGlobalAdminIdx) {
 
 $currentPage = 'worksheet';
 $currentPortal = 'digital';
+if (session_status() === PHP_SESSION_ACTIVE) {
+    $_SESSION['active_portal'] = 'digital';
+}
 
 // Page-specific script loading
 $pageScripts = ['assets/js/sheets.js'];

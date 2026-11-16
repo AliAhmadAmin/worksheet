@@ -6,7 +6,6 @@
 require_once __DIR__ . '/includes/auth_check.php';
 
 $currentPage = 'tasks';
-$currentPortal = 'digital';
 
 // Page-specific script loading
 $pageScripts = ['assets/js/tasks.js'];
