@@ -244,7 +244,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
     <?php elseif ($currentPortal === 'newsroom'): ?>
         <?php 
         $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); 
-        $activeNavPage = $currentPage ?? ($isHodNav ? 'attendance' : 'newsroom');
+        $activeNavPage = $currentPage ?? ($isHodNav ? 'attendance' : 'worksheet');
         ?>
         <!-- News Room Operations Category -->
         <div class="sidebar-nav-group">
@@ -254,22 +254,26 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Team Dashboard</span>
             </a>
-            <a href="newsroom.php" class="nav-btn <?= ($activeNavPage === 'newsroom') ? 'active' : '' ?>" data-tab="tab-newsroom" data-route="newsroom">
-                <span class="nav-icon">📺</span>
-                <span class="nav-label">Newsroom</span>
-                <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
-            </a>
-            <?php else: ?>
-            <a href="newsroom.php" class="nav-btn <?= ($activeNavPage === 'newsroom') ? 'active' : '' ?>" data-tab="tab-newsroom" data-route="newsroom">
-                <span class="nav-icon">📺</span>
-                <span class="nav-label">Newsroom</span>
-                <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
-            </a>
-            <?php endif; ?>
             <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
             </a>
+            <a href="newsroom.php" class="nav-btn <?= ($activeNavPage === 'newsroom') ? 'active' : '' ?>" data-tab="tab-newsroom" data-route="newsroom">
+                <span class="nav-icon">📺</span>
+                <span class="nav-label">Dispatch News</span>
+                <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
+            </a>
+            <?php else: ?>
+            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
+                <span class="nav-icon" id="main-nav-tab-icon">📝</span>
+                <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
+            </a>
+            <a href="newsroom.php" class="nav-btn <?= ($activeNavPage === 'newsroom') ? 'active' : '' ?>" data-tab="tab-newsroom" data-route="newsroom">
+                <span class="nav-icon">📺</span>
+                <span class="nav-label">Dispatch News</span>
+                <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
+            </a>
+            <?php endif; ?>
             <a href="tasks.php" class="nav-btn <?= ($activeNavPage === 'tasks') ? 'active' : '' ?>" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
                 <span class="nav-label" id="tasks-nav-tab-label">Assign Task</span>
@@ -337,7 +341,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
     <?php elseif ($currentPortal === 'programming'): ?>
         <?php 
         $isHodNav = in_array($userRole, ['hod', 'deputy_hod']); 
-        $activeNavPage = $currentPage ?? ($isHodNav ? 'attendance' : 'programming');
+        $activeNavPage = $currentPage ?? ($isHodNav ? 'attendance' : 'worksheet');
         ?>
         <!-- Programming Operations Category -->
         <div class="sidebar-nav-group">
@@ -347,22 +351,26 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Team Dashboard</span>
             </a>
+            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
+                <span class="nav-icon" id="main-nav-tab-icon">📝</span>
+                <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
+            </a>
             <a href="programming.php" class="nav-btn <?= ($activeNavPage === 'programming') ? 'active' : '' ?>" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
                 <span class="nav-label">Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </a>
             <?php else: ?>
+            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
+                <span class="nav-icon" id="main-nav-tab-icon">📝</span>
+                <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
+            </a>
             <a href="programming.php" class="nav-btn <?= ($activeNavPage === 'programming') ? 'active' : '' ?>" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
                 <span class="nav-label">Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </a>
             <?php endif; ?>
-            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
-                <span class="nav-icon" id="main-nav-tab-icon">📝</span>
-                <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
-            </a>
             <a href="tasks.php" class="nav-btn <?= ($activeNavPage === 'tasks') ? 'active' : '' ?>" data-tab="tab-tasks" data-route="tasks">
                 <span class="nav-icon" id="tasks-nav-tab-icon">🎯</span>
                 <span class="nav-label" id="tasks-nav-tab-label">Assign Task</span>

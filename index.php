@@ -9,23 +9,22 @@ $userRoleIdx = strtolower($authUser['role'] ?? '');
 $deptLowerIdx = strtolower($authUser['department_name'] ?? '');
 $isGlobalAdminIdx = in_array($userRoleIdx, ['super_admin', 'admin']);
 
-if (!$isGlobalAdminIdx) {
-    if (stripos($deptLowerIdx, 'news') !== false) {
-        header('Location: newsroom.php' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''));
-        exit;
-    } elseif (stripos($deptLowerIdx, 'prog') !== false) {
-        header('Location: programming.php' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''));
-        exit;
-    } elseif ($userRoleIdx === 'hr' || stripos($deptLowerIdx, 'hr') !== false) {
-        header('Location: hr.php' . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : ''));
-        exit;
-    }
-}
-
 $currentPage = 'worksheet';
-$currentPortal = 'digital';
+
+// Preserve portal context based on employee's department or active admin portal
+if ($isGlobalAdminIdx && !empty($_SESSION['active_portal'])) {
+    $currentPortal = $_SESSION['active_portal'];
+} elseif (stripos($deptLowerIdx, 'news') !== false) {
+    $currentPortal = 'newsroom';
+} elseif (stripos($deptLowerIdx, 'prog') !== false) {
+    $currentPortal = 'programming';
+} elseif ($userRoleIdx === 'hr' || stripos($deptLowerIdx, 'hr') !== false) {
+    $currentPortal = 'hr';
+} else {
+    $currentPortal = 'digital';
+}
 if (session_status() === PHP_SESSION_ACTIVE) {
-    $_SESSION['active_portal'] = 'digital';
+    $_SESSION['active_portal'] = $currentPortal;
 }
 
 // Page-specific script loading
