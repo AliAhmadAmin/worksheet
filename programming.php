@@ -9,15 +9,17 @@ $userRolePg = strtolower($authUser['role'] ?? '');
 $deptNamePg = strtolower($authUser['department_name'] ?? '');
 $isGlobalAdminPg = in_array($userRolePg, ['super_admin', 'admin']);
 $isProgMemberPg = (stripos($deptNamePg, 'prog') !== false);
+$isDigitalMemberPg = (stripos($deptNamePg, 'digital') !== false);
+$canAccessProgramming = $isGlobalAdminPg || $isProgMemberPg || $isDigitalMemberPg;
 
-if (!$isGlobalAdminPg && !$isProgMemberPg) {
+if (!$canAccessProgramming) {
     header('Location: index.php');
     exit;
 }
 
 $currentPage = 'programming';
-$currentPortal = 'programming';
-if (session_status() === PHP_SESSION_ACTIVE) {
+$currentPortal = ($isProgMemberPg && !$isDigitalMemberPg) ? 'programming' : 'digital';
+if (session_status() === PHP_SESSION_ACTIVE && $isProgMemberPg) {
     $_SESSION['active_portal'] = 'programming';
 }
 

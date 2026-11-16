@@ -9,15 +9,17 @@ $userRoleNr = strtolower($authUser['role'] ?? '');
 $deptNameNr = strtolower($authUser['department_name'] ?? '');
 $isGlobalAdminNr = in_array($userRoleNr, ['super_admin', 'admin']);
 $isNewsMemberNr = (stripos($deptNameNr, 'news') !== false);
+$isDigitalMemberNr = (stripos($deptNameNr, 'digital') !== false);
+$canAccessNewsroom = $isGlobalAdminNr || $isNewsMemberNr || $isDigitalMemberNr;
 
-if (!$isGlobalAdminNr && !$isNewsMemberNr) {
+if (!$canAccessNewsroom) {
     header('Location: index.php');
     exit;
 }
 
 $currentPage = 'newsroom';
-$currentPortal = 'newsroom';
-if (session_status() === PHP_SESSION_ACTIVE) {
+$currentPortal = ($isNewsMemberNr && !$isDigitalMemberNr) ? 'newsroom' : 'digital';
+if (session_status() === PHP_SESSION_ACTIVE && $isNewsMemberNr) {
     $_SESSION['active_portal'] = 'newsroom';
 }
 
