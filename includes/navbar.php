@@ -477,7 +477,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- People & Payroll Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">PEOPLE & FINANCE</div>
-            <a href="hr.php#payroll" class="nav-btn" data-tab="tab-hr-payroll" data-route="payroll">
+            <a href="payroll.php" class="nav-btn <?= ($activeNavPage === 'payroll') ? 'active' : '' ?>" data-tab="tab-hr-payroll" data-route="payroll">
                 <span class="nav-icon">💰</span>
                 <span class="nav-label">Payroll & Salaries</span>
             </a>

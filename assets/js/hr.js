@@ -20,6 +20,9 @@ let HrState = {
     fines: [],
     profiles: [],
     payroll: [],
+    payrollFiltered: [],
+    payrollPage: 1,
+    payrollPageSize: 25,
     currentSubTab: 'leaves',
     selectedMonth: new Date().toISOString().slice(0, 7)
 };
@@ -3825,17 +3828,47 @@ function applyPayrollFilters() {
     }
 
     updatePayrollSummaryStats(list);
-    renderHrPayrollTable(list);
+    renderHrPayrollTable(list, true);
 }
 
-function renderHrPayrollTable(payroll) {
+function renderHrPayrollTable(payroll, resetPage = false) {
     const tbody = document.getElementById('hr-payroll-table-body');
     if (!tbody) return;
 
+    HrState.payrollFiltered = payroll || [];
+    if (resetPage) {
+        HrState.payrollPage = 1;
+    }
+
     if (!payroll || payroll.length === 0) {
+        renderGenericHrPagination({
+            containerId: 'hr-payroll-pagination',
+            totalItems: 0,
+            currentPage: 1,
+            pageSize: HrState.payrollPageSize || 25,
+            onPageChange: 'changePayrollPage',
+            onPageSizeChange: 'changePayrollPageSize'
+        });
         tbody.innerHTML = `<tr><td colspan="14" style="text-align: center; padding: 30px; color: var(--text-muted);">No staff records found for selected month.</td></tr>`;
         return;
     }
+
+    const pageSize = HrState.payrollPageSize || 25;
+    const totalPages = Math.max(1, Math.ceil(payroll.length / pageSize));
+    if (HrState.payrollPage > totalPages) HrState.payrollPage = totalPages;
+    if (HrState.payrollPage < 1) HrState.payrollPage = 1;
+
+    const startIdx = (HrState.payrollPage - 1) * pageSize;
+    const pagedPayroll = payroll.slice(startIdx, startIdx + pageSize);
+
+    renderGenericHrPagination({
+        containerId: 'hr-payroll-pagination',
+        totalItems: payroll.length,
+        currentPage: HrState.payrollPage,
+        pageSize: pageSize,
+        onPageChange: 'changePayrollPage',
+        onPageSizeChange: 'changePayrollPageSize'
+    });
 
     const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
 
@@ -3846,7 +3879,7 @@ function renderHrPayrollTable(payroll) {
     };
 
     let html = '';
-    payroll.forEach(p => {
+    pagedPayroll.forEach(p => {
         const stBadge = statusBadges[p.payment_status] || statusBadges.draft;
         const avatarInitial = p.employee_name ? p.employee_name.charAt(0).toUpperCase() : '👤';
         const avatarHtml = p.avatar
@@ -3945,6 +3978,17 @@ function renderHrPayrollTable(payroll) {
 
     tbody.innerHTML = html;
 }
+
+window.changePayrollPage = function(page) {
+    HrState.payrollPage = page;
+    renderHrPayrollTable(HrState.payrollFiltered || HrState.payroll, false);
+};
+
+window.changePayrollPageSize = function(size) {
+    HrState.payrollPageSize = size;
+    HrState.payrollPage = 1;
+    renderHrPayrollTable(HrState.payrollFiltered || HrState.payroll, false);
+};
 
 function openEditPayrollModalById(empId) {
     const item = (HrState.payroll || []).find(p => p.employee_id == empId);

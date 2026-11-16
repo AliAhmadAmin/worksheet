@@ -976,9 +976,9 @@ $activeHrTab = $currentPage ?? 'hr';
 <?php endif; ?>
 
 
-<?php if ($activeHrTab === 'hr' || $activeHrTab === 'payroll'): ?>
+<?php if ($activeHrTab === 'payroll'): ?>
 <!-- ================= 6. DEDICATED MONTHLY PAYROLL & SALARIES ================= -->
-<section id="tab-hr-payroll" class="tab-section <?= ($activeHrTab === 'payroll') ? 'active' : '' ?>">
+<section id="tab-hr-payroll" class="tab-section active">
     <div class="worksheet-container">
 
         <div class="worksheet-card" style="margin-bottom: 18px;">
@@ -1093,6 +1093,8 @@ $activeHrTab = $currentPage ?? 'hr';
                     </tbody>
                 </table>
             </div>
+            <!-- Payroll Table Pagination Footer -->
+            <div id="hr-payroll-pagination" class="table-pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px; background: var(--bg-card-elevated, #fafafa); border-radius: 0 0 var(--radius-md, 8px) var(--radius-md, 8px);"></div>
         </div>
 
     </div>

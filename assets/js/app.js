@@ -1112,8 +1112,8 @@ const PAGE_ROUTE_MAP = {
     'tab-notices': 'notices.php',
     'tab-hr-fines': 'fines.php',
     'tab-fines': 'fines.php',
-    'tab-hr-payroll': 'hr.php#payroll',
-    'tab-payroll': 'hr.php#payroll'
+    'tab-hr-payroll': 'payroll.php',
+    'tab-payroll': 'payroll.php'
 };
 
 // Tab Navigation & URL Hash Routing
