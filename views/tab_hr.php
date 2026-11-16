@@ -6,7 +6,7 @@
 ?>
 
 <!-- ================= 1. HR EXECUTIVE DASHBOARD ================= -->
-<section id="tab-hr" class="tab-section <?= (($currentPage ?? '') === 'hr' || ($currentPortal ?? '') === 'hr') ? 'active' : '' ?>">
+<section id="tab-hr" class="tab-section <?= (($currentPage ?? '') === 'hr') ? 'active' : '' ?>">
     <div class="worksheet-container">
 
         <!-- Executive Hero Header -->
@@ -288,7 +288,7 @@
 
 
 <!-- ================= 2. DEDICATED LEAVE MANAGEMENT CENTER ================= -->
-<section id="tab-hr-leaves" class="tab-section">
+<section id="tab-hr-leaves" class="tab-section <?= (($currentPage ?? '') === 'leaves') ? 'active' : '' ?>">
     <div class="worksheet-container">
         
         <div class="worksheet-card" style="margin-bottom: 18px;">
@@ -394,6 +394,8 @@
                     </tbody>
                 </table>
             </div>
+            <!-- Leaves Table Pagination Footer -->
+            <div id="hr-leaves-pagination" class="table-pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px; background: var(--bg-card-elevated, #fafafa); border-radius: 0 0 var(--radius-md, 8px) var(--radius-md, 8px);"></div>
         </div>
 
     </div>
@@ -401,7 +403,7 @@
 
 
 <!-- ================= 3. DEDICATED SALARY ADVANCE & LOANS CENTER ================= -->
-<section id="tab-hr-loans" class="tab-section">
+<section id="tab-hr-loans" class="tab-section <?= (($currentPage ?? '') === 'loans') ? 'active' : '' ?>">
     <div class="worksheet-container">
         
         <div class="worksheet-card" style="margin-bottom: 18px;">
@@ -507,6 +509,8 @@
                     </tbody>
                 </table>
             </div>
+            <!-- Loans Table Pagination Footer -->
+            <div id="hr-loans-pagination" class="table-pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px; background: var(--bg-card-elevated, #fafafa); border-radius: 0 0 var(--radius-md, 8px) var(--radius-md, 8px);"></div>
         </div>
 
     </div>
@@ -514,7 +518,7 @@
 
 
 <!-- ================= 3. FUEL, TRAVEL, FOOD & INCENTIVE CLAIMS ================= -->
-<section id="tab-hr-claims" class="tab-section">
+<section id="tab-hr-claims" class="tab-section <?= (($currentPage ?? '') === 'claims') ? 'active' : '' ?>">
     <div class="worksheet-container">
         
         <div class="worksheet-card" style="margin-bottom: 18px;">
@@ -655,6 +659,8 @@
                     </tbody>
                 </table>
             </div>
+            <!-- Claims Table Pagination Footer -->
+            <div id="hr-claims-pagination" class="table-pagination-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 10px; background: var(--bg-card-elevated, #fafafa); border-radius: 0 0 var(--radius-md, 8px) var(--radius-md, 8px);"></div>
         </div>
 
     </div>
@@ -662,7 +668,7 @@
 
 
 <!-- ================= 4. DEDICATED COMPANY NOTICE BOARD ================= -->
-<section id="tab-hr-notices" class="tab-section">
+<section id="tab-hr-notices" class="tab-section <?= (($currentPage ?? '') === 'notices') ? 'active' : '' ?>">
     <div class="worksheet-container">
         
         <div class="worksheet-card" style="margin-bottom: 20px;">
@@ -734,7 +740,7 @@
 
 
 <!-- ================= 5. DEDICATED DISCIPLINARY FINES & PENALTIES ================= -->
-<section id="tab-hr-fines" class="tab-section">
+<section id="tab-hr-fines" class="tab-section <?= (($currentPage ?? '') === 'fines') ? 'active' : '' ?>">
     <div class="worksheet-container">
         <?php
         $canIssueDisciplinary = !empty($authUser) && (
@@ -958,7 +964,7 @@
 
 
 <!-- ================= 6. DEDICATED MONTHLY PAYROLL & SALARIES ================= -->
-<section id="tab-hr-payroll" class="tab-section">
+<section id="tab-hr-payroll" class="tab-section <?= (($currentPage ?? '') === 'payroll') ? 'active' : '' ?>">
     <div class="worksheet-container">
 
         <div class="worksheet-card" style="margin-bottom: 18px;">

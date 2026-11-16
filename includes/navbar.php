@@ -194,25 +194,25 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- People & Services Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">PEOPLE & SERVICES</div>
-            <a href="hr.php#leaves" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
+            <a href="leaves.php" class="nav-btn <?= ($activeNavPage === 'leaves') ? 'active' : '' ?>" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
                 <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
             </a>
-            <a href="hr.php#loans" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+            <a href="loans.php" class="nav-btn <?= ($activeNavPage === 'loans') ? 'active' : '' ?>" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
                 <span class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
             </a>
-            <a href="hr.php#claims" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+            <a href="claims.php" class="nav-btn <?= ($activeNavPage === 'claims') ? 'active' : '' ?>" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
                 <span class="nav-label">Fuel, Travel & Food</span>
             </a>
-            <a href="hr.php#notices" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+            <a href="notices.php" class="nav-btn <?= ($activeNavPage === 'notices') ? 'active' : '' ?>" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
             </a>
-            <a href="hr.php#fines" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+            <a href="fines.php" class="nav-btn <?= ($activeNavPage === 'fines') ? 'active' : '' ?>" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
                 <span class="nav-label">Disciplinary & Fines</span>
             </a>
@@ -287,25 +287,25 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- People & Services Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">PEOPLE & SERVICES</div>
-            <a href="hr.php#leaves" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
+            <a href="leaves.php" class="nav-btn <?= ($activeNavPage === 'leaves') ? 'active' : '' ?>" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
                 <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
             </a>
-            <a href="hr.php#loans" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+            <a href="loans.php" class="nav-btn <?= ($activeNavPage === 'loans') ? 'active' : '' ?>" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
                 <span class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
             </a>
-            <a href="hr.php#claims" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+            <a href="claims.php" class="nav-btn <?= ($activeNavPage === 'claims') ? 'active' : '' ?>" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
                 <span class="nav-label">Fuel, Travel & Food</span>
             </a>
-            <a href="hr.php#notices" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+            <a href="notices.php" class="nav-btn <?= ($activeNavPage === 'notices') ? 'active' : '' ?>" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
             </a>
-            <a href="hr.php#fines" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+            <a href="fines.php" class="nav-btn <?= ($activeNavPage === 'fines') ? 'active' : '' ?>" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
                 <span class="nav-label">Disciplinary & Fines</span>
             </a>
@@ -380,25 +380,25 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- People & Services Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">PEOPLE & SERVICES</div>
-            <a href="hr.php#leaves" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
+            <a href="leaves.php" class="nav-btn <?= ($activeNavPage === 'leaves') ? 'active' : '' ?>" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Portal</span>
                 <span class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
             </a>
-            <a href="hr.php#loans" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+            <a href="loans.php" class="nav-btn <?= ($activeNavPage === 'loans') ? 'active' : '' ?>" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
                 <span class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
             </a>
-            <a href="hr.php#claims" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+            <a href="claims.php" class="nav-btn <?= ($activeNavPage === 'claims') ? 'active' : '' ?>" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
                 <span class="nav-label">Fuel, Travel & Food</span>
             </a>
-            <a href="hr.php#notices" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+            <a href="notices.php" class="nav-btn <?= ($activeNavPage === 'notices') ? 'active' : '' ?>" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
             </a>
-            <a href="hr.php#fines" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+            <a href="fines.php" class="nav-btn <?= ($activeNavPage === 'fines') ? 'active' : '' ?>" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
                 <span class="nav-label">Disciplinary & Fines</span>
             </a>
@@ -449,26 +449,26 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <!-- Requests & Notices Category -->
         <div class="sidebar-nav-group">
             <div class="sidebar-nav-title">REQUESTS & NOTICES</div>
-            <a href="hr.php#leaves" class="nav-btn" data-tab="tab-hr-leaves" data-route="leaves">
+            <a href="leaves.php" class="nav-btn <?= ($activeNavPage === 'leaves') ? 'active' : '' ?>" data-tab="tab-hr-leaves" data-route="leaves">
                 <span class="nav-icon">🏖️</span>
                 <span class="nav-label">Leave Requests</span>
                 <span id="pending-leaves-badge" class="nav-badge badge-warning pending-leaves-badge" style="display: none; background: #ea580c; color: #fff;">0</span>
             </a>
-            <a href="hr.php#loans" class="nav-btn" data-tab="tab-hr-loans" data-route="loans">
+            <a href="loans.php" class="nav-btn <?= ($activeNavPage === 'loans') ? 'active' : '' ?>" data-tab="tab-hr-loans" data-route="loans">
                 <span class="nav-icon">💳</span>
                 <span class="nav-label">Advance Salary</span>
                 <span id="pending-loans-badge" class="nav-badge badge-info pending-loans-badge" style="display: none; background: #0284c7; color: #fff;">0</span>
             </a>
-            <a href="hr.php#claims" class="nav-btn" data-tab="tab-hr-claims" data-route="claims">
+            <a href="claims.php" class="nav-btn <?= ($activeNavPage === 'claims') ? 'active' : '' ?>" data-tab="tab-hr-claims" data-route="claims">
                 <span class="nav-icon">⛽</span>
                 <span class="nav-label">Fuel, Travel & Food</span>
                 <span id="pending-claims-badge" class="nav-badge badge-info" style="display: none;">0</span>
             </a>
-            <a href="hr.php#notices" class="nav-btn" data-tab="tab-hr-notices" data-route="notices">
+            <a href="notices.php" class="nav-btn <?= ($activeNavPage === 'notices') ? 'active' : '' ?>" data-tab="tab-hr-notices" data-route="notices">
                 <span class="nav-icon">📢</span>
                 <span class="nav-label">Notice Board</span>
             </a>
-            <a href="hr.php#fines" class="nav-btn" data-tab="tab-hr-fines" data-route="fines">
+            <a href="fines.php" class="nav-btn <?= ($activeNavPage === 'fines') ? 'active' : '' ?>" data-tab="tab-hr-fines" data-route="fines">
                 <span class="nav-icon">⚠️</span>
                 <span class="nav-label">Disciplinary & Fines</span>
             </a>

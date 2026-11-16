@@ -1102,12 +1102,18 @@ const PAGE_ROUTE_MAP = {
     'tab-roster': 'roster.php',
     'tab-reports': 'reports.php',
     'tab-hr': 'hr.php',
-    'tab-hr-leaves': 'hr.php#leaves',
-    'tab-hr-loans': 'hr.php#loans',
-    'tab-hr-claims': 'hr.php#claims',
-    'tab-hr-notices': 'hr.php#notices',
-    'tab-hr-fines': 'hr.php#fines',
-    'tab-hr-payroll': 'hr.php#payroll'
+    'tab-hr-leaves': 'leaves.php',
+    'tab-leaves': 'leaves.php',
+    'tab-hr-loans': 'loans.php',
+    'tab-loans': 'loans.php',
+    'tab-hr-claims': 'claims.php',
+    'tab-claims': 'claims.php',
+    'tab-hr-notices': 'notices.php',
+    'tab-notices': 'notices.php',
+    'tab-hr-fines': 'fines.php',
+    'tab-fines': 'fines.php',
+    'tab-hr-payroll': 'hr.php#payroll',
+    'tab-payroll': 'hr.php#payroll'
 };
 
 // Tab Navigation & URL Hash Routing
@@ -1258,9 +1264,11 @@ function setupTabNavigation() {
     const hash = window.location.hash.replace('#', '').trim();
     if (hash) {
         const hashTargetId = `tab-${hash}`;
-        const targetSection = document.getElementById(hashTargetId) || document.getElementById(hash);
-        if (!targetSection && PAGE_ROUTE_MAP[hashTargetId]) {
-            window.location.replace(PAGE_ROUTE_MAP[hashTargetId]);
+        const hrHashTargetId = `tab-hr-${hash}`;
+        const targetSection = document.getElementById(hashTargetId) || document.getElementById(hrHashTargetId) || document.getElementById(hash);
+        const routeDest = PAGE_ROUTE_MAP[hashTargetId] || PAGE_ROUTE_MAP[hrHashTargetId];
+        if (!targetSection && routeDest) {
+            window.location.replace(routeDest);
             return;
         }
     }

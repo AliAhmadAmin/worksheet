@@ -5,7 +5,17 @@
 let HrState = {
     overview: null,
     leaves: [],
+    leavesFiltered: [],
+    leavesPage: 1,
+    leavesPageSize: 15,
     loans: [],
+    loansFiltered: [],
+    loansPage: 1,
+    loansPageSize: 15,
+    claims: [],
+    claimsFiltered: [],
+    claimsPage: 1,
+    claimsPageSize: 15,
     notices: [],
     fines: [],
     profiles: [],
@@ -13,6 +23,60 @@ let HrState = {
     currentSubTab: 'leaves',
     selectedMonth: new Date().toISOString().slice(0, 7)
 };
+
+function renderGenericHrPagination({
+    containerId,
+    totalItems,
+    currentPage,
+    pageSize,
+    onPageChange,
+    onPageSizeChange
+}) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (totalItems <= 0) {
+        container.innerHTML = '';
+        container.style.display = 'none';
+        return;
+    }
+    container.style.display = 'flex';
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
+    const startItem = (safePage - 1) * pageSize + 1;
+    const endItem = Math.min(safePage * pageSize, totalItems);
+
+    let html = `
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-muted); flex-wrap: wrap;">
+            <span>Showing <strong style="color: var(--text-main);">${startItem}-${endItem}</strong> of <strong style="color: var(--text-main);">${totalItems}</strong> records</span>
+            <div style="display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;">
+                <label style="font-size: 11.5px;">Rows per page:</label>
+                <select class="input-control" style="padding: 2px 8px; font-size: 11.5px; width: auto; height: 26px; border-radius: 4px;" onchange="${onPageSizeChange}(parseInt(this.value))">
+                    <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
+                    <option value="15" ${pageSize === 15 ? 'selected' : ''}>15</option>
+                    <option value="25" ${pageSize === 25 ? 'selected' : ''}>25</option>
+                    <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+                </select>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 5px;">
+            <button type="button" class="btn btn-outline" style="padding: 4px 10px; font-size: 11.5px; border-radius: var(--radius-sm); font-weight: 600;" 
+                ${safePage <= 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : `onclick="${onPageChange}(${safePage - 1})"`}>
+                ‹ Previous
+            </button>
+            <span style="font-size: 12px; font-weight: 700; color: var(--text-main); padding: 0 8px;">
+                Page ${safePage} of ${totalPages}
+            </span>
+            <button type="button" class="btn btn-outline" style="padding: 4px 10px; font-size: 11.5px; border-radius: var(--radius-sm); font-weight: 600;" 
+                ${safePage >= totalPages ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : `onclick="${onPageChange}(${safePage + 1})"`}>
+                Next ›
+            </button>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
 
 async function loadHrDashboard() {
     const monthInput = document.getElementById('hr-payroll-month');
@@ -634,6 +698,7 @@ async function populateHrEmployeeDropdowns() {
 async function loadHrLeaves() {
     const tbody = document.getElementById('hr-leaves-table-body');
     if (!tbody) return;
+    populateHrEmployeeDropdowns();
 
     const statusFilter = document.getElementById('hr-leave-status-filter')?.value || 'all';
     const typeFilter = document.getElementById('hr-leave-type-filter')?.value || 'all';
@@ -736,7 +801,7 @@ function applyLeavesClientFilters() {
         });
     }
 
-    renderLeavesTable(list);
+    renderLeavesTable(list, true);
 }
 
 function resetLeavesFilters() {
@@ -752,16 +817,29 @@ function resetLeavesFilters() {
     loadHrLeaves();
 }
 
-function renderLeavesTable(leaves) {
+function renderLeavesTable(leaves, resetPage = false) {
     const tbody = document.getElementById('hr-leaves-table-body');
     const countLabel = document.getElementById('hr-leaves-count-label');
     if (!tbody) return;
 
+    HrState.leavesFiltered = leaves || [];
+    if (resetPage) {
+        HrState.leavesPage = 1;
+    }
+
     if (countLabel) {
-        countLabel.textContent = `Showing ${leaves.length} request(s)`;
+        countLabel.textContent = `Showing ${leaves ? leaves.length : 0} request(s)`;
     }
 
     if (!leaves || leaves.length === 0) {
+        renderGenericHrPagination({
+            containerId: 'hr-leaves-pagination',
+            totalItems: 0,
+            currentPage: 1,
+            pageSize: HrState.leavesPageSize || 15,
+            onPageChange: 'changeLeavesPage',
+            onPageSizeChange: 'changeLeavesPageSize'
+        });
         tbody.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
@@ -773,6 +851,23 @@ function renderLeavesTable(leaves) {
         `;
         return;
     }
+
+    const pageSize = HrState.leavesPageSize || 15;
+    const totalPages = Math.max(1, Math.ceil(leaves.length / pageSize));
+    if (HrState.leavesPage > totalPages) HrState.leavesPage = totalPages;
+    if (HrState.leavesPage < 1) HrState.leavesPage = 1;
+
+    const startIdx = (HrState.leavesPage - 1) * pageSize;
+    const pagedLeaves = leaves.slice(startIdx, startIdx + pageSize);
+
+    renderGenericHrPagination({
+        containerId: 'hr-leaves-pagination',
+        totalItems: leaves.length,
+        currentPage: HrState.leavesPage,
+        pageSize: pageSize,
+        onPageChange: 'changeLeavesPage',
+        onPageSizeChange: 'changeLeavesPageSize'
+    });
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
     const isHodOnly = (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
@@ -797,7 +892,7 @@ function renderLeavesTable(leaves) {
     };
 
     let html = '';
-    leaves.forEach(l => {
+    pagedLeaves.forEach(l => {
         const typeBadge = leaveTypeBadges[l.leave_type] || leaveTypeBadges.other;
         const statBadge = statusBadges[l.status] || statusBadges.pending;
 
@@ -913,6 +1008,17 @@ function renderLeavesTable(leaves) {
 
     tbody.innerHTML = html;
 }
+
+window.changeLeavesPage = function(page) {
+    HrState.leavesPage = page;
+    renderLeavesTable(HrState.leavesFiltered || HrState.leaves, false);
+};
+
+window.changeLeavesPageSize = function(size) {
+    HrState.leavesPageSize = size;
+    HrState.leavesPage = 1;
+    renderLeavesTable(HrState.leavesFiltered || HrState.leaves, false);
+};
 
 async function openApplyLeaveModal() {
     await populateHrEmployeeDropdowns();
@@ -1099,6 +1205,7 @@ async function handleDeleteLeave(leaveId) {
 async function loadHrLoans() {
     const tbody = document.getElementById('hr-loans-table-body');
     if (!tbody) return;
+    populateHrEmployeeDropdowns();
 
     const statusFilter = document.getElementById('hr-loan-status-filter')?.value || 'all';
     const typeFilter = document.getElementById('hr-loan-type-filter')?.value || 'all';
@@ -1208,7 +1315,7 @@ function applyLoansClientFilters() {
         });
     }
 
-    renderLoansTable(list);
+    renderLoansTable(list, true);
 }
 
 function resetLoansFilters() {
@@ -1224,16 +1331,29 @@ function resetLoansFilters() {
     loadHrLoans();
 }
 
-function renderLoansTable(loans) {
+function renderLoansTable(loans, resetPage = false) {
     const tbody = document.getElementById('hr-loans-table-body');
     const countLabel = document.getElementById('hr-loans-count-label');
     if (!tbody) return;
 
+    HrState.loansFiltered = loans || [];
+    if (resetPage) {
+        HrState.loansPage = 1;
+    }
+
     if (countLabel) {
-        countLabel.textContent = `Showing ${loans.length} loan record(s)`;
+        countLabel.textContent = `Showing ${loans ? loans.length : 0} loan record(s)`;
     }
 
     if (!loans || loans.length === 0) {
+        renderGenericHrPagination({
+            containerId: 'hr-loans-pagination',
+            totalItems: 0,
+            currentPage: 1,
+            pageSize: HrState.loansPageSize || 15,
+            onPageChange: 'changeLoansPage',
+            onPageSizeChange: 'changeLoansPageSize'
+        });
         tbody.innerHTML = `
             <tr>
                 <td colspan="8" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
@@ -1245,6 +1365,23 @@ function renderLoansTable(loans) {
         `;
         return;
     }
+
+    const pageSize = HrState.loansPageSize || 15;
+    const totalPages = Math.max(1, Math.ceil(loans.length / pageSize));
+    if (HrState.loansPage > totalPages) HrState.loansPage = totalPages;
+    if (HrState.loansPage < 1) HrState.loansPage = 1;
+
+    const startIdx = (HrState.loansPage - 1) * pageSize;
+    const pagedLoans = loans.slice(startIdx, startIdx + pageSize);
+
+    renderGenericHrPagination({
+        containerId: 'hr-loans-pagination',
+        totalItems: loans.length,
+        currentPage: HrState.loansPage,
+        pageSize: pageSize,
+        onPageChange: 'changeLoansPage',
+        onPageSizeChange: 'changeLoansPageSize'
+    });
 
     const currentUser = HrState.currentUser || AppState.currentUser || {};
     const isHodOnly = (currentUser.is_hod === true || currentUser.role === 'hod' || (currentUser.designation && (currentUser.designation.includes('HOD') || currentUser.designation.includes('Director'))));
@@ -1268,7 +1405,7 @@ function renderLoansTable(loans) {
     };
 
     let html = '';
-    loans.forEach(l => {
+    pagedLoans.forEach(l => {
         const typeBadge = loanTypeBadges[l.request_type] || loanTypeBadges.advance_salary;
         const statBadge = statusBadges[l.status] || statusBadges.pending;
 
@@ -1393,6 +1530,17 @@ function renderLoansTable(loans) {
 
     tbody.innerHTML = html;
 }
+
+window.changeLoansPage = function(page) {
+    HrState.loansPage = page;
+    renderLoansTable(HrState.loansFiltered || HrState.loans, false);
+};
+
+window.changeLoansPageSize = function(size) {
+    HrState.loansPageSize = size;
+    HrState.loansPage = 1;
+    renderLoansTable(HrState.loansFiltered || HrState.loans, false);
+};
 
 async function openApplyLoanModal() {
     await populateHrEmployeeDropdowns();
@@ -1589,6 +1737,7 @@ async function handleDeleteLoan(loanId) {
 async function loadHrClaims() {
     const tbody = document.getElementById('hr-claims-table-body');
     if (!tbody) return;
+    populateHrEmployeeDropdowns();
 
     const typeFilter = document.getElementById('hr-claims-type-filter')?.value || 'all';
     const monthFilter = document.getElementById('hr-claims-month-filter')?.value || '';
@@ -1697,7 +1846,7 @@ function applyClaimsClientFilters() {
         });
     }
 
-    renderHrClaimsTable(list);
+    renderHrClaimsTable(list, true);
 }
 
 function resetClaimsFilters() {
@@ -1715,13 +1864,18 @@ function resetClaimsFilters() {
     loadHrClaims();
 }
 
-function renderHrClaimsTable(claims) {
+function renderHrClaimsTable(claims, resetPage = false) {
     const tbody = document.getElementById('hr-claims-table-body');
     const countLabel = document.getElementById('hr-claims-count-label');
     if (!tbody) return;
 
+    HrState.claimsFiltered = claims || [];
+    if (resetPage) {
+        HrState.claimsPage = 1;
+    }
+
     if (countLabel) {
-        countLabel.textContent = `Showing ${claims.length} claim(s)`;
+        countLabel.textContent = `Showing ${claims ? claims.length : 0} claim(s)`;
     }
 
     const isManager = AppState.currentUser && (
@@ -1733,6 +1887,14 @@ function renderHrClaimsTable(claims) {
     );
 
     if (!claims || claims.length === 0) {
+        renderGenericHrPagination({
+            containerId: 'hr-claims-pagination',
+            totalItems: 0,
+            currentPage: 1,
+            pageSize: HrState.claimsPageSize || 15,
+            onPageChange: 'changeClaimsPage',
+            onPageSizeChange: 'changeClaimsPageSize'
+        });
         tbody.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
@@ -1748,6 +1910,23 @@ function renderHrClaimsTable(claims) {
         `;
         return;
     }
+
+    const pageSize = HrState.claimsPageSize || 15;
+    const totalPages = Math.max(1, Math.ceil(claims.length / pageSize));
+    if (HrState.claimsPage > totalPages) HrState.claimsPage = totalPages;
+    if (HrState.claimsPage < 1) HrState.claimsPage = 1;
+
+    const startIdx = (HrState.claimsPage - 1) * pageSize;
+    const pagedClaims = claims.slice(startIdx, startIdx + pageSize);
+
+    renderGenericHrPagination({
+        containerId: 'hr-claims-pagination',
+        totalItems: claims.length,
+        currentPage: HrState.claimsPage,
+        pageSize: pageSize,
+        onPageChange: 'changeClaimsPage',
+        onPageSizeChange: 'changeClaimsPageSize'
+    });
 
     const isAdmin = AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || (AppState.currentUser.can_manage_hr && AppState.currentUser.role !== 'hod'));
 
@@ -1769,7 +1948,7 @@ function renderHrClaimsTable(claims) {
     };
 
     let html = '';
-    claims.forEach(c => {
+    pagedClaims.forEach(c => {
         const typeBadge = typeBadges[c.claim_type] || typeBadges.other;
         const statBadge = statusBadges[c.status] || statusBadges.pending;
 
@@ -1846,6 +2025,17 @@ function renderHrClaimsTable(claims) {
 
     tbody.innerHTML = html;
 }
+
+window.changeClaimsPage = function(page) {
+    HrState.claimsPage = page;
+    renderHrClaimsTable(HrState.claimsFiltered || HrState.claims, false);
+};
+
+window.changeClaimsPageSize = function(size) {
+    HrState.claimsPageSize = size;
+    HrState.claimsPage = 1;
+    renderHrClaimsTable(HrState.claimsFiltered || HrState.claims, false);
+};
 
 async function openAddClaimModal() {
     await populateHrEmployeeDropdowns();
