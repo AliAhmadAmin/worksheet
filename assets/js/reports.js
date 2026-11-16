@@ -383,6 +383,11 @@ function renderLiveAttendanceTable() {
             }
         }
 
+        let overnightBadge = '';
+        if (emp.is_overnight) {
+            overnightBadge = `<span class="badge" style="background: rgba(139, 92, 246, 0.12); color: #8b5cf6; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 10px; margin-left: 4px;" title="Active Overnight Shift started yesterday">🌙 Overnight</span>`;
+        }
+
         const canExcuseLate = (isSuperOrHr || (AppState.currentUser && AppState.currentUser.role === 'hod')) && (emp.is_late == 1 && !emp.late_excused && emp.check_in_time);
 
         let sourcesInBadge = '';
@@ -413,7 +418,7 @@ function renderLiveAttendanceTable() {
             </td>
             <td><span class="user-role-tag" style="background: rgba(59, 130, 246, 0.1); color: var(--primary); padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap;">${escapeHtml(emp.department_name || 'Digital')}</span></td>
             <td style="white-space: nowrap;">
-                <div><code style="font-size: 12px; font-weight: 700; color: ${emp.check_in_time ? '#10b981' : 'var(--text-dim)'};">${escapeHtml(emp.check_in_time || '-')}</code>${lateBadge}</div>
+                <div><code style="font-size: 12px; font-weight: 700; color: ${emp.check_in_time ? '#10b981' : 'var(--text-dim)'};">${escapeHtml(emp.check_in_time || '-')}</code>${lateBadge}${overnightBadge}</div>
                 ${sourcesInBadge}
             </td>
             <td style="white-space: nowrap;">

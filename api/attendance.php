@@ -295,6 +295,25 @@ switch ($action) {
         $stmt->execute([$empId, $date]);
         $sheet = $stmt->fetch();
 
+        // Smart Overnight Shift Pairing:
+        // If today's sheet doesn't have an active check-in, check if yesterday has an ongoing unclosed shift
+        if ((!$sheet || empty($sheet['check_in_time'])) && $date === $today) {
+            $prevDate = date('Y-m-d', strtotime('-1 day'));
+            $stmtPrev = $pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
+            $stmtPrev->execute([$empId, $prevDate]);
+            $prevSheet = $stmtPrev->fetch();
+
+            if ($prevSheet && !empty($prevSheet['check_in_time']) && empty($prevSheet['check_out_time']) && empty($prevSheet['is_locked'])) {
+                $prevInDateTime = strtotime($prevSheet['sheet_date'] . ' ' . $prevSheet['check_in_time']);
+                $nowTs = time();
+                // If started within the last 24 hours (e.g. 6 PM yesterday, checking out early morning today)
+                if ($prevInDateTime && ($nowTs - $prevInDateTime) >= 1800 && ($nowTs - $prevInDateTime) <= 86400) {
+                    $sheet = $prevSheet;
+                    $date = $prevDate;
+                }
+            }
+        }
+
         // Check if this is an overnight shift started yesterday (e.g. 6PM to 2AM)
         $isOvernightShift = false;
         if ($sheet && !empty($sheet['check_in_time']) && empty($sheet['is_locked'])) {
@@ -356,7 +375,11 @@ switch ($action) {
         $dutySeconds = 0;
 
         if ($inDateTime) {
-            if ($nowTs >= $inDateTime && ($nowTs - $inDateTime) <= 129600) {
+            // When checking out from yesterday's sheet, outDateTime occurs on today
+            $outDateTime = ($sheet['sheet_date'] !== $today) ? strtotime($today . ' ' . $customTime) : strtotime($sheet['sheet_date'] . ' ' . $customTime);
+            if ($outDateTime && $outDateTime >= $inDateTime && ($outDateTime - $inDateTime) <= 129600) {
+                $dutySeconds = $outDateTime - $inDateTime;
+            } elseif ($nowTs >= $inDateTime && ($nowTs - $inDateTime) <= 129600) {
                 $dutySeconds = $nowTs - $inDateTime;
             } else {
                 $checkInTs = strtotime($sheet['check_in_time']);
@@ -666,6 +689,28 @@ switch ($action) {
             'sheets_empty' => 0
         ];
 
+        // Detect active overnight shifts started yesterday that are still ongoing today
+        $activeOvernightShifts = [];
+        if ($date === date('Y-m-d')) {
+            $prevDate = date('Y-m-d', strtotime('-1 day'));
+            $stmtPrevOpen = $pdo->prepare("
+                SELECT id, employee_id, sheet_date, check_in_time, biometric_in_time, whatsapp_in_time, is_late, late_minutes, late_excused, late_excused_reason
+                FROM daily_sheets 
+                WHERE sheet_date = ? 
+                  AND check_in_time IS NOT NULL AND check_in_time != ''
+                  AND (check_out_time IS NULL OR check_out_time = '')
+                  AND (is_locked = 0 OR is_locked IS NULL)
+            ");
+            $stmtPrevOpen->execute([$prevDate]);
+            $nowTs = time();
+            foreach ($stmtPrevOpen->fetchAll(PDO::FETCH_ASSOC) as $os) {
+                $inTs = strtotime($os['sheet_date'] . ' ' . $os['check_in_time']);
+                if ($inTs && ($nowTs - $inTs) >= 1800 && ($nowTs - $inTs) <= 64800) {
+                    $activeOvernightShifts[(int)$os['employee_id']] = $os;
+                }
+            }
+        }
+
         foreach ($rows as &$r) {
             // Track late arrivals
             if (!empty($r['check_in_time']) && !empty($r['is_late']) && empty($r['late_excused'])) {
@@ -683,6 +728,16 @@ switch ($action) {
                     $r['status'] = 'working';
                     $stats['checked_in']++;
                 }
+            } else if (isset($activeOvernightShifts[(int)$r['employee_id']])) {
+                // Employee is actively on duty in an overnight shift started yesterday
+                $os = $activeOvernightShifts[(int)$r['employee_id']];
+                $r['sheet_id'] = $os['id'];
+                $r['check_in_time'] = $os['check_in_time'];
+                $r['biometric_in_time'] = $os['biometric_in_time'];
+                $r['whatsapp_in_time'] = $os['whatsapp_in_time'];
+                $r['status'] = 'working';
+                $r['is_overnight'] = 1;
+                $stats['checked_in']++;
             } else {
                 if ($date === date('Y-m-d')) {
                     $r['status'] = 'not_arrived';

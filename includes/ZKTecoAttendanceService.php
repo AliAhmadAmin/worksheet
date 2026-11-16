@@ -465,6 +465,123 @@ class ZKTecoAttendanceService {
         $isExplicitCheckOut = in_array($rawPunchState, ['check_out', 'out', '1', 'o'], true);
         $isExplicitCheckIn = in_array($rawPunchState, ['check_in', 'in', '0', 'i'], true);
 
+        // ==========================================
+        // SMART CROSS-MIDNIGHT / OVERNIGHT SHIFT PAIRING
+        // ==========================================
+        // When an employee works an evening/night shift (e.g. 6 PM - 2 AM), they punch out after midnight.
+        // If today's sheet does not already have an active check-in, check if yesterday has an open shift.
+        $punchHour = (int)date('H', $curTs);
+        $prevDate = date('Y-m-d', strtotime($punchDate . ' -1 day'));
+
+        $stmtPrev = $this->pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
+        $stmtPrev->execute([$empId, $prevDate]);
+        $prevSheet = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+        $isOvernightCheckout = false;
+        if ($prevSheet) {
+            $prevInStr = !empty($prevSheet['biometric_in_time']) ? $prevSheet['biometric_in_time'] : (!empty($prevSheet['check_in_time']) ? $prevSheet['check_in_time'] : null);
+            $prevHasOut = !empty($prevSheet['biometric_out_time']) || !empty($prevSheet['check_out_time']);
+
+            if ($prevInStr && !$prevHasOut) {
+                $prevInTs = strtotime($prevDate . ' ' . $prevInStr);
+                $elapsedSinceIn = ($prevInTs && $curTs > $prevInTs) ? ($curTs - $prevInTs) : 0;
+
+                // Check if today already has its own active check-in
+                $todayHasIn = $sheet && (!empty($sheet['biometric_in_time']) || !empty($sheet['check_in_time']));
+
+                // Overnight shift completion criteria:
+                // 1. Shift duration between 45 minutes and 18 hours (e.g. checked in 6 PM yesterday, punching out 12:05 AM to 08:00 AM)
+                // 2. Punch is in early morning window (before 08:00 AM) OR machine punch state explicitly says check_out
+                // 3. Today's sheet does not have an active check-in
+                if ($elapsedSinceIn >= 2700 && $elapsedSinceIn <= 64800 && !$todayHasIn) {
+                    if ($punchHour < 8 || $isExplicitCheckOut) {
+                        $isOvernightCheckout = true;
+                    }
+                }
+            }
+        }
+
+        if ($isOvernightCheckout) {
+            // Prevent duplicate punch within 2 minutes of existing biometric_out_time on prevSheet
+            if (!empty($prevSheet['biometric_out_time'])) {
+                $existingOutTs = strtotime($punchDate . ' ' . $prevSheet['biometric_out_time']);
+                if ($existingOutTs && abs($curTs - $existingOutTs) < 120) {
+                    return [
+                        'status' => 'duplicate',
+                        'sheet_id' => $prevSheet['id'],
+                        'remarks' => "Ignored duplicate punch within 2 minutes of Biometric Out ({$prevSheet['biometric_out_time']})."
+                    ];
+                }
+            }
+
+            // Calculate duty seconds across midnight
+            $prevInStr = !empty($prevSheet['biometric_in_time']) ? $prevSheet['biometric_in_time'] : $prevSheet['check_in_time'];
+            $inTs = strtotime($prevDate . ' ' . $prevInStr);
+            $outTs = $curTs;
+            $dutySeconds = max(0, $outTs - $inTs);
+            $h = floor($dutySeconds / 3600);
+            $m = floor(($dutySeconds % 3600) / 60);
+            $dutyFormatted = sprintf('%02d:%02d:00', $h, $m);
+
+            $preserveWebCheckout = !empty($prevSheet['is_locked']) || !empty($prevSheet['check_out_time']);
+
+            if ($preserveWebCheckout) {
+                $stmtUp = $this->pdo->prepare("
+                    UPDATE daily_sheets 
+                    SET biometric_out_time = ?,
+                        biometric_duty_hours = ?,
+                        biometric_duty_seconds = ?,
+                        remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ");
+                $stmtUp->execute([
+                    $punchTimeStr,
+                    $dutyFormatted,
+                    $dutySeconds,
+                    "[Biometric {$verifyType}] Overnight Out at {$punchTimeStr} (Bio Duty: {$dutyFormatted})",
+                    $prevSheet['id']
+                ]);
+            } else {
+                $stmtUp = $this->pdo->prepare("
+                    UPDATE daily_sheets 
+                    SET biometric_out_time = ?,
+                        biometric_duty_hours = ?,
+                        biometric_duty_seconds = ?,
+                        check_out_time = ?,
+                        total_duty_hours = ?,
+                        total_duty_seconds = ?,
+                        is_locked = 1,
+                        locked_at = COALESCE(locked_at, CURRENT_TIMESTAMP),
+                        remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?),
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ");
+                $stmtUp->execute([
+                    $punchTimeStr,
+                    $dutyFormatted,
+                    $dutySeconds,
+                    $punchTimeStr,
+                    $dutyFormatted,
+                    $dutySeconds,
+                    "[Biometric {$verifyType}] Overnight Out at {$punchTimeStr} (Duty: {$dutyFormatted})",
+                    $prevSheet['id']
+                ]);
+            }
+
+            // If an empty orphan row for today was created earlier with no check-in, clean it up
+            if ($sheet && empty($sheet['check_in_time']) && empty($sheet['biometric_in_time'])) {
+                $stmtDel = $this->pdo->prepare("DELETE FROM daily_sheets WHERE id = ?");
+                $stmtDel->execute([$sheet['id']]);
+            }
+
+            return [
+                'status' => 'applied',
+                'sheet_id' => $prevSheet['id'],
+                'remarks' => "Recorded Overnight Biometric Out at {$punchTimeStr} for {$prevDate} shift (Duty: {$dutyFormatted}) via {$verifyType} for {$employee['name']}."
+            ];
+        }
+
         // Determine punch intent: Check-In vs Check-Out
         $isCheckOut = false;
         if ($isExplicitCheckOut) {
