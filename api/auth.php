@@ -111,10 +111,6 @@ switch ($action) {
         $deptLower = strtolower($user['department_name'] ?? '');
         if ($userRole === 'hr' || $deptLower === 'hr' || $deptLower === 'human resources') {
             $redirectUrl = 'hr.php';
-        } elseif (stripos($deptLower, 'programming') !== false) {
-            $redirectUrl = 'programming.php';
-        } elseif (stripos($deptLower, 'news') !== false) {
-            $redirectUrl = 'newsroom.php';
         }
 
         // Remove sensitive fields from output

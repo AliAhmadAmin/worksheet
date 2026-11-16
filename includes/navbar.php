@@ -357,7 +357,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </a>
             <a href="programming.php" class="nav-btn <?= ($activeNavPage === 'programming') ? 'active' : '' ?>" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
-                <span class="nav-label">Programming</span>
+                <span class="nav-label">Dispatch Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </a>
             <?php else: ?>
@@ -367,7 +367,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </a>
             <a href="programming.php" class="nav-btn <?= ($activeNavPage === 'programming') ? 'active' : '' ?>" data-tab="tab-programming" data-route="programming">
                 <span class="nav-icon">📡</span>
-                <span class="nav-label">Programming</span>
+                <span class="nav-label">Dispatch Programming</span>
                 <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
             </a>
             <?php endif; ?>
