@@ -632,7 +632,8 @@ function switchAttendanceView(view) {
     });
 
     if (view === 'live' && typeof loadLiveAttendance === 'function') {
-        loadLiveAttendance();
+        loadLiveAttendance(true);
+        if (typeof startLiveRosterPoller === 'function') startLiveRosterPoller();
     } else if (view === 'report' && typeof loadAttendanceReport === 'function') {
         loadAttendanceReport();
     } else if (view === 'whatsapp') {
@@ -670,4 +671,7 @@ function jumpLiveDateToday() {
 // Auto-initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     WhatsAppAtt.init();
+    if (typeof startLiveRosterPoller === 'function') {
+        startLiveRosterPoller();
+    }
 });

@@ -92,7 +92,7 @@ try {
                         </div>
 
                         <div>
-                            <button type="button" class="btn btn-primary" onclick="loadLiveAttendance()" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;">
+                            <button type="button" id="btn-refresh-live-roster" class="btn btn-primary" onclick="refreshLiveAttendance()" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;">
                                 🔄 Refresh Roster
                             </button>
                         </div>

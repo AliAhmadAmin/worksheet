@@ -876,14 +876,17 @@ class ZKTecoAttendanceService {
             $stmt = $this->pdo->query("
                 SELECT id, employee_id, sheet_date, check_in_time, check_out_time, biometric_in_time, biometric_out_time
                 FROM daily_sheets
-                WHERE biometric_out_time IS NOT NULL AND biometric_out_time != ''
-                  AND sheet_date >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)
+                WHERE (
+                    (biometric_out_time IS NOT NULL AND biometric_out_time != '')
+                    OR (check_out_time IS NOT NULL AND check_out_time != '')
+                )
+                AND sheet_date >= DATE_SUB(CURDATE(), INTERVAL 5 DAY)
             ");
             $sheets = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
             foreach ($sheets as $s) {
                 $sheetDate = $s['sheet_date'];
-                $outStr = $s['biometric_out_time'];
+                $outStr = !empty($s['biometric_out_time']) ? $s['biometric_out_time'] : $s['check_out_time'];
                 $inStr = !empty($s['check_in_time']) ? $s['check_in_time'] : (!empty($s['biometric_in_time']) ? $s['biometric_in_time'] : null);
                 
                 $outTs = strtotime($sheetDate . ' ' . $outStr);
@@ -923,9 +926,12 @@ class ZKTecoAttendanceService {
                                 UPDATE daily_sheets
                                 SET biometric_out_time = ?,
                                     biometric_duty_hours = ?,
-                                    biometric_duty_seconds = ?
+                                    biometric_duty_seconds = ?,
+                                    check_out_time = IF(check_out_time IS NULL OR check_out_time = '', ?, check_out_time),
+                                    total_duty_hours = IF(total_duty_hours IS NULL OR total_duty_hours = '', ?, total_duty_hours),
+                                    total_duty_seconds = IF(total_duty_seconds IS NULL OR total_duty_seconds = 0, ?, total_duty_seconds)
                                 WHERE id = ?
-                            ")->execute([$outStr, $dutyFormatted, $dutySecs, $prevSheet['id']]);
+                            ")->execute([$outStr, $dutyFormatted, $dutySecs, $outStr, $dutyFormatted, $dutySecs, $prevSheet['id']]);
                         }
                     }
 
@@ -936,9 +942,12 @@ class ZKTecoAttendanceService {
                             UPDATE daily_sheets
                             SET biometric_out_time = NULL,
                                 biometric_duty_hours = NULL,
-                                biometric_duty_seconds = 0
+                                biometric_duty_seconds = 0,
+                                total_duty_hours = IF(check_out_time = ?, NULL, total_duty_hours),
+                                total_duty_seconds = IF(check_out_time = ?, 0, total_duty_seconds),
+                                check_out_time = IF(check_out_time = ?, NULL, check_out_time)
                             WHERE id = ?
-                        ")->execute([$s['id']]);
+                        ")->execute([$outStr, $outStr, $outStr, $s['id']]);
                     }
                 }
             }

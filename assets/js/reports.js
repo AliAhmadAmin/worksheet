@@ -489,7 +489,40 @@ function renderLiveAttendanceTable() {
     });
 }
 
-async function loadLiveAttendance() {
+async function refreshLiveAttendance() {
+    const btn = document.getElementById('btn-refresh-live-roster');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Syncing...';
+    }
+    try {
+        await loadLiveAttendance(true);
+        showToast('Live roster refreshed & synced with latest biometric punches!', 'success');
+    } catch (e) {
+        showToast('Error syncing roster: ' + e.message, 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🔄 Refresh Roster';
+        }
+    }
+}
+
+let _liveRosterPoller = null;
+function startLiveRosterPoller() {
+    if (_liveRosterPoller) clearInterval(_liveRosterPoller);
+    _liveRosterPoller = setInterval(async () => {
+        const liveSec = document.getElementById('att-view-live-section');
+        const isLiveVisible = !liveSec || liveSec.style.display !== 'none';
+        const isTabActive = document.getElementById('tab-attendance')?.classList.contains('active') || window.location.pathname.includes('attendance.php');
+        
+        if (isLiveVisible && isTabActive && !document.hidden) {
+            await loadLiveAttendance(false);
+        }
+    }, 30000); // Auto-refresh live board every 30 seconds
+}
+
+async function loadLiveAttendance(forceSync = false) {
     const tbody = document.getElementById('live-attendance-tbody');
     if (!tbody) return;
 
@@ -499,6 +532,9 @@ async function loadLiveAttendance() {
     let url = `api/attendance.php?action=live_board&date=${targetDate}`;
     if (deptFilter !== 'all') {
         url += `&department_id=${encodeURIComponent(deptFilter)}`;
+    }
+    if (forceSync) {
+        url += `&sync=1&force=1`;
     }
 
     try {

@@ -599,7 +599,8 @@ switch ($action) {
             $zkService = new ZKTecoAttendanceService($pdo);
             $zkService->healOrphanMorningCheckouts();
             $mdbService = new ZKTecoMdbService($pdo);
-            $mdbService->syncIncremental(false);
+            $forceSync = !empty($_GET['sync']) || !empty($_GET['force']);
+            $mdbService->syncIncremental($forceSync);
         } catch (Throwable $t) {
             // Non-blocking failover
         }
