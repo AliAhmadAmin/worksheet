@@ -611,10 +611,16 @@ function filterAssignTaskEmpDropdown(query) {
         renderAssignTaskEmpDropdownList(source);
         return;
     }
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
     const filtered = source.filter(emp => {
         const code = (emp.emp_code || emp.employee_code || '').toLowerCase();
+        const autoCode = `dp-${String(emp.id).padStart(3, '0')}`.toLowerCase();
+        const cleanCode = code.replace(/[^a-z0-9]/g, '');
+        const cleanAuto = autoCode.replace(/[^a-z0-9]/g, '');
+
         return (emp.name && emp.name.toLowerCase().includes(q)) || 
-            code.includes(q) ||
+            code.includes(q) || autoCode.includes(q) ||
+            (cleanQ && cleanCode.includes(cleanQ)) || (cleanQ && cleanAuto.includes(cleanQ)) ||
             (emp.designation && emp.designation.toLowerCase().includes(q)) ||
             (emp.department_name && emp.department_name.toLowerCase().includes(q)) ||
             (emp.email && emp.email.toLowerCase().includes(q)) ||
@@ -716,12 +722,20 @@ function filterEditTaskEmpDropdown(query) {
         renderEditTaskEmpDropdownList(AppState.employees);
         return;
     }
-    const filtered = (AppState.employees || []).filter(emp => 
-        emp.name.toLowerCase().includes(q) || 
-        (emp.email && emp.email.toLowerCase().includes(q)) ||
-        (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
-        (emp.department_name && emp.department_name.toLowerCase().includes(q))
-    );
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+    const filtered = (AppState.employees || []).filter(emp => {
+        const code = (emp.emp_code || emp.employee_code || '').toLowerCase();
+        const autoCode = `dp-${String(emp.id).padStart(3, '0')}`.toLowerCase();
+        const cleanCode = code.replace(/[^a-z0-9]/g, '');
+        const cleanAuto = autoCode.replace(/[^a-z0-9]/g, '');
+
+        return emp.name.toLowerCase().includes(q) || 
+            code.includes(q) || autoCode.includes(q) ||
+            (cleanQ && cleanCode.includes(cleanQ)) || (cleanQ && cleanAuto.includes(cleanQ)) ||
+            (emp.email && emp.email.toLowerCase().includes(q)) ||
+            (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
+            (emp.department_name && emp.department_name.toLowerCase().includes(q));
+    });
     renderEditTaskEmpDropdownList(filtered);
 }
 

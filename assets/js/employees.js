@@ -218,13 +218,30 @@ function applyDirectoryFilters() {
     }
 
     if (search) {
-        list = list.filter(e => 
-            (e.name || '').toLowerCase().includes(search) ||
-            (e.email || '').toLowerCase().includes(search) ||
-            (e.designation || '').toLowerCase().includes(search) ||
-            (e.department_name || '').toLowerCase().includes(search) ||
-            (e.team_name || '').toLowerCase().includes(search)
-        );
+        const cleanSearch = search.replace(/[^a-z0-9]/g, '');
+        list = list.filter(e => {
+            const name = (e.name || '').toLowerCase();
+            const email = (e.email || '').toLowerCase();
+            const desig = (e.designation || '').toLowerCase();
+            const dept = (e.department_name || '').toLowerCase();
+            const team = (e.team_name || '').toLowerCase();
+            const role = (e.role || '').toLowerCase();
+            const empCode = (e.emp_code || e.employee_code || '').toLowerCase();
+            const autoCode = `dp-${String(e.id).padStart(3, '0')}`.toLowerCase();
+            const cleanEmpCode = empCode.replace(/[^a-z0-9]/g, '');
+            const cleanAutoCode = autoCode.replace(/[^a-z0-9]/g, '');
+
+            return name.includes(search) ||
+                   email.includes(search) ||
+                   desig.includes(search) ||
+                   dept.includes(search) ||
+                   team.includes(search) ||
+                   role.includes(search) ||
+                   empCode.includes(search) ||
+                   autoCode.includes(search) ||
+                   (cleanSearch && cleanEmpCode.includes(cleanSearch)) ||
+                   (cleanSearch && cleanAutoCode.includes(cleanSearch));
+        });
     }
 
     // Sync top pill badge to match active staff in currently selected department
@@ -857,18 +874,26 @@ function renderAddDeptHodDropdownList(employees) {
 
 function filterAddDeptHodDropdown(query) {
     const q = (query || '').trim().toLowerCase();
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
     const list = AppState.employees || [];
     if (!q) {
         renderAddDeptHodDropdownList(list);
         return;
     }
-    const filtered = list.filter(emp => 
-        (emp.name && emp.name.toLowerCase().includes(q)) || 
-        (emp.email && emp.email.toLowerCase().includes(q)) ||
-        (emp.designation && emp.designation.toLowerCase().includes(q)) ||
-        (emp.department_name && emp.department_name.toLowerCase().includes(q)) ||
-        (emp.employee_code && emp.employee_code.toLowerCase().includes(q))
-    );
+    const filtered = list.filter(emp => {
+        const name = (emp.name || '').toLowerCase();
+        const email = (emp.email || '').toLowerCase();
+        const desig = (emp.designation || '').toLowerCase();
+        const dept = (emp.department_name || '').toLowerCase();
+        const code = (emp.emp_code || emp.employee_code || '').toLowerCase();
+        const autoCode = `dp-${String(emp.id).padStart(3, '0')}`.toLowerCase();
+        const cleanCode = code.replace(/[^a-z0-9]/g, '');
+        const cleanAuto = autoCode.replace(/[^a-z0-9]/g, '');
+
+        return name.includes(q) || email.includes(q) || desig.includes(q) || dept.includes(q) ||
+               code.includes(q) || autoCode.includes(q) ||
+               (cleanQ && cleanCode.includes(cleanQ)) || (cleanQ && cleanAuto.includes(cleanQ));
+    });
     renderAddDeptHodDropdownList(filtered);
 }
 
@@ -995,18 +1020,26 @@ function renderEditDeptHodDropdownList(employees) {
 
 function filterEditDeptHodDropdown(query) {
     const q = (query || '').trim().toLowerCase();
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
     const list = AppState.employees || [];
     if (!q) {
         renderEditDeptHodDropdownList(list);
         return;
     }
-    const filtered = list.filter(emp => 
-        (emp.name && emp.name.toLowerCase().includes(q)) || 
-        (emp.email && emp.email.toLowerCase().includes(q)) ||
-        (emp.designation && emp.designation.toLowerCase().includes(q)) ||
-        (emp.department_name && emp.department_name.toLowerCase().includes(q)) ||
-        (emp.employee_code && emp.employee_code.toLowerCase().includes(q))
-    );
+    const filtered = list.filter(emp => {
+        const name = (emp.name || '').toLowerCase();
+        const email = (emp.email || '').toLowerCase();
+        const desig = (emp.designation || '').toLowerCase();
+        const dept = (emp.department_name || '').toLowerCase();
+        const code = (emp.emp_code || emp.employee_code || '').toLowerCase();
+        const autoCode = `dp-${String(emp.id).padStart(3, '0')}`.toLowerCase();
+        const cleanCode = code.replace(/[^a-z0-9]/g, '');
+        const cleanAuto = autoCode.replace(/[^a-z0-9]/g, '');
+
+        return name.includes(q) || email.includes(q) || desig.includes(q) || dept.includes(q) ||
+               code.includes(q) || autoCode.includes(q) ||
+               (cleanQ && cleanCode.includes(cleanQ)) || (cleanQ && cleanAuto.includes(cleanQ));
+    });
     renderEditDeptHodDropdownList(filtered);
 }
 

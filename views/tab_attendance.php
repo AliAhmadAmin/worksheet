@@ -83,6 +83,12 @@ try {
                                     <option value="<?= htmlspecialchars($d['id']) ?>">🏢 <?= htmlspecialchars($d['name']) ?></option>
                                 <?php endforeach; ?>
                             </select>
+
+                            <!-- Live Roster Employee & Code Search Box -->
+                            <div style="position: relative; display: inline-flex; align-items: center;">
+                                <input type="text" id="live-att-search" class="input-control" placeholder="🔍 Search name, code (DP-025)..." style="padding: 4px 26px 4px 9px; font-size: 11.5px; width: 230px; border-radius: var(--radius-md);" oninput="renderLiveAttendanceTable()" autocomplete="off">
+                                <button type="button" id="live-att-search-clear" onclick="clearLiveRosterSearch()" style="display: none; position: absolute; right: 7px; background: transparent; border: none; font-size: 11px; cursor: pointer; color: var(--text-muted); line-height: 1;" title="Clear search">✕</button>
+                            </div>
                         </div>
 
                         <div>
@@ -989,12 +995,28 @@ try {
                             </div>
                         </div>
 
-                        <!-- Windows Background Service Command Tooltip -->
-                        <div style="margin-top: 8px; font-size: 10.5px; color: var(--text-muted);">
+                        <!-- Windows Background Service & 24/7 Sync Details -->
+                        <div style="margin-top: 10px; font-size: 11px; color: var(--text-muted); line-height: 1.45;">
+                            <div style="background: rgba(59, 130, 246, 0.06); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 6px;">
+                                <strong>💡 How Auto-Sync Operates:</strong>
+                                <ul style="margin: 4px 0 0 16px; padding: 0;">
+                                    <li><strong>Web Auto-Sync (Active):</strong> Automatically syncs punches every minute whenever any staff member or admin is working in Worksheet.</li>
+                                    <li><strong>24/7 Overnight Sync (Unattended):</strong> To keep syncing uninterrupted when all computers and browsers are closed at night, run the 1-click batch script on the server.</li>
+                                </ul>
+                            </div>
                             <details style="cursor: pointer;">
-                                <summary style="font-weight: 700; color: #3b82f6;">🖥️ How to run 24/7 in Windows Task Scheduler</summary>
-                                <div style="margin-top: 6px; padding: 6px 8px; background: var(--bg-card); border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: monospace; font-size: 10px; word-break: break-all;">
-                                    schtasks /create /tn "ZKTeco_Worksheet_Sync" /tr "C:\xampp\php\php.exe C:\xampp\htdocs\Worksheet\cron\sync_zkteco_mdb.php" /sc minute /mo 15 /ru SYSTEM /f
+                                <summary style="font-weight: 700; color: #2563eb;">🖥️ Run 24/7 Unattended (Windows Task Scheduler / Background Daemon)</summary>
+                                <div style="margin-top: 6px; padding: 8px 10px; background: var(--bg-card); border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 10.5px;">
+                                    <div style="font-weight: 700; margin-bottom: 4px;">Option A: 1-Click Task Scheduler (Recommended)</div>
+                                    <div style="color: var(--text-muted); margin-bottom: 4px;">Double-click this batch file on the server (or run as Administrator):</div>
+                                    <code style="display: block; padding: 4px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; font-size: 10px; word-break: break-all; margin-bottom: 8px;">C:\xampp\htdocs\Worksheet\cron\install_task.bat</code>
+                                    
+                                    <div style="font-weight: 700; margin-bottom: 4px;">Option B: Command Prompt / PowerShell</div>
+                                    <code style="display: block; padding: 4px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; font-size: 10px; word-break: break-all; margin-bottom: 8px;">schtasks /create /tn "ZKTeco_Worksheet_Sync" /tr "C:\xampp\php\php.exe C:\xampp\htdocs\Worksheet\cron\sync_zkteco_mdb.php" /sc minute /mo 1 /f</code>
+
+                                    <div style="font-weight: 700; margin-bottom: 4px;">Option C: Standalone Background Daemon (No Task Scheduler needed)</div>
+                                    <div style="color: var(--text-muted); margin-bottom: 4px;">Double-click to start completely silent background loop:</div>
+                                    <code style="display: block; padding: 4px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; font-size: 10px; word-break: break-all;">C:\xampp\htdocs\Worksheet\cron\start_daemon_invisible.vbs</code>
                                 </div>
                             </details>
                         </div>

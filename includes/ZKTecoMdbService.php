@@ -418,7 +418,20 @@ PS1;
             }
         }
 
+        // Concurrency lock using a lock file
+        $lockFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'zkteco_sync.lock';
+        $lockFp = @fopen($lockFile, 'c+');
+        if ($lockFp && !flock($lockFp, LOCK_EX | LOCK_NB)) {
+            fclose($lockFp);
+            return [
+                'success' => true,
+                'skipped' => true,
+                'message' => 'Sync is already running in another process.'
+            ];
+        }
+
         if (empty($mdbPath) || !file_exists($mdbPath)) {
+            if ($lockFp) { flock($lockFp, LOCK_UN); fclose($lockFp); }
             $err = "Database file not accessible at: " . ($mdbPath ?: 'empty path');
             $this->updateSyncStatus('error', $err);
             return ['success' => false, 'message' => $err];
@@ -427,6 +440,7 @@ PS1;
         // Fast file modification time check
         $mtime = @filemtime($mdbPath);
         if ($mtime && !empty($lastSync) && $mtime <= (strtotime($lastSync) - 10) && !$forced) {
+            if ($lockFp) { flock($lockFp, LOCK_UN); fclose($lockFp); }
             $this->updateSyncStatus('success', 'File unchanged, no new punches.');
             return [
                 'success' => true,
@@ -445,6 +459,7 @@ PS1;
         }
 
         $result = $this->importPunches($mdbPath, $startWindow, null, 2000);
+        if ($lockFp) { flock($lockFp, LOCK_UN); fclose($lockFp); }
         if ($result['success']) {
             $stmtMax = $this->pdo->query("SELECT MAX(punch_time) FROM zkteco_attendance_logs");
             $newestPunch = $stmtMax ? $stmtMax->fetchColumn() : null;

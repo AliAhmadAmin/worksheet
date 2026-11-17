@@ -361,6 +361,7 @@ async function initApp() {
 
         if (AppState.currentUser) {
             await loadUserData(false);
+            initGlobalZKTecoHeartbeat();
         }
 
         setupTabNavigation();
@@ -369,6 +370,36 @@ async function initApp() {
         console.error("App initialization failed:", err);
         showToast("Error connecting to server / database.", "error");
     }
+}
+
+// Universal ZKTeco Auto-Sync Heartbeat
+// Keeps biometric punches continuously synced whenever ANY user is active on Worksheet
+let _zktecoHeartbeatTimer = null;
+function initGlobalZKTecoHeartbeat() {
+    if (_zktecoHeartbeatTimer) return;
+
+    async function doHeartbeatPing() {
+        if (!AppState.currentUser) return;
+        try {
+            const res = await fetch('api/zkteco_manage.php?action=trigger_auto_sync', {
+                method: 'GET',
+                cache: 'no-store'
+            });
+            const data = await res.json();
+            if (data && data.success && !data.skipped) {
+                // If ZKTeco tab is currently active on screen, refresh its view
+                if (typeof ZKTecoAtt !== 'undefined' && typeof ZKTecoAtt.loadLogs === 'function') {
+                    ZKTecoAtt.loadLogs();
+                    ZKTecoAtt.loadSettings();
+                }
+            }
+        } catch (e) {}
+    }
+
+    // Ping after 4s initial load
+    setTimeout(doHeartbeatPing, 4000);
+    // Recurring ping every 60s
+    _zktecoHeartbeatTimer = setInterval(doHeartbeatPing, 60000);
 }
 
 function updateLoginGreeting() {
@@ -822,11 +853,14 @@ function renderAdminEmpDropdownList(employees) {
             ? `<span style="font-size: 10px; background: rgba(59, 130, 246, 0.15); color: var(--primary); padding: 1px 6px; border-radius: 4px; font-weight: 700; margin-left: 6px;">My Sheet</span>`
             : '';
 
+        const codeBadge = `<span style="font-family: monospace; font-size: 10px; font-weight: 700; color: #0284c7; background: rgba(2, 132, 199, 0.1); padding: 1px 4px; border-radius: 3px; margin-left: 6px;">${escapeHtml(emp.emp_code || `DP-${String(emp.id).padStart(3, '0')}`)}</span>`;
+
         item.innerHTML = `
             ${avatarHtml}
             <div style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                 <div style="color: var(--text-main); line-height: 1.2; display: flex; align-items: center;">
                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(emp.name)}</span>
+                    ${codeBadge}
                     ${roleBadge}
                 </div>
                 <div style="font-size: 10.5px; color: var(--text-muted); font-weight: normal; display: flex; align-items: center; gap: 6px; margin-top: 1px;">
@@ -847,11 +881,20 @@ function filterAdminEmpDropdown(query) {
         renderAdminEmpDropdownList(inspectable);
         return;
     }
-    const filtered = inspectable.filter(emp => 
-        emp.name.toLowerCase().includes(q) || 
-        (emp.team_name && emp.team_name.toLowerCase().includes(q)) ||
-        (emp.department_name && emp.department_name.toLowerCase().includes(q))
-    );
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+    const filtered = inspectable.filter(emp => {
+        const name = (emp.name || '').toLowerCase();
+        const team = (emp.team_name || '').toLowerCase();
+        const dept = (emp.department_name || '').toLowerCase();
+        const code = (emp.emp_code || emp.employee_code || '').toLowerCase();
+        const autoCode = `dp-${String(emp.id).padStart(3, '0')}`.toLowerCase();
+        const cleanCode = code.replace(/[^a-z0-9]/g, '');
+        const cleanAuto = autoCode.replace(/[^a-z0-9]/g, '');
+
+        return name.includes(q) || team.includes(q) || dept.includes(q) ||
+               code.includes(q) || autoCode.includes(q) ||
+               (cleanQ && cleanCode.includes(cleanQ)) || (cleanQ && cleanAuto.includes(cleanQ));
+    });
     renderAdminEmpDropdownList(filtered);
 }
 

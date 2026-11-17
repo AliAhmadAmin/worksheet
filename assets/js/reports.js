@@ -299,6 +299,37 @@ function renderLiveAttendanceTable() {
         filteredEmployees = filteredEmployees.filter(e => (e.sheet_status === 'pending' || (e.status === 'checked_out' && !e.is_hod_checked)));
     }
 
+    // Search Filter by Name, Employee Code, Designation, Department
+    const searchInput = document.getElementById('live-att-search');
+    const search = (searchInput?.value || '').toLowerCase().trim();
+    const clearBtn = document.getElementById('live-att-search-clear');
+    if (clearBtn) {
+        clearBtn.style.display = search ? 'inline-block' : 'none';
+    }
+
+    if (search) {
+        const cleanSearch = search.replace(/[^a-z0-9]/g, '');
+        filteredEmployees = filteredEmployees.filter(e => {
+            const name = (e.name || '').toLowerCase();
+            const desig = (e.designation || '').toLowerCase();
+            const dept = (e.department_name || '').toLowerCase();
+            const team = (e.team_name || '').toLowerCase();
+            const empCode = (e.emp_code || e.employee_code || '').toLowerCase();
+            const autoCode = `dp-${String(e.employee_id || e.id).padStart(3, '0')}`.toLowerCase();
+            const cleanEmpCode = empCode.replace(/[^a-z0-9]/g, '');
+            const cleanAutoCode = autoCode.replace(/[^a-z0-9]/g, '');
+
+            return name.includes(search) ||
+                desig.includes(search) ||
+                dept.includes(search) ||
+                team.includes(search) ||
+                empCode.includes(search) ||
+                autoCode.includes(search) ||
+                (cleanSearch && cleanEmpCode.includes(cleanSearch)) ||
+                (cleanSearch && cleanAutoCode.includes(cleanSearch));
+        });
+    }
+
     tbody.innerHTML = '';
     if (filteredEmployees.length === 0) {
         const colSpan = showHodCheck ? 8 : 7;
@@ -308,13 +339,19 @@ function renderLiveAttendanceTable() {
             'checked_out': 'Checked Out',
             'absent': 'Absent / Off',
             'late': 'Late Arrivals',
-            'checked': 'Verify',
+            'checked': 'Verified',
             'pending': 'Pending Verify'
         };
         const fLabel = filterNames[currentLiveAttendanceFilter] || currentLiveAttendanceFilter;
+        const msg = search
+            ? `No staff matching "<strong>${escapeHtml(search)}</strong>" found in ${escapeHtml(fLabel)}.`
+            : `No staff records found for filter "<strong>${escapeHtml(fLabel)}</strong>"`;
+        const resetAction = search ? `clearLiveRosterSearch()` : `filterLiveRosterCards('all')`;
+        const resetLabel = search ? `Clear Search` : `Show All Staff`;
+
         tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align: center; color: var(--text-muted); padding: 35px 20px;">
-            <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">No staff records found for filter "<strong>${escapeHtml(fLabel)}</strong>"</div>
-            <button type="button" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; margin-top: 6px;" onclick="filterLiveRosterCards('all')">Show All Staff</button>
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;">${msg}</div>
+            <button type="button" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; margin-top: 6px;" onclick="${resetAction}">${resetLabel}</button>
         </td></tr>`;
         return;
     }
@@ -620,7 +657,10 @@ function renderRepAttEmpDropdownList(list) {
                 <div class="dropdown-emp-item ${isSelected ? 'active' : ''}" onclick="selectRepAttEmpFromDropdown(${emp.id})" style="padding: 7px 10px; border-radius: var(--radius-md); cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s; background: ${isSelected ? 'rgba(0, 179, 0, 0.1)' : 'transparent'};">
                     ${avatarHtml}
                     <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 700; font-size: 12.5px; color: ${isSelected ? 'var(--primary)' : 'var(--text-main)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(emp.name)}</div>
+                        <div style="font-weight: 700; font-size: 12.5px; color: ${isSelected ? 'var(--primary)' : 'var(--text-main)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center;">
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(emp.name)}</span>
+                            <span style="font-family: monospace; font-size: 10px; font-weight: 700; color: #0284c7; background: rgba(2, 132, 199, 0.1); padding: 1px 4px; border-radius: 3px; margin-left: 5px;">${escapeHtml(emp.emp_code || `DP-${String(emp.id).padStart(3, '0')}`)}</span>
+                        </div>
                         <div style="font-size: 10.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(emp.designation || 'Staff')} • ${escapeHtml(emp.department_name || 'Digital')}</div>
                     </div>
                     ${isSelected ? '<span style="color: var(--primary); font-size: 13px; font-weight: 800;">✓</span>' : ''}
@@ -659,12 +699,21 @@ function filterRepAttEmpDropdown(query) {
         return;
     }
 
-    const filtered = (AppState.employees || []).filter(e =>
-        (e.name || '').toLowerCase().includes(q) ||
-        (e.designation || '').toLowerCase().includes(q) ||
-        (e.department_name || '').toLowerCase().includes(q) ||
-        (e.email || '').toLowerCase().includes(q)
-    );
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+    const filtered = (AppState.employees || []).filter(e => {
+        const name = (e.name || '').toLowerCase();
+        const desig = (e.designation || '').toLowerCase();
+        const dept = (e.department_name || '').toLowerCase();
+        const email = (e.email || '').toLowerCase();
+        const code = (e.emp_code || e.employee_code || '').toLowerCase();
+        const autoCode = `dp-${String(e.id).padStart(3, '0')}`.toLowerCase();
+        const cleanCode = code.replace(/[^a-z0-9]/g, '');
+        const cleanAuto = autoCode.replace(/[^a-z0-9]/g, '');
+
+        return name.includes(q) || desig.includes(q) || dept.includes(q) || email.includes(q) ||
+            code.includes(q) || autoCode.includes(q) ||
+            (cleanQ && cleanCode.includes(cleanQ)) || (cleanQ && cleanAuto.includes(cleanQ));
+    });
     renderRepAttEmpDropdownList(filtered);
 }
 
@@ -817,7 +866,7 @@ function stepRepAttMonth(delta) {
     const parts = currVal.split('-');
     let y = parseInt(parts[0], 10);
     let m = parseInt(parts[1], 10) - 1; // 0-based
-    
+
     m += delta;
     const d = new Date(y, m, 1);
     const newMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -1505,10 +1554,10 @@ function printAttendanceReport() {
                         <td style="text-align: center; color: ${r.is_weekend ? '#d97706' : '#475569'}; font-weight: 600;">${escapeHtml(fullDay)}</td>
                         <td style="text-align: center;">
                             <span style="font-family: monospace; font-weight: 700; color: ${r.is_late && !r.late_excused ? '#b91c1c' : (r.check_in ? '#059669' : '#94a3b8')};">${r.check_in ? formatTimeTo12h(r.check_in) : '-'}</span>
-                            ${r.is_late ? (r.late_excused 
-                                ? `<div style="font-size: 8.5px; color: #059669; font-weight: 700;">Excused</div>` 
-                                : `<div style="font-size: 8.5px; color: #b91c1c; font-weight: 700;">Late (${formatLateDuration(r.late_minutes)})</div>`) 
-                                : ''}
+                            ${r.is_late ? (r.late_excused
+                        ? `<div style="font-size: 8.5px; color: #059669; font-weight: 700;">Excused</div>`
+                        : `<div style="font-size: 8.5px; color: #b91c1c; font-weight: 700;">Late (${formatLateDuration(r.late_minutes)})</div>`)
+                        : ''}
                         </td>
                         <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${r.check_out ? '#2563eb' : '#94a3b8'};">${r.check_out ? formatTimeTo12h(r.check_out) : '-'}</td>
                         <td style="text-align: center; font-family: monospace; font-weight: 700;">${r.duty_formatted || '0:00:00'}</td>

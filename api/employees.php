@@ -106,7 +106,8 @@ switch ($action) {
                    END as employment_type,
                    COALESCE(e.shift_policy, p.shift_policy, 'fixed') as shift_policy,
                    COALESCE(e.late_grace_minutes, 15) as late_grace_minutes,
-                   p.emp_code, p.father_husband_name, p.cnic_no, p.bank_name, p.bank_account_no, p.fixed_allowance,
+                   COALESCE(NULLIF(p.emp_code, ''), NULLIF(e.emp_code, '')) as emp_code,
+                   p.father_husband_name, p.cnic_no, p.bank_name, p.bank_account_no, p.fixed_allowance,
                    p.basic_salary, p.hourly_rate, p.expected_hours, p.joining_date,
                    p.annual_leave_quota, p.casual_leave_quota, p.sick_leave_quota,
                    d.name as department_name, t.name as team_name 

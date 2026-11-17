@@ -23,7 +23,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; background: var(--bg-card-elevated); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
                         <!-- Left: Search Box -->
                         <div style="position: relative; flex: 1; min-width: 220px; max-width: 340px;">
-                            <input type="text" id="emp-dir-search" class="input-control" placeholder="🔍 Search name, email, role..." style="width: 100%; padding: 7px 12px; font-size: 12.5px; border-radius: var(--radius-md);" oninput="applyDirectoryFilters()">
+                            <input type="text" id="emp-dir-search" class="input-control" placeholder="🔍 Search name, code (e.g. DP-025), email, role..." style="width: 100%; padding: 7px 12px; font-size: 12.5px; border-radius: var(--radius-md);" oninput="applyDirectoryFilters()">
                         </div>
 
                         <!-- Right: Compact Filter Dropdowns & Reset -->

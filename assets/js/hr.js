@@ -795,8 +795,13 @@ function applyLeavesClientFilters() {
     }
 
     if (search) {
+        const cleanSearch = search.replace(/[^a-z0-9]/g, '');
         list = list.filter(l => {
+            const empCode = (l.emp_code || '').toLowerCase();
+            const cleanEmpCode = empCode.replace(/[^a-z0-9]/g, '');
             return (l.employee_name && l.employee_name.toLowerCase().includes(search)) ||
+                   (empCode && empCode.includes(search)) ||
+                   (cleanSearch && cleanEmpCode.includes(cleanSearch)) ||
                    (l.leave_type && l.leave_type.toLowerCase().includes(search)) ||
                    (l.reason && l.reason.toLowerCase().includes(search)) ||
                    (l.department_name && l.department_name.toLowerCase().includes(search)) ||
@@ -1308,8 +1313,13 @@ function applyLoansClientFilters() {
     }
 
     if (search) {
+        const cleanSearch = search.replace(/[^a-z0-9]/g, '');
         list = list.filter(l => {
+            const empCode = (l.emp_code || '').toLowerCase();
+            const cleanEmpCode = empCode.replace(/[^a-z0-9]/g, '');
             return (l.employee_name && l.employee_name.toLowerCase().includes(search)) ||
+                   (empCode && empCode.includes(search)) ||
+                   (cleanSearch && cleanEmpCode.includes(cleanSearch)) ||
                    (l.request_type && l.request_type.toLowerCase().includes(search)) ||
                    (l.reason && l.reason.toLowerCase().includes(search)) ||
                    (l.department_name && l.department_name.toLowerCase().includes(search)) ||
@@ -1835,9 +1845,13 @@ function applyClaimsClientFilters() {
     }
 
     if (search) {
+        const cleanSearch = search.replace(/[^a-z0-9]/g, '');
         list = list.filter(c => {
+            const empCode = (c.emp_code || '').toLowerCase();
+            const cleanEmpCode = empCode.replace(/[^a-z0-9]/g, '');
             return (c.employee_name && c.employee_name.toLowerCase().includes(search)) ||
-                   (c.emp_code && c.emp_code.toLowerCase().includes(search)) ||
+                   (empCode && empCode.includes(search)) ||
+                   (cleanSearch && cleanEmpCode.includes(cleanSearch)) ||
                    (c.claim_type && c.claim_type.toLowerCase().includes(search)) ||
                    (c.reason && c.reason.toLowerCase().includes(search)) ||
                    (c.description && c.description.toLowerCase().includes(search)) ||
@@ -2618,8 +2632,13 @@ function applyShowCauseClientFilters() {
     }
 
     if (search) {
+        const cleanSearch = search.replace(/[^a-z0-9]/g, '');
         list = list.filter(n => {
+            const empCode = (n.emp_code || '').toLowerCase();
+            const cleanEmpCode = empCode.replace(/[^a-z0-9]/g, '');
             return (n.employee_name && n.employee_name.toLowerCase().includes(search)) ||
+                   (empCode && empCode.includes(search)) ||
+                   (cleanSearch && cleanEmpCode.includes(cleanSearch)) ||
                    (n.title && n.title.toLowerCase().includes(search)) ||
                    (n.allegation_details && n.allegation_details.toLowerCase().includes(search)) ||
                    (n.employee_reply && n.employee_reply.toLowerCase().includes(search)) ||
@@ -3371,8 +3390,13 @@ function applyFinesClientFilters() {
     }
 
     if (search) {
+        const cleanSearch = search.replace(/[^a-z0-9]/g, '');
         list = list.filter(f => {
+            const empCode = (f.emp_code || '').toLowerCase();
+            const cleanEmpCode = empCode.replace(/[^a-z0-9]/g, '');
             return (f.employee_name && f.employee_name.toLowerCase().includes(search)) ||
+                   (empCode && empCode.includes(search)) ||
+                   (cleanSearch && cleanEmpCode.includes(cleanSearch)) ||
                    (f.reason && f.reason.toLowerCase().includes(search)) ||
                    (f.fine_category && f.fine_category.toLowerCase().includes(search)) ||
                    (f.department_name && f.department_name.toLowerCase().includes(search)) ||

@@ -591,6 +591,16 @@ switch ($action) {
         break;
 
     case 'live_board':
+        // Opportunistic Biometric Sync if due
+        try {
+            require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
+            require_once __DIR__ . '/../includes/ZKTecoMdbService.php';
+            $mdbService = new ZKTecoMdbService($db);
+            $mdbService->syncIncremental(false);
+        } catch (Throwable $t) {
+            // Non-blocking failover
+        }
+
         $date = $_GET['date'] ?? date('Y-m-d');
         $deptFilter = isset($_GET['department_id']) && $_GET['department_id'] !== '' && $_GET['department_id'] !== 'all' ? (int)$_GET['department_id'] : null;
 
@@ -614,6 +624,7 @@ switch ($action) {
             SELECT 
                 e.id as employee_id,
                 e.name,
+                COALESCE(NULLIF(p.emp_code, ''), NULLIF(e.emp_code, '')) as emp_code,
                 e.designation,
                 e.role,
                 e.avatar,
@@ -651,6 +662,7 @@ switch ($action) {
                 s.whatsapp_duty_seconds,
                 (SELECT COUNT(*) FROM sheet_entries se WHERE se.sheet_id = s.id) as total_entries
             FROM employees e
+            LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id
             LEFT JOIN departments d ON e.department_id = d.id
             LEFT JOIN teams t ON e.team_id = t.id
             LEFT JOIN daily_sheets s ON e.id = s.employee_id AND s.sheet_date = ?
