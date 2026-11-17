@@ -592,17 +592,19 @@ switch ($action) {
         break;
 
     case 'live_board':
-        // Opportunistic Biometric Sync if due and auto-heal orphan overnight checkouts
-        try {
-            require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
-            require_once __DIR__ . '/../includes/ZKTecoMdbService.php';
-            $zkService = new ZKTecoAttendanceService($pdo);
-            $zkService->healOrphanMorningCheckouts();
-            $mdbService = new ZKTecoMdbService($pdo);
-            $forceSync = !empty($_GET['sync']) || !empty($_GET['force']);
-            $mdbService->syncIncremental($forceSync);
-        } catch (Throwable $t) {
-            // Non-blocking failover
+        // Opportunistic Biometric Sync if explicitly requested (e.g. Refresh button clicked)
+        if (!empty($_GET['sync']) || !empty($_GET['force'])) {
+            try {
+                require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
+                require_once __DIR__ . '/../includes/ZKTecoMdbService.php';
+                $zkService = new ZKTecoAttendanceService($pdo);
+                $zkService->healOrphanMorningCheckouts();
+                $mdbService = new ZKTecoMdbService($pdo);
+                $forceSync = !empty($_GET['force']);
+                $mdbService->syncIncremental($forceSync);
+            } catch (Throwable $t) {
+                // Non-blocking failover
+            }
         }
 
         $date = $_GET['date'] ?? date('Y-m-d');

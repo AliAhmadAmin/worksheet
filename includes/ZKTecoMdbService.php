@@ -11,6 +11,21 @@ require_once __DIR__ . '/ZKTecoAttendanceService.php';
 class ZKTecoMdbService {
     private $pdo;
     private $attService;
+    private $cachedMethod = null;
+
+    public function getMethod($mdbPath = null) {
+        if ($this->cachedMethod !== null) {
+            return $this->cachedMethod;
+        }
+        if (extension_loaded('pdo_odbc')) {
+            $this->cachedMethod = 'pdo_odbc';
+        } elseif (function_exists('odbc_connect')) {
+            $this->cachedMethod = 'native_odbc';
+        } else {
+            $this->cachedMethod = 'windows_adodb_bridge';
+        }
+        return $this->cachedMethod;
+    }
 
     public function __construct($pdo = null) {
         $this->pdo = $pdo ?: getDbConnection();
@@ -192,24 +207,9 @@ class ZKTecoMdbService {
             return ['success' => false, 'message' => 'File not found.'];
         }
 
-        $test = $this->testConnection($mdbPath);
-        if (!$test['success']) {
-            return $test;
-        }
-        $method = $test['method'];
+        $method = $this->getMethod($mdbPath);
 
-        // 1. Fetch Users mapping from USERINFO (USERID -> Badgenumber)
-        $userMap = [];
-        $usersRes = $this->runQuery($mdbPath, $method, "SELECT USERID, Badgenumber, Name FROM USERINFO");
-        if ($usersRes['success'] && !empty($usersRes['data'])) {
-            foreach ($usersRes['data'] as $u) {
-                $uid = (string)($u['USERID'] ?? '');
-                $badge = trim((string)($u['Badgenumber'] ?? ''));
-                $userMap[$uid] = !empty($badge) ? $badge : $uid;
-            }
-        }
-
-        // 2. Build Query for CHECKINOUT
+        // 1. Build Query for CHECKINOUT
         $whereClauses = [];
         if (!empty($startDate)) {
             $whereClauses[] = "CHECKTIME >= #" . date('Y-m-d 00:00:00', strtotime($startDate)) . "#";
@@ -220,14 +220,44 @@ class ZKTecoMdbService {
 
         $whereSql = !empty($whereClauses) ? "WHERE " . implode(' AND ', $whereClauses) : "";
         $topClause = $limit > 0 ? "TOP {$limit}" : "";
-        $sql = "SELECT {$topClause} USERID, CHECKTIME, CHECKTYPE, VERIFYCODE FROM CHECKINOUT {$whereSql} ORDER BY CHECKTIME ASC";
+        $sqlPunches = "SELECT {$topClause} USERID, CHECKTIME, CHECKTYPE, VERIFYCODE FROM CHECKINOUT {$whereSql} ORDER BY CHECKTIME ASC";
+        $sqlUsers = "SELECT USERID, Badgenumber, Name FROM USERINFO";
 
-        $punchesRes = $this->runQuery($mdbPath, $method, $sql);
-        if (!$punchesRes['success']) {
-            return ['success' => false, 'message' => 'Failed to query CHECKINOUT table: ' . $punchesRes['message']];
+        $userMap = [];
+        $rawPunches = [];
+
+        if ($method === 'windows_adodb_bridge') {
+            $multiRes = $this->queryMultipleViaWindowsBridge($mdbPath, [
+                'users' => $sqlUsers,
+                'punches' => $sqlPunches
+            ]);
+            if (!$multiRes['success']) {
+                return ['success' => false, 'message' => 'Failed to query MDB: ' . ($multiRes['message'] ?? 'Unknown error')];
+            }
+            if (!empty($multiRes['users'])) {
+                foreach ($multiRes['users'] as $u) {
+                    $uid = (string)($u['USERID'] ?? '');
+                    $badge = trim((string)($u['Badgenumber'] ?? ''));
+                    $userMap[$uid] = !empty($badge) ? $badge : $uid;
+                }
+            }
+            $rawPunches = $multiRes['punches'] ?? [];
+        } else {
+            $usersRes = $this->runQuery($mdbPath, $method, $sqlUsers);
+            if ($usersRes['success'] && !empty($usersRes['data'])) {
+                foreach ($usersRes['data'] as $u) {
+                    $uid = (string)($u['USERID'] ?? '');
+                    $badge = trim((string)($u['Badgenumber'] ?? ''));
+                    $userMap[$uid] = !empty($badge) ? $badge : $uid;
+                }
+            }
+
+            $punchesRes = $this->runQuery($mdbPath, $method, $sqlPunches);
+            if (!$punchesRes['success']) {
+                return ['success' => false, 'message' => 'Failed to query CHECKINOUT table: ' . $punchesRes['message']];
+            }
+            $rawPunches = $punchesRes['data'] ?? [];
         }
-
-        $rawPunches = $punchesRes['data'] ?? [];
         $appliedCount = 0;
         $duplicateCount = 0;
         $unmatchedCount = 0;
@@ -349,6 +379,77 @@ try {
     }
     \$conn.Close()
     \$out = @{ success = \$true; data = \$rows }
+    ConvertTo-Json \$out -Depth 5 -Compress
+} catch {
+    \$out = @{ success = \$false; message = \$_.Exception.Message }
+    ConvertTo-Json \$out -Compress
+}
+PS1;
+
+        $tempScript = sys_get_temp_dir() . '/mdb_bridge_' . uniqid() . '.ps1';
+        file_put_contents($tempScript, $script);
+
+        $cmd = "\"{$ps32}\" -NoProfile -ExecutionPolicy Bypass -File \"{$tempScript}\"";
+        $output = shell_exec($cmd);
+        @unlink($tempScript);
+
+        if (empty($output)) {
+            return ['success' => false, 'message' => 'Empty output from Windows ADODB bridge.'];
+        }
+
+        $decoded = json_decode(trim($output), true);
+        if (!$decoded) {
+            return ['success' => false, 'message' => 'Invalid JSON response from bridge: ' . substr($output, 0, 100)];
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * Executes multiple queries within a single COM connection session via PowerShell bridge.
+     * Prevents multiple process startups and dramatically boosts sync performance.
+     */
+    private function queryMultipleViaWindowsBridge($mdbPath, array $queries) {
+        $cleanPath = str_replace("'", "''", $mdbPath);
+
+        $ps32 = 'C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe';
+        if (!file_exists($ps32)) {
+            $ps32 = 'powershell.exe';
+        }
+
+        $queryBlocks = [];
+        foreach ($queries as $key => $sql) {
+            $cleanSql = str_replace("'", "''", $sql);
+            $queryBlocks[] = "
+    \$rs_{$key} = \$conn.Execute('{$cleanSql}')
+    \$rows_{$key} = @()
+    while (-not \$rs_{$key}.EOF) {
+        \$obj = @{}
+        for (\$i = 0; \$i -lt \$rs_{$key}.Fields.Count; \$i++) {
+            \$f = \$rs_{$key}.Fields.Item(\$i)
+            \$val = \$f.Value
+            if (\$val -is [System.DateTime]) {
+                \$val = \$val.ToString('yyyy-MM-dd HH:mm:ss')
+            }
+            \$obj[\$f.Name] = \$val
+        }
+        \$rows_{$key} += \$obj
+        \$rs_{$key}.MoveNext()
+    }
+    \$out['{$key}'] = \$rows_{$key}
+";
+        }
+
+        $allQueriesPs = implode("\n", $queryBlocks);
+
+        $script = <<<PS1
+\$mdb = '{$cleanPath}'
+try {
+    \$conn = New-Object -ComObject ADODB.Connection
+    \$conn.Open("Provider=Microsoft.Jet.OLEDB.4.0;Data Source=\$mdb")
+    \$out = @{ success = \$true }
+{$allQueriesPs}
+    \$conn.Close()
     ConvertTo-Json \$out -Depth 5 -Compress
 } catch {
     \$out = @{ success = \$false; message = \$_.Exception.Message }

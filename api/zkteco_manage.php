@@ -57,11 +57,13 @@ switch ($action) {
         break;
 
     case 'get_logs':
-        // Opportunistic or forced MDB sync before returning logs
-        try {
-            $forceSync = !empty($_GET['sync']) || !empty($_GET['force']);
-            $mdbService->syncIncremental($forceSync);
-        } catch (Throwable $t) {}
+        // Only run MDB sync if explicitly requested (e.g. sync=1 or force=1)
+        if (!empty($_GET['sync']) || !empty($_GET['force'])) {
+            try {
+                $forceSync = !empty($_GET['force']);
+                $mdbService->syncIncremental($forceSync);
+            } catch (Throwable $t) {}
+        }
 
         $dateFilter = $_GET['date'] ?? '';
         $empFilter = $_GET['employee_id'] ?? '';

@@ -10,23 +10,38 @@ const ZKTecoAtt = {
     settings: {},
     searchTimer: null,
 
+    _poller: null,
+
     init() {
         this.loadSettings();
         this.loadDevices();
-        this.loadLogs(true);
+        this.loadLogs(false);
         this.populateSimEmployees();
         this.startAutoSyncPoller();
+        this.triggerBackgroundSync();
+    },
+
+    async triggerBackgroundSync() {
+        try {
+            const res = await fetch('api/zkteco_manage.php?action=trigger_auto_sync');
+            const data = await res.json();
+            if (data && data.success && !data.skipped) {
+                this.loadLogs(false);
+                this.loadSettings();
+            }
+        } catch (e) {}
     },
 
     startAutoSyncPoller() {
+        if (this._poller) clearInterval(this._poller);
         // Lightweight background ping every 60 seconds (1 minute): triggers sync if due
-        setInterval(async () => {
+        this._poller = setInterval(async () => {
             try {
                 const res = await fetch('api/zkteco_manage.php?action=trigger_auto_sync');
                 const data = await res.json();
                 if (data && data.success && !data.skipped) {
                     console.log('ZKTeco Auto-Sync completed:', data);
-                    this.loadLogs();
+                    this.loadLogs(false);
                 }
             } catch (e) {}
         }, 60000); // 60 seconds
@@ -65,7 +80,8 @@ const ZKTecoAtt = {
             btn.innerHTML = '⏳ Syncing...';
         }
         try {
-            await this.loadLogs(true);
+            await fetch('api/zkteco_manage.php?action=trigger_auto_sync&force=1');
+            await this.loadLogs(false);
             await this.loadSettings();
             showToast('Biometric stream refreshed & synced with latest punches!', 'success');
         } catch (e) {
