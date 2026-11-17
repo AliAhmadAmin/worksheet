@@ -9,6 +9,8 @@ require_once __DIR__ . '/../config/database.php';
 
 class ZKTecoAttendanceService {
     private $pdo;
+    private static $tablesChecked = false;
+    private $pinCache = [];
 
     public function __construct($pdo = null) {
         $this->pdo = $pdo ?: getDbConnection();
@@ -19,6 +21,8 @@ class ZKTecoAttendanceService {
      * Auto-create required ZKTeco database tables if they do not exist.
      */
     private function ensureTablesExist() {
+        if (self::$tablesChecked) return;
+        self::$tablesChecked = true;
         try {
             $this->pdo->exec("
                 CREATE TABLE IF NOT EXISTS `zkteco_settings` (
@@ -404,7 +408,11 @@ class ZKTecoAttendanceService {
     public function findEmployeeByPin($pin) {
         if (empty($pin)) return null;
 
-        $cleanPin = trim($pin);
+        $cleanPin = trim((string)$pin);
+        if (array_key_exists($cleanPin, $this->pinCache)) {
+            return $this->pinCache[$cleanPin];
+        }
+
         $cleanDigits = preg_replace('/[^\d]/', '', $cleanPin);
         $cleanCode = strtoupper($cleanPin);
 
@@ -419,7 +427,10 @@ class ZKTecoAttendanceService {
             !empty($cleanDigits) ? $cleanDigits : null
         ]));
 
-        if (empty($codeVariants)) return null;
+        if (empty($codeVariants)) {
+            $this->pinCache[$cleanPin] = null;
+            return null;
+        }
 
         $placeholders = implode(',', array_fill(0, count($codeVariants), '?'));
         $sql = "
@@ -440,9 +451,8 @@ class ZKTecoAttendanceService {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($allParams);
         $emp = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($emp) return $emp;
-
-        return null;
+        $this->pinCache[$cleanPin] = $emp ?: null;
+        return $this->pinCache[$cleanPin];
     }
 
     /**

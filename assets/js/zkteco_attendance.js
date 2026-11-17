@@ -431,7 +431,7 @@ const ZKTecoAtt = {
 
     async populateSimEmployees() {
         const select = document.getElementById('zk-sim-employee');
-        if (!select) return;
+        if (!select || select.children.length > 1) return;
 
         try {
             const res = await fetch('api/employees.php?action=list');

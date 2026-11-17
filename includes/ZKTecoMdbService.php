@@ -12,6 +12,7 @@ class ZKTecoMdbService {
     private $pdo;
     private $attService;
     private $cachedMethod = null;
+    private static $schemaChecked = false;
 
     public function getMethod($mdbPath = null) {
         if ($this->cachedMethod !== null) {
@@ -37,6 +38,8 @@ class ZKTecoMdbService {
      * Auto-migrate schema columns on live servers seamlessly without manual SQL intervention.
      */
     private function ensureDatabaseSchema() {
+        if (self::$schemaChecked) return;
+        self::$schemaChecked = true;
         try {
             $this->pdo->exec("
                 ALTER TABLE zkteco_settings 
