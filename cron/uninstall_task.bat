@@ -1,6 +1,7 @@
 @echo off
-title Uninstall ZKTeco Sync Task
-echo Removing ZKTeco_Worksheet_Sync from Windows Task Scheduler...
+title Remove ZKTeco Sync Task
+echo Removing old ZKTeco_Worksheet_Sync task...
 schtasks /delete /tn "ZKTeco_Worksheet_Sync" /f
-echo Done.
+echo.
+echo Task removed. To reinstall with the 100% silent windowless runner, run install_task.bat.
 pause

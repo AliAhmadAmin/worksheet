@@ -392,8 +392,8 @@ PS1;
         $tempScript = sys_get_temp_dir() . '/mdb_bridge_' . uniqid() . '.ps1';
         file_put_contents($tempScript, $script);
 
-        $cmd = "\"{$ps32}\" -NoProfile -ExecutionPolicy Bypass -File \"{$tempScript}\"";
-        $output = shell_exec($cmd);
+        $cmd = "\"{$ps32}\" -WindowStyle Hidden -NonInteractive -NoProfile -ExecutionPolicy Bypass -File \"{$tempScript}\"";
+        $output = $this->executeCommandSilently($cmd);
         @unlink($tempScript);
 
         if (empty($output)) {
@@ -463,8 +463,8 @@ PS1;
         $tempScript = sys_get_temp_dir() . '/mdb_bridge_' . uniqid() . '.ps1';
         file_put_contents($tempScript, $script);
 
-        $cmd = "\"{$ps32}\" -NoProfile -ExecutionPolicy Bypass -File \"{$tempScript}\"";
-        $output = shell_exec($cmd);
+        $cmd = "\"{$ps32}\" -WindowStyle Hidden -NonInteractive -NoProfile -ExecutionPolicy Bypass -File \"{$tempScript}\"";
+        $output = $this->executeCommandSilently($cmd);
         @unlink($tempScript);
 
         if (empty($output)) {
@@ -477,6 +477,33 @@ PS1;
         }
 
         return $decoded;
+    }
+
+    /**
+     * Executes a command on Windows completely invisibly without spawning a CMD console window.
+     * Uses proc_open with CREATE_NO_WINDOW and bypass_shell to suppress any popup or taskbar flash.
+     */
+    private function executeCommandSilently($cmd) {
+        $descriptors = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w']
+        ];
+        $options = [
+            'bypass_shell' => true,
+            'suppress_errors' => true,
+            'create_no_window' => true
+        ];
+        $process = @proc_open($cmd, $descriptors, $pipes, null, null, $options);
+        if (!is_resource($process)) {
+            return '';
+        }
+        fclose($pipes[0]);
+        $output = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($process);
+        return $output;
     }
 
     private function formatBytes($bytes, $precision = 2) {

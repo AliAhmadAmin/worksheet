@@ -8,7 +8,7 @@ echo This registers 'ZKTeco_Worksheet_Sync' to run every 1 minute 24/7,
 echo even when all browser tabs and computers are closed.
 echo.
 
-schtasks /create /tn "ZKTeco_Worksheet_Sync" /tr "C:\xampp\php\php.exe C:\xampp\htdocs\Worksheet\cron\sync_zkteco_mdb.php" /sc minute /mo 1 /f
+schtasks /create /tn "ZKTeco_Worksheet_Sync" /tr "wscript.exe \"C:\xampp\htdocs\Worksheet\cron\sync_silent.vbs\"" /sc minute /mo 1 /f
 
 if %errorlevel% equ 0 (
     echo.
