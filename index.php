@@ -28,7 +28,7 @@ if (session_status() === PHP_SESSION_ACTIVE) {
 }
 
 // Page-specific script loading
-$pageScripts = ['assets/js/sheets.js'];
+$pageScripts = ['assets/js/sheets.js', 'assets/js/reports.js'];
 
 // 1. Header (HTML DocType, Head, Styles)
 require_once __DIR__ . '/includes/header.php';
