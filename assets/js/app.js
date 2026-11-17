@@ -392,6 +392,10 @@ function initGlobalZKTecoHeartbeat() {
                     ZKTecoAtt.loadLogs();
                     ZKTecoAtt.loadSettings();
                 }
+                // If Live Attendance tab is currently active on screen, refresh live shift roster
+                if (typeof loadLiveAttendance === 'function' && document.getElementById('tab-attendance')?.classList.contains('active')) {
+                    loadLiveAttendance();
+                }
             }
         } catch (e) {}
     }

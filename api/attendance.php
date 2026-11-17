@@ -5,6 +5,7 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+ob_start();
 header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
 
@@ -595,7 +596,7 @@ switch ($action) {
         try {
             require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
             require_once __DIR__ . '/../includes/ZKTecoMdbService.php';
-            $mdbService = new ZKTecoMdbService($db);
+            $mdbService = new ZKTecoMdbService($pdo);
             $mdbService->syncIncremental(false);
         } catch (Throwable $t) {
             // Non-blocking failover
@@ -800,6 +801,7 @@ switch ($action) {
             }
         }
 
+        if (ob_get_length()) ob_clean();
         echo json_encode([
             'success' => true,
             'date' => $date,
@@ -807,7 +809,7 @@ switch ($action) {
             'has_hod_check_enabled' => $hasHodCheckEnabled,
             'employees' => $rows
         ]);
-        break;
+        exit;
 
     case 'attendance_report':
         try {

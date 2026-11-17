@@ -395,7 +395,7 @@ PS1;
         }
 
         $enabled = isset($settings['mdb_auto_sync_enabled']) ? (int)$settings['mdb_auto_sync_enabled'] : 1;
-        $intervalMins = isset($settings['mdb_sync_interval_mins']) ? max(1, (int)$settings['mdb_sync_interval_mins']) : 15;
+        $intervalMins = isset($settings['mdb_sync_interval_mins']) && (int)$settings['mdb_sync_interval_mins'] > 0 ? (int)$settings['mdb_sync_interval_mins'] : 1;
         $mdbPath = trim($settings['mdb_default_path'] ?? '');
         $lastSync = $settings['mdb_last_sync_time'] ?? null;
         $lastPunch = $settings['mdb_last_punch_time'] ?? null;
@@ -418,20 +418,21 @@ PS1;
             }
         }
 
-        // Concurrency lock using a lock file
-        $lockFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'zkteco_sync.lock';
-        $lockFp = @fopen($lockFile, 'c+');
-        if ($lockFp && !flock($lockFp, LOCK_EX | LOCK_NB)) {
-            fclose($lockFp);
-            return [
-                'success' => true,
-                'skipped' => true,
-                'message' => 'Sync is already running in another process.'
-            ];
-        }
+        // Concurrency lock using MySQL GET_LOCK (non-blocking, auto-released on disconnect)
+        try {
+            $lockStmt = $this->pdo->query("SELECT GET_LOCK('zkteco_sync_lock', 0)");
+            $hasLock = $lockStmt ? (int)$lockStmt->fetchColumn() : 1;
+            if ($hasLock !== 1) {
+                return [
+                    'success' => true,
+                    'skipped' => true,
+                    'message' => 'Sync is already running in another process.'
+                ];
+            }
+        } catch (Throwable $t) {}
 
         if (empty($mdbPath) || !file_exists($mdbPath)) {
-            if ($lockFp) { flock($lockFp, LOCK_UN); fclose($lockFp); }
+            $this->releaseSyncLock();
             $err = "Database file not accessible at: " . ($mdbPath ?: 'empty path');
             $this->updateSyncStatus('error', $err);
             return ['success' => false, 'message' => $err];
@@ -440,7 +441,7 @@ PS1;
         // Fast file modification time check
         $mtime = @filemtime($mdbPath);
         if ($mtime && !empty($lastSync) && $mtime <= (strtotime($lastSync) - 10) && !$forced) {
-            if ($lockFp) { flock($lockFp, LOCK_UN); fclose($lockFp); }
+            $this->releaseSyncLock();
             $this->updateSyncStatus('success', 'File unchanged, no new punches.');
             return [
                 'success' => true,
@@ -459,7 +460,7 @@ PS1;
         }
 
         $result = $this->importPunches($mdbPath, $startWindow, null, 2000);
-        if ($lockFp) { flock($lockFp, LOCK_UN); fclose($lockFp); }
+        $this->releaseSyncLock();
         if ($result['success']) {
             $stmtMax = $this->pdo->query("SELECT MAX(punch_time) FROM zkteco_attendance_logs");
             $newestPunch = $stmtMax ? $stmtMax->fetchColumn() : null;
@@ -482,6 +483,12 @@ PS1;
         }
 
         return $result;
+    }
+
+    private function releaseSyncLock() {
+        try {
+            $this->pdo->query("SELECT RELEASE_LOCK('zkteco_sync_lock')");
+        } catch (Throwable $t) {}
     }
 
     private function updateSyncStatus($type, $msg) {
