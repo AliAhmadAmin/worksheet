@@ -471,7 +471,7 @@ try {
                             <button type="button" class="btn btn-outline" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.openSetupModal()">
                                 ⚙️ ADMS Machine Setup
                             </button>
-                            <button type="button" class="btn btn-primary" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.loadLogs()">
+                            <button type="button" id="zk-btn-refresh-stream" class="btn btn-primary" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;" onclick="ZKTecoAtt.refreshStream()">
                                 🔄 Refresh Stream
                             </button>
                         </div>

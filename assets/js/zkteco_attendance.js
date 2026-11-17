@@ -13,7 +13,7 @@ const ZKTecoAtt = {
     init() {
         this.loadSettings();
         this.loadDevices();
-        this.loadLogs();
+        this.loadLogs(true);
         this.populateSimEmployees();
         this.startAutoSyncPoller();
     },
@@ -58,7 +58,27 @@ const ZKTecoAtt = {
         }
     },
 
-    async loadLogs() {
+    async refreshStream() {
+        const btn = document.getElementById('zk-btn-refresh-stream');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Syncing...';
+        }
+        try {
+            await this.loadLogs(true);
+            await this.loadSettings();
+            showToast('Biometric stream refreshed & synced with latest punches!', 'success');
+        } catch (e) {
+            showToast('Error syncing stream: ' + e.message, 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '🔄 Refresh Stream';
+            }
+        }
+    },
+
+    async loadLogs(forceSync = false) {
         try {
             const dateInput = document.getElementById('zk-logs-date-filter');
             const statusInput = document.getElementById('zk-logs-status-filter');
@@ -74,6 +94,10 @@ const ZKTecoAtt = {
                 search: searchInput ? searchInput.value : '',
                 limit: 200
             });
+            if (forceSync) {
+                params.append('sync', '1');
+                params.append('force', '1');
+            }
 
             const res = await fetch(`api/zkteco_manage.php?${params.toString()}`);
             const data = await res.json();

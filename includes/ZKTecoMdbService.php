@@ -27,10 +27,11 @@ class ZKTecoMdbService {
                 ALTER TABLE zkteco_settings 
                 ADD COLUMN IF NOT EXISTS mdb_default_path VARCHAR(255) NULL,
                 ADD COLUMN IF NOT EXISTS mdb_auto_sync_enabled TINYINT(1) DEFAULT 1,
-                ADD COLUMN IF NOT EXISTS mdb_sync_interval_mins INT DEFAULT 15,
+                ADD COLUMN IF NOT EXISTS mdb_sync_interval_mins INT DEFAULT 1,
                 ADD COLUMN IF NOT EXISTS mdb_last_sync_time DATETIME NULL,
                 ADD COLUMN IF NOT EXISTS mdb_last_punch_time DATETIME NULL,
-                ADD COLUMN IF NOT EXISTS mdb_last_sync_status VARCHAR(255) NULL
+                ADD COLUMN IF NOT EXISTS mdb_last_sync_status VARCHAR(255) NULL,
+                ADD COLUMN IF NOT EXISTS mdb_last_file_mtime BIGINT NULL
             ");
         } catch (Exception $e) {
             // Non-blocking: table might already have columns or running older MySQL without IF NOT EXISTS
@@ -38,10 +39,11 @@ class ZKTecoMdbService {
                 $cols = [
                     'mdb_default_path' => 'VARCHAR(255) NULL',
                     'mdb_auto_sync_enabled' => 'TINYINT(1) DEFAULT 1',
-                    'mdb_sync_interval_mins' => 'INT DEFAULT 15',
+                    'mdb_sync_interval_mins' => 'INT DEFAULT 1',
                     'mdb_last_sync_time' => 'DATETIME NULL',
                     'mdb_last_punch_time' => 'DATETIME NULL',
-                    'mdb_last_sync_status' => 'VARCHAR(255) NULL'
+                    'mdb_last_sync_status' => 'VARCHAR(255) NULL',
+                    'mdb_last_file_mtime' => 'BIGINT NULL'
                 ];
                 foreach ($cols as $col => $type) {
                     try {
@@ -438,9 +440,13 @@ PS1;
             return ['success' => false, 'message' => $err];
         }
 
-        // Fast file modification time check
+        // Fast file modification time check with stat cache cleared
+        @clearstatcache(true, $mdbPath);
         $mtime = @filemtime($mdbPath);
-        if ($mtime && !empty($lastSync) && $mtime <= (strtotime($lastSync) - 10) && !$forced) {
+        $lastFileMtime = isset($settings['mdb_last_file_mtime']) ? (int)$settings['mdb_last_file_mtime'] : null;
+
+        // If file timestamp is identical to our last imported check, and not forced, skip
+        if ($mtime !== false && !empty($lastFileMtime) && $mtime === $lastFileMtime && !$forced) {
             $this->releaseSyncLock();
             $this->updateSyncStatus('success', 'File unchanged, no new punches.');
             return [
@@ -471,10 +477,11 @@ PS1;
                 UPDATE zkteco_settings 
                 SET mdb_last_sync_time = NOW(),
                     mdb_last_punch_time = ?,
-                    mdb_last_sync_status = ?
+                    mdb_last_sync_status = ?,
+                    mdb_last_file_mtime = ?
                 WHERE id = 1
             ");
-            $stmtUp->execute([$newestPunch, $statusMsg]);
+            $stmtUp->execute([$newestPunch, $statusMsg, $mtime ?: time()]);
 
             $result['last_sync'] = date('Y-m-d H:i:s');
             $result['status_msg'] = $statusMsg;
