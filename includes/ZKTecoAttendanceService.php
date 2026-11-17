@@ -480,21 +480,20 @@ class ZKTecoAttendanceService {
         $isOvernightCheckout = false;
         if ($prevSheet) {
             $prevInStr = !empty($prevSheet['biometric_in_time']) ? $prevSheet['biometric_in_time'] : (!empty($prevSheet['check_in_time']) ? $prevSheet['check_in_time'] : null);
-            $prevHasOut = !empty($prevSheet['biometric_out_time']) || !empty($prevSheet['check_out_time']);
 
-            if ($prevInStr && !$prevHasOut) {
+            if ($prevInStr) {
                 $prevInTs = strtotime($prevDate . ' ' . $prevInStr);
                 $elapsedSinceIn = ($prevInTs && $curTs > $prevInTs) ? ($curTs - $prevInTs) : 0;
 
-                // Check if today already has its own active check-in
+                // Check if today already has its own active check-in prior to this punch
                 $todayHasIn = $sheet && (!empty($sheet['biometric_in_time']) || !empty($sheet['check_in_time']));
 
                 // Overnight shift completion criteria:
-                // 1. Shift duration between 45 minutes and 18 hours (e.g. checked in 6 PM yesterday, punching out 12:05 AM to 08:00 AM)
-                // 2. Punch is in early morning window (before 08:00 AM) OR machine punch state explicitly says check_out
+                // 1. Shift duration between 45 minutes and 18 hours (e.g. checked in yesterday, punching out next morning)
+                // 2. Punch is in early morning window (before 10:00 AM) OR machine punch state explicitly says check_out
                 // 3. Today's sheet does not have an active check-in
                 if ($elapsedSinceIn >= 2700 && $elapsedSinceIn <= 64800 && !$todayHasIn) {
-                    if ($punchHour < 8 || $isExplicitCheckOut) {
+                    if ($punchHour < 10 || $isExplicitCheckOut) {
                         $isOvernightCheckout = true;
                     }
                 }
@@ -791,6 +790,32 @@ class ZKTecoAttendanceService {
                 }
 
                 // Biometric in is empty
+                // If today's sheet has an earlier morning out time (e.g. Out 01:54 AM vs In 01:58 PM):
+                // That out punch was an overnight departure from yesterday's shift!
+                if (!empty($sheet['biometric_out_time'])) {
+                    $existingOutTs = strtotime($punchDate . ' ' . $sheet['biometric_out_time']);
+                    if ($existingOutTs && $existingOutTs < $curTs && (int)date('H', $existingOutTs) < 10) {
+                        $prevDate = date('Y-m-d', strtotime($punchDate . ' -1 day'));
+                        $stmtPrev = $this->pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
+                        $stmtPrev->execute([$empId, $prevDate]);
+                        $prevS = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+                        if ($prevS) {
+                            $prevIn = !empty($prevS['biometric_in_time']) ? $prevS['biometric_in_time'] : (!empty($prevS['check_in_time']) ? $prevS['check_in_time'] : null);
+                            if ($prevIn) {
+                                $inT = strtotime($prevDate . ' ' . $prevIn);
+                                $dutyS = max(0, $existingOutTs - $inT);
+                                $h = floor($dutyS / 3600);
+                                $m = floor(($dutyS % 3600) / 60);
+                                $dutyF = sprintf('%02d:%02d:00', $h, $m);
+                                $this->pdo->prepare("UPDATE daily_sheets SET biometric_out_time = ?, biometric_duty_hours = ?, biometric_duty_seconds = ? WHERE id = ?")->execute([$sheet['biometric_out_time'], $dutyF, $dutyS, $prevS['id']]);
+                            }
+                        }
+                        // Clear out time from today's sheet
+                        $this->pdo->prepare("UPDATE daily_sheets SET biometric_out_time = NULL, biometric_duty_hours = NULL, biometric_duty_seconds = 0 WHERE id = ?")->execute([$sheet['id']]);
+                        $sheet['biometric_out_time'] = null;
+                    }
+                }
+
                 $needWebCheckIn = empty($sheet['check_in_time']);
                 $sql = "
                     UPDATE daily_sheets 
@@ -840,5 +865,83 @@ class ZKTecoAttendanceService {
                 last_activity = CURRENT_TIMESTAMP
         ");
         $stmt->execute([$sn, $ip, $model, $firmware, $status]);
+    }
+
+    /**
+     * Auto-heal orphan early-morning checkouts that mistakenly landed on the next calendar day.
+     * Moves the punch to the previous evening shift and cleans up today's sheet.
+     */
+    public function healOrphanMorningCheckouts() {
+        try {
+            $stmt = $this->pdo->query("
+                SELECT id, employee_id, sheet_date, check_in_time, check_out_time, biometric_in_time, biometric_out_time
+                FROM daily_sheets
+                WHERE biometric_out_time IS NOT NULL AND biometric_out_time != ''
+                  AND sheet_date >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)
+            ");
+            $sheets = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+
+            foreach ($sheets as $s) {
+                $sheetDate = $s['sheet_date'];
+                $outStr = $s['biometric_out_time'];
+                $inStr = !empty($s['check_in_time']) ? $s['check_in_time'] : (!empty($s['biometric_in_time']) ? $s['biometric_in_time'] : null);
+                
+                $outTs = strtotime($sheetDate . ' ' . $outStr);
+                $outHour = $outTs ? (int)date('H', $outTs) : 0;
+
+                $isOrphanOnToday = false;
+                if ($inStr) {
+                    $inTs = strtotime($sheetDate . ' ' . $inStr);
+                    // Check-out is before check-in and occurred in the morning
+                    if ($outTs && $inTs && $outTs < $inTs && $outHour < 10) {
+                        $isOrphanOnToday = true;
+                    }
+                } else if ($outHour < 10) {
+                    // Only an early-morning punch out exists with no check-in at all
+                    $isOrphanOnToday = true;
+                }
+
+                if ($isOrphanOnToday) {
+                    $prevDate = date('Y-m-d', strtotime($sheetDate . ' -1 day'));
+                    $empId = (int)$s['employee_id'];
+
+                    $stmtPrev = $this->pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
+                    $stmtPrev->execute([$empId, $prevDate]);
+                    $prevSheet = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+                    if ($prevSheet) {
+                        $prevInStr = !empty($prevSheet['biometric_in_time']) ? $prevSheet['biometric_in_time'] : (!empty($prevSheet['check_in_time']) ? $prevSheet['check_in_time'] : null);
+                        if ($prevInStr) {
+                            $prevInTs = strtotime($prevDate . ' ' . $prevInStr);
+                            $overnightOutTs = $outTs;
+                            $dutySecs = max(0, $overnightOutTs - $prevInTs);
+                            $h = floor($dutySecs / 3600);
+                            $m = floor(($dutySecs % 3600) / 60);
+                            $dutyFormatted = sprintf('%02d:%02d:00', $h, $m);
+
+                            $this->pdo->prepare("
+                                UPDATE daily_sheets
+                                SET biometric_out_time = ?,
+                                    biometric_duty_hours = ?,
+                                    biometric_duty_seconds = ?
+                                WHERE id = ?
+                            ")->execute([$outStr, $dutyFormatted, $dutySecs, $prevSheet['id']]);
+                        }
+                    }
+
+                    if (empty($s['check_in_time']) && empty($s['biometric_in_time'])) {
+                        $this->pdo->prepare("DELETE FROM daily_sheets WHERE id = ?")->execute([$s['id']]);
+                    } else {
+                        $this->pdo->prepare("
+                            UPDATE daily_sheets
+                            SET biometric_out_time = NULL,
+                                biometric_duty_hours = NULL,
+                                biometric_duty_seconds = 0
+                            WHERE id = ?
+                        ")->execute([$s['id']]);
+                    }
+                }
+            }
+        } catch (Throwable $t) {}
     }
 }

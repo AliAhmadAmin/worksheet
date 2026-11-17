@@ -592,10 +592,12 @@ switch ($action) {
         break;
 
     case 'live_board':
-        // Opportunistic Biometric Sync if due
+        // Opportunistic Biometric Sync if due and auto-heal orphan overnight checkouts
         try {
             require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
             require_once __DIR__ . '/../includes/ZKTecoMdbService.php';
+            $zkService = new ZKTecoAttendanceService($pdo);
+            $zkService->healOrphanMorningCheckouts();
             $mdbService = new ZKTecoMdbService($pdo);
             $mdbService->syncIncremental(false);
         } catch (Throwable $t) {
@@ -728,6 +730,24 @@ switch ($action) {
             // Track late arrivals
             if (!empty($r['check_in_time']) && !empty($r['is_late']) && empty($r['late_excused'])) {
                 $stats['late_count']++;
+            }
+
+            // Guard: If check_out_time or biometric_out_time is earlier than check_in_time on the same day (e.g. Out 01:54 AM vs In 01:58 PM),
+            // it belongs to yesterday's night shift and should never be counted as today's checkout!
+            if (!empty($r['check_in_time'])) {
+                $cInTs = strtotime($date . ' ' . $r['check_in_time']);
+                if (!empty($r['biometric_out_time'])) {
+                    $bOutTs = strtotime($date . ' ' . $r['biometric_out_time']);
+                    if ($bOutTs && $cInTs && $bOutTs < $cInTs && (int)date('H', $bOutTs) < 10) {
+                        $r['biometric_out_time'] = null;
+                    }
+                }
+                if (!empty($r['check_out_time'])) {
+                    $cOutTs = strtotime($date . ' ' . $r['check_out_time']);
+                    if ($cOutTs && $cInTs && $cOutTs < $cInTs && (int)date('H', $cOutTs) < 10) {
+                        $r['check_out_time'] = null;
+                    }
+                }
             }
 
             if (($r['day_type'] ?? '') === 'holiday') {
