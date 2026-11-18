@@ -1005,18 +1005,23 @@ try {
                                 </ul>
                             </div>
                             <details style="cursor: pointer;">
-                                <summary style="font-weight: 700; color: #2563eb;">🖥️ Run 24/7 Unattended (Windows Task Scheduler / Background Daemon)</summary>
+                                <summary style="font-weight: 700; color: #2563eb;">🖥️ Run 24/7 Unattended on Server (When all browsers are closed)</summary>
                                 <div style="margin-top: 6px; padding: 8px 10px; background: var(--bg-card); border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 10.5px;">
-                                    <div style="font-weight: 700; margin-bottom: 4px;">Option A: 1-Click Task Scheduler (Recommended)</div>
-                                    <div style="color: var(--text-muted); margin-bottom: 4px;">Double-click this batch file on the server (or run as Administrator):</div>
-                                    <code style="display: block; padding: 4px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; font-size: 10px; word-break: break-all; margin-bottom: 8px;">C:\xampp\htdocs\Worksheet\cron\install_task.bat</code>
+                                    <div style="font-weight: 700; color: #059669; margin-bottom: 4px;">Option A: 1-Click Startup Daemon (Easiest & Most Reliable)</div>
+                                    <div style="color: var(--text-muted); margin-bottom: 4px;">Double-click this file on the server. It adds an invisible runner to Windows Startup that loops every 60 seconds 24/7:</div>
+                                    <code style="display: block; padding: 4px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; font-size: 10px; word-break: break-all; margin-bottom: 8px;">C:\xampp\htdocs\Worksheet\cron\install_startup_daemon.bat</code>
                                     
-                                    <div style="font-weight: 700; margin-bottom: 4px;">Option B: Command Prompt / PowerShell</div>
-                                    <code style="display: block; padding: 4px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; font-size: 10px; word-break: break-all; margin-bottom: 8px;">schtasks /create /tn "ZKTeco_Worksheet_Sync" /tr "C:\xampp\php\php.exe C:\xampp\htdocs\Worksheet\cron\sync_zkteco_mdb.php" /sc minute /mo 1 /f</code>
+                                    <div style="font-weight: 700; margin-bottom: 4px;">Option B: Windows Task Scheduler</div>
+                                    <div style="color: var(--text-muted); margin-bottom: 4px;">Right-click and Run as Administrator on the server:</div>
+                                    <code style="display: block; padding: 4px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; font-size: 10px; word-break: break-all; margin-bottom: 8px;">C:\xampp\htdocs\Worksheet\cron\install_task.bat</code>
 
-                                    <div style="font-weight: 700; margin-bottom: 4px;">Option C: Standalone Background Daemon (No Task Scheduler needed)</div>
-                                    <div style="color: var(--text-muted); margin-bottom: 4px;">Double-click to start completely silent background loop:</div>
-                                    <code style="display: block; padding: 4px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; font-size: 10px; word-break: break-all;">C:\xampp\htdocs\Worksheet\cron\start_daemon_invisible.vbs</code>
+                                    <div style="font-weight: 700; margin-bottom: 4px;">Option C: Run Right Now in Background (Immediate)</div>
+                                    <div style="color: var(--text-muted); margin-bottom: 4px;">Double-click to start invisible 24/7 background loop immediately:</div>
+                                    <code style="display: block; padding: 4px 6px; background: rgba(0,0,0,0.05); border-radius: 4px; font-size: 10px; word-break: break-all; margin-bottom: 8px;">C:\xampp\htdocs\Worksheet\cron\start_daemon_247.vbs</code>
+
+                                    <div style="background: rgba(234, 88, 12, 0.08); border: 1px solid rgba(234, 88, 12, 0.3); border-radius: 4px; padding: 6px 8px; margin-top: 6px; color: #c2410c;">
+                                        <strong>⚠️ Server Sleep Setting:</strong> In Windows Settings &rarr; <i>Power &amp; battery</i>, set <b>"Sleep: Never"</b> so the server PC does not go to sleep at night when employees leave.
+                                    </div>
                                 </div>
                             </details>
                         </div>

@@ -375,6 +375,34 @@ switch ($action) {
         ]);
         break;
 
+    case 'check_sync_status':
+        $stmt = $pdo->query("SELECT mdb_default_path, mdb_auto_sync_enabled, mdb_sync_interval_mins, mdb_last_sync_time, mdb_last_punch_time, mdb_last_sync_status FROM zkteco_settings WHERE id = 1");
+        $settings = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : [];
+        $mdbPath = trim($settings['mdb_default_path'] ?? '');
+        $lastSync = $settings['mdb_last_sync_time'] ?? null;
+        
+        $elapsedSec = $lastSync ? (time() - strtotime($lastSync)) : 999999;
+        $elapsedMins = round($elapsedSec / 60);
+
+        // Check if file is currently accessible
+        $fileExists = !empty($mdbPath) && file_exists($mdbPath);
+
+        // Daemon health: considered healthy if synced within last 5 minutes
+        $isHealthy = ($elapsedSec < 300);
+
+        echo json_encode([
+            'success' => true,
+            'last_sync_time' => $lastSync,
+            'last_sync_status' => $settings['mdb_last_sync_status'] ?? 'Unknown',
+            'elapsed_minutes' => $elapsedMins,
+            'is_healthy' => $isHealthy,
+            'file_accessible' => $fileExists,
+            'mdb_path' => $mdbPath,
+            'auto_sync_enabled' => (int)($settings['mdb_auto_sync_enabled'] ?? 1),
+            'sync_interval_mins' => (int)($settings['mdb_sync_interval_mins'] ?? 1)
+        ]);
+        break;
+
     case 'trigger_auto_sync':
         $force = !empty($data['force']) || !empty($_GET['force']);
         $res = $mdbService->syncIncremental($force);

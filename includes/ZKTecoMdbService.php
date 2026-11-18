@@ -215,10 +215,14 @@ class ZKTecoMdbService {
         // 1. Build Query for CHECKINOUT
         $whereClauses = [];
         if (!empty($startDate)) {
-            $whereClauses[] = "CHECKTIME >= #" . date('Y-m-d 00:00:00', strtotime($startDate)) . "#";
+            $hasTime = (strlen(trim($startDate)) > 10);
+            $startFormatted = $hasTime ? date('Y-m-d H:i:s', strtotime($startDate)) : date('Y-m-d 00:00:00', strtotime($startDate));
+            $whereClauses[] = "CHECKTIME >= #" . $startFormatted . "#";
         }
         if (!empty($endDate)) {
-            $whereClauses[] = "CHECKTIME <= #" . date('Y-m-d 23:59:59', strtotime($endDate)) . "#";
+            $hasTime = (strlen(trim($endDate)) > 10);
+            $endFormatted = $hasTime ? date('Y-m-d H:i:s', strtotime($endDate)) : date('Y-m-d 23:59:59', strtotime($endDate));
+            $whereClauses[] = "CHECKTIME <= #" . $endFormatted . "#";
         }
 
         $whereSql = !empty($whereClauses) ? "WHERE " . implode(' AND ', $whereClauses) : "";

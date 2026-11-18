@@ -517,9 +517,12 @@ function startLiveRosterPoller() {
         const isTabActive = document.getElementById('tab-attendance')?.classList.contains('active') || window.location.pathname.includes('attendance.php');
         
         if (isLiveVisible && isTabActive && !document.hidden) {
+            try {
+                await fetch('api/zkteco_manage.php?action=trigger_auto_sync');
+            } catch (e) {}
             await loadLiveAttendance(false);
         }
-    }, 30000); // Auto-refresh live board every 30 seconds
+    }, 60000); // Auto-sync and refresh live board every 60 seconds
 }
 
 async function loadLiveAttendance(forceSync = false) {

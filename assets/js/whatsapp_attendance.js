@@ -674,4 +674,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof startLiveRosterPoller === 'function') {
         startLiveRosterPoller();
     }
+    // Opportunistically sync MDB punches whenever attendance portal is opened
+    try {
+        fetch('api/zkteco_manage.php?action=trigger_auto_sync').then(() => {
+            if (typeof loadLiveAttendance === 'function') loadLiveAttendance(false);
+        }).catch(() => {});
+    } catch (e) {}
 });
