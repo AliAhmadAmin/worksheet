@@ -392,6 +392,7 @@ switch ($action) {
 
         echo json_encode([
             'success' => true,
+            'server_time' => date('Y-m-d H:i:s'),
             'last_sync_time' => $lastSync,
             'last_sync_status' => $settings['mdb_last_sync_status'] ?? 'Unknown',
             'elapsed_minutes' => $elapsedMins,
