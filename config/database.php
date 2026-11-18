@@ -746,6 +746,48 @@ function migratePermissionsSchema($pdo) {
         try { $pdo->exec("ALTER TABLE tasks ADD COLUMN task_image VARCHAR(255) NULL"); } catch (Exception $e) {}
         try { $pdo->exec("ALTER TABLE tasks ADD COLUMN emp_code VARCHAR(50) NULL"); } catch (Exception $e) {}
 
+        // Digital Team: Fresh Programs & Episode Breakdown Pipeline
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS digital_fresh_programs (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                program_date DATE NOT NULL,
+                program_name VARCHAR(255) NOT NULL,
+                episode_no VARCHAR(100) NOT NULL,
+                source_url TEXT NULL,
+                status ENUM('pending', 'in_progress', 'completed') DEFAULT 'pending',
+                is_locked TINYINT(1) DEFAULT 0,
+                notes TEXT NULL,
+                assigned_by INT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_prog_date (program_date),
+                INDEX idx_prog_status (status),
+                INDEX idx_prog_locked (is_locked)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS digital_program_editors (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                program_id INT NOT NULL,
+                employee_id INT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_prog_editor (program_id, employee_id),
+                INDEX idx_editor_prog (program_id),
+                INDEX idx_editor_emp (employee_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS digital_program_links (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                program_id INT NOT NULL,
+                link_type ENUM('clip', 'reel') NOT NULL,
+                added_by INT NOT NULL,
+                url TEXT NOT NULL,
+                title VARCHAR(255) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_link_prog_type (program_id, link_type),
+                INDEX idx_link_added_by (added_by)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+
     } catch (Exception $e) {
         // Ignore if already migrated
     }

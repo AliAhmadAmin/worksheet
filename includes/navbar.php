@@ -183,11 +183,31 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </a>
             <?php endif; ?>
             <?php if ($canViewProgHandover): ?>
-            <a href="programming.php" class="nav-btn <?= ($activeNavPage === 'programming') ? 'active' : '' ?>" data-tab="tab-programming" data-route="programming">
-                <span class="nav-icon">📡</span>
-                <span class="nav-label">Programming</span>
-                <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
-            </a>
+            <?php 
+            $isProgSectionActive = in_array($activeNavPage, ['programming', 'fresh_programs']); 
+            ?>
+            <div class="sidebar-nav-dropdown <?= $isProgSectionActive ? 'open' : '' ?>" id="nav-dropdown-prog">
+                <button type="button" class="nav-btn nav-dropdown-btn <?= $isProgSectionActive ? 'active' : '' ?>" onclick="toggleNavDropdown('nav-dropdown-prog')" style="width: 100%; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+                        <span class="nav-icon">📡</span>
+                        <span class="nav-label">Programming</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span id="pending-programming-badge" class="nav-badge badge-warning" style="display: none; background: #d97706; color: #fff;">0</span>
+                        <span class="dropdown-arrow" style="font-size: 9px; opacity: 0.7; transition: transform 0.2s ease; <?= $isProgSectionActive ? 'transform: rotate(180deg);' : '' ?>">▼</span>
+                    </div>
+                </button>
+                <div class="nav-submenu" style="<?= $isProgSectionActive ? 'display: block;' : 'display: none;' ?>">
+                    <a href="fresh_programs.php" class="nav-sub-btn <?= ($activeNavPage === 'fresh_programs') ? 'active' : '' ?>">
+                        <span class="nav-sub-icon">🎬</span>
+                        <span class="nav-sub-label">Fresh Programs</span>
+                    </a>
+                    <a href="programming.php" class="nav-sub-btn <?= ($activeNavPage === 'programming') ? 'active' : '' ?>">
+                        <span class="nav-sub-icon">📤</span>
+                        <span class="nav-sub-label">Handover Dispatches</span>
+                    </a>
+                </div>
+            </div>
             <?php endif; ?>
         </div>
 
@@ -527,4 +547,69 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             </a>
         </div>
     </div>
+
+    <style>
+    .sidebar-nav-dropdown {
+        width: 100%;
+    }
+    .sidebar-nav-dropdown.open .dropdown-arrow {
+        transform: rotate(180deg);
+    }
+    .nav-submenu {
+        padding-left: 10px;
+        margin-top: 3px;
+        margin-bottom: 5px;
+        border-left: 2px solid rgba(0, 179, 0, 0.28);
+        margin-left: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .nav-sub-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: var(--radius-sm, 6px);
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+    .nav-sub-btn:hover {
+        background: var(--bg-card-elevated);
+        color: var(--text-main);
+        transform: translateX(2px);
+    }
+    .nav-sub-btn.active {
+        background: linear-gradient(135deg, rgba(0, 179, 0, 0.14), rgba(0, 179, 0, 0.05));
+        color: var(--primary, #00b300);
+        font-weight: 700;
+    }
+    .nav-sub-icon {
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    </style>
+    <script>
+    function toggleNavDropdown(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const submenu = el.querySelector('.nav-submenu');
+        const arrow = el.querySelector('.dropdown-arrow');
+        const isOpen = el.classList.contains('open');
+        if (isOpen) {
+            el.classList.remove('open');
+            if (submenu) submenu.style.display = 'none';
+            if (arrow) arrow.style.transform = 'rotate(0deg)';
+        } else {
+            el.classList.add('open');
+            if (submenu) submenu.style.display = 'flex';
+            if (arrow) arrow.style.transform = 'rotate(180deg)';
+        }
+    }
+    </script>
 </aside>
