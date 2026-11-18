@@ -614,13 +614,13 @@ PS1;
             $statusMsg = "Synced at " . date('h:i A') . ": " . ($result['stats']['applied'] ?? 0) . " applied, " . ($result['stats']['duplicate'] ?? 0) . " dupes.";
             $stmtUp = $this->pdo->prepare("
                 UPDATE zkteco_settings 
-                SET mdb_last_sync_time = NOW(),
+                SET mdb_last_sync_time = ?,
                     mdb_last_punch_time = ?,
                     mdb_last_sync_status = ?,
                     mdb_last_file_mtime = ?
                 WHERE id = 1
             ");
-            $stmtUp->execute([$newestPunch, $statusMsg, $mtime ?: time()]);
+            $stmtUp->execute([date('Y-m-d H:i:s'), $newestPunch, $statusMsg, $mtime ?: time()]);
 
             $result['last_sync'] = date('Y-m-d H:i:s');
             $result['status_msg'] = $statusMsg;
@@ -640,8 +640,8 @@ PS1;
     private function updateSyncStatus($type, $msg) {
         try {
             $statusText = ($type === 'error' ? '❌ ' : '✔ ') . $msg;
-            $stmt = $this->pdo->prepare("UPDATE zkteco_settings SET mdb_last_sync_time = NOW(), mdb_last_sync_status = ? WHERE id = 1");
-            $stmt->execute([$statusText]);
+            $stmt = $this->pdo->prepare("UPDATE zkteco_settings SET mdb_last_sync_time = ?, mdb_last_sync_status = ? WHERE id = 1");
+            $stmt->execute([date('Y-m-d H:i:s'), $statusText]);
         } catch (Exception $e) {}
     }
 }

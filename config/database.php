@@ -70,6 +70,9 @@ function getDbConnection() {
         try {
             $pdo = new PDO($dsn, DB_USER, $pass, $options);
             if ($pdo) {
+                try {
+                    $pdo->exec("SET time_zone = '+05:00'");
+                } catch (Throwable $tz) {}
                 migratePermissionsSchema($pdo);
                 return $pdo;
             }

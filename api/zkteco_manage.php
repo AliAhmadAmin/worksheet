@@ -381,7 +381,7 @@ switch ($action) {
         $mdbPath = trim($settings['mdb_default_path'] ?? '');
         $lastSync = $settings['mdb_last_sync_time'] ?? null;
         
-        $elapsedSec = $lastSync ? (time() - strtotime($lastSync)) : 999999;
+        $elapsedSec = $lastSync ? max(0, time() - strtotime($lastSync)) : 999999;
         $elapsedMins = round($elapsedSec / 60);
 
         // Check if file is currently accessible
