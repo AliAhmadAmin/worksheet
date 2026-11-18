@@ -57,15 +57,14 @@ switch ($action) {
         break;
 
     case 'get_logs':
-        // Only run MDB sync if explicitly requested (e.g. sync=1 or force=1)
-        if (!empty($_GET['sync']) || !empty($_GET['force'])) {
+        $dateFilter = $_GET['date'] ?? '';
+        // Real-time incremental sync for today's logs stream (rate-limited by filemtime)
+        if (empty($dateFilter) || $dateFilter === date('Y-m-d') || !empty($_GET['sync']) || !empty($_GET['force'])) {
             try {
                 $forceSync = !empty($_GET['force']);
                 $mdbService->syncIncremental($forceSync);
             } catch (Throwable $t) {}
         }
-
-        $dateFilter = $_GET['date'] ?? '';
         $empFilter = $_GET['employee_id'] ?? '';
         $statusFilter = $_GET['status'] ?? 'all';
         $search = trim($_GET['search'] ?? '');

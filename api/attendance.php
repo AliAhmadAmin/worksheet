@@ -592,8 +592,10 @@ switch ($action) {
         break;
 
     case 'live_board':
-        // Opportunistic Biometric Sync if explicitly requested (e.g. Refresh button clicked)
-        if (!empty($_GET['sync']) || !empty($_GET['force'])) {
+        $date = $_GET['date'] ?? date('Y-m-d');
+
+        // Opportunistic Biometric Sync for today's live board (checks incremental punches every 1 min, or immediately if forced)
+        if ($date === date('Y-m-d') || !empty($_GET['sync']) || !empty($_GET['force'])) {
             try {
                 require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
                 require_once __DIR__ . '/../includes/ZKTecoMdbService.php';
@@ -606,8 +608,6 @@ switch ($action) {
                 // Non-blocking failover
             }
         }
-
-        $date = $_GET['date'] ?? date('Y-m-d');
         $deptFilter = isset($_GET['department_id']) && $_GET['department_id'] !== '' && $_GET['department_id'] !== 'all' ? (int)$_GET['department_id'] : null;
 
         $whereClauses = ["e.is_active = 1"];

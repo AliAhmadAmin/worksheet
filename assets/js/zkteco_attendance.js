@@ -34,17 +34,19 @@ const ZKTecoAtt = {
 
     startAutoSyncPoller() {
         if (this._poller) clearInterval(this._poller);
-        // Lightweight background ping every 60 seconds (1 minute): triggers sync if due
+        // Real-time background stream poller every 15 seconds
         this._poller = setInterval(async () => {
-            try {
-                const res = await fetch('api/zkteco_manage.php?action=trigger_auto_sync');
-                const data = await res.json();
-                if (data && data.success && !data.skipped) {
-                    console.log('ZKTeco Auto-Sync completed:', data);
+            const zkSec = document.getElementById('att-view-zkteco-section');
+            const isZkVisible = zkSec && zkSec.style.display !== 'none';
+            if (!document.hidden) {
+                try {
+                    await fetch('api/zkteco_manage.php?action=trigger_auto_sync');
+                } catch (e) {}
+                if (isZkVisible) {
                     this.loadLogs(false);
                 }
-            } catch (e) {}
-        }, 60000); // 60 seconds
+            }
+        }, 15000); // 15 seconds real-time stream
     },
 
     async loadSettings() {

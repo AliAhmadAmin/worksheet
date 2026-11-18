@@ -676,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // Opportunistically sync MDB punches whenever attendance portal is opened
     try {
-        fetch('api/zkteco_manage.php?action=trigger_auto_sync').then(() => {
+        fetch('api/zkteco_manage.php?action=trigger_auto_sync&force=1').then(() => {
             if (typeof loadLiveAttendance === 'function') loadLiveAttendance(false);
         }).catch(() => {});
     } catch (e) {}

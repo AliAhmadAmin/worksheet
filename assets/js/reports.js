@@ -234,6 +234,8 @@ function switchAttendanceView(mode) {
         loadAttendanceReport();
     } else if (mode === 'whatsapp' && typeof WhatsAppAtt !== 'undefined') {
         WhatsAppAtt.init();
+    } else if (mode === 'zkteco' && typeof ZKTecoAtt !== 'undefined') {
+        ZKTecoAtt.init();
     }
 }
 
@@ -518,11 +520,12 @@ function startLiveRosterPoller() {
         
         if (isLiveVisible && isTabActive && !document.hidden) {
             try {
-                await fetch('api/zkteco_manage.php?action=trigger_auto_sync');
+                // Background sync ping (non-blocking)
+                fetch('api/zkteco_manage.php?action=trigger_auto_sync').catch(() => {});
             } catch (e) {}
             await loadLiveAttendance(false);
         }
-    }, 60000); // Auto-sync and refresh live board every 60 seconds
+    }, 15000); // Live real-time refresh every 15 seconds
 }
 
 async function loadLiveAttendance(forceSync = false) {
@@ -2874,5 +2877,13 @@ async function handleExcuseLate(empId, date, empName, lateMinutes) {
         showToast("Error updating attendance status.", "error");
     }
 }
+
+// Auto-initialize live attendance and background live poller
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('live-attendance-tbody')) {
+        loadLiveAttendance(false);
+        startLiveRosterPoller();
+    }
+});
 
 

@@ -1701,3 +1701,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('scroll', hidePreview, true);
     window.addEventListener('resize', hidePreview);
 })();
+
+// Global ZKTeco Biometric Background Heartbeat:
+// Automatically triggers background biometric incremental sync every 60 seconds whenever any user has the portal active
+setInterval(() => {
+    if (!document.hidden) {
+        try {
+            fetch('api/zkteco_manage.php?action=trigger_auto_sync').catch(() => {});
+        } catch (e) {}
+    }
+}, 60000);
