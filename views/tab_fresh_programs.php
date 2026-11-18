@@ -32,6 +32,9 @@ $currentEmpId = (int)($authUser['id'] ?? 0);
                 <button type="button" class="btn btn-primary" onclick="openAssignProgramModal()" style="background: linear-gradient(135deg, #10b981, #059669); border: none; font-weight: 700; padding: 8px 16px; border-radius: 8px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);">
                     <span>➕</span> Assign New Program
                 </button>
+                <button type="button" class="btn btn-outline" onclick="triggerWeekRollover()" style="padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; color: #0284c7; border-color: rgba(2, 132, 199, 0.4); display: inline-flex; align-items: center; gap: 6px;" title="Roll over current week programs to next week with incremented episode numbers">
+                    <span>🔁</span> Auto-Advance Week
+                </button>
                 <?php endif; ?>
                 <button type="button" class="btn btn-outline" onclick="loadFreshPrograms(true)" style="padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
                     <span>🔄</span> Refresh Board
@@ -206,6 +209,11 @@ $currentEmpId = (int)($authUser['id'] ?? 0);
                             <option value="in_progress">⚡ In Progress</option>
                             <option value="completed">🔒 Completed</option>
                         </select>
+
+                        <select id="filter-program" class="input-control" onchange="loadFreshPrograms()" style="font-size: 12px; height: 34px; border-radius: 6px; min-width: 155px; padding: 4px 8px; background: var(--bg-card); font-weight: 600;">
+                            <option value="all">All Programs</option>
+                            <!-- Injected dynamically by fresh_programs.js -->
+                        </select>
                     </div>
 
                     <div style="display: flex; gap: 8px; align-items: center;">
@@ -319,9 +327,10 @@ $currentEmpId = (int)($authUser['id'] ?? 0);
 </div>
 
 <!-- Modal: Assign / Edit Fresh Program -->
-<div id="modal-assign-fresh-program" class="modal-overlay" style="display: none; z-index: 10100; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
-    <div class="modal-card" style="max-width: 580px; width: 92%; border-radius: 16px; padding: 0; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.25);">
-        <div style="padding: 18px 24px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-card-elevated);">
+<div id="modal-assign-fresh-program" class="modal-overlay" style="display: none; z-index: 10100;">
+    <div class="modal-card" style="max-width: 580px; width: 94%; max-height: calc(100vh - 40px); display: flex; flex-direction: column; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.25); margin: auto;">
+        <!-- Modal Header (fixed at top) -->
+        <div class="modal-header" style="padding: 16px 22px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; background: var(--bg-card-elevated); flex-shrink: 0;">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 22px;">🎬</span>
                 <div>
@@ -332,60 +341,76 @@ $currentEmpId = (int)($authUser['id'] ?? 0);
             <button type="button" class="btn-modal-close" onclick="closeAssignProgramModal()" style="background: transparent; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted);">✕</button>
         </div>
 
-        <form id="form-assign-fresh-program" onsubmit="handleSaveProgram(event)" style="padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;">
-            <input type="hidden" id="assign-prog-id" value="">
+        <form id="form-assign-fresh-program" onsubmit="handleSaveProgram(event)" style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; margin: 0;">
+            <!-- Modal Body (scrolls smoothly) -->
+            <div class="modal-body" style="padding: 18px 22px; display: flex; flex-direction: column; gap: 13px; overflow-y: auto; flex: 1; min-height: 0;">
+                <input type="hidden" id="assign-prog-id" value="">
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">📅 Program Air Date *</label>
+                        <input type="date" id="assign-prog-date" class="input-control" required style="width: 100%; font-size: 13px; height: 38px; border-radius: 6px;">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;"># Episode Number *</label>
+                        <input type="text" id="assign-prog-episode" class="input-control" placeholder="e.g. Ep 12 or Episode 45" required style="width: 100%; font-size: 13px; height: 38px; border-radius: 6px;">
+                    </div>
+                </div>
+
                 <div>
-                    <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">📅 Program Air Date *</label>
-                    <input type="date" id="assign-prog-date" class="input-control" required style="width: 100%; font-size: 13px; height: 38px; border-radius: 6px;">
+                    <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">📺 Program Name *</label>
+                    <input type="text" id="assign-prog-name" class="input-control" placeholder="e.g. Discover Pakistan Morning, Food Trail, Wanderers..." list="program-names-list" required style="width: 100%; font-size: 13px; height: 38px; border-radius: 6px;">
+                    <datalist id="program-names-list">
+                        <option value="Discover Pakistan Morning">
+                        <option value="Food Trail">
+                        <option value="Wanderers">
+                        <option value="History of Lahore">
+                        <option value="Flavors of Pakistan">
+                        <option value="Northern Tales">
+                        <option value="Wild Frontiers">
+                        <option value="Discovering Heritage">
+                        <option value="Culture & Colors">
+                        <option value="Docu Discovery">
+                    </datalist>
                 </div>
+
                 <div>
-                    <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;"># Episode Number *</label>
-                    <input type="text" id="assign-prog-episode" class="input-control" placeholder="e.g. Ep 12 or Episode 45" required style="width: 100%; font-size: 13px; height: 38px; border-radius: 6px;">
+                    <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">👥 Assigned Editors (Select 1 or Multiple) *</label>
+                    <div id="assign-editors-container" style="max-height: 130px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--bg-card-elevated);">
+                        <!-- Injected by fresh_programs.js with avatar pills -->
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Click any editor to assign/unassign. Multiple editors can collaborate on this episode.</div>
+                </div>
+
+                <div>
+                    <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">🔗 Source Footage / Drive Link (Optional)</label>
+                    <input type="url" id="assign-prog-source" class="input-control" placeholder="Google Drive, NAS, or Server folder link..." style="width: 100%; font-size: 12.5px; height: 38px; border-radius: 6px;">
+                </div>
+
+                <div>
+                    <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">📝 Editing Instructions / Notes (Optional)</label>
+                    <textarea id="assign-prog-notes" class="input-control" rows="2" placeholder="Specific guidelines, sound sync instructions, promo cut notes..." style="width: 100%; font-size: 12.5px; border-radius: 6px; resize: vertical;"></textarea>
+                </div>
+
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 10px 14px; display: flex; align-items: flex-start; gap: 10px;">
+                    <input type="checkbox" id="assign-prog-recurring" checked style="width: 17px; height: 17px; cursor: pointer; accent-color: #10b981; margin-top: 2px;">
+                    <div>
+                        <label for="assign-prog-recurring" style="font-size: 12.5px; font-weight: 700; color: var(--text-main); cursor: pointer; margin: 0; display: flex; align-items: center; gap: 6px;">
+                            <span>🔁</span> Standing Weekly Program (Auto-Rolls Over to Next Week)
+                        </label>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.4;">
+                            When marked Completed, next week's episode automatically generates with Episode # + 1 on the same broadcast day.
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div>
-                <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">📺 Program Name *</label>
-                <input type="text" id="assign-prog-name" class="input-control" placeholder="e.g. Discover Pakistan Morning, Food Trail, Wanderers..." list="program-names-list" required style="width: 100%; font-size: 13px; height: 38px; border-radius: 6px;">
-                <datalist id="program-names-list">
-                    <option value="Discover Pakistan Morning">
-                    <option value="Food Trail">
-                    <option value="Wanderers">
-                    <option value="History of Lahore">
-                    <option value="Flavors of Pakistan">
-                    <option value="Northern Tales">
-                    <option value="Wild Frontiers">
-                    <option value="Discovering Heritage">
-                    <option value="Culture & Colors">
-                    <option value="Docu Discovery">
-                </datalist>
-            </div>
-
-            <div>
-                <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">👥 Assigned Editors (Select 1 or Multiple) *</label>
-                <div id="assign-editors-container" style="max-height: 160px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--bg-card-elevated);">
-                    <!-- Injected by fresh_programs.js with avatar pills -->
-                </div>
-                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Click any editor to assign/unassign. Multiple editors can collaborate on this episode.</div>
-            </div>
-
-            <div>
-                <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">🔗 Source Footage / Drive Link (Optional)</label>
-                <input type="url" id="assign-prog-source" class="input-control" placeholder="Google Drive, NAS, or Server folder link..." style="width: 100%; font-size: 12.5px; height: 38px; border-radius: 6px;">
-            </div>
-
-            <div>
-                <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px;">📝 Editing Instructions / Notes (Optional)</label>
-                <textarea id="assign-prog-notes" class="input-control" rows="2" placeholder="Specific guidelines, sound sync instructions, promo cut notes..." style="width: 100%; font-size: 12.5px; border-radius: 6px; resize: vertical;"></textarea>
-            </div>
-
-            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
-                <button type="button" class="btn btn-outline" onclick="closeAssignProgramModal()" style="padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+            <!-- Modal Footer (pinned at bottom, always visible) -->
+            <div class="modal-footer" style="padding: 12px 22px; border-top: 1px solid var(--border-color); background: var(--bg-card-elevated); display: flex; justify-content: flex-end; gap: 10px; flex-shrink: 0;">
+                <button type="button" class="btn btn-outline" onclick="closeAssignProgramModal()" style="padding: 8px 18px; font-size: 13px; font-weight: 600; border-radius: 8px;">
                     Cancel
                 </button>
-                <button type="submit" id="btn-save-assign" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); border: none; padding: 8px 22px; font-size: 13px; font-weight: 700; border-radius: 8px;">
+                <button type="submit" id="btn-save-assign" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); border: none; padding: 8px 22px; font-size: 13px; font-weight: 700; border-radius: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
                     Save Program
                 </button>
             </div>

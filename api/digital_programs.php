@@ -48,6 +48,99 @@ $isDigitalMember = (stripos($userDeptName, 'digital') !== false || $isGlobalAdmi
 // Digital HOD managed departments
 $managedDeptIds = getHodManagedDepartmentIds($pdo, $currentUserId, $userDeptId);
 
+/**
+ * Increment Episode Number smartly
+ * Handles: "5" -> "6", "Ep 4" -> "Ep 5", "Episode 12" -> "Episode 13", "31 A" -> "32 A"
+ */
+function incrementEpisodeNumber($ep) {
+    $ep = trim((string)$ep);
+    if ($ep === '') return '1';
+    if (is_numeric($ep)) return (string)((int)$ep + 1);
+
+    if (preg_match('/^(.*?)(\d+)$/', $ep, $matches)) {
+        $prefix = $matches[1];
+        $num = (int)$matches[2];
+        $padLen = strlen($matches[2]);
+        $newNum = str_pad($num + 1, $padLen, '0', STR_PAD_LEFT);
+        return $prefix . $newNum;
+    }
+
+    if (preg_match('/^(\d+)(\s*[a-zA-Z]*)$/', $ep, $matches)) {
+        $num = (int)$matches[1];
+        $suffix = $matches[2];
+        return ($num + 1) . $suffix;
+    }
+
+    if (preg_match('/\d+/', $ep, $m)) {
+        return preg_replace('/\d+/', (int)$m[0] + 1, $ep, 1);
+    }
+
+    return $ep . ' (Next)';
+}
+
+/**
+ * Auto-roll over a recurring program to the next week (+7 days)
+ * Matches broadcast day, increments episode number, and keeps same editor assignments
+ */
+function autoRollOverProgram($pdo, $progId, $currentUserId) {
+    $stmt = $pdo->prepare("SELECT * FROM digital_fresh_programs WHERE id = ?");
+    $stmt->execute([$progId]);
+    $prog = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$prog || (int)($prog['is_recurring'] ?? 1) !== 1) {
+        return null;
+    }
+
+    $currentDate = $prog['program_date'];
+    $nextDate = date('Y-m-d', strtotime($currentDate . ' +7 days'));
+    $nextDay = date('l', strtotime($nextDate));
+    $nextEp = incrementEpisodeNumber($prog['episode_no']);
+
+    // Check if next episode already exists for this program name on that date
+    $stmtChk = $pdo->prepare("SELECT id FROM digital_fresh_programs WHERE program_name = ? AND program_date = ?");
+    $stmtChk->execute([$prog['program_name'], $nextDate]);
+    $existingId = $stmtChk->fetchColumn();
+
+    if ($existingId) {
+        return (int)$existingId;
+    }
+
+    // Insert next week's episode on that broadcast day
+    $stmtIns = $pdo->prepare("
+        INSERT INTO digital_fresh_programs (program_date, program_name, episode_no, source_url, status, is_locked, notes, assigned_by, broadcast_day, is_recurring)
+        VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, ?, 1)
+    ");
+    $stmtIns->execute([
+        $nextDate,
+        $prog['program_name'],
+        $nextEp,
+        $prog['source_url'] ?? null,
+        $prog['notes'] ?? null,
+        $currentUserId,
+        $nextDay
+    ]);
+    $newProgId = (int)$pdo->lastInsertId();
+
+    // Copy assigned editors
+    $stmtEds = $pdo->prepare("SELECT employee_id FROM digital_program_editors WHERE program_id = ?");
+    $stmtEds->execute([$progId]);
+    $editorIds = $stmtEds->fetchAll(PDO::FETCH_COLUMN);
+
+    if (!empty($editorIds)) {
+        $stmtInsEd = $pdo->prepare("INSERT IGNORE INTO digital_program_editors (program_id, employee_id) VALUES (?, ?)");
+        foreach ($editorIds as $eid) {
+            $stmtInsEd->execute([$newProgId, $eid]);
+        }
+    }
+
+    return [
+        'id' => $newProgId,
+        'date' => $nextDate,
+        'episode_no' => $nextEp,
+        'program_name' => $prog['program_name'],
+        'day' => $nextDay
+    ];
+}
+
 switch ($action) {
     case 'list':
         $date = $_GET['date'] ?? null;
@@ -55,6 +148,7 @@ switch ($action) {
         $dateTo = $_GET['date_to'] ?? null;
         $month = $_GET['month'] ?? null;
         $status = $_GET['status'] ?? 'all';
+        $programName = trim($_GET['program_name'] ?? 'all');
         $editorId = !empty($_GET['editor_id']) ? (int)$_GET['editor_id'] : null;
         $search = trim($_GET['search'] ?? '');
 
@@ -76,6 +170,11 @@ switch ($action) {
         if ($status !== 'all' && in_array($status, ['pending', 'in_progress', 'completed'])) {
             $where[] = "p.status = ?";
             $params[] = $status;
+        }
+
+        if ($programName !== '' && $programName !== 'all') {
+            $where[] = "p.program_name = ?";
+            $params[] = $programName;
         }
 
         if ($editorId) {
@@ -107,12 +206,17 @@ switch ($action) {
         $stmt->execute($params);
         $programs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Fetch all distinct program names ever added
+        $stmtProgNames = $pdo->query("SELECT DISTINCT program_name FROM digital_fresh_programs WHERE program_name IS NOT NULL AND program_name != '' ORDER BY program_name ASC");
+        $allProgramNames = $stmtProgNames->fetchAll(PDO::FETCH_COLUMN);
+
         if (empty($programs)) {
             echo json_encode([
                 'success' => true,
                 'programs' => [],
                 'stats' => ['total' => 0, 'pending' => 0, 'in_progress' => 0, 'completed' => 0, 'clips' => 0, 'reels' => 0],
-                'is_hod' => $isHod
+                'is_hod' => $isHod,
+                'program_names' => $allProgramNames
             ]);
             exit;
         }
@@ -222,7 +326,8 @@ switch ($action) {
             'success' => true,
             'programs' => $programs,
             'stats' => $stats,
-            'is_hod' => $isHod
+            'is_hod' => $isHod,
+            'program_names' => $allProgramNames
         ]);
         break;
 
@@ -273,6 +378,8 @@ switch ($action) {
         $episodeNo = trim($data['episode_no'] ?? '');
         $sourceUrl = trim($data['source_url'] ?? '');
         $notes = trim($data['notes'] ?? '');
+        $isRecurring = isset($data['is_recurring']) ? (int)$data['is_recurring'] : 1;
+        $broadcastDay = date('l', strtotime($progDate));
         $editorIds = is_array($data['editor_ids'] ?? null) ? array_map('intval', $data['editor_ids']) : [];
 
         if (empty($progName)) {
@@ -288,18 +395,18 @@ switch ($action) {
             // Update existing
             $stmtUp = $pdo->prepare("
                 UPDATE digital_fresh_programs 
-                SET program_date = ?, program_name = ?, episode_no = ?, source_url = ?, notes = ?
+                SET program_date = ?, program_name = ?, episode_no = ?, source_url = ?, notes = ?, broadcast_day = ?, is_recurring = ?
                 WHERE id = ?
             ");
-            $stmtUp->execute([$progDate, $progName, $episodeNo, $sourceUrl, $notes, $id]);
+            $stmtUp->execute([$progDate, $progName, $episodeNo, $sourceUrl, $notes, $broadcastDay, $isRecurring, $id]);
             $progId = $id;
         } else {
             // Create new
             $stmtIns = $pdo->prepare("
-                INSERT INTO digital_fresh_programs (program_date, program_name, episode_no, source_url, status, is_locked, notes, assigned_by)
-                VALUES (?, ?, ?, ?, 'pending', 0, ?, ?)
+                INSERT INTO digital_fresh_programs (program_date, program_name, episode_no, source_url, status, is_locked, notes, assigned_by, broadcast_day, is_recurring)
+                VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?)
             ");
-            $stmtIns->execute([$progDate, $progName, $episodeNo, $sourceUrl, $notes, $currentUserId]);
+            $stmtIns->execute([$progDate, $progName, $episodeNo, $sourceUrl, $notes, $currentUserId, $broadcastDay, $isRecurring]);
             $progId = (int)$pdo->lastInsertId();
         }
 
@@ -364,11 +471,61 @@ switch ($action) {
         $stmtUp = $pdo->prepare("UPDATE digital_fresh_programs SET status = ?, is_locked = ? WHERE id = ?");
         $stmtUp->execute([$newStatus, $isLocked, $progId]);
 
+        // Auto-roll over to next week if marked completed and recurring
+        $rolloverInfo = null;
+        if ($newStatus === 'completed' && (int)($prog['is_recurring'] ?? 1) === 1) {
+            $rolloverResult = autoRollOverProgram($pdo, $progId, $currentUserId);
+            if (is_array($rolloverResult)) {
+                $rolloverInfo = $rolloverResult;
+            }
+        }
+
         echo json_encode([
             'success' => true,
-            'message' => "Program status updated to " . ucfirst(str_replace('_', ' ', $newStatus)) . ($isLocked ? ' (Program Locked 🔒)' : ''),
+            'message' => "Program status updated to " . ucfirst(str_replace('_', ' ', $newStatus)) . ($isLocked ? ' (Program Locked 🔒)' : '') . ($rolloverInfo ? " • Next week's episode ({$rolloverInfo['episode_no']}) auto-scheduled for {$rolloverInfo['date']} ({$rolloverInfo['day']})!" : ''),
             'status' => $newStatus,
-            'is_locked' => $isLocked
+            'is_locked' => $isLocked,
+            'rollover' => $rolloverInfo
+        ]);
+        break;
+
+    case 'rollover_week':
+        if (!$isHod) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Only HOD or Administrator can roll over week schedule.']);
+            exit;
+        }
+
+        $dateFrom = trim($data['date_from'] ?? '');
+        $dateTo = trim($data['date_to'] ?? '');
+
+        if (empty($dateFrom) || empty($dateTo)) {
+            echo json_encode(['success' => false, 'message' => 'Valid week date range is required.']);
+            exit;
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT id FROM digital_fresh_programs 
+            WHERE program_date BETWEEN ? AND ? AND is_recurring = 1
+            ORDER BY program_date ASC
+        ");
+        $stmt->execute([$dateFrom, $dateTo]);
+        $programs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $created = [];
+        foreach ($programs as $p) {
+            $res = autoRollOverProgram($pdo, $p['id'], $currentUserId);
+            if (is_array($res)) {
+                $created[] = $res;
+            }
+        }
+
+        $count = count($created);
+        echo json_encode([
+            'success' => true,
+            'message' => $count > 0 ? "Successfully auto-advanced {$count} program(s) to next week with incremented episode numbers!" : "All recurring programs for next week are already up-to-date.",
+            'created_count' => $count,
+            'episodes' => $created
         ]);
         break;
 

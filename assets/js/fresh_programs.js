@@ -6,14 +6,16 @@
 (function () {
     let currentMonth = new Date().toISOString().substring(0, 7); // 'YYYY-MM'
     let selectedDate = null;
-    let selectedWeek = getCurrentWeekNum(); // Default to current week (1-5)
+    let selectedWeek = null; // Default to Entire Month
     let selectedEditor = 'all';
     let selectedStatus = 'all';
+    let selectedProgram = 'all';
     let searchQuery = '';
-    let isViewMonth = false;
+    let isViewMonth = true; // DEFAULT TO ENTIRE MONTH
     let isViewAll = false;
 
     let allPrograms = [];
+    let allProgramNames = [];
     let allEditors = [];
     let calendarCounts = {};
     let searchTimeout = null;
@@ -205,6 +207,8 @@
                 html += `<option value="date_${selectedDate}" selected>📍 Date: ${selectedDate}</option>`;
             }
 
+            html += `<option value="month" ${(!selectedDate && isViewMonth) ? 'selected' : ''}>📆 Entire Month (${monthShort})</option>`;
+
             for (let w = 1; w <= maxWeeks; w++) {
                 const range = getWeekDateRange(currentMonth, w);
                 const isCur = (isCurrentMonth && curWeek === w);
@@ -213,7 +217,6 @@
                 html += `<option value="week_${w}" ${isSelected ? 'selected' : ''}>📅 Week ${w} (${monthShort} ${range.startDay}–${range.endDay})${curLabel}</option>`;
             }
 
-            html += `<option value="month" ${(!selectedDate && isViewMonth) ? 'selected' : ''}>📆 Entire Month (${monthShort})</option>`;
             html += `<option value="all" ${(!selectedDate && isViewAll) ? 'selected' : ''}>⭐ All Time</option>`;
 
             select.innerHTML = html;
@@ -371,8 +374,12 @@
 
         selectedEditor = document.getElementById('filter-editor')?.value || 'all';
         selectedStatus = document.getElementById('filter-status')?.value || 'all';
+        selectedProgram = document.getElementById('filter-program')?.value || 'all';
 
         let url = `api/digital_programs.php?action=list&status=${encodeURIComponent(selectedStatus)}`;
+        if (selectedProgram !== 'all') {
+            url += `&program_name=${encodeURIComponent(selectedProgram)}`;
+        }
 
         if (isViewAll) {
             updateDateBadge('⭐ All Programs (All Time)');
@@ -408,6 +415,10 @@
 
             allPrograms = data.programs || [];
             isHod = !!data.is_hod;
+            if (data.program_names) {
+                allProgramNames = data.program_names;
+                populateProgramFilters(allProgramNames);
+            }
             updateKpiStats(data.stats || {});
             renderProgramsTable(allPrograms);
         } catch (e) {
@@ -416,6 +427,32 @@
         }
     }
     window.loadFreshPrograms = loadFreshPrograms;
+
+    function populateProgramFilters(names) {
+        if (!Array.isArray(names)) return;
+
+        // 1. Top Toolbar Program Filter
+        const filterSelect = document.getElementById('filter-program');
+        if (filterSelect) {
+            const curVal = selectedProgram || filterSelect.value || 'all';
+            let html = '<option value="all">All Programs</option>';
+            names.forEach(n => {
+                const isSel = (n === curVal) ? 'selected' : '';
+                html += `<option value="${escapeHtml(n)}" ${isSel}>${escapeHtml(n)}</option>`;
+            });
+            filterSelect.innerHTML = html;
+        }
+
+        // 2. Assign Program Modal Auto-Complete Datalist
+        const datalist = document.getElementById('program-names-list');
+        if (datalist) {
+            let dlHtml = '';
+            names.forEach(n => {
+                dlHtml += `<option value="${escapeHtml(n)}">`;
+            });
+            datalist.innerHTML = dlHtml;
+        }
+    }
 
     function formatFriendlyDate(dateStr) {
         if (!dateStr) return '';
@@ -694,6 +731,9 @@
             });
             const data = await res.json();
             if (data.success) {
+                if (data.rollover) {
+                    alert(`Episode Completed! 🎉\n\nNext week's episode (${data.rollover.program_name} - ${data.rollover.episode_no}) has been automatically scheduled for ${data.rollover.date} (${data.rollover.day}) with the same editors.`);
+                }
                 await loadCalendarMonthData();
                 await loadFreshPrograms();
             } else {
@@ -988,6 +1028,8 @@
         document.getElementById('assign-prog-episode').value = '';
         document.getElementById('assign-prog-source').value = '';
         document.getElementById('assign-prog-notes').value = '';
+        const recCheckbox = document.getElementById('assign-prog-recurring');
+        if (recCheckbox) recCheckbox.checked = true;
 
         populateModalEditors(allEditors, []);
 
@@ -1010,6 +1052,8 @@
         document.getElementById('assign-prog-episode').value = prog.episode_no;
         document.getElementById('assign-prog-source').value = prog.source_url || '';
         document.getElementById('assign-prog-notes').value = prog.notes || '';
+        const recCheckbox = document.getElementById('assign-prog-recurring');
+        if (recCheckbox) recCheckbox.checked = ((prog.is_recurring ?? 1) !== 0);
 
         const selectedIds = (prog.editors || []).map(e => e.id);
         populateModalEditors(allEditors, selectedIds);
@@ -1040,6 +1084,7 @@
         const episodeNo = document.getElementById('assign-prog-episode').value.trim();
         const sourceUrl = document.getElementById('assign-prog-source').value.trim();
         const notes = document.getElementById('assign-prog-notes').value.trim();
+        const isRecurring = document.getElementById('assign-prog-recurring')?.checked ? 1 : 0;
 
         const checkedEditors = Array.from(document.querySelectorAll('input[name="assign_editors[]"]:checked'))
             .map(cb => parseInt(cb.value, 10));
@@ -1065,6 +1110,7 @@
                     episode_no: episodeNo,
                     source_url: sourceUrl,
                     notes: notes,
+                    is_recurring: isRecurring,
                     editor_ids: checkedEditors
                 })
             });
@@ -1085,6 +1131,54 @@
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Save Program';
+        }
+    };
+
+    // Auto-Advance Week Rollover for HOD
+    window.triggerWeekRollover = async function () {
+        let range = null;
+        if (selectedWeek) {
+            range = getWeekDateRange(currentMonth, selectedWeek);
+        } else if (selectedDate) {
+            const d = new Date(selectedDate + 'T00:00:00');
+            const w = Math.floor((d.getDate() - 1) / 7) + 1;
+            range = getWeekDateRange(selectedDate.substring(0, 7), w);
+        } else {
+            const curW = getCurrentWeekNum();
+            range = getWeekDateRange(currentMonth, curW);
+        }
+
+        if (!range) {
+            alert('Please select a specific week first to roll over its schedule.');
+            return;
+        }
+
+        const confirmMsg = `Auto-Advance Week Schedule:\n\nDo you want to roll over all active standing programs from:\nWeek range (${formatFriendlyDate(range.startDate)} to ${formatFriendlyDate(range.endDate)})\ninto next week (+7 days) with Episode numbers auto-incremented by 1?`;
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+
+        try {
+            const res = await fetch('api/digital_programs.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'rollover_week',
+                    date_from: range.startDate,
+                    date_to: range.endDate
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert(data.message);
+                await loadCalendarMonthData();
+                await loadFreshPrograms();
+            } else {
+                alert(data.message || 'Failed to auto-advance week schedule.');
+            }
+        } catch (e) {
+            console.error('Week rollover error:', e);
+            alert('Network error rolling over week schedule.');
         }
     };
 
@@ -1110,14 +1204,17 @@
         if (searchEl) searchEl.value = '';
         const statusEl = document.getElementById('filter-status');
         if (statusEl) statusEl.value = 'all';
+        const progEl = document.getElementById('filter-program');
+        if (progEl) progEl.value = 'all';
         const editorEl = document.getElementById('filter-editor');
         if (editorEl) editorEl.value = 'all';
         searchQuery = '';
         selectedEditor = 'all';
         selectedStatus = 'all';
+        selectedProgram = 'all';
         selectedDate = null;
-        selectedWeek = getCurrentWeekNum();
-        isViewMonth = false;
+        selectedWeek = null;
+        isViewMonth = true; // DEFAULT TO ENTIRE MONTH
         isViewAll = false;
         renderWeekSelectorBar();
         renderCalendar();

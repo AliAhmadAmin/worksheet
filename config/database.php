@@ -758,6 +758,8 @@ function migratePermissionsSchema($pdo) {
                 is_locked TINYINT(1) DEFAULT 0,
                 notes TEXT NULL,
                 assigned_by INT NULL,
+                broadcast_day VARCHAR(20) NULL,
+                is_recurring TINYINT(1) DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_prog_date (program_date),
@@ -787,6 +789,9 @@ function migratePermissionsSchema($pdo) {
                 INDEX idx_link_added_by (added_by)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+
+        try { $pdo->exec("ALTER TABLE digital_fresh_programs ADD COLUMN broadcast_day VARCHAR(20) NULL"); } catch (Exception $e) {}
+        try { $pdo->exec("ALTER TABLE digital_fresh_programs ADD COLUMN is_recurring TINYINT(1) DEFAULT 1"); } catch (Exception $e) {}
 
     } catch (Exception $e) {
         // Ignore if already migrated
