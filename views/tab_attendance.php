@@ -91,10 +91,7 @@ try {
                             </div>
                         </div>
 
-                        <div style="display: flex; gap: 6px; align-items: center;">
-                            <button type="button" id="btn-auto-heal-missing" class="btn btn-outline" onclick="triggerAutoHealMissingOut()" style="padding: 5px 11px; font-size: 11.5px; font-weight: 700; color: #d97706; border-color: rgba(217, 119, 6, 0.4); display: inline-flex; align-items: center; gap: 4px;" title="Auto-close past open shifts where staff forgot to checkout">
-                                🪄 Auto-Heal Missing Out
-                            </button>
+                        <div>
                             <button type="button" id="btn-refresh-live-roster" class="btn btn-primary" onclick="refreshLiveAttendance()" style="padding: 5px 12px; font-size: 11.5px; font-weight: 700;">
                                 🔄 Refresh Roster
                             </button>

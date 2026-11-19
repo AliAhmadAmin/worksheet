@@ -605,31 +605,6 @@ switch ($action) {
         ]);
         break;
 
-    case 'auto_heal_missing_out':
-        if (!$hasGlobalAttendance && !$isHod) {
-            http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Unauthorized: Only Admin or HOD can auto-heal shifts.']);
-            exit;
-        }
-
-        require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
-        $zkService = new ZKTecoAttendanceService($pdo);
-        $targetDate = !empty($_GET['date']) ? trim($_GET['date']) : (!empty($data['date']) ? trim($data['date']) : null);
-        $empId = !empty($_GET['employee_id']) ? (int)$_GET['employee_id'] : (!empty($data['employee_id']) ? (int)$data['employee_id'] : null);
-        
-        $healed = $zkService->healMissingOutShifts($targetDate, $empId);
-        $count = count($healed);
-
-        echo json_encode([
-            'success' => true,
-            'healed_count' => $count,
-            'message' => $count > 0 
-                ? "Successfully self-healed {$count} missing check-out shifts to scheduled hours!" 
-                : "All shifts are already closed and verified. No missing check-outs found.",
-            'details' => $healed
-        ]);
-        break;
-
     case 'live_board':
         $date = $_GET['date'] ?? date('Y-m-d');
 
@@ -646,14 +621,20 @@ switch ($action) {
             } catch (Throwable $t) {
                 // Non-blocking failover
             }
-        } elseif ($date < date('Y-m-d')) {
-            // Auto-heal missing checkouts when viewing past roster dates
-            try {
-                require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
-                $zkService = new ZKTecoAttendanceService($pdo);
-                $zkService->healMissingOutShifts($date);
-            } catch (Throwable $t) {}
         }
+
+        // Revert any previously auto-closed fake checkout records so they show accurately as Missing Out
+        try {
+            $pdo->exec("
+                UPDATE daily_sheets 
+                SET check_out_time = NULL, 
+                    total_duty_hours = NULL, 
+                    total_duty_seconds = 0, 
+                    is_locked = 0, 
+                    remarks = TRIM(REPLACE(remarks, '[System Auto-Closed]', ''))
+                WHERE remarks LIKE '%[System Auto-Closed]%'
+            ");
+        } catch (Throwable $e) {}
         $deptFilter = isset($_GET['department_id']) && $_GET['department_id'] !== '' && $_GET['department_id'] !== 'all' ? (int)$_GET['department_id'] : null;
 
         $whereClauses = ["e.is_active = 1"];
@@ -848,9 +829,11 @@ switch ($action) {
                     $elapsedSec = $cInTs ? (time() - $cInTs) : 0;
 
                     // If shift date is in the past, or shift has exceeded 16 hours without checkout:
-                    // Note: If checked in yesterday, allow up to 16h for active overnight shift.
                     $isPastDate = ($date < date('Y-m-d'));
-                    $isOvernightWindow = ($date === date('Y-m-d', strtotime('-1 day')) && $elapsedSec <= 16 * 3600);
+                    $nowHour = (int)date('H');
+                    $cInHour = $cInTs ? (int)date('H', $cInTs) : 0;
+                    // Overnight window from yesterday is ONLY active right now if today is the day after AND it's currently still morning (< 12:00 PM) AND check-in was evening/night (>= 16:00)
+                    $isOvernightWindow = ($date === date('Y-m-d', strtotime('-1 day')) && $nowHour < 12 && $cInHour >= 16 && $elapsedSec <= 16 * 3600);
 
                     if (($isPastDate && !$isOvernightWindow) || $elapsedSec > 16 * 3600) {
                         $r['status'] = 'missing_out';
@@ -1504,6 +1487,12 @@ switch ($action) {
                             $badgeClass = 'badge-present';
                             $empSummary['full_days']++;
                             $grandTotals['total_present_full']++;
+                        } elseif ($hasCheckIn && !$hasCheckOut && !$d['is_today']) {
+                            $status = 'missing_out';
+                            $statusLabel = '⚠️ Missing Out';
+                            $badgeClass = 'badge-missing-out';
+                            $empSummary['incomplete']++;
+                            $grandTotals['total_absences']++;
                         } elseif ($isEmpWeeklyOff) {
                             $status = 'weekend';
                             $statusLabel = 'Weekly Off';
@@ -1567,6 +1556,12 @@ switch ($action) {
                                 $empSummary['incomplete']++;
                                 $grandTotals['total_absences']++;
                             }
+                        } elseif ($hasCheckIn && !$hasCheckOut && !$d['is_today']) {
+                            $status = 'missing_out';
+                            $statusLabel = '⚠️ Missing Out';
+                            $badgeClass = 'badge-missing-out';
+                            $empSummary['incomplete']++;
+                            $grandTotals['total_absences']++;
                         } elseif ($isEmpWeeklyOff) {
                             $status = 'weekend';
                             $statusLabel = 'Weekly Off';
