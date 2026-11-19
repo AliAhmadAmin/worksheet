@@ -611,8 +611,9 @@ async function handleLogout(e) {
 
 function hasPermission(permKey) {
     if (!AppState.currentUser) return false;
-    if (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin') return true;
-    if (AppState.currentUser.role === 'hod') {
+    const r = (AppState.currentUser.role || '').toLowerCase();
+    if (r === 'super_admin' || r === 'admin') return true;
+    if (r === 'hod' || r === 'deputy_hod') {
         // HODs do not have global company-wide permissions
         if (permKey === 'can_manage_hr' || permKey === 'can_manage_all_departments') return false;
         return true;
@@ -649,7 +650,6 @@ function applyRoleBasedVisibility(user) {
     document.querySelectorAll('.nav-btn[data-tab="tab-reports"]').forEach(el => el.style.display = canReports ? '' : 'none');
     document.querySelectorAll('.nav-btn[data-tab="tab-roster"]').forEach(el => el.style.display = (isSuperAdmin || isHod || isHr) ? '' : 'none');
 
-    const uRole = (user.role || '').toLowerCase();
     const uDept = (user.department_name || '').toLowerCase();
     const isGlobal = (uRole === 'super_admin' || uRole === 'admin');
     const isNews = uDept.includes('news');
@@ -668,7 +668,7 @@ function applyRoleBasedVisibility(user) {
 
     const adminPortalSwitcher = document.querySelector('.portal-switcher-wrapper.admin-only');
     if (adminPortalSwitcher) {
-        adminPortalSwitcher.style.display = (isSuperAdmin || user.role === 'admin') ? '' : 'none';
+        adminPortalSwitcher.style.display = isGlobal ? '' : 'none';
     }
 
     const hodSwitcher = document.getElementById('hod-dept-switcher-wrapper');
