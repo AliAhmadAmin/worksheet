@@ -9,6 +9,7 @@ $currentPage = 'attendance';
 
 // Page-specific script loading
 $pageScripts = [
+    'assets/js/sheets.js',
     'assets/js/reports.js',
     'assets/js/whatsapp_attendance.js',
     'assets/js/zkteco_attendance.js'

@@ -2185,7 +2185,9 @@ async function handleAdminSaveShiftSubmit(e) {
         if (data.success) {
             showToast(data.message || "Shift schedule and attendance saved successfully.", "success");
             closeModal('admin-shift-modal');
-            await loadDailyWorksheet();
+            if (typeof loadDailyWorksheet === 'function' && document.getElementById('worksheet-table-body')) {
+                await loadDailyWorksheet();
+            }
             if (typeof loadLiveAttendance === 'function') loadLiveAttendance();
             if (typeof loadAttendanceReport === 'function') {
                 const repEmpId = document.getElementById('rep-att-emp-select')?.value || empId;
@@ -2233,8 +2235,14 @@ async function handleAdminClearShift() {
         if (data.success) {
             showToast("Shift cleared successfully.", "info");
             closeModal('admin-shift-modal');
-            await loadDailyWorksheet();
+            if (typeof loadDailyWorksheet === 'function' && document.getElementById('worksheet-table-body')) {
+                await loadDailyWorksheet();
+            }
             if (typeof loadLiveAttendance === 'function') loadLiveAttendance();
+            if (typeof loadAttendanceReport === 'function') {
+                const repEmpId = document.getElementById('rep-att-emp-select')?.value || empId;
+                loadAttendanceReport(repEmpId);
+            }
         } else {
             showToast(data.message, "error");
         }

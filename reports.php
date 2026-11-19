@@ -8,7 +8,7 @@ require_once __DIR__ . '/includes/auth_check.php';
 $currentPage = 'reports';
 
 // Page-specific script loading
-$pageScripts = ['assets/js/reports.js'];
+$pageScripts = ['assets/js/sheets.js', 'assets/js/reports.js'];
 
 // 1. Header (HTML DocType, Head, Styles)
 require_once __DIR__ . '/includes/header.php';
