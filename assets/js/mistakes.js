@@ -71,7 +71,8 @@ function closeAddMistakeModal() {
 }
 
 function setMistakeSeverity(sev) {
-    document.getElementById('mistake-input-severity').value = sev;
+    const el = document.getElementById('mistake-input-severity');
+    if (el) el.value = sev;
     document.querySelectorAll('.btn-mistake-sev').forEach(btn => {
         if (btn.dataset.sev === sev) {
             btn.classList.add('active');
@@ -219,13 +220,10 @@ async function loadMistakesList(empId, month, year, startDate = null, endDate = 
 
         // Update Summary Cards
         if (sumRes.success) {
-            document.getElementById('stat-mistakes-month').textContent = sumRes.count_month || 0;
-            document.getElementById('stat-mistakes-year').textContent = sumRes.count_year || 0;
-
-            const sev = sumRes.by_severity || {};
-            document.getElementById('stat-mistakes-critical').textContent = sev.critical || 0;
-            document.getElementById('stat-mistakes-moderate').textContent = sev.moderate || 0;
-            document.getElementById('stat-mistakes-minor').textContent = sev.minor || 0;
+            const mEl = document.getElementById('stat-mistakes-month');
+            if (mEl) mEl.textContent = sumRes.count_month || 0;
+            const yEl = document.getElementById('stat-mistakes-year');
+            if (yEl) yEl.textContent = sumRes.count_year || 0;
         }
 
         const mistakes = (listRes.success && Array.isArray(listRes.mistakes)) ? listRes.mistakes : [];
@@ -237,29 +235,22 @@ async function loadMistakesList(empId, month, year, startDate = null, endDate = 
 
         if (tbody) {
             tbody.innerHTML = mistakes.map(m => {
-                const sevBadge = m.severity === 'critical'
-                    ? '<span class="badge" style="background:#fee2e2; color:#dc2626; font-weight:700;">🔴 Critical</span>'
-                    : (m.severity === 'moderate'
-                        ? '<span class="badge" style="background:#ffedd5; color:#c2410c; font-weight:700;">🟠 Moderate</span>'
-                        : '<span class="badge" style="background:#fef3c7; color:#b45309; font-weight:700;">🟡 Minor</span>');
-
                 const taskInfo = m.entry_title 
-                    ? `<div style="font-size:11.5px; color:var(--text-muted); margin-top:3px;">Task: <strong>${escapeHtml(m.entry_time_slot || '')}</strong> [${escapeHtml(m.entry_content_type || '')}] ${escapeHtml(m.entry_title)}</div>`
+                    ? `<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Task: <strong>${escapeHtml(m.entry_time_slot || '')}</strong> [${escapeHtml(m.entry_content_type || '')}] ${escapeHtml(m.entry_title)}</div>`
                     : '';
 
                 return `
                     <tr>
-                        <td style="white-space: nowrap; font-weight:600; font-size:12.5px;">${m.mistake_date}</td>
-                        <td>${sevBadge}</td>
-                        <td style="font-size:12.5px; font-weight:600;">${escapeHtml(m.category)}</td>
+                        <td style="white-space: nowrap; font-weight:600; font-size:12px;">${m.mistake_date}</td>
+                        <td style="font-size:12px; font-weight:600; color:var(--text-main);">${escapeHtml(m.category)}</td>
                         <td>
-                            <div style="font-weight:700; font-size:13px; color:var(--text-main);">${escapeHtml(m.title)}</div>
-                            ${m.description ? `<div style="font-size:12px; color:var(--text-muted); margin-top:2px; line-height:1.4;">${escapeHtml(m.description)}</div>` : ''}
+                            <div style="font-weight:700; font-size:12.5px; color:var(--text-main);">${escapeHtml(m.title)}</div>
+                            ${m.description ? `<div style="font-size:11.5px; color:var(--text-muted); margin-top:2px; line-height:1.35;">${escapeHtml(m.description)}</div>` : ''}
                             ${taskInfo}
                         </td>
-                        <td style="font-size:12px; color:var(--text-muted);">${escapeHtml(m.logged_by_name || 'System')}</td>
+                        <td style="font-size:11.5px; color:var(--text-muted);">${escapeHtml(m.logged_by_name || 'System')}</td>
                         <td style="text-align: center;">
-                            <button type="button" class="btn-icon" style="color:#ef4444;" onclick="deleteMistakeRecord(${m.id})" title="Delete mistake record">🗑️</button>
+                            <button type="button" class="btn-icon" style="color:#ef4444; padding:2px;" onclick="deleteMistakeRecord(${m.id})" title="Delete mistake record">🗑️</button>
                         </td>
                     </tr>
                 `;
