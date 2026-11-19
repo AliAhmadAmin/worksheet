@@ -883,8 +883,54 @@ class ZKTecoAttendanceService {
      */
     public function healOrphanMorningCheckouts() {
         try {
+            // 1. Self-heal: Restore any overnight checkouts recorded in zkteco_attendance_logs whose daily_sheets check_out_time was cleared
+            try {
+                $stmtLogs = $this->pdo->query("
+                    SELECT l.id, l.sheet_id, l.employee_id, l.punch_time, l.punch_date, l.remarks
+                    FROM zkteco_attendance_logs l
+                    WHERE l.punch_date >= DATE_SUB(CURDATE(), INTERVAL 5 DAY)
+                      AND (l.remarks LIKE '%Overnight Biometric Out%' OR (l.punch_state = 'check_out' AND HOUR(l.punch_time) < 12))
+                      AND l.sheet_id IS NOT NULL AND l.employee_id IS NOT NULL
+                    ORDER BY l.id ASC
+                ");
+                $overnightPunches = $stmtLogs ? $stmtLogs->fetchAll(PDO::FETCH_ASSOC) : [];
+                foreach ($overnightPunches as $op) {
+                    $sheetId = (int)$op['sheet_id'];
+                    $stmtChk = $this->pdo->prepare("SELECT id, sheet_date, check_in_time, biometric_in_time, check_out_time, total_duty_hours FROM daily_sheets WHERE id = ?");
+                    $stmtChk->execute([$sheetId]);
+                    $sh = $stmtChk->fetch(PDO::FETCH_ASSOC);
+                    if ($sh && (empty($sh['check_out_time']) || $sh['check_out_time'] === '-')) {
+                        $pTime = date('h:i A', strtotime($op['punch_time']));
+                        $inStr = !empty($sh['biometric_in_time']) ? $sh['biometric_in_time'] : (!empty($sh['check_in_time']) ? $sh['check_in_time'] : null);
+                        if ($inStr) {
+                            $inTs = strtotime($sh['sheet_date'] . ' ' . $inStr);
+                            $outTs = strtotime($op['punch_time']);
+                            $dutySecs = max(0, $outTs - $inTs);
+                            $h = floor($dutySecs / 3600);
+                            $m = floor(($dutySecs % 3600) / 60);
+                            $dutyF = sprintf('%02d:%02d:00', $h, $m);
+
+                            $this->pdo->prepare("
+                                UPDATE daily_sheets
+                                SET biometric_out_time = ?,
+                                    biometric_duty_hours = ?,
+                                    biometric_duty_seconds = ?,
+                                    check_out_time = ?,
+                                    total_duty_hours = ?,
+                                    total_duty_seconds = ?,
+                                    is_locked = 1,
+                                    locked_at = COALESCE(locked_at, CURRENT_TIMESTAMP),
+                                    remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?)
+                                WHERE id = ?
+                            ")->execute([$pTime, $dutyF, $dutySecs, $pTime, $dutyF, $dutySecs, "[Biometric Restored] Overnight Out at {$pTime} (Duty: {$dutyF})", $sheetId]);
+                        }
+                    }
+                }
+            } catch (Throwable $t) {}
+
+            // 2. Heal orphan morning checkouts
             $stmt = $this->pdo->query("
-                SELECT id, employee_id, sheet_date, check_in_time, check_out_time, biometric_in_time, biometric_out_time
+                SELECT id, employee_id, sheet_date, check_in_time, check_out_time, biometric_in_time, biometric_out_time, total_duty_seconds, total_duty_hours, remarks
                 FROM daily_sheets
                 WHERE (
                     (biometric_out_time IS NOT NULL AND biometric_out_time != '')
@@ -895,6 +941,12 @@ class ZKTecoAttendanceService {
             $sheets = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
 
             foreach ($sheets as $s) {
+                // If this shift already has valid duty hours or was recorded as an overnight shift, it is NOT an orphan!
+                $hasDuty = (!empty($s['total_duty_seconds']) && (int)$s['total_duty_seconds'] > 0) || (!empty($s['total_duty_hours']) && $s['total_duty_hours'] !== '-') || (strpos($s['remarks'] ?? '', 'Overnight') !== false);
+                if ($hasDuty) {
+                    continue; // Legitimate completed shift, keep untouched!
+                }
+
                 $sheetDate = $s['sheet_date'];
                 $outStr = !empty($s['biometric_out_time']) ? $s['biometric_out_time'] : $s['check_out_time'];
                 $inStr = !empty($s['check_in_time']) ? $s['check_in_time'] : (!empty($s['biometric_in_time']) ? $s['biometric_in_time'] : null);
@@ -939,9 +991,12 @@ class ZKTecoAttendanceService {
                                     biometric_duty_seconds = ?,
                                     check_out_time = IF(check_out_time IS NULL OR check_out_time = '', ?, check_out_time),
                                     total_duty_hours = IF(total_duty_hours IS NULL OR total_duty_hours = '', ?, total_duty_hours),
-                                    total_duty_seconds = IF(total_duty_seconds IS NULL OR total_duty_seconds = 0, ?, total_duty_seconds)
+                                    total_duty_seconds = IF(total_duty_seconds IS NULL OR total_duty_seconds = 0, ?, total_duty_seconds),
+                                    is_locked = 1,
+                                    locked_at = COALESCE(locked_at, CURRENT_TIMESTAMP),
+                                    remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?)
                                 WHERE id = ?
-                            ")->execute([$outStr, $dutyFormatted, $dutySecs, $outStr, $dutyFormatted, $dutySecs, $prevSheet['id']]);
+                            ")->execute([$outStr, $dutyFormatted, $dutySecs, $outStr, $dutyFormatted, $dutySecs, "[Biometric] Overnight Out at {$outStr} (Duty: {$dutyFormatted})", $prevSheet['id']]);
                         }
                     }
 

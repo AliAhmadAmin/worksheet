@@ -735,22 +735,17 @@ switch ($action) {
                 $stats['late_count']++;
             }
 
-            // Guard: If check_out_time or biometric_out_time is earlier than check_in_time on the same day (e.g. Out 01:54 AM vs In 01:58 PM),
-            // it belongs to yesterday's night shift and should never be counted as today's checkout!
-            if (!empty($r['check_in_time'])) {
+            // Auto-calculate duty hours across midnight if check_out_time exists but duty hours are empty
+            if (!empty($r['check_in_time']) && !empty($r['check_out_time']) && (empty($r['total_duty_hours']) || $r['total_duty_hours'] === '-')) {
                 $cInTs = strtotime($date . ' ' . $r['check_in_time']);
-                if (!empty($r['biometric_out_time'])) {
-                    $bOutTs = strtotime($date . ' ' . $r['biometric_out_time']);
-                    if ($bOutTs && $cInTs && $bOutTs < $cInTs && (int)date('H', $bOutTs) < 10) {
-                        $r['biometric_out_time'] = null;
-                    }
+                $cOutTs = strtotime($date . ' ' . $r['check_out_time']);
+                if ($cOutTs < $cInTs) {
+                    $cOutTs = strtotime($date . ' ' . $r['check_out_time'] . ' +1 day');
                 }
-                if (!empty($r['check_out_time'])) {
-                    $cOutTs = strtotime($date . ' ' . $r['check_out_time']);
-                    if ($cOutTs && $cInTs && $cOutTs < $cInTs && (int)date('H', $cOutTs) < 10) {
-                        $r['check_out_time'] = null;
-                    }
-                }
+                $dutySec = max(0, $cOutTs - $cInTs);
+                $h = floor($dutySec / 3600);
+                $m = floor(($dutySec % 3600) / 60);
+                $r['total_duty_hours'] = sprintf('%02d:%02d:00', $h, $m);
             }
 
             if (($r['day_type'] ?? '') === 'holiday') {
