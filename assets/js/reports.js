@@ -154,10 +154,19 @@ function renderEmployeeBreakdown(data) {
 
     tbody.innerHTML = '';
     const emps = data.employee_breakdown || [];
+    const colTotals = {};
+    contentTypes.forEach(ct => colTotals[ct] = 0);
+    let grandTotal = 0;
 
     emps.forEach(emp => {
         const tr = document.createElement('tr');
-        const countsHtml = contentTypes.map(ct => `<td>${emp.counts[ct] || 0}</td>`).join('');
+        const countsHtml = contentTypes.map(ct => {
+            const val = emp.counts[ct] || 0;
+            colTotals[ct] += val;
+            return `<td>${val}</td>`;
+        }).join('');
+        grandTotal += (emp.total || 0);
+
         tr.innerHTML = `
             <td style="text-align: left; font-weight: 600;">${escapeHtml(emp.team_name)}</td>
             <td style="text-align: left;">${escapeHtml(emp.employee_name)}</td>
@@ -166,6 +175,17 @@ function renderEmployeeBreakdown(data) {
         `;
         tbody.appendChild(tr);
     });
+
+    // Totals bottom row for Team & Employee Performance Breakdown
+    const totalsRow = document.createElement('tr');
+    totalsRow.className = 'row-column-totals';
+    const colTotalsHtml = contentTypes.map(ct => `<td>${colTotals[ct]}</td>`).join('');
+    totalsRow.innerHTML = `
+        <td colspan="2" style="font-weight: 800; text-align: left; padding-left: 14px;">Total</td>
+        ${colTotalsHtml}
+        <td class="cell-grand-total">${grandTotal}</td>
+    `;
+    tbody.appendChild(totalsRow);
 }
 
 function renderDutyStats(summary) {

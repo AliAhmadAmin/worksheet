@@ -124,7 +124,7 @@ switch ($action) {
         // Dynamically include any existing raw tracking departments or content types from entries
         foreach ($rawRows as $r) {
             $rDept = trim($r['department'] ?? '');
-            if ($rDept !== '') {
+            if ($rDept !== '' && stripos($rDept, 'Select Depart') === false) {
                 $foundDept = false;
                 foreach ($trackingDepts as $td) {
                     if (strcasecmp($td, $rDept) === 0) { $foundDept = true; break; }
@@ -133,7 +133,7 @@ switch ($action) {
             }
 
             $rType = trim($r['content_type'] ?? '');
-            if ($rType !== '') {
+            if ($rType !== '' && stripos($rType, 'Select Content') === false) {
                 $foundType = false;
                 foreach ($contentTypes as $ct) {
                     if (strcasecmp($ct, $rType) === 0) { $foundType = true; break; }
@@ -156,8 +156,27 @@ switch ($action) {
         }
 
         foreach ($rawRows as $r) {
-            $rawDept = trim($r['department'] ?? 'Others');
-            $matchedDept = $trackingDepts[0] ?? 'Others';
+            $rawCol = trim($r['content_type'] ?? '');
+            if ($rawCol === '' || stripos($rawCol, 'Select Content') !== false) {
+                continue; // Do not count entries with no content type
+            }
+
+            $matchedCol = null;
+            foreach ($contentTypes as $c) {
+                if (strcasecmp($c, $rawCol) === 0) {
+                    $matchedCol = $c;
+                    break;
+                }
+            }
+            if (!$matchedCol) {
+                continue; // Skip unrecognized content types
+            }
+
+            $rawDept = trim($r['department'] ?? '');
+            if ($rawDept === '' || stripos($rawDept, 'Select Depart') !== false) {
+                $rawDept = 'Others';
+            }
+            $matchedDept = 'Others';
             foreach ($trackingDepts as $d) {
                 if (strcasecmp($d, $rawDept) === 0) {
                     $matchedDept = $d;
@@ -165,16 +184,8 @@ switch ($action) {
                 }
             }
 
-            $rawCol = trim($r['content_type'] ?? 'Others');
-            $matchedCol = $contentTypes[0] ?? 'Others';
-            foreach ($contentTypes as $c) {
-                if (strcasecmp($c, $rawCol) === 0) {
-                    $matchedCol = $c;
-                    break;
-                }
-            }
-
             $count = (int)$r['total_count'];
+            if ($count <= 0) continue;
 
             if (!isset($deptMatrix[$matchedDept])) {
                 $deptMatrix[$matchedDept] = [
@@ -241,19 +252,19 @@ switch ($action) {
 
         foreach ($empRaw as $r) {
             $empId = $r['employee_id'];
-            $cType = $r['content_type'];
+            $cType = trim($r['content_type'] ?? '');
             $count = (int)$r['total_count'];
 
-            if (!$cType || $count <= 0) continue;
+            if ($cType === '' || stripos($cType, 'Select Content') !== false || $count <= 0) continue;
 
-            $rawCol = trim($cType);
-            $matchedCol = $contentTypes[0] ?? 'Others';
+            $matchedCol = null;
             foreach ($contentTypes as $c) {
-                if (strcasecmp($c, $rawCol) === 0) {
+                if (strcasecmp($c, $cType) === 0) {
                     $matchedCol = $c;
                     break;
                 }
             }
+            if (!$matchedCol) continue;
 
             if (!isset($empMap[$empId]['counts'][$matchedCol])) {
                 $empMap[$empId]['counts'][$matchedCol] = 0;
@@ -425,9 +436,28 @@ switch ($action) {
             $matrix[$dept] = array_fill_keys($contentTypes, 0);
         }
 
+        $deptColTotals = array_fill_keys($contentTypes, 0);
+        $deptGrandTotal = 0;
+
         foreach ($rawRows as $r) {
-            $rawDept = trim($r['department'] ?? 'Others');
-            $matchedDept = $trackingDepts[0] ?? 'Others';
+            $rawCol = trim($r['content_type'] ?? '');
+            if ($rawCol === '' || stripos($rawCol, 'Select Content') !== false) {
+                continue;
+            }
+            $matchedCol = null;
+            foreach ($contentTypes as $c) {
+                if (strcasecmp($c, $rawCol) === 0) {
+                    $matchedCol = $c;
+                    break;
+                }
+            }
+            if (!$matchedCol) continue;
+
+            $rawDept = trim($r['department'] ?? '');
+            if ($rawDept === '' || stripos($rawDept, 'Select Depart') !== false) {
+                $rawDept = 'Others';
+            }
+            $matchedDept = 'Others';
             foreach ($trackingDepts as $d) {
                 if (strcasecmp($d, $rawDept) === 0) {
                     $matchedDept = $d;
@@ -435,25 +465,22 @@ switch ($action) {
                 }
             }
 
-            $rawCol = trim($r['content_type'] ?? 'Others');
-            $matchedCol = $contentTypes[0] ?? 'Others';
-            foreach ($contentTypes as $c) {
-                if (strcasecmp($c, $rawCol) === 0) {
-                    $matchedCol = $c;
-                    break;
-                }
-            }
+            $count = (int)$r['total_count'];
+            if ($count <= 0) continue;
 
             if (!isset($matrix[$matchedDept][$matchedCol])) {
                 $matrix[$matchedDept][$matchedCol] = 0;
             }
-            $matrix[$matchedDept][$matchedCol] += (int)$r['total_count'];
+            $matrix[$matchedDept][$matchedCol] += $count;
+            $deptColTotals[$matchedCol] += $count;
+            $deptGrandTotal += $count;
         }
 
         foreach ($matrix as $dept => $vals) {
             $rowTot = array_sum($vals);
             fputcsv($output, array_merge([$dept], array_values($vals), [$rowTot]));
         }
+        fputcsv($output, array_merge(['Total'], array_values($deptColTotals), [$deptGrandTotal]));
 
         fputcsv($output, []);
         fputcsv($output, ['Team & Employee Performance Breakdown']);
@@ -485,7 +512,23 @@ switch ($action) {
         $empRows = $empStmt->fetchAll();
 
         $emps = [];
+        $empColTotals = array_fill_keys($contentTypes, 0);
+        $empGrandTotal = 0;
+
         foreach ($empRows as $r) {
+            $cType = trim($r['content_type'] ?? '');
+            $count = (int)$r['total_count'];
+            if ($cType === '' || stripos($cType, 'Select Content') !== false || $count <= 0) continue;
+
+            $matchedCol = null;
+            foreach ($contentTypes as $c) {
+                if (strcasecmp($c, $cType) === 0) {
+                    $matchedCol = $c;
+                    break;
+                }
+            }
+            if (!$matchedCol) continue;
+
             $key = ($r['team_name'] ?? 'General') . '|' . $r['employee_name'];
             if (!isset($emps[$key])) {
                 $emps[$key] = [
@@ -494,24 +537,16 @@ switch ($action) {
                     'counts' => array_fill_keys($contentTypes, 0)
                 ];
             }
-            $rawCol = trim($r['content_type'] ?? 'Others');
-            $matchedCol = $contentTypes[0] ?? 'Others';
-            foreach ($contentTypes as $c) {
-                if (strcasecmp($c, $rawCol) === 0) {
-                    $matchedCol = $c;
-                    break;
-                }
-            }
-            if (!isset($emps[$key]['counts'][$matchedCol])) {
-                $emps[$key]['counts'][$matchedCol] = 0;
-            }
-            $emps[$key]['counts'][$matchedCol] += (int)$r['total_count'];
+            $emps[$key]['counts'][$matchedCol] += $count;
+            $empColTotals[$matchedCol] += $count;
+            $empGrandTotal += $count;
         }
 
         foreach ($emps as $e) {
             $tot = array_sum($e['counts']);
             fputcsv($output, array_merge([$e['team'], $e['name']], array_values($e['counts']), [$tot]));
         }
+        fputcsv($output, array_merge(['Total', ''], array_values($empColTotals), [$empGrandTotal]));
 
         fclose($output);
         exit;
