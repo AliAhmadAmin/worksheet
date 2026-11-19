@@ -387,7 +387,12 @@ function renderLiveAttendanceTable() {
         } else if (emp.status === 'working') {
             statusBadge = '<span class="attendance-status-pill working" style="white-space: nowrap; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🟢 On Duty</span>';
         } else if (emp.status === 'checked_out') {
-            statusBadge = '<span class="attendance-status-pill checked_out" style="white-space: nowrap; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🔵 Checked Out</span>';
+            const isAutoClosed = emp.remarks && emp.remarks.includes('[System Auto-Closed]');
+            if (isAutoClosed) {
+                statusBadge = '<span class="attendance-status-pill checked_out" style="background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); white-space: nowrap; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Shift auto-closed at scheduled end time (missing checkout self-healed)">🪄 Auto-Closed</span>';
+            } else {
+                statusBadge = '<span class="attendance-status-pill checked_out" style="white-space: nowrap; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🔵 Checked Out</span>';
+            }
         } else if (emp.status === 'missing_out') {
             statusBadge = '<span class="attendance-status-pill missing-out" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;" title="Employee checked in but forgot to punch/checkout. Click ⏱️ to adjust.">⚠️ Missing Out</span>';
         } else if (emp.status === 'not_arrived') {
@@ -507,6 +512,11 @@ function renderLiveAttendanceTable() {
                             ⏱️${isMissingOut ? ' Fix Out' : ''}
                         </button>
                     ` : ''}
+                    ${(isMissingOut && canAdjustShift) ? `
+                        <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 11px; font-weight: 700; border-color: rgba(16, 185, 129, 0.4); color: #059669; background: rgba(16, 185, 129, 0.08); white-space: nowrap;" onclick="quickHealSingleEmployee(${emp.employee_id}, '${targetDate}')" title="Auto-close shift to scheduled hours">
+                            🪄 Auto-Close
+                        </button>
+                    ` : ''}
                 </div>
             </td>
         `;
@@ -530,6 +540,52 @@ async function refreshLiveAttendance() {
             btn.disabled = false;
             btn.innerHTML = '🔄 Refresh Roster';
         }
+    }
+}
+
+async function triggerAutoHealMissingOut() {
+    const btn = document.getElementById('btn-auto-heal-missing');
+    const targetDate = document.getElementById('attendance-board-date')?.value || new Date().toISOString().split('T')[0];
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Auto-Healing...';
+    }
+
+    try {
+        const res = await fetch(`api/attendance.php?action=auto_heal_missing_out&date=${targetDate}`);
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message, data.healed_count > 0 ? 'success' : 'info');
+            await loadLiveAttendance(true);
+        } else {
+            showToast(data.message || 'Failed to auto-heal missing out shifts', 'error');
+        }
+    } catch (e) {
+        showToast('Error during auto-healing: ' + e.message, 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🪄 Auto-Heal Missing Out';
+        }
+    }
+}
+
+async function quickHealSingleEmployee(empId, targetDate) {
+    if (!confirm('Auto-close this shift using the employee\'s scheduled shift hours?')) {
+        return;
+    }
+    try {
+        const res = await fetch(`api/attendance.php?action=auto_heal_missing_out&date=${targetDate}&employee_id=${empId}`);
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+            await loadLiveAttendance(false);
+        } else {
+            showToast(data.message || 'Failed to auto-close shift', 'error');
+        }
+    } catch (e) {
+        showToast('Error closing shift: ' + e.message, 'error');
     }
 }
 
@@ -603,6 +659,22 @@ async function loadLiveAttendance(forceSync = false) {
             } else {
                 cardMissing.style.borderColor = 'var(--border-color)';
                 cardMissing.style.background = 'var(--bg-card-elevated)';
+            }
+        }
+
+        const btnAutoHeal = document.getElementById('btn-auto-heal-missing');
+        if (btnAutoHeal) {
+            const mCount = Number(data.stats.missing_out || 0);
+            if (mCount > 0) {
+                btnAutoHeal.innerHTML = `🪄 Auto-Heal (${mCount} Missing)`;
+                btnAutoHeal.style.borderColor = '#d97706';
+                btnAutoHeal.style.background = 'rgba(217, 119, 6, 0.12)';
+                btnAutoHeal.style.fontWeight = '800';
+            } else {
+                btnAutoHeal.innerHTML = `🪄 Auto-Heal Missing`;
+                btnAutoHeal.style.borderColor = 'rgba(217, 119, 6, 0.4)';
+                btnAutoHeal.style.background = 'transparent';
+                btnAutoHeal.style.fontWeight = '700';
             }
         }
 

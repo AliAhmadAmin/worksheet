@@ -605,6 +605,31 @@ switch ($action) {
         ]);
         break;
 
+    case 'auto_heal_missing_out':
+        if (!$hasGlobalAttendance && !$isHod) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized: Only Admin or HOD can auto-heal shifts.']);
+            exit;
+        }
+
+        require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
+        $zkService = new ZKTecoAttendanceService($pdo);
+        $targetDate = !empty($_GET['date']) ? trim($_GET['date']) : (!empty($data['date']) ? trim($data['date']) : null);
+        $empId = !empty($_GET['employee_id']) ? (int)$_GET['employee_id'] : (!empty($data['employee_id']) ? (int)$data['employee_id'] : null);
+        
+        $healed = $zkService->healMissingOutShifts($targetDate, $empId);
+        $count = count($healed);
+
+        echo json_encode([
+            'success' => true,
+            'healed_count' => $count,
+            'message' => $count > 0 
+                ? "Successfully self-healed {$count} missing check-out shifts to scheduled hours!" 
+                : "All shifts are already closed and verified. No missing check-outs found.",
+            'details' => $healed
+        ]);
+        break;
+
     case 'live_board':
         $date = $_GET['date'] ?? date('Y-m-d');
 
@@ -621,6 +646,13 @@ switch ($action) {
             } catch (Throwable $t) {
                 // Non-blocking failover
             }
+        } elseif ($date < date('Y-m-d')) {
+            // Auto-heal missing checkouts when viewing past roster dates
+            try {
+                require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
+                $zkService = new ZKTecoAttendanceService($pdo);
+                $zkService->healMissingOutShifts($date);
+            } catch (Throwable $t) {}
         }
         $deptFilter = isset($_GET['department_id']) && $_GET['department_id'] !== '' && $_GET['department_id'] !== 'all' ? (int)$_GET['department_id'] : null;
 
@@ -680,6 +712,7 @@ switch ($action) {
                 s.whatsapp_out_time,
                 s.whatsapp_duty_hours,
                 s.whatsapp_duty_seconds,
+                s.remarks,
                 (SELECT COUNT(*) FROM sheet_entries se WHERE se.sheet_id = s.id) as total_entries
             FROM employees e
             LEFT JOIN hr_employee_profiles p ON e.id = p.employee_id

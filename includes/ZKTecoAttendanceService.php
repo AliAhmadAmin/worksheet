@@ -1041,6 +1041,148 @@ class ZKTecoAttendanceService {
                     }
                 }
             }
+
+            // 3. Auto-heal any open shifts where staff forgot to punch out
+            $this->healMissingOutShifts();
         } catch (Throwable $t) {}
+    }
+
+    /**
+     * Self-heal missing checkouts for employees who checked in but forgot to punch out.
+     * Automatically closes the shift at the scheduled shift end time (or check_in + 8 hours),
+     * calculates duty hours, locks the sheet, and marks remarks with an audit trail.
+     * 
+     * @param string|null $targetDate Specific date (e.g. '2026-11-18') or null for past dates in last 7 days.
+     * @param int|null $empId Specific employee ID or null for all.
+     * @return array [healed_count => int, details => array]
+     */
+    public function healMissingOutShifts($targetDate = null, $empId = null) {
+        $healed = [];
+        try {
+            $sql = "
+                SELECT s.id, s.employee_id, s.sheet_date, s.check_in_time, s.biometric_in_time,
+                       s.check_out_time, s.biometric_out_time, s.effective_shift_timing, s.remarks,
+                       e.name as employee_name, e.shift_timing, e.shift_policy
+                FROM daily_sheets s
+                JOIN employees e ON s.employee_id = e.id
+                WHERE (s.check_in_time IS NOT NULL AND s.check_in_time != '')
+                  AND (s.check_out_time IS NULL OR s.check_out_time = '' OR s.check_out_time = '-')
+                  AND (s.biometric_out_time IS NULL OR s.biometric_out_time = '')
+                  AND (s.day_type IS NULL OR s.day_type = 'working')
+            ";
+            $params = [];
+
+            if (!empty($targetDate)) {
+                $sql .= " AND s.sheet_date = ?";
+                $params[] = $targetDate;
+            } else {
+                $sql .= " AND s.sheet_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+            }
+
+            if (!empty($empId)) {
+                $sql .= " AND s.employee_id = ?";
+                $params[] = (int)$empId;
+            }
+
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            $sheets = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+
+            $nowTs = time();
+            $today = date('Y-m-d');
+            $yesterday = date('Y-m-d', strtotime('-1 day'));
+            $currentHour = (int)date('H', $nowTs);
+
+            foreach ($sheets as $s) {
+                $sheetDate = $s['sheet_date'];
+                $inStr = !empty($s['biometric_in_time']) ? $s['biometric_in_time'] : $s['check_in_time'];
+                $inTs = strtotime($sheetDate . ' ' . $inStr);
+                if (!$inTs) continue;
+
+                $elapsedHours = ($nowTs - $inTs) / 3600;
+                $isPastDate = ($sheetDate < $today);
+
+                // If shift belongs to today, only heal if shift started >= 16 hours ago
+                if (!$isPastDate && $elapsedHours < 16) {
+                    continue;
+                }
+
+                // If shift is from yesterday (potential overnight shift):
+                // If it is currently morning (before 12 PM noon) and shift started in the evening/night and < 16h elapsed, wait
+                if ($sheetDate === $yesterday && $currentHour < 12 && $elapsedHours < 16) {
+                    $inHour = (int)date('H', $inTs);
+                    if ($inHour >= 16) {
+                        continue; // Still within legitimate overnight work window
+                    }
+                }
+
+                // Determine scheduled end time or standard 8-hour shift
+                $timing = !empty($s['effective_shift_timing']) ? $s['effective_shift_timing'] : (!empty($s['shift_timing']) ? $s['shift_timing'] : '10:00 AM TO 6:00 PM');
+                
+                $outTimeFormatted = null;
+                $dutySeconds = 0;
+
+                // Attempt to parse scheduled end time (e.g. "10:00 AM TO 6:00 PM" -> "06:00 PM")
+                $parts = preg_split('/\s+(?:to|-)\s+/i', trim($timing));
+                if (count($parts) >= 2 && !empty($parts[1])) {
+                    $endParsed = strtotime($parts[1]);
+                    if ($endParsed !== false) {
+                        $outTimeFormatted = date('h:i A', $endParsed);
+                        $startParsed = !empty($parts[0]) ? strtotime($parts[0]) : null;
+                        
+                        if ($startParsed && $endParsed < $startParsed) {
+                            $endDateTimeTs = strtotime($sheetDate . ' ' . $outTimeFormatted . ' +1 day');
+                        } else {
+                            $endDateTimeTs = strtotime($sheetDate . ' ' . $outTimeFormatted);
+                        }
+
+                        if ($endDateTimeTs && $endDateTimeTs > $inTs) {
+                            $diffSec = $endDateTimeTs - $inTs;
+                            // Check if scheduled end gives a reasonable shift duration between 4h and 12h
+                            if ($diffSec >= 14400 && $diffSec <= 43200) {
+                                $dutySeconds = $diffSec;
+                            }
+                        }
+                    }
+                }
+
+                // Fallback to standard 8-hour shift (28,800 seconds)
+                if (empty($outTimeFormatted) || $dutySeconds <= 0) {
+                    $dutySeconds = 8 * 3600; // 8 hours standard
+                    $outTs = $inTs + $dutySeconds;
+                    $outTimeFormatted = date('h:i A', $outTs);
+                }
+
+                $h = floor($dutySeconds / 3600);
+                $m = floor(($dutySeconds % 3600) / 60);
+                $dutyFormatted = sprintf('%02d:%02d:00', $h, $m);
+
+                $auditRemark = "[System Auto-Closed] Missing checkout self-healed to scheduled end ({$outTimeFormatted}, Duty: {$dutyFormatted})";
+
+                $up = $this->pdo->prepare("
+                    UPDATE daily_sheets 
+                    SET check_out_time = ?,
+                        total_duty_hours = ?,
+                        total_duty_seconds = ?,
+                        is_locked = 1,
+                        locked_at = CURRENT_TIMESTAMP,
+                        remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?)
+                    WHERE id = ?
+                ");
+                $up->execute([$outTimeFormatted, $dutyFormatted, $dutySeconds, $auditRemark, $s['id']]);
+
+                $healed[] = [
+                    'sheet_id' => $s['id'],
+                    'employee_id' => $s['employee_id'],
+                    'name' => $s['employee_name'],
+                    'date' => $sheetDate,
+                    'check_in' => $inStr,
+                    'check_out' => $outTimeFormatted,
+                    'duty_hours' => $dutyFormatted
+                ];
+            }
+        } catch (Throwable $e) {}
+
+        return $healed;
     }
 }
