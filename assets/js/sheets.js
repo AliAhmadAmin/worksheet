@@ -225,6 +225,10 @@ async function loadDailyWorksheet(allowOvernightRedirect = true) {
 
         AppState.currentSheet = data.sheet;
         AppState.currentEntries = data.entries || [];
+        AppState.currentSheetMistakes = data.mistakes || [];
+        AppState.viewingEmployeeId = empId;
+        AppState.viewingEmployeeName = (data.employee && data.employee.name) ? data.employee.name : '';
+        AppState.currentDate = date;
         AppState.isLocked = data.is_locked;
         AppState.departmentSettings = data.department_settings || {};
         AppState.isHodChecked = data.is_hod_checked || 0;
@@ -366,6 +370,24 @@ function renderWorksheetHero(sheet, empData, data = null) {
                 lateBadgeEl.style.color = '#10b981';
                 lateBadgeEl.textContent = '✓ On Time';
                 lateBadgeEl.title = `On time for shift: ${sheet.effective_shift_timing || schedShift || 'Scheduled'}`;
+            }
+        }
+
+        // Update Quality Mistakes Badge
+        const mistakesBadge = document.getElementById('admin-meta-mistakes-count');
+        if (mistakesBadge) {
+            const mCount = Array.isArray(data?.mistakes) ? data.mistakes.length : 0;
+            const mMonth = data?.monthly_mistakes_count || 0;
+            mistakesBadge.textContent = `${mCount} (Month: ${mMonth})`;
+            if (mCount > 0) {
+                mistakesBadge.style.background = '#fee2e2';
+                mistakesBadge.style.color = '#dc2626';
+            } else if (mMonth > 0) {
+                mistakesBadge.style.background = '#fef3c7';
+                mistakesBadge.style.color = '#b45309';
+            } else {
+                mistakesBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+                mistakesBadge.style.color = '#d97706';
             }
         }
 
@@ -1260,9 +1282,24 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
         }
     });
 
-    // Action column
+    // Action column with row-level quality mistake button for supervisors
+    const rowEntryId = data?.id || null;
+    let mistakeBtnHtml = '';
+    if (isAdmin && rowEntryId) {
+        const rowMistakes = (Array.isArray(AppState.currentSheetMistakes))
+            ? AppState.currentSheetMistakes.filter(m => m.entry_id == rowEntryId)
+            : [];
+        const hasMistake = rowMistakes.length > 0;
+        mistakeBtnHtml = `
+            <button type="button" class="btn-icon" style="padding: 2px 6px; font-size: 11px; margin-right: 4px; border-radius: 6px; cursor: pointer; ${hasMistake ? 'background: #fee2e2; border: 1px solid #f87171; color: #dc2626;' : 'background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.25); color: #d97706;'}" onclick="openAddMistakeModal(${rowEntryId})" title="${hasMistake ? `${rowMistakes.length} Mistake(s) logged on this row. Click to view/add.` : 'Log mistake for this task row'}">
+                ⚠️${hasMistake ? `<span style="font-weight: 800; font-size: 10px; margin-left: 2px;">${rowMistakes.length}</span>` : ''}
+            </button>
+        `;
+    }
+
     cellsHtml += `
-        <td class="col-action" style="text-align: center;">
+        <td class="col-action" style="text-align: center; white-space: nowrap;">
+            ${mistakeBtnHtml}
             ${(!isReadOnlyInspection && canEdit && !isLocked) ? '<button type="button" class="btn-icon-del" onclick="removeTableRow(this)" title="Delete Row">🗑️</button>' : (isLocked ? '<span style="color: var(--text-dim); font-size: 11px;" title="Rows cannot be deleted after shift checkout">🔒</span>' : (isReadOnlyInspection ? '<span style="color: var(--text-dim); font-size: 11px;" title="Read-only view">👁️</span>' : ''))}
         </td>
     `;

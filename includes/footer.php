@@ -1,6 +1,6 @@
     <!-- Application Scripts -->
 <?php
-$coreScripts = ['assets/js/app.js'];
+$coreScripts = ['assets/js/app.js', 'assets/js/mistakes.js'];
 $scriptsToLoad = (isset($pageScripts) && is_array($pageScripts))
     ? array_merge($coreScripts, $pageScripts)
     : [

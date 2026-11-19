@@ -160,6 +160,9 @@
                                 <button type="button" id="admin-unlock-btn" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;" onclick="toggleSheetLock()">
                                     🔒 Lock Sheet
                                 </button>
+                                <button type="button" id="admin-btn-log-mistake" class="btn btn-outline" style="padding: 6px 13px; font-size: 12px; font-weight: 700; border-color: #f59e0b; color: #d97706;" onclick="openAddMistakeModal()" title="Log a Quality Mistake or Defect for this Employee">
+                                    <span>⚠️</span> Log Mistake
+                                </button>
                                 <button type="button" id="admin-btn-sub-hod-check" class="btn btn-outline" style="padding: 6px 13px; font-size: 12px; font-weight: 700; display: none; align-items: center; gap: 5px;" onclick="handleToggleSubHodCheckSheet()" title="Mark this worksheet as Verified by Sub-HOD">
                                     <span>📝</span> <span id="admin-btn-sub-hod-check-text">Sub-HOD Verify</span>
                                 </button>
@@ -184,6 +187,10 @@
                             <span class="admin-inspector-meta-item">👥 <span><strong>Team:</strong> <span id="admin-meta-team" style="color: var(--text-main); font-weight: 600;">Team</span></span></span>
                             <span class="meta-separator" style="color: var(--border-color);">|</span>
                             <span class="admin-inspector-meta-item">🕒 <span><strong>Shift:</strong> In: <strong id="admin-meta-in" style="color: #0284c7;">--:--</strong> • Out: <strong id="admin-meta-out" style="color: #ea580c;">--:--</strong></span> <span id="admin-meta-late-badge" style="display: none; margin-left: 6px;"></span> <button type="button" class="btn btn-outline" style="padding: 2px 8px; font-size: 10.5px; border-radius: 12px; margin-left: 6px; font-weight: 600;" onclick="openAdminShiftModal()" title="Manually edit or backdate shift check-in and check-out times">✏️ Edit Shift</button></span>
+                            <span class="meta-separator" style="color: var(--border-color);">|</span>
+                            <span class="admin-inspector-meta-item" style="cursor: pointer;" onclick="openMistakesModal()" title="Click to view all mistakes for this employee">
+                                <span>⚠️ <strong>Mistakes:</strong> <span id="admin-meta-mistakes-count" class="badge" style="background: rgba(245, 158, 11, 0.15); color: #d97706; padding: 2px 8px; border-radius: 10px; font-weight: 800;">0</span></span>
+                            </span>
                         </div>
                     </div>
                 </div>

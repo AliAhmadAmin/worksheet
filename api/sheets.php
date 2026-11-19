@@ -128,6 +128,33 @@ switch ($action) {
             unset($entry);
         }
 
+        // Fetch quality mistakes recorded for this sheet / employee on this date
+        $sheetMistakes = [];
+        $monthlyMistakesCount = 0;
+        $yearlyMistakesCount = 0;
+        try {
+            $sheetIdVal = $sheet ? (int)$sheet['id'] : 0;
+            $stmtSheetMistakes = $pdo->prepare("
+                SELECT em.*, u.name as logged_by_name, u.role as logged_by_role 
+                FROM employee_mistakes em 
+                LEFT JOIN employees u ON em.logged_by = u.id 
+                WHERE (em.sheet_id = ? AND ? > 0) OR (em.employee_id = ? AND em.mistake_date = ?)
+                ORDER BY em.id ASC
+            ");
+            $stmtSheetMistakes->execute([$sheetIdVal, $sheetIdVal, $empId, $date]);
+            $sheetMistakes = $stmtSheetMistakes->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+            // Monthly mistakes count
+            $stmtMCount = $pdo->prepare("SELECT COUNT(*) FROM employee_mistakes WHERE employee_id = ? AND DATE_FORMAT(mistake_date, '%Y-%m') = ?");
+            $stmtMCount->execute([$empId, date('Y-m', strtotime($date))]);
+            $monthlyMistakesCount = (int)$stmtMCount->fetchColumn();
+
+            // Yearly mistakes count
+            $stmtYCount = $pdo->prepare("SELECT COUNT(*) FROM employee_mistakes WHERE employee_id = ? AND YEAR(mistake_date) = ?");
+            $stmtYCount->execute([$empId, date('Y', strtotime($date))]);
+            $yearlyMistakesCount = (int)$stmtYCount->fetchColumn();
+        } catch (Exception $e) {}
+
         // Fetch dynamic columns for this employee's department
         $empDeptId = (int)($employee['department_id'] ?? 0);
         if ($empDeptId <= 0) $empDeptId = 2;
@@ -391,6 +418,9 @@ switch ($action) {
             'can_edit_after_lock' => $isSelf ? ($isLocked === 0) : $canManageOtherSheets,
             'is_read_only_inspection' => $isReadOnlyInspection,
             'can_unlock' => $canUnlock,
+            'mistakes' => $sheetMistakes,
+            'monthly_mistakes_count' => $monthlyMistakesCount,
+            'yearly_mistakes_count' => $yearlyMistakesCount,
             'monthly_off_days_taken' => $monthlyOffDaysTaken,
             'monthly_off_days_allowed' => $monthlyOffDaysAllowed,
             'approved_leave' => $approvedLeave,

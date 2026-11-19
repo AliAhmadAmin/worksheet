@@ -2055,6 +2055,184 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
         </div>
     </div>
 
+    <!-- MODAL: LOG QUALITY MISTAKE / DEFECT -->
+    <div id="modal-log-mistake" class="modal-overlay" style="z-index: 10050;">
+        <div class="modal-card" style="max-width: 520px; border-radius: 20px; padding: 0; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.3);">
+            <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(239, 68, 68, 0.1)); padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 42px; height: 42px; border-radius: 12px; background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                        ⚠️
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-main);">Log Quality Mistake</h3>
+                        <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--text-muted);">Record a quality defect, error, or guideline violation</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-modal-close" onclick="closeAddMistakeModal()">✕</button>
+            </div>
+
+            <div style="padding: 22px 24px; max-height: 75vh; overflow-y: auto;">
+                <input type="hidden" id="mistake-input-emp-id" value="">
+                <input type="hidden" id="mistake-input-entry-id" value="">
+                <input type="hidden" id="mistake-input-severity" value="minor">
+
+                <!-- Employee & Date Banner -->
+                <div style="background: var(--bg-card-elevated, #f8fafc); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                    <div>
+                        <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">Employee</div>
+                        <div id="mistake-display-emp-name" style="font-size: 14px; font-weight: 800; color: var(--text-main); margin-top: 2px;">Employee Name</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">Date</div>
+                        <input type="date" id="mistake-input-date" class="input-control" style="padding: 4px 8px; font-size: 12.5px; font-weight: 700; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-input);">
+                    </div>
+                </div>
+
+                <!-- Linked Task Preview (if applicable) -->
+                <div id="mistake-task-preview-wrap" style="display: none; background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.2); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #0284c7; text-transform: uppercase;">Linked Task Row</div>
+                    <div id="mistake-task-preview-text" style="font-size: 12.5px; font-weight: 600; color: var(--text-main); margin-top: 2px;"></div>
+                </div>
+
+                <!-- Category & Severity -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--text-main);">Category</label>
+                        <select id="mistake-input-category" class="input-control" style="width: 100%; font-size: 13px; padding: 9px 12px; border-radius: 10px;">
+                            <option value="Spelling & Grammar">Spelling & Grammar</option>
+                            <option value="Video / Visual Glitch">Video / Visual Glitch</option>
+                            <option value="Audio Distortion / Levels">Audio Distortion / Levels</option>
+                            <option value="Thumbnail & Graphics">Thumbnail & Graphics</option>
+                            <option value="Incorrect Link / Slug">Incorrect Link / Slug</option>
+                            <option value="Missed Deadline / Delay">Missed Deadline / Delay</option>
+                            <option value="Policy / Guideline Violation">Policy / Guideline Violation</option>
+                            <option value="General Mistake">General Mistake</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--text-main);">Severity</label>
+                        <div style="display: flex; gap: 6px;">
+                            <button type="button" class="btn btn-outline btn-mistake-sev active" data-sev="minor" onclick="setMistakeSeverity('minor')" style="flex: 1; padding: 7px 4px; font-size: 11.5px; font-weight: 700; border-radius: 8px;">🟡 Minor</button>
+                            <button type="button" class="btn btn-outline btn-mistake-sev" data-sev="moderate" onclick="setMistakeSeverity('moderate')" style="flex: 1; padding: 7px 4px; font-size: 11.5px; font-weight: 700; border-radius: 8px;">🟠 Moderate</button>
+                            <button type="button" class="btn btn-outline btn-mistake-sev" data-sev="critical" onclick="setMistakeSeverity('critical')" style="flex: 1; padding: 7px 4px; font-size: 11.5px; font-weight: 700; border-radius: 8px;">🔴 Critical</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mistake Summary Title -->
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--text-main);">Mistake Summary <span style="color:#ef4444;">*</span></label>
+                    <input type="text" id="mistake-input-title" class="input-control" placeholder="e.g., Wrong spelling in 6:00 PM ticker headline" style="width: 100%; font-size: 13.5px; padding: 9px 12px; border-radius: 10px;">
+                </div>
+
+                <!-- Detailed Notes -->
+                <div style="margin-bottom: 8px;">
+                    <label style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--text-main);">Detailed Notes / Guidance</label>
+                    <textarea id="mistake-input-desc" class="input-control" rows="3" placeholder="Provide context, what went wrong, and instructions to prevent recurrence..." style="width: 100%; font-size: 13px; padding: 9px 12px; border-radius: 10px; resize: vertical;"></textarea>
+                </div>
+            </div>
+
+            <div style="background: var(--bg-card-elevated, #f8fafc); padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-outline" onclick="closeAddMistakeModal()" style="min-width: 90px; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 10px;">
+                    Cancel
+                </button>
+                <button type="button" id="btn-save-mistake" class="btn btn-warning" onclick="submitMistakeForm()" style="min-width: 130px; padding: 8px 20px; font-size: 13px; font-weight: 700; border-radius: 10px; background: #ea580c; border-color: #ea580c; color: #fff;">
+                    <span>💾</span> Save Mistake
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: VIEW EMPLOYEE MISTAKES RECORD -->
+    <div id="modal-view-mistakes" class="modal-overlay" style="z-index: 10040;">
+        <div class="modal-card" style="max-width: 820px; border-radius: 20px; padding: 0; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.35);">
+            <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(239, 68, 68, 0.1)); padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                        ⚠️
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--text-main);">
+                            Quality & Mistakes Record — <span id="view-mistakes-emp-name" style="color: #0284c7;">Employee</span>
+                        </h3>
+                        <p style="margin: 3px 0 0 0; font-size: 12px; color: var(--text-muted);">
+                            Monthly & Yearly Quality Tracking and Defect Audit History
+                        </p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button type="button" class="btn btn-warning" onclick="openAddMistakeModal(null, currentMistakeEmpId)" style="padding: 6px 14px; font-size: 12px; font-weight: 700; border-radius: 8px; background: #ea580c; color: #fff;">
+                        <span>+</span> Log New
+                    </button>
+                    <button type="button" class="btn-modal-close" onclick="closeMistakesModal()">✕</button>
+                </div>
+            </div>
+
+            <!-- Summary KPI Statistics Bar -->
+            <div style="background: var(--bg-card-elevated, #f8fafc); padding: 16px 24px; border-bottom: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;">
+                <div style="background: var(--bg-card, #fff); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; text-align: center;">
+                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted);">This Month (<span id="view-mistakes-month-label">Month</span>)</div>
+                    <div id="stat-mistakes-month" style="font-size: 22px; font-weight: 800; color: #d97706; margin-top: 4px;">0</div>
+                </div>
+                <div style="background: var(--bg-card, #fff); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; text-align: center;">
+                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted);">This Year (<span id="view-mistakes-year-label">Year</span>)</div>
+                    <div id="stat-mistakes-year" style="font-size: 22px; font-weight: 800; color: var(--text-main); margin-top: 4px;">0</div>
+                </div>
+                <div style="background: var(--bg-card, #fff); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 12px; text-align: center;">
+                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #dc2626;">🔴 Critical</div>
+                    <div id="stat-mistakes-critical" style="font-size: 22px; font-weight: 800; color: #dc2626; margin-top: 4px;">0</div>
+                </div>
+                <div style="background: var(--bg-card, #fff); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 12px; text-align: center;">
+                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #c2410c;">🟠 Moderate</div>
+                    <div id="stat-mistakes-moderate" style="font-size: 22px; font-weight: 800; color: #c2410c; margin-top: 4px;">0</div>
+                </div>
+                <div style="background: var(--bg-card, #fff); border: 1px solid rgba(234, 179, 8, 0.25); border-radius: 12px; padding: 12px; text-align: center;">
+                    <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #b45309;">🟡 Minor</div>
+                    <div id="stat-mistakes-minor" style="font-size: 22px; font-weight: 800; color: #b45309; margin-top: 4px;">0</div>
+                </div>
+            </div>
+
+            <div style="padding: 20px 24px; max-height: 55vh; overflow-y: auto;">
+                <div id="view-mistakes-loading" style="display: none; text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
+                    ⏳ Loading quality mistakes history...
+                </div>
+
+                <div id="view-mistakes-empty" style="display: none; text-align: center; padding: 40px 20px; color: var(--text-muted);">
+                    <div style="font-size: 38px; margin-bottom: 8px;">🎉</div>
+                    <div style="font-size: 15px; font-weight: 700; color: var(--text-main);">Zero Mistakes Recorded!</div>
+                    <p style="font-size: 12.5px; margin: 4px 0 0 0;">This employee has maintained clean quality standards for this evaluation period.</p>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="matrix-table" style="font-size: 13px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 14%;">Date</th>
+                                <th style="width: 13%;">Severity</th>
+                                <th style="width: 20%;">Category</th>
+                                <th style="width: 35%;">Mistake & Guidance</th>
+                                <th style="width: 12%;">Logged By</th>
+                                <th style="width: 6%; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="view-mistakes-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="background: var(--bg-card-elevated, #f8fafc); padding: 14px 24px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+                <div style="font-size: 12px; color: var(--text-muted);">
+                    💡 Quality metrics are factored into monthly appraisals & reviews.
+                </div>
+                <button type="button" class="btn btn-outline" onclick="closeMistakesModal()" style="min-width: 90px; padding: 8px 18px; font-size: 13px; font-weight: 600; border-radius: 10px;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
 
 
 

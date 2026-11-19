@@ -145,10 +145,11 @@ function renderEmployeeBreakdown(data) {
 
     thead.innerHTML = `
         <tr>
-            <th style="width: 20%; text-align: left;">Team</th>
-            <th style="width: 25%; text-align: left;">Employee Name</th>
+            <th style="width: 18%; text-align: left;">Team</th>
+            <th style="width: 22%; text-align: left;">Employee Name</th>
             ${contentTypes.map(ct => `<th>${ct}</th>`).join('')}
             <th class="col-total">Total</th>
+            <th style="width: 10%; text-align: center; background: rgba(239, 68, 68, 0.08); color: #dc2626;">⚠️ Mistakes</th>
         </tr>
     `;
 
@@ -157,6 +158,7 @@ function renderEmployeeBreakdown(data) {
     const colTotals = {};
     contentTypes.forEach(ct => colTotals[ct] = 0);
     let grandTotal = 0;
+    let totalMistakes = 0;
 
     emps.forEach(emp => {
         const tr = document.createElement('tr');
@@ -167,11 +169,18 @@ function renderEmployeeBreakdown(data) {
         }).join('');
         grandTotal += (emp.total || 0);
 
+        const mCount = parseInt(emp.mistakes_count || 0);
+        totalMistakes += mCount;
+        const mistakeBadge = (mCount > 0)
+            ? `<span class="badge" style="background:#fee2e2; color:#dc2626; font-weight:800; padding:3px 9px; border-radius:12px; cursor:pointer;" onclick="openMistakesModal(${emp.employee_id}, '${escapeHtml(emp.employee_name)}', null, null, '${data.start_date || ''}', '${data.end_date || ''}')" title="Click to view ${mCount} mistake(s)">⚠️ ${mCount}</span>`
+            : `<span style="color:#94a3b8; font-size:12px;">0</span>`;
+
         tr.innerHTML = `
             <td style="text-align: left; font-weight: 600;">${escapeHtml(emp.team_name)}</td>
             <td style="text-align: left;">${escapeHtml(emp.employee_name)}</td>
             ${countsHtml}
             <td class="cell-row-total">${emp.total || 0}</td>
+            <td style="text-align: center;">${mistakeBadge}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -184,6 +193,7 @@ function renderEmployeeBreakdown(data) {
         <td colspan="2" style="font-weight: 800; text-align: left; padding-left: 14px;">Total</td>
         ${colTotalsHtml}
         <td class="cell-grand-total">${grandTotal}</td>
+        <td style="text-align: center; font-weight: 800; color: #dc2626;">${totalMistakes}</td>
     `;
     tbody.appendChild(totalsRow);
 }
@@ -1173,6 +1183,10 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                 ? `<span style="background: rgba(245, 158, 11, 0.15); color: #b45309; border: 1px solid rgba(245, 158, 11, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 4px; white-space: nowrap;" title="Worked on scheduled weekly off / rest day (Earned compensatory day off credit)">⭐ Off Worked</span>`
                 : '';
 
+            const mistakesPill = (r.mistakes_count > 0)
+                ? `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-left: 4px; cursor: pointer; white-space: nowrap;" onclick="openMistakesModal(${emp.id}, '${escapeHtml(emp.name)}', null, null, '${r.date}', '${r.date}')" title="${r.mistakes_count} quality mistake(s) logged on this date. Click to view.">⚠️ ${r.mistakes_count}</span>`
+                : '';
+
             let latePillHtml = '';
             if (r.check_in) {
                 if (r.is_late) {
@@ -1215,8 +1229,12 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                             ${escapeHtml(cleanStatusText)}
                         </span>
                         ${offWorkedPill}
+                        ${mistakesPill}
                     </td>
                     <td style="text-align: right; white-space: nowrap;">
+                        <button type="button" class="btn btn-outline" style="padding: 3px 6px; font-size: 11px; font-weight: 700; color: #dc2626; border-color: rgba(239, 68, 68, 0.35); margin-right: 4px;" onclick="openAddMistakeModal(null, ${emp.id}, '${r.date}')" title="Log Quality Mistake for this Date">
+                            ⚠️
+                        </button>
                         ${r.is_late && !r.late_excused ? `
                             <button type="button" class="btn btn-outline" style="padding: 3px 7px; font-size: 10.5px; font-weight: 700; color: #059669; border-color: rgba(16, 185, 129, 0.4); margin-right: 4px;" onclick="handleExcuseLateQuick(${emp.id}, '${r.date}')" title="1-Click Excuse Late Arrival">
                                 🛡️ Excuse
@@ -1298,6 +1316,11 @@ function renderSingleEmployeeTimesheet(item, globalData) {
                         <span style="color: ${balanceColor}; font-weight: 600;">Balance:</span>
                         <strong style="color: ${balanceColor}; font-weight: 800; margin-left: 4px;">${balanceText}</strong>
                     </div>
+
+                    <div style="padding: 4px 10px; background: ${(sum.total_mistakes || 0) > 0 ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-card)'}; border: 1px solid ${(sum.total_mistakes || 0) > 0 ? 'rgba(239, 68, 68, 0.3)' : 'var(--border-color)'}; border-radius: 6px; font-size: 12px; cursor: pointer;" onclick="openMistakesModal(${emp.id}, '${escapeHtml(emp.name)}', AppState.selectedMonth, AppState.selectedYear)" title="Click to view detailed employee mistake history">
+                        <span style="color: #dc2626; font-weight: 600;">⚠️ Mistakes:</span>
+                        <strong style="color: ${(sum.total_mistakes || 0) > 0 ? '#dc2626' : 'var(--text-muted)'}; font-weight: 800; margin-left: 4px;">${sum.total_mistakes || 0}</strong>
+                    </div>
                 </div>
 
                 <!-- Weekly Hours Pills -->
@@ -1374,6 +1397,12 @@ function renderMultiEmployeeAttendanceMatrix(data) {
                         ${sum.hour_balance >= 0 ? '+' + sum.hour_balance : sum.hour_balance}h
                     </strong>
                 </td>
+                <td style="text-align: center;">
+                    ${(sum.total_mistakes || 0) > 0
+                        ? `<span class="badge" style="background: rgba(239, 68, 68, 0.12); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 6px; cursor: pointer;" onclick="event.stopPropagation(); openMistakesModal(${emp.id}, '${escapeHtml(emp.name)}', AppState.selectedMonth, AppState.selectedYear)" title="Click to view all mistakes for ${escapeHtml(emp.name)}">⚠️ ${sum.total_mistakes}</span>`
+                        : `<span style="color: var(--text-dim); font-size: 11.5px;">0</span>`
+                    }
+                </td>
                 <td style="text-align: right;">
                     <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; white-space: nowrap;" onclick="event.stopPropagation(); selectEmployeeForReport(${emp.id})">
                         👁️ View
@@ -1406,6 +1435,7 @@ function renderMultiEmployeeAttendanceMatrix(data) {
                             <th>Duty Hours</th>
                             <th>Expected</th>
                             <th>Balance</th>
+                            <th title="Total Quality Mistakes in this period">⚠️ Mistakes</th>
                             <th style="text-align: right;">Action</th>
                         </tr>
                     </thead>
@@ -1466,7 +1496,7 @@ function exportAttendanceReportCsv() {
 
     if (hasDailyRecords) {
         // Detailed Timesheet CSV
-        csvContent += "Employee Name,Email,Designation,Department,Date,Day,Check In,Check Out,Duty Hours,Status,Is Late,Late Minutes,Late Excused,Leave Reason / Remarks\n";
+        csvContent += "Employee Name,Email,Designation,Department,Date,Day,Check In,Check Out,Duty Hours,Status,Is Late,Late Minutes,Late Excused,Mistakes,Leave Reason / Remarks\n";
 
         data.report_data.forEach(item => {
             const emp = item.employee;
@@ -1493,6 +1523,7 @@ function exportAttendanceReportCsv() {
                     `"${r.is_late ? 'Yes' : 'No'}"`,
                     `"${r.late_minutes || 0}"`,
                     `"${r.late_excused ? 'Yes' : 'No'}"`,
+                    `"${r.mistakes_count || 0}"`,
                     `"${note.replace(/"/g, '""')}"`
                 ];
                 csvContent += row.join(",") + "\n";
@@ -1500,7 +1531,7 @@ function exportAttendanceReportCsv() {
         });
     } else {
         // Company-Wide Summary Matrix CSV
-        csvContent += "Employee Name,Email,Designation,Department,Full Shifts,Short Shifts (6h),Half Shifts (4h),Approved Leaves,Absent Days,Late Arrivals,Late Minutes,Duty Hours,Expected Hours,Balance Hours\n";
+        csvContent += "Employee Name,Email,Designation,Department,Full Shifts,Short Shifts (6h),Half Shifts (4h),Approved Leaves,Absent Days,Late Arrivals,Late Minutes,Duty Hours,Expected Hours,Balance Hours,Mistakes\n";
 
         data.report_data.forEach(item => {
             const emp = item.employee;
@@ -1519,7 +1550,8 @@ function exportAttendanceReportCsv() {
                 `"${sum.late_minutes || 0}"`,
                 `"${sum.duty_formatted}"`,
                 `"${sum.expected_duty_hours} hrs"`,
-                `"${sum.hour_balance >= 0 ? '+' + sum.hour_balance : sum.hour_balance}h"`
+                `"${sum.hour_balance >= 0 ? '+' + sum.hour_balance : sum.hour_balance}h"`,
+                `"${sum.total_mistakes || 0}"`
             ];
             csvContent += row.join(",") + "\n";
         });

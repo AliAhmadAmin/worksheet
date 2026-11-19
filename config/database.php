@@ -864,6 +864,28 @@ function ensureDepartmentAndTeamsSchema($pdo) {
             INDEX idx_dept_cols (department_id, is_visible, sort_order)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        $pdo->exec("CREATE TABLE IF NOT EXISTS employee_mistakes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT NOT NULL,
+            sheet_id INT NULL,
+            entry_id INT NULL,
+            mistake_date DATE NOT NULL,
+            category VARCHAR(100) NOT NULL,
+            severity ENUM('minor', 'moderate', 'critical') DEFAULT 'minor',
+            title VARCHAR(255) NOT NULL,
+            description TEXT NULL,
+            logged_by INT NOT NULL,
+            status ENUM('logged', 'acknowledged', 'resolved') DEFAULT 'logged',
+            penalty_points INT DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_mistake_emp (employee_id, mistake_date),
+            INDEX idx_mistake_date (mistake_date),
+            INDEX idx_mistake_sheet (sheet_id),
+            INDEX idx_mistake_entry (entry_id),
+            INDEX idx_mistake_logged_by (logged_by)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         try {
             $checkCD = $pdo->query("SHOW COLUMNS FROM sheet_entries LIKE 'custom_data'")->fetch();
             if (!$checkCD) {

@@ -243,12 +243,35 @@ switch ($action) {
         $allEmps = $pdo->query("SELECT e.id, e.name, t.name as team_name FROM employees e LEFT JOIN teams t ON e.team_id = t.id {$empWhere} ORDER BY t.id ASC, e.name ASC")->fetchAll();
         foreach ($allEmps as $emp) {
             $empMap[$emp['id']] = [
+                'employee_id' => (int)$emp['id'],
                 'team_name' => $emp['team_name'] ?? 'General',
                 'employee_name' => $emp['name'],
                 'counts' => array_fill_keys($contentTypes, 0),
-                'total' => 0
+                'total' => 0,
+                'mistakes_count' => 0
             ];
         }
+
+        // Query mistakes count for employees in the selected date range
+        $mistakesMap = [];
+        $totalMistakesInReport = 0;
+        try {
+            $stmtMReport = $pdo->prepare("
+                SELECT em.employee_id, COUNT(*) as cnt 
+                FROM employee_mistakes em 
+                JOIN employees e ON em.employee_id = e.id 
+                {$empWhere} AND em.mistake_date BETWEEN ? AND ? 
+                GROUP BY em.employee_id
+            ");
+            $stmtMReport->execute([$startDate, $endDate]);
+            $mistakesMap = $stmtMReport->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+            foreach ($mistakesMap as $eId => $mCount) {
+                if (isset($empMap[$eId])) {
+                    $empMap[$eId]['mistakes_count'] = (int)$mCount;
+                }
+                $totalMistakesInReport += (int)$mCount;
+            }
+        } catch (Exception $e) {}
 
         foreach ($empRaw as $r) {
             $empId = $r['employee_id'];
@@ -335,6 +358,7 @@ switch ($action) {
             'column_totals' => $colTotals,
             'grand_total' => $grandTotal,
             'all_time_content' => $allTimeContent,
+            'total_mistakes' => $totalMistakesInReport,
             'employee_breakdown' => array_values($empMap),
             'duty_summary' => [
                 'active_employees' => (int)($dutySummary['active_employees'] ?? 0),
@@ -484,7 +508,7 @@ switch ($action) {
 
         fputcsv($output, []);
         fputcsv($output, ['Team & Employee Performance Breakdown']);
-        fputcsv($output, array_merge(['Team', 'Employee Name'], $contentTypes, ['Total']));
+        fputcsv($output, array_merge(['Team', 'Employee Name'], $contentTypes, ['Total', 'Mistakes']));
 
         if ($filterDeptId) {
             $empExportWhere = "WHERE e.is_active = 1 AND e.department_id = " . intval($filterDeptId);
@@ -493,6 +517,23 @@ switch ($action) {
         } else {
             $empExportWhere = "WHERE e.is_active = 1";
         }
+
+        // Query mistakes count for CSV
+        $exportMistakesMap = [];
+        $totalExportMistakes = 0;
+        try {
+            $mExpStmt = $pdo->prepare("
+                SELECT e.name, COUNT(*) as cnt 
+                FROM employee_mistakes em 
+                JOIN employees e ON em.employee_id = e.id 
+                {$empExportWhere} AND em.mistake_date BETWEEN ? AND ? 
+                GROUP BY e.id, e.name
+            ");
+            $mExpStmt->execute([$startDate, $endDate]);
+            $exportMistakesMap = $mExpStmt->fetchAll(PDO::FETCH_KEY_PAIR) ?: [];
+            $totalExportMistakes = array_sum($exportMistakesMap);
+        } catch (Exception $e) {}
+
         $empSql = "
             SELECT 
                 t.name as team_name,
@@ -544,9 +585,10 @@ switch ($action) {
 
         foreach ($emps as $e) {
             $tot = array_sum($e['counts']);
-            fputcsv($output, array_merge([$e['team'], $e['name']], array_values($e['counts']), [$tot]));
+            $mCount = $exportMistakesMap[$e['name']] ?? 0;
+            fputcsv($output, array_merge([$e['team'], $e['name']], array_values($e['counts']), [$tot, $mCount]));
         }
-        fputcsv($output, array_merge(['Total', ''], array_values($empColTotals), [$empGrandTotal]));
+        fputcsv($output, array_merge(['Total', ''], array_values($empColTotals), [$empGrandTotal, $totalExportMistakes]));
 
         fclose($output);
         exit;

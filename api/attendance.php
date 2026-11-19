@@ -1079,6 +1079,30 @@ switch ($action) {
                 $leavesByEmp = [];
             }
 
+            // Fetch mistakes within the evaluation window
+            $mistakesByEmpAndDate = [];
+            $mistakesCountByEmp = [];
+            try {
+                $mSql = "
+                    SELECT id, employee_id, mistake_date, category, severity, title 
+                    FROM employee_mistakes 
+                    WHERE mistake_date BETWEEN ? AND ?
+                ";
+                $mParams = [$startDate, $endDate];
+                if ($empIdFilter) {
+                    $mSql .= " AND employee_id = ?";
+                    $mParams[] = $empIdFilter;
+                }
+                $mStmt = $pdo->prepare($mSql);
+                $mStmt->execute($mParams);
+                while ($mRow = $mStmt->fetch(PDO::FETCH_ASSOC)) {
+                    $eId = (int)$mRow['employee_id'];
+                    $mDate = $mRow['mistake_date'];
+                    $mistakesByEmpAndDate[$eId][$mDate][] = $mRow;
+                    $mistakesCountByEmp[$eId] = ($mistakesCountByEmp[$eId] ?? 0) + 1;
+                }
+            } catch (Exception $e) {}
+
             // Generate list of days between startDate and endDate
             $periodDates = [];
             $currDate = $startDate;
@@ -1109,7 +1133,8 @@ switch ($action) {
                 'total_late_excused_days' => 0,
                 'total_duty_seconds' => 0,
                 'total_duty_hours' => 0,
-                'total_expected_hours' => 0
+                'total_expected_hours' => 0,
+                'total_mistakes' => array_sum($mistakesCountByEmp)
             ];
 
             foreach ($employees as $emp) {
@@ -1140,7 +1165,8 @@ switch ($action) {
                     'weekly_hours' => [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0],
                     'off_days_worked' => 0,
                     'alt_days_taken' => 0,
-                    'comp_off_balance' => 0
+                    'comp_off_balance' => 0,
+                    'total_mistakes' => $mistakesCountByEmp[$empId] ?? 0
                 ];
 
                 $empLeaves = $leavesByEmp[$empId] ?? [];
@@ -1619,7 +1645,9 @@ switch ($action) {
                             'late_excused_reason' => $lateExcusedReasonDay,
                             'effective_shift_timing' => $effShiftDay,
                             'work_summary' => $sheet['work_summary'] ?? '',
-                            'remarks' => $sheet['remarks'] ?? ''
+                            'remarks' => $sheet['remarks'] ?? '',
+                            'mistakes' => $mistakesByEmpAndDate[$empId][$dt] ?? [],
+                            'mistakes_count' => count($mistakesByEmpAndDate[$empId][$dt] ?? [])
                         ];
                     }
                 }
