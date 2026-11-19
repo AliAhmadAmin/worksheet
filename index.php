@@ -7,13 +7,13 @@ require_once __DIR__ . '/includes/auth_check.php';
 
 $userRoleIdx = strtolower($authUser['role'] ?? '');
 $deptLowerIdx = strtolower($authUser['department_name'] ?? '');
+$parentDeptLowerIdx = strtolower($authUser['parent_dept_name'] ?? '');
 $isGlobalAdminIdx = in_array($userRoleIdx, ['super_admin', 'admin']);
-$isHrIdx = ($userRoleIdx === 'hr' || stripos($deptLowerIdx, 'hr') !== false || !empty($authUser['can_manage_hr']));
-$canSwitchPortals = $isGlobalAdminIdx || $isHrIdx;
+$canSwitchPortals = $isGlobalAdminIdx;
 
 $currentPage = 'worksheet';
 
-// Handle explicit portal switch via ?portal=
+// Handle explicit portal switch via ?portal= (Global Admins only)
 if (!empty($_GET['portal']) && $canSwitchPortals) {
     $req = strtolower(trim($_GET['portal']));
     if (in_array($req, ['digital', 'newsroom', 'programming', 'hr'], true)) {
@@ -21,15 +21,15 @@ if (!empty($_GET['portal']) && $canSwitchPortals) {
     }
 }
 
-// Preserve portal context based on employee's department or active admin/hr portal
+// Determine active workspace portal based on admin selection or user department
 if ($canSwitchPortals && !empty($_SESSION['active_portal'])) {
     $currentPortal = $_SESSION['active_portal'];
-} elseif (stripos($deptLowerIdx, 'news') !== false) {
-    $currentPortal = 'newsroom';
-} elseif (stripos($deptLowerIdx, 'prog') !== false) {
-    $currentPortal = 'programming';
-} elseif ($isHrIdx) {
+} elseif ($userRoleIdx === 'hr' || (stripos($deptLowerIdx, 'hr') !== false && $userRoleIdx !== 'hod') || ($userRoleIdx === 'hod' && stripos($deptLowerIdx, 'hr') !== false)) {
     $currentPortal = 'hr';
+} elseif (stripos($deptLowerIdx, 'news') !== false || stripos($parentDeptLowerIdx, 'news') !== false) {
+    $currentPortal = 'newsroom';
+} elseif (stripos($deptLowerIdx, 'prog') !== false || stripos($parentDeptLowerIdx, 'prog') !== false) {
+    $currentPortal = 'programming';
 } else {
     $currentPortal = 'digital';
 }

@@ -98,6 +98,9 @@ switch ($action) {
         // Regenerate Session ID to prevent Session Fixation Attacks
         session_regenerate_id(true);
 
+        // Reset any stale portal state from previous sessions
+        unset($_SESSION['active_portal']);
+
         // Login success - populate session
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['user_name'] = $user['name'];
@@ -105,11 +108,25 @@ switch ($action) {
         $_SESSION['email'] = $user['email'];
         $_SESSION['department_id'] = $user['department_id'] ?? 0;
 
-        // Determine destination landing dashboard
-        $redirectUrl = 'index.php';
         $userRole = strtolower($user['role'] ?? '');
         $deptLower = strtolower($user['department_name'] ?? '');
-        if ($userRole === 'hr' || $deptLower === 'hr' || $deptLower === 'human resources') {
+
+        // Initialize active portal accurately based on role and department
+        if ($userRole === 'super_admin' || $userRole === 'admin') {
+            $_SESSION['active_portal'] = 'digital';
+        } elseif ($userRole === 'hr' || (stripos($deptLower, 'hr') !== false && $userRole !== 'hod') || ($userRole === 'hod' && stripos($deptLower, 'hr') !== false)) {
+            $_SESSION['active_portal'] = 'hr';
+        } elseif (stripos($deptLower, 'news') !== false) {
+            $_SESSION['active_portal'] = 'newsroom';
+        } elseif (stripos($deptLower, 'prog') !== false) {
+            $_SESSION['active_portal'] = 'programming';
+        } else {
+            $_SESSION['active_portal'] = 'digital';
+        }
+
+        // Determine destination landing dashboard
+        $redirectUrl = 'index.php';
+        if ($_SESSION['active_portal'] === 'hr') {
             $redirectUrl = 'hr.php';
         }
 

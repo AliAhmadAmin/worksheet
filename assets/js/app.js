@@ -622,9 +622,10 @@ function hasPermission(permKey) {
 
 function applyRoleBasedVisibility(user) {
     if (!user) return;
-    const isSuperAdmin = user.role === 'super_admin';
-    const isHod = user.role === 'hod' || user.role === 'admin';
-    const isHr = (user.role === 'hr' || (user.department_name && user.department_name.toLowerCase() === 'hr') || !!parseInt(user.can_manage_hr || 0)) && user.role !== 'hod';
+    const uRole = (user.role || '').toLowerCase();
+    const isSuperAdmin = uRole === 'super_admin';
+    const isHod = uRole === 'hod' || uRole === 'deputy_hod' || uRole === 'admin';
+    const isHr = (uRole === 'hr' || (user.department_name && user.department_name.toLowerCase().includes('hr')) || !!parseInt(user.can_manage_hr || 0)) && uRole !== 'hod';
     const canInspect = isSuperAdmin || isHod || isHr || !!parseInt(user.can_inspect_sheets || 0);
     const canManage = isSuperAdmin || isHod || isHr || !!parseInt(user.can_manage_employees || 0);
     const canAttendance = isSuperAdmin || isHod || isHr || !!parseInt(user.can_view_attendance || 0);
@@ -646,6 +647,7 @@ function applyRoleBasedVisibility(user) {
     document.querySelectorAll('.nav-btn[data-tab="tab-attendance"]').forEach(el => el.style.display = canAttendance ? '' : 'none');
     document.querySelectorAll('.nav-btn[data-tab="tab-employees"]').forEach(el => el.style.display = canManage ? '' : 'none');
     document.querySelectorAll('.nav-btn[data-tab="tab-reports"]').forEach(el => el.style.display = canReports ? '' : 'none');
+    document.querySelectorAll('.nav-btn[data-tab="tab-roster"]').forEach(el => el.style.display = (isSuperAdmin || isHod || isHr) ? '' : 'none');
 
     const uRole = (user.role || '').toLowerCase();
     const uDept = (user.department_name || '').toLowerCase();

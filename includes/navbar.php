@@ -1,19 +1,20 @@
 <?php
 if (empty($currentPortal)) {
-    if (!empty($_SESSION['active_portal'])) {
+    $userRolePortal = strtolower($authUser['role'] ?? '');
+    $userDeptPortal = strtolower($authUser['department_name'] ?? '');
+    $userParentDeptPortal = strtolower($authUser['parent_dept_name'] ?? '');
+    $isGlobalAdminPortal = in_array($userRolePortal, ['super_admin', 'admin']);
+
+    if ($isGlobalAdminPortal && !empty($_SESSION['active_portal'])) {
         $currentPortal = $_SESSION['active_portal'];
+    } elseif ($userRolePortal === 'hr' || (stripos($userDeptPortal, 'hr') !== false && $userRolePortal !== 'hod') || ($userRolePortal === 'hod' && stripos($userDeptPortal, 'hr') !== false)) {
+        $currentPortal = 'hr';
+    } elseif (stripos($userDeptPortal, 'news') !== false || stripos($userParentDeptPortal, 'news') !== false) {
+        $currentPortal = 'newsroom';
+    } elseif (stripos($userDeptPortal, 'prog') !== false || stripos($userParentDeptPortal, 'prog') !== false) {
+        $currentPortal = 'programming';
     } else {
-        $userRolePortal = strtolower($authUser['role'] ?? '');
-        $userDeptPortal = strtolower($authUser['department_name'] ?? '');
-        if ($userRolePortal === 'hr' || stripos($userDeptPortal, 'hr') !== false) {
-            $currentPortal = 'hr';
-        } elseif (stripos($userDeptPortal, 'news') !== false) {
-            $currentPortal = 'newsroom';
-        } elseif (stripos($userDeptPortal, 'prog') !== false) {
-            $currentPortal = 'programming';
-        } else {
-            $currentPortal = 'digital';
-        }
+        $currentPortal = 'digital';
     }
 }
 
@@ -69,12 +70,13 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         <?php 
         $userRole = strtolower($authUser['role'] ?? 'employee');
         $userDept = strtolower($authUser['department_name'] ?? '');
+        $userParentDept = strtolower($authUser['parent_dept_name'] ?? '');
         $isGlobalAdmin = in_array($userRole, ['super_admin', 'admin']);
-        $isHrRole = ($userRole === 'hr' || stripos($userDept, 'hr') !== false || !empty($authUser['can_manage_hr']));
-        $canSwitchPortals = $isGlobalAdmin || $isHrRole;
-        $isNewsDept = (stripos($userDept, 'news') !== false);
-        $isProgDept = (stripos($userDept, 'prog') !== false);
-        $isDigitalDept = (stripos($userDept, 'digital') !== false);
+        $isHrRole = ($userRole === 'hr' || (stripos($userDept, 'hr') !== false && $userRole !== 'hod') || ($userRole === 'hod' && stripos($userDept, 'hr') !== false));
+        $canSwitchPortals = $isGlobalAdmin;
+        $isNewsDept = (stripos($userDept, 'news') !== false || stripos($userParentDept, 'news') !== false);
+        $isProgDept = (stripos($userDept, 'prog') !== false || stripos($userParentDept, 'prog') !== false);
+        $isDigitalDept = (stripos($userDept, 'digital') !== false || (!$isNewsDept && !$isProgDept && !$isHrRole));
 
         // Access permissions:
         // - News Handover: visible to News Room, Digital Media, HR, or Global Admin (Programming cannot see)
@@ -82,7 +84,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
 
         // - Program Handover: visible to Programming, Digital Media, HR, or Global Admin (News Room cannot see)
         $canViewProgHandover = $isGlobalAdmin || $isHrRole || ($isProgDept && !$isNewsDept) || $isDigitalDept;
-        $canViewManagement = $isGlobalAdmin || $isHrRole || $userRole === 'hod' || !empty($authUser['can_view_reports']) || !empty($authUser['can_view_attendance']) || !empty($authUser['can_manage_employees']);
+        $canViewManagement = $isGlobalAdmin || $isHrRole || in_array($userRole, ['hod', 'deputy_hod']) || !empty($authUser['can_view_reports']) || !empty($authUser['can_view_attendance']) || !empty($authUser['can_manage_employees']);
         $isHodNav = in_array($userRole, ['hod', 'deputy_hod']);
         ?>
         <?php if ($canSwitchPortals): ?>
@@ -389,6 +391,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span id="pending-news-badge" class="nav-badge badge-warning" style="display: none; background: #dc2626; color: #fff;">0</span>
             </a>
             <?php endif; ?>
+            <a href="fresh_programs.php" class="nav-btn <?= ($activeNavPage === 'fresh_programs') ? 'active' : '' ?>" data-tab="tab-fresh-programs" data-route="fresh_programs">
+                <span class="nav-icon">🎬</span>
+                <span class="nav-label">Fresh Programs</span>
+            </a>
         </div>
 
         <!-- People & Services Category -->

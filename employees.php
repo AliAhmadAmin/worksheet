@@ -6,7 +6,7 @@
 require_once __DIR__ . '/includes/auth_check.php';
 
 $userRoleEmp = strtolower($authUser['role'] ?? '');
-$canAccessEmployees = in_array($userRoleEmp, ['super_admin', 'admin', 'hr']) || !empty($authUser['can_manage_employees']);
+$canAccessEmployees = in_array($userRoleEmp, ['super_admin', 'admin', 'hr', 'hod', 'deputy_hod']) || !empty($authUser['can_manage_employees']);
 
 if (!$canAccessEmployees) {
     header('Location: index.php');
