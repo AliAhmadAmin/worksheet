@@ -627,12 +627,22 @@ class ZKTecoAttendanceService {
                 $inTs = strtotime($punchDate . ' ' . $refInStr);
                 $outTs = $curTs;
                 if ($outTs < $inTs) {
-                    $outTs += 86400; // Overnight shift
+                    $inH = (int)date('H', $inTs);
+                    $outH = (int)date('H', $outTs);
+                    // Only treat as overnight shift if in is afternoon/evening (>= 14) and out is morning (< 12)
+                    if ($inH >= 14 && $outH < 12) {
+                        $outTs += 86400; // Overnight shift
+                        $dutySeconds = max(0, $outTs - $inTs);
+                    } else {
+                        // Inverted punch on same day (e.g. out at 2:37 PM vs in at 2:41 PM) -> do NOT add 24 hours!
+                        $dutySeconds = 0;
+                    }
+                } else {
+                    $dutySeconds = max(0, $outTs - $inTs);
                 }
-                $dutySeconds = max(0, $outTs - $inTs);
                 $h = floor($dutySeconds / 3600);
                 $m = floor(($dutySeconds % 3600) / 60);
-                $dutyFormatted = sprintf('%02d:%02d:00', $h, $m);
+                $dutyFormatted = ($dutySeconds > 0) ? sprintf('%02d:%02d:00', $h, $m) : null;
             }
 
             if (!$sheet) {
@@ -800,29 +810,44 @@ class ZKTecoAttendanceService {
                 }
 
                 // Biometric in is empty
-                // If today's sheet has an earlier morning out time (e.g. Out 01:54 AM vs In 01:58 PM):
-                // That out punch was an overnight departure from yesterday's shift!
-                if (!empty($sheet['biometric_out_time'])) {
-                    $existingOutTs = strtotime($punchDate . ' ' . $sheet['biometric_out_time']);
-                    if ($existingOutTs && $existingOutTs < $curTs && (int)date('H', $existingOutTs) < 10) {
-                        $prevDate = date('Y-m-d', strtotime($punchDate . ' -1 day'));
-                        $stmtPrev = $this->pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
-                        $stmtPrev->execute([$empId, $prevDate]);
-                        $prevS = $stmtPrev->fetch(PDO::FETCH_ASSOC);
-                        if ($prevS) {
-                            $prevIn = !empty($prevS['biometric_in_time']) ? $prevS['biometric_in_time'] : (!empty($prevS['check_in_time']) ? $prevS['check_in_time'] : null);
-                            if ($prevIn) {
-                                $inT = strtotime($prevDate . ' ' . $prevIn);
-                                $dutyS = max(0, $existingOutTs - $inT);
-                                $h = floor($dutyS / 3600);
-                                $m = floor(($dutyS % 3600) / 60);
-                                $dutyF = sprintf('%02d:%02d:00', $h, $m);
-                                $this->pdo->prepare("UPDATE daily_sheets SET biometric_out_time = ?, biometric_duty_hours = ?, biometric_duty_seconds = ? WHERE id = ?")->execute([$sheet['biometric_out_time'], $dutyF, $dutyS, $prevS['id']]);
+                // If today's sheet has an earlier out time (either morning overnight out OR accidental out punch right before in):
+                if (!empty($sheet['biometric_out_time']) || !empty($sheet['check_out_time'])) {
+                    $existingOutStr = !empty($sheet['biometric_out_time']) ? $sheet['biometric_out_time'] : $sheet['check_out_time'];
+                    $existingOutTs = strtotime($punchDate . ' ' . $existingOutStr);
+                    if ($existingOutTs && $existingOutTs <= $curTs) {
+                        if ((int)date('H', $existingOutTs) < 10) {
+                            $prevDate = date('Y-m-d', strtotime($punchDate . ' -1 day'));
+                            $stmtPrev = $this->pdo->prepare("SELECT * FROM daily_sheets WHERE employee_id = ? AND sheet_date = ?");
+                            $stmtPrev->execute([$empId, $prevDate]);
+                            $prevS = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+                            if ($prevS) {
+                                $prevIn = !empty($prevS['biometric_in_time']) ? $prevS['biometric_in_time'] : (!empty($prevS['check_in_time']) ? $prevS['check_in_time'] : null);
+                                if ($prevIn) {
+                                    $inT = strtotime($prevDate . ' ' . $prevIn);
+                                    $dutyS = max(0, $existingOutTs - $inT);
+                                    $h = floor($dutyS / 3600);
+                                    $m = floor(($dutyS % 3600) / 60);
+                                    $dutyF = sprintf('%02d:%02d:00', $h, $m);
+                                    $this->pdo->prepare("UPDATE daily_sheets SET biometric_out_time = ?, biometric_duty_hours = ?, biometric_duty_seconds = ? WHERE id = ?")->execute([$existingOutStr, $dutyF, $dutyS, $prevS['id']]);
+                                }
                             }
                         }
-                        // Clear out time from today's sheet
-                        $this->pdo->prepare("UPDATE daily_sheets SET biometric_out_time = NULL, biometric_duty_hours = NULL, biometric_duty_seconds = 0 WHERE id = ?")->execute([$sheet['id']]);
+                        // Clear out time, duty hours and unlock sheet from today's sheet so employee starts fresh On Duty!
+                        $this->pdo->prepare("
+                            UPDATE daily_sheets 
+                            SET biometric_out_time = NULL, 
+                                biometric_duty_hours = NULL, 
+                                biometric_duty_seconds = 0, 
+                                check_out_time = NULL, 
+                                total_duty_hours = NULL, 
+                                total_duty_seconds = 0, 
+                                is_locked = 0, 
+                                locked_at = NULL 
+                            WHERE id = ?
+                        ")->execute([$sheet['id']]);
                         $sheet['biometric_out_time'] = null;
+                        $sheet['check_out_time'] = null;
+                        $sheet['is_locked'] = 0;
                     }
                 }
 

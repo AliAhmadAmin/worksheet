@@ -8,9 +8,10 @@ require_once __DIR__ . '/includes/auth_check.php';
 $userRoleNr = strtolower($authUser['role'] ?? '');
 $deptNameNr = strtolower($authUser['department_name'] ?? '');
 $isGlobalAdminNr = in_array($userRoleNr, ['super_admin', 'admin']);
+$isHrMemberNr = ($userRoleNr === 'hr' || stripos($deptNameNr, 'hr') !== false || !empty($authUser['can_manage_hr']));
 $isNewsMemberNr = (stripos($deptNameNr, 'news') !== false);
 $isDigitalMemberNr = (stripos($deptNameNr, 'digital') !== false);
-$canAccessNewsroom = $isGlobalAdminNr || $isNewsMemberNr || $isDigitalMemberNr;
+$canAccessNewsroom = $isGlobalAdminNr || $isHrMemberNr || $isNewsMemberNr || $isDigitalMemberNr;
 
 if (!$canAccessNewsroom) {
     header('Location: index.php');
@@ -18,8 +19,8 @@ if (!$canAccessNewsroom) {
 }
 
 $currentPage = 'newsroom';
-$currentPortal = ($isNewsMemberNr && !$isDigitalMemberNr) ? 'newsroom' : 'digital';
-if (session_status() === PHP_SESSION_ACTIVE && $isNewsMemberNr) {
+$currentPortal = 'newsroom';
+if (session_status() === PHP_SESSION_ACTIVE) {
     $_SESSION['active_portal'] = 'newsroom';
 }
 

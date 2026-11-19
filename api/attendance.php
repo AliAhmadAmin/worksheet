@@ -389,8 +389,16 @@ switch ($action) {
                     if ($checkOutTs >= $checkInTs) {
                         $dutySeconds = $checkOutTs - $checkInTs;
                     } else {
-                        // Crossed midnight (e.g. 6PM to 2AM)
-                        $dutySeconds = ($checkOutTs + 86400) - $checkInTs;
+                        // Inverted punch or genuine overnight shift
+                        $inH = (int)date('H', $checkInTs);
+                        $outH = (int)date('H', $checkOutTs);
+                        if ($inH >= 14 && $outH < 12) {
+                            // Genuine overnight shift (e.g. 6 PM to 2 AM next day)
+                            $dutySeconds = ($checkOutTs + 86400) - $checkInTs;
+                        } else {
+                            // Accidental early checkout punch before checkin on same day
+                            $dutySeconds = 0;
+                        }
                     }
                 }
             }
@@ -464,7 +472,13 @@ switch ($action) {
                     if ($outTs >= $inTs) {
                         $dutySeconds = $outTs - $inTs;
                     } else {
-                        $dutySeconds = ($outTs + 86400) - $inTs;
+                        $inH = (int)date('H', $inTs);
+                        $outH = (int)date('H', $outTs);
+                        if ($inH >= 14 && $outH < 12) {
+                            $dutySeconds = ($outTs + 86400) - $inTs;
+                        } else {
+                            $dutySeconds = 0;
+                        }
                     }
                     $dutyFormatted = formatDutyTime($dutySeconds);
                 }
@@ -731,6 +745,39 @@ switch ($action) {
         }
 
         foreach ($rows as &$r) {
+            // Self-heal inverted punches on today's live roster (accidental early checkout punch before checkin)
+            if ($date === date('Y-m-d') && !empty($r['check_in_time']) && !empty($r['check_out_time'])) {
+                $cInTs = strtotime($date . ' ' . $r['check_in_time']);
+                $cOutTs = strtotime($date . ' ' . $r['check_out_time']);
+                if ($cInTs && $cOutTs && $cOutTs < $cInTs) {
+                    $inH = (int)date('H', $cInTs);
+                    $outH = (int)date('H', $cOutTs);
+                    if (!($inH >= 14 && $outH < 12)) {
+                        // Inverted punch on same day! Clear checkout and restore to active on-duty
+                        $r['check_out_time'] = null;
+                        $r['total_duty_hours'] = null;
+                        $r['is_locked'] = 0;
+
+                        if (!empty($r['sheet_id'])) {
+                            try {
+                                $pdo->prepare("
+                                    UPDATE daily_sheets 
+                                    SET check_out_time = NULL, 
+                                        biometric_out_time = NULL, 
+                                        biometric_duty_hours = NULL, 
+                                        biometric_duty_seconds = 0, 
+                                        total_duty_hours = NULL, 
+                                        total_duty_seconds = 0, 
+                                        is_locked = 0, 
+                                        locked_at = NULL 
+                                    WHERE id = ?
+                                ")->execute([$r['sheet_id']]);
+                            } catch (Throwable $e) {}
+                        }
+                    }
+                }
+            }
+
             // Track late arrivals
             if (!empty($r['check_in_time']) && !empty($r['is_late']) && empty($r['late_excused'])) {
                 $stats['late_count']++;
@@ -741,7 +788,13 @@ switch ($action) {
                 $cInTs = strtotime($date . ' ' . $r['check_in_time']);
                 $cOutTs = strtotime($date . ' ' . $r['check_out_time']);
                 if ($cOutTs < $cInTs) {
-                    $cOutTs = strtotime($date . ' ' . $r['check_out_time'] . ' +1 day');
+                    $inH = (int)date('H', $cInTs);
+                    $outH = (int)date('H', $cOutTs);
+                    if ($inH >= 14 && $outH < 12) {
+                        $cOutTs = strtotime($date . ' ' . $r['check_out_time'] . ' +1 day');
+                    } else {
+                        $cOutTs = $cInTs;
+                    }
                 }
                 $dutySec = max(0, $cOutTs - $cInTs);
                 $h = floor($dutySec / 3600);

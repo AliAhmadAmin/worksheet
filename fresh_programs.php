@@ -8,8 +8,9 @@ require_once __DIR__ . '/includes/auth_check.php';
 $userRolePg = strtolower($authUser['role'] ?? '');
 $deptNamePg = strtolower($authUser['department_name'] ?? '');
 $isGlobalAdminPg = in_array($userRolePg, ['super_admin', 'admin', 'manager']);
+$isHrMemberPg = ($userRolePg === 'hr' || stripos($deptNamePg, 'hr') !== false || !empty($authUser['can_manage_hr']));
 $isDigitalMemberPg = (stripos($deptNamePg, 'digital') !== false);
-$canAccess = $isGlobalAdminPg || $isDigitalMemberPg || in_array($userRolePg, ['hod', 'deputy_hod']);
+$canAccess = $isGlobalAdminPg || $isHrMemberPg || $isDigitalMemberPg || in_array($userRolePg, ['hod', 'deputy_hod']);
 
 if (!$canAccess) {
     header('Location: index.php');

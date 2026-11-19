@@ -79,6 +79,40 @@ switch ($action) {
         $sheetStmt->execute([$empId, $date]);
         $sheet = $sheetStmt->fetch();
 
+        // Self-heal: If check_out_time exists but is earlier than check_in_time on the same day (inverted/accidental checkout punch)
+        if ($sheet && !empty($sheet['check_in_time']) && !empty($sheet['check_out_time'])) {
+            $inTs = strtotime($date . ' ' . $sheet['check_in_time']);
+            $outTs = strtotime($date . ' ' . $sheet['check_out_time']);
+            if ($inTs && $outTs && $outTs < $inTs) {
+                $inH = (int)date('H', $inTs);
+                $outH = (int)date('H', $outTs);
+                $isLegitOvernight = ($inH >= 14 && $outH < 12 && $date < date('Y-m-d'));
+                if (!$isLegitOvernight) {
+                    $pdo->prepare("
+                        UPDATE daily_sheets 
+                        SET check_out_time = NULL, 
+                            biometric_out_time = NULL, 
+                            biometric_duty_hours = NULL, 
+                            biometric_duty_seconds = 0, 
+                            total_duty_hours = NULL, 
+                            total_duty_seconds = 0, 
+                            is_locked = 0, 
+                            locked_at = NULL 
+                        WHERE id = ?
+                    ")->execute([$sheet['id']]);
+
+                    $sheet['check_out_time'] = null;
+                    $sheet['biometric_out_time'] = null;
+                    $sheet['biometric_duty_hours'] = null;
+                    $sheet['biometric_duty_seconds'] = 0;
+                    $sheet['total_duty_hours'] = null;
+                    $sheet['total_duty_seconds'] = 0;
+                    $sheet['is_locked'] = 0;
+                    $sheet['locked_at'] = null;
+                }
+            }
+        }
+
         $entries = [];
         if ($sheet) {
             $entriesStmt = $pdo->prepare("SELECT * FROM sheet_entries WHERE sheet_id = ? ORDER BY id ASC");

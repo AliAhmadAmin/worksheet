@@ -70,20 +70,22 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
         $userRole = strtolower($authUser['role'] ?? 'employee');
         $userDept = strtolower($authUser['department_name'] ?? '');
         $isGlobalAdmin = in_array($userRole, ['super_admin', 'admin']);
+        $isHrRole = ($userRole === 'hr' || stripos($userDept, 'hr') !== false || !empty($authUser['can_manage_hr']));
+        $canSwitchPortals = $isGlobalAdmin || $isHrRole;
         $isNewsDept = (stripos($userDept, 'news') !== false);
         $isProgDept = (stripos($userDept, 'prog') !== false);
         $isDigitalDept = (stripos($userDept, 'digital') !== false);
 
         // Access permissions:
-        // - News Handover: visible to News Room, Digital Media, or Global Admin (Programming cannot see)
-        $canViewNewsHandover = $isGlobalAdmin || ($isNewsDept && !$isProgDept) || $isDigitalDept;
+        // - News Handover: visible to News Room, Digital Media, HR, or Global Admin (Programming cannot see)
+        $canViewNewsHandover = $isGlobalAdmin || $isHrRole || ($isNewsDept && !$isProgDept) || $isDigitalDept;
 
-        // - Program Handover: visible to Programming, Digital Media, or Global Admin (News Room cannot see)
-        $canViewProgHandover = $isGlobalAdmin || ($isProgDept && !$isNewsDept) || $isDigitalDept;
-        $canViewManagement = $isGlobalAdmin || $userRole === 'hod' || !empty($authUser['can_view_reports']) || !empty($authUser['can_view_attendance']) || !empty($authUser['can_manage_employees']);
+        // - Program Handover: visible to Programming, Digital Media, HR, or Global Admin (News Room cannot see)
+        $canViewProgHandover = $isGlobalAdmin || $isHrRole || ($isProgDept && !$isNewsDept) || $isDigitalDept;
+        $canViewManagement = $isGlobalAdmin || $isHrRole || $userRole === 'hod' || !empty($authUser['can_view_reports']) || !empty($authUser['can_view_attendance']) || !empty($authUser['can_manage_employees']);
         $isHodNav = in_array($userRole, ['hod', 'deputy_hod']);
         ?>
-        <?php if ($isGlobalAdmin): ?>
+        <?php if ($canSwitchPortals): ?>
         <div class="portal-switcher-wrapper admin-only" style="position: relative;">
             <button type="button" class="portal-switcher-btn" onclick="togglePortalMenu()" id="portal-switcher-btn" title="Switch Department Workspace Portal">
                 <span class="portal-icon"><?= $currentPortal === 'hr' ? '💼' : ($currentPortal === 'newsroom' ? '📺' : ($currentPortal === 'programming' ? '📡' : '🎬')) ?></span>
@@ -98,7 +100,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <div class="portal-dropdown-header">
                     <span>🏢 Active Department Portals</span>
                 </div>
-                <a href="index.php" class="portal-menu-item <?= $currentPortal === 'digital' ? 'active' : '' ?>">
+                <a href="index.php?portal=digital" class="portal-menu-item <?= $currentPortal === 'digital' ? 'active' : '' ?>">
                     <span class="item-icon">🎬</span>
                     <div class="item-info">
                         <div class="item-title">Digital Media Portal</div>
@@ -106,7 +108,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                     </div>
                     <?php if ($currentPortal === 'digital'): ?><span class="item-check">✓</span><?php endif; ?>
                 </a>
-                <a href="newsroom.php" class="portal-menu-item <?= $currentPortal === 'newsroom' ? 'active' : '' ?>">
+                <a href="newsroom.php?portal=newsroom" class="portal-menu-item <?= $currentPortal === 'newsroom' ? 'active' : '' ?>">
                     <span class="item-icon">📺</span>
                     <div class="item-info">
                         <div class="item-title">News Room Portal</div>
@@ -114,7 +116,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                     </div>
                     <?php if ($currentPortal === 'newsroom'): ?><span class="item-check">✓</span><?php endif; ?>
                 </a>
-                <a href="programming.php" class="portal-menu-item <?= $currentPortal === 'programming' ? 'active' : '' ?>">
+                <a href="programming.php?portal=programming" class="portal-menu-item <?= $currentPortal === 'programming' ? 'active' : '' ?>">
                     <span class="item-icon">📡</span>
                     <div class="item-info">
                         <div class="item-title">Programming Portal</div>
@@ -122,7 +124,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                     </div>
                     <?php if ($currentPortal === 'programming'): ?><span class="item-check">✓</span><?php endif; ?>
                 </a>
-                <a href="hr.php" class="portal-menu-item <?= $currentPortal === 'hr' ? 'active' : '' ?>">
+                <a href="hr.php?portal=hr" class="portal-menu-item <?= $currentPortal === 'hr' ? 'active' : '' ?>">
                     <span class="item-icon">💼</span>
                     <div class="item-info">
                         <div class="item-title">HR & People Portal</div>

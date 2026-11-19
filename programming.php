@@ -8,9 +8,10 @@ require_once __DIR__ . '/includes/auth_check.php';
 $userRolePg = strtolower($authUser['role'] ?? '');
 $deptNamePg = strtolower($authUser['department_name'] ?? '');
 $isGlobalAdminPg = in_array($userRolePg, ['super_admin', 'admin']);
+$isHrMemberPg = ($userRolePg === 'hr' || stripos($deptNamePg, 'hr') !== false || !empty($authUser['can_manage_hr']));
 $isProgMemberPg = (stripos($deptNamePg, 'prog') !== false);
 $isDigitalMemberPg = (stripos($deptNamePg, 'digital') !== false);
-$canAccessProgramming = $isGlobalAdminPg || $isProgMemberPg || $isDigitalMemberPg;
+$canAccessProgramming = $isGlobalAdminPg || $isHrMemberPg || $isProgMemberPg || $isDigitalMemberPg;
 
 if (!$canAccessProgramming) {
     header('Location: index.php');
@@ -18,8 +19,8 @@ if (!$canAccessProgramming) {
 }
 
 $currentPage = 'programming';
-$currentPortal = ($isProgMemberPg && !$isDigitalMemberPg) ? 'programming' : 'digital';
-if (session_status() === PHP_SESSION_ACTIVE && $isProgMemberPg) {
+$currentPortal = 'programming';
+if (session_status() === PHP_SESSION_ACTIVE) {
     $_SESSION['active_portal'] = 'programming';
 }
 
