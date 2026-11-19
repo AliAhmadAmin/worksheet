@@ -121,6 +121,13 @@ try {
                             </div>
                             <span style="font-size: 18px; opacity: 0.8;">🔵</span>
                         </div>
+                        <div id="card-stat-missing" class="live-kpi-card" onclick="filterLiveRosterCards('missing_out')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter staff who forgot to checkout (missing punches)">
+                            <div>
+                                <span style="font-size: 9.5px; color: #d97706; font-weight: 800; text-transform: uppercase;">⚠️ MISSING OUT</span>
+                                <h3 id="att-stat-missing" style="font-size: 18px; color: #d97706; margin: 2px 0 0; font-weight: 800; line-height: 1.1;">0</h3>
+                            </div>
+                            <span style="font-size: 18px; opacity: 0.8;">⚠️</span>
+                        </div>
                         <div id="card-stat-absent-box" class="live-kpi-card" onclick="filterLiveRosterCards('absent')" style="background: var(--bg-card-elevated); padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all 0.2s ease;" title="Click to filter by Shift Pending / Absent staff">
                             <div>
                                 <span style="font-size: 9.5px; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">ABSENT / OFF</span>

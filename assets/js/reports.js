@@ -259,6 +259,7 @@ function updateLiveCardActiveStates(activeFilter) {
         'all': 'card-stat-total',
         'working': 'card-stat-working',
         'checked_out': 'card-stat-out',
+        'missing_out': 'card-stat-missing',
         'absent': 'card-stat-absent-box',
         'late': 'card-stat-late',
         'checked': 'card-stat-checked',
@@ -291,6 +292,8 @@ function renderLiveAttendanceTable() {
         filteredEmployees = filteredEmployees.filter(e => e.status === 'working');
     } else if (currentLiveAttendanceFilter === 'checked_out') {
         filteredEmployees = filteredEmployees.filter(e => e.status === 'checked_out');
+    } else if (currentLiveAttendanceFilter === 'missing_out') {
+        filteredEmployees = filteredEmployees.filter(e => e.status === 'missing_out');
     } else if (currentLiveAttendanceFilter === 'absent') {
         filteredEmployees = filteredEmployees.filter(e => e.status === 'not_arrived' || e.status === 'absent' || e.status === 'holiday');
     } else if (currentLiveAttendanceFilter === 'late') {
@@ -339,6 +342,7 @@ function renderLiveAttendanceTable() {
             'all': 'All Staff',
             'working': 'On Duty',
             'checked_out': 'Checked Out',
+            'missing_out': 'Missing Checkout',
             'absent': 'Absent / Off',
             'late': 'Late Arrivals',
             'checked': 'Verified',
@@ -365,6 +369,8 @@ function renderLiveAttendanceTable() {
         (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr')
     );
 
+    const canAdjustShift = isSuperOrHr || (AppState.currentUser && AppState.currentUser.role === 'hod');
+
     const canInspect = AppState.currentUser && (
         AppState.currentUser.role === 'super_admin' ||
         AppState.currentUser.role === 'admin' ||
@@ -382,6 +388,8 @@ function renderLiveAttendanceTable() {
             statusBadge = '<span class="attendance-status-pill working" style="white-space: nowrap; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🟢 On Duty</span>';
         } else if (emp.status === 'checked_out') {
             statusBadge = '<span class="attendance-status-pill checked_out" style="white-space: nowrap; font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">🔵 Checked Out</span>';
+        } else if (emp.status === 'missing_out') {
+            statusBadge = '<span class="attendance-status-pill missing-out" style="background: rgba(245, 158, 11, 0.15); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;" title="Employee checked in but forgot to punch/checkout. Click ⏱️ to adjust.">⚠️ Missing Out</span>';
         } else if (emp.status === 'not_arrived') {
             statusBadge = '<span class="attendance-status-pill not-arrived" style="background: rgba(245, 158, 11, 0.12); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; padding: 4px 10px; border-radius: 20px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">⏳ Shift Pending</span>';
         } else {
@@ -393,6 +401,8 @@ function renderLiveAttendanceTable() {
 
         if (isHodChecked) {
             sheetBadge = `<span class="badge badge-hod-checked" title="Verified by HOD at ${escapeHtml(emp.hod_checked_at || '')}">✅ Verified</span>`;
+        } else if (emp.status === 'missing_out') {
+            sheetBadge = `<span class="badge" style="background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 12px; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;" title="Shift unclosed (missing checkout). Requires HOD/Admin review.">⚠️ Unclosed Shift</span>`;
         } else if (emp.status === 'checked_out' || emp.sheet_status === 'pending') {
             sheetBadge = `<span class="badge badge-hod-pending" title="Shift completed and checked out, urgent: not verified yet">⚠️ Pending Verify</span>`;
         } else if (emp.status === 'working' || emp.check_in_time) {
@@ -445,6 +455,19 @@ function renderLiveAttendanceTable() {
             sourcesOutBadge += `<div style="font-size: 10px; color: #16a34a; font-weight: 600;" title="WhatsApp Check-Out">💬 ${escapeHtml(emp.whatsapp_out_time)}</div>`;
         }
 
+        const isMissingOut = (emp.status === 'missing_out');
+        const outDisplay = emp.check_out_time
+            ? `<code style="font-size: 12px; font-weight: 700; color: #3b82f6;">${escapeHtml(emp.check_out_time)}</code>`
+            : (isMissingOut
+                ? `<span style="font-size: 11px; font-weight: 700; color: #d97706;" title="No checkout punch recorded">⚠️ Missing</span>`
+                : `<code style="font-size: 12px; font-weight: 700; color: var(--text-dim);">-</code>`);
+
+        const dutyDisplay = (emp.total_duty_hours && emp.total_duty_hours !== '-')
+            ? `<strong style="font-size: 13px; color: var(--text-main);">${escapeHtml(emp.total_duty_hours)}</strong>`
+            : (isMissingOut
+                ? `<span style="font-size: 11px; font-weight: 600; color: #ef4444;" title="Incomplete shift: Check-out missing">-</span>`
+                : `<strong style="font-size: 13px; color: var(--text-dim);">-</strong>`);
+
         tr.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 8px; ${canInspect ? 'cursor: pointer;' : ''}" ${canInspect ? `onclick="inspectEmployeeWorksheet(${emp.employee_id}, '${targetDate}')"` : ''} title="${canInspect ? 'Click to inspect ' + escapeHtml(emp.name) + '\'s worksheet' : ''}">
@@ -461,10 +484,10 @@ function renderLiveAttendanceTable() {
                 ${sourcesInBadge}
             </td>
             <td style="white-space: nowrap;">
-                <div><code style="font-size: 12px; font-weight: 700; color: ${emp.check_out_time ? '#3b82f6' : 'var(--text-dim)'};">${escapeHtml(emp.check_out_time || '-')}</code></div>
+                <div>${outDisplay}</div>
                 ${sourcesOutBadge}
             </td>
-            <td style="white-space: nowrap;"><strong style="font-size: 13px; color: ${emp.total_duty_hours ? 'var(--text-main)' : 'var(--text-dim)'};">${escapeHtml(emp.total_duty_hours || '-')}</strong></td>
+            <td style="white-space: nowrap;">${dutyDisplay}</td>
             <td style="white-space: nowrap;">${statusBadge}</td>
             ${sheetStatusTd}
             <td style="text-align: right; white-space: nowrap;">
@@ -479,9 +502,9 @@ function renderLiveAttendanceTable() {
                             📝 Inspect
                         </button>
                     ` : ''}
-                    ${isSuperOrHr ? `
-                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; border-color: rgba(59,130,246,0.4); color: var(--primary); white-space: nowrap; font-weight: 600;" onclick="openAdminShiftModal(${emp.employee_id}, '${targetDate}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${emp.check_in_time || ''}', '${emp.check_out_time || ''}', ${emp.is_locked ? 1 : 0})" title="Adjust Check-In/Out Times">
-                            ⏱️
+                    ${canAdjustShift ? `
+                        <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; ${isMissingOut ? 'border-color: #f59e0b; background: rgba(245, 158, 11, 0.12); color: #b45309; font-weight: 700;' : 'border-color: rgba(59,130,246,0.4); color: var(--primary); font-weight: 600;'} white-space: nowrap;" onclick="openAdminShiftModal(${emp.employee_id}, '${targetDate}', '${escapeHtml(emp.name)}', '${escapeHtml(emp.designation || 'Staff')}', '${escapeHtml(emp.department_name || 'Digital')}', '${emp.check_in_time || ''}', '${emp.check_out_time || ''}', ${emp.is_locked ? 1 : 0})" title="${isMissingOut ? 'Missing Checkout! Click to record employee departure time' : 'Adjust Check-In/Out Times'}">
+                            ⏱️${isMissingOut ? ' Fix Out' : ''}
                         </button>
                     ` : ''}
                 </div>
@@ -556,6 +579,7 @@ async function loadLiveAttendance(forceSync = false) {
         const totalEl = document.getElementById('att-stat-total');
         const workingEl = document.getElementById('att-stat-working');
         const outEl = document.getElementById('att-stat-out');
+        const missingEl = document.getElementById('att-stat-missing');
         const absentEl = document.getElementById('att-stat-absent');
         const lateEl = document.getElementById('att-stat-late');
         const checkedEl = document.getElementById('att-stat-checked') || document.getElementById('att-stat-verified');
@@ -564,10 +588,23 @@ async function loadLiveAttendance(forceSync = false) {
         if (totalEl) totalEl.textContent = data.stats.total_employees;
         if (workingEl) workingEl.textContent = data.stats.checked_in;
         if (outEl) outEl.textContent = data.stats.checked_out;
+        if (missingEl) missingEl.textContent = data.stats.missing_out || 0;
         if (absentEl) absentEl.textContent = data.stats.not_arrived;
         if (lateEl) lateEl.textContent = data.stats.late_count || 0;
         if (checkedEl) checkedEl.textContent = data.stats.sheets_checked ?? (data.stats.sheets_verified || 0);
         if (pendingEl) pendingEl.textContent = data.stats.sheets_pending || 0;
+
+        const cardMissing = document.getElementById('card-stat-missing');
+        if (cardMissing) {
+            const mCount = Number(data.stats.missing_out || 0);
+            if (mCount > 0) {
+                cardMissing.style.borderColor = 'rgba(245, 158, 11, 0.6)';
+                cardMissing.style.background = 'rgba(245, 158, 11, 0.08)';
+            } else {
+                cardMissing.style.borderColor = 'var(--border-color)';
+                cardMissing.style.background = 'var(--bg-card-elevated)';
+            }
+        }
 
         const dashTeam = document.getElementById('dash-stat-team');
         if (dashTeam) dashTeam.textContent = `${data.stats.total_employees} Employees`;

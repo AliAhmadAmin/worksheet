@@ -2015,6 +2015,13 @@ body.modal-open {
     color: #94a3b8;
 }
 
+.attendance-status-pill.missing-out {
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    font-weight: 700;
+}
+
 /* Admin Worksheet Inspector Showcase & Metadata Bar */
 .admin-inspector-box {
     background: var(--bg-card-elevated);

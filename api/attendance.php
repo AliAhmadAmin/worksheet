@@ -697,6 +697,7 @@ switch ($action) {
             'total_employees' => count($rows),
             'checked_in' => 0,
             'checked_out' => 0,
+            'missing_out' => 0,
             'day_off' => 0,
             'not_arrived' => 0,
             'late_count' => 0,
@@ -756,8 +757,23 @@ switch ($action) {
                     $r['status'] = 'checked_out';
                     $stats['checked_out']++;
                 } else {
-                    $r['status'] = 'working';
-                    $stats['checked_in']++;
+                    // Check if shift is still active or employee forgot to checkout
+                    $cInTs = strtotime($date . ' ' . $r['check_in_time']);
+                    $elapsedSec = $cInTs ? (time() - $cInTs) : 0;
+
+                    // If shift date is in the past, or shift has exceeded 16 hours without checkout:
+                    // Note: If checked in yesterday, allow up to 16h for active overnight shift.
+                    $isPastDate = ($date < date('Y-m-d'));
+                    $isOvernightWindow = ($date === date('Y-m-d', strtotime('-1 day')) && $elapsedSec <= 16 * 3600);
+
+                    if (($isPastDate && !$isOvernightWindow) || $elapsedSec > 16 * 3600) {
+                        $r['status'] = 'missing_out';
+                        $r['is_missing_out'] = 1;
+                        $stats['missing_out'] = ($stats['missing_out'] ?? 0) + 1;
+                    } else {
+                        $r['status'] = 'working';
+                        $stats['checked_in']++;
+                    }
                 }
             } else if (isset($activeOvernightShifts[(int)$r['employee_id']])) {
                 // Employee is actively on duty in an overnight shift started yesterday
@@ -790,6 +806,9 @@ switch ($action) {
             } elseif ($r['status'] === 'working') {
                 $r['sheet_status'] = 'working';
                 $stats['sheets_empty']++;
+            } elseif ($r['status'] === 'missing_out') {
+                $r['sheet_status'] = 'missing_out';
+                $stats['sheets_not_checked']++;
             } else {
                 $r['sheet_status'] = 'not_checked';
                 $stats['sheets_not_checked']++;
