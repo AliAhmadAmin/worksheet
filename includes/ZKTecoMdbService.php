@@ -576,12 +576,15 @@ PS1;
         }
 
         // Fast file modification time check with stat cache cleared
+        // Note: On Windows UNC network shares (\\...), SMB directory caching frequently causes filemtime to remain stale.
+        // Therefore, we only use the filemtime skip optimization for local disk files (e.g. C:\...). For network UNC paths, we rely on the interval check above and the fast timestamp index query.
+        $isNetworkShare = (strpos($mdbPath, '\\\\') === 0 || strpos($mdbPath, '//') === 0);
         @clearstatcache(true, $mdbPath);
         $mtime = @filemtime($mdbPath);
         $lastFileMtime = isset($settings['mdb_last_file_mtime']) ? (int)$settings['mdb_last_file_mtime'] : null;
 
-        // If file timestamp is identical to our last imported check, and not forced, skip
-        if ($mtime !== false && !empty($lastFileMtime) && $mtime === $lastFileMtime && !$forced) {
+        // If file timestamp is identical to our last imported check, and not forced, skip (local files only)
+        if (!$isNetworkShare && $mtime !== false && !empty($lastFileMtime) && $mtime === $lastFileMtime && !$forced) {
             $this->releaseSyncLock();
             $this->updateSyncStatus('success', 'File unchanged, no new punches.');
             return [

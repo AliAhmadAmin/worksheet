@@ -41,6 +41,16 @@ switch ($action) {
         $empId = (int)($_GET['employee_id'] ?? $currentUserId);
         $date = $_GET['date'] ?? date('Y-m-d');
 
+        // Opportunistic biometric sync when viewing today's sheet
+        if ($date === date('Y-m-d')) {
+            try {
+                require_once __DIR__ . '/../includes/ZKTecoAttendanceService.php';
+                require_once __DIR__ . '/../includes/ZKTecoMdbService.php';
+                $zkMdb = new ZKTecoMdbService($pdo);
+                $zkMdb->syncIncremental(false);
+            } catch (Throwable $t) {}
+        }
+
         // Fetch employee details
         $empStmt = $pdo->prepare("
             SELECT e.*, d.name as department_name, t.name as team_name 

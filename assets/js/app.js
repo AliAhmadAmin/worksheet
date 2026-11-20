@@ -387,6 +387,19 @@ function initGlobalZKTecoHeartbeat() {
             });
             const data = await res.json();
             if (data && data.success && !data.skipped) {
+                // If punches were applied, dynamically update active screens
+                if (data.stats && (data.stats.applied > 0 || data.stats.total_processed > 0)) {
+                    // 1. If currently on Worksheet tab, refresh today's sheet timings without losing unsaved edits
+                    if (typeof loadDailySheet === 'function' && document.getElementById('tab-worksheet')?.classList.contains('active')) {
+                        const curDate = AppState.currentDate || new Date().toISOString().split('T')[0];
+                        const todayStr = new Date().toISOString().split('T')[0];
+                        if (curDate === todayStr) {
+                            const empId = AppState.viewingEmployeeId || (AppState.currentUser ? AppState.currentUser.id : null);
+                            if (empId) loadDailySheet(curDate, empId);
+                        }
+                    }
+                }
+
                 // If ZKTeco tab is currently active on screen, refresh its view
                 if (typeof ZKTecoAtt !== 'undefined' && typeof ZKTecoAtt.loadLogs === 'function') {
                     ZKTecoAtt.loadLogs();

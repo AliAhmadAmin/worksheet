@@ -524,6 +524,11 @@ if (!empty($_SESSION['user_id'])) {
                 if (btnIcon) btnIcon.textContent = "🚀";
             }
         }
+
+        // Opportunistic background punch sync on portal landing
+        setTimeout(() => {
+            fetch('api/zkteco_manage.php?action=trigger_auto_sync').catch(() => {});
+        }, 1500);
     </script>
 </body>
 </html>
