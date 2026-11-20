@@ -188,8 +188,7 @@ switch ($action) {
             // Update existing
             $stmtUp = $pdo->prepare("
                 UPDATE documentaries 
-                SET sr_no = ?,
-                    title = ?,
+                SET title = ?,
                     topic_guest = ?,
                     doc_type = ?,
                     doc_date = ?,
@@ -204,7 +203,6 @@ switch ($action) {
                 WHERE id = ?
             ");
             $stmtUp->execute([
-                $srNo ?: null,
                 $title,
                 $topicGuest ?: null,
                 $docType,
@@ -223,11 +221,9 @@ switch ($action) {
 
             echo json_encode(['success' => true, 'message' => 'Documentary record updated successfully.', 'id' => $id]);
         } else {
-            // If sr_no is empty, auto-generate sequential
-            if (empty($srNo)) {
-                $maxId = (int)$pdo->query("SELECT MAX(id) FROM documentaries")->fetchColumn();
-                $srNo = (string)($maxId + 1);
-            }
+            // Auto-generate sequential Sr # (comes automatically)
+            $maxSr = (int)$pdo->query("SELECT COALESCE(MAX(CAST(sr_no AS UNSIGNED)), 0) FROM documentaries")->fetchColumn();
+            $srNo = (string)($maxSr + 1);
 
             $stmtIn = $pdo->prepare("
                 INSERT INTO documentaries 
@@ -251,7 +247,7 @@ switch ($action) {
             ]);
 
             $newId = (int)$pdo->lastInsertId();
-            echo json_encode(['success' => true, 'message' => 'Documentary successfully filed.', 'id' => $newId]);
+            echo json_encode(['success' => true, 'message' => 'Documentary successfully filed.', 'id' => $newId, 'sr_no' => $srNo]);
         }
         break;
 
@@ -311,6 +307,11 @@ switch ($action) {
 
         $pdo->prepare("DELETE FROM documentaries WHERE id = ?")->execute([$id]);
         echo json_encode(['success' => true, 'message' => 'Documentary record deleted successfully.']);
+        break;
+
+    case 'clear_all':
+        $pdo->exec("TRUNCATE TABLE documentaries");
+        echo json_encode(['success' => true, 'message' => 'All documentary records cleared successfully.']);
         break;
 
     case 'export_csv':

@@ -171,55 +171,42 @@
             const hasYt = Boolean(doc.youtube_url && doc.youtube_url.trim());
             const hasFb = Boolean(doc.facebook_url && doc.facebook_url.trim());
 
-            // YouTube column rendering
-            let ytCell = '';
-            if (hasYt) {
-                ytCell = `
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <a href="${escapeHtml(doc.youtube_url)}" target="_blank" rel="noopener noreferrer" 
-                           class="btn-sm" 
-                           style="background: rgba(239, 68, 68, 0.12); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" 
-                           title="${escapeHtml(doc.youtube_url)}">
-                            <span>▶️</span> YouTube
-                        </a>
-                        <button type="button" class="btn-sm" onclick="openDigitalLinksModal(${doc.id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}', '${escapeHtml(doc.youtube_url).replace(/'/g, "\\'")}', '${escapeHtml(doc.facebook_url || '').replace(/'/g, "\\'")}')" style="background: transparent; border: none; cursor: pointer; font-size: 12px; color: var(--text-muted); padding: 2px 4px;" title="Edit Link">✏️</button>
+            // FB & YT Links single combined cell
+            const linksCell = `
+                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 130px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+                        ${hasFb ? `
+                            <a href="${escapeHtml(doc.facebook_url)}" target="_blank" rel="noopener noreferrer" 
+                               style="background: rgba(24, 119, 242, 0.12); color: #1877f2; border: 1px solid rgba(24, 119, 242, 0.3); border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" 
+                               title="${escapeHtml(doc.facebook_url)}">
+                                <span>📘</span> FB Link
+                            </a>
+                        ` : `
+                            <button type="button" 
+                                    onclick="openDigitalLinksModal(${doc.id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}', '${escapeHtml(doc.youtube_url || '').replace(/'/g, "\\'")}', '')" 
+                                    style="background: rgba(24, 119, 242, 0.05); color: #1877f2; border: 1px dashed rgba(24, 119, 242, 0.35); border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                <span>+</span> Add FB
+                            </button>
+                        `}
+                        <button type="button" onclick="openDigitalLinksModal(${doc.id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}', '${escapeHtml(doc.youtube_url || '').replace(/'/g, "\\'")}', '${escapeHtml(doc.facebook_url || '').replace(/'/g, "\\'")}')" style="background: transparent; border: none; cursor: pointer; font-size: 12px; color: var(--text-muted); padding: 1px 3px;" title="Update Links">✏️</button>
                     </div>
-                `;
-            } else {
-                ytCell = `
-                    <button type="button" 
-                            class="btn-sm" 
-                            onclick="openDigitalLinksModal(${doc.id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}', '', '${escapeHtml(doc.facebook_url || '').replace(/'/g, "\\'")}')" 
-                            style="background: rgba(239, 68, 68, 0.06); color: #dc2626; border: 1px dashed rgba(239, 68, 68, 0.35); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                        <span>+</span> Add YT
-                    </button>
-                `;
-            }
-
-            // Facebook column rendering
-            let fbCell = '';
-            if (hasFb) {
-                fbCell = `
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <a href="${escapeHtml(doc.facebook_url)}" target="_blank" rel="noopener noreferrer" 
-                           class="btn-sm" 
-                           style="background: rgba(24, 119, 242, 0.12); color: #1877f2; border: 1px solid rgba(24, 119, 242, 0.3); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" 
-                           title="${escapeHtml(doc.facebook_url)}">
-                            <span>📘</span> Facebook
-                        </a>
-                        <button type="button" class="btn-sm" onclick="openDigitalLinksModal(${doc.id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}', '${escapeHtml(doc.youtube_url || '').replace(/'/g, "\\'")}', '${escapeHtml(doc.facebook_url).replace(/'/g, "\\'")}')" style="background: transparent; border: none; cursor: pointer; font-size: 12px; color: var(--text-muted); padding: 2px 4px;" title="Edit Link">✏️</button>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+                        ${hasYt ? `
+                            <a href="${escapeHtml(doc.youtube_url)}" target="_blank" rel="noopener noreferrer" 
+                               style="background: rgba(239, 68, 68, 0.12); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" 
+                               title="${escapeHtml(doc.youtube_url)}">
+                                <span>▶️</span> YT Link
+                            </a>
+                        ` : `
+                            <button type="button" 
+                                    onclick="openDigitalLinksModal(${doc.id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}', '', '${escapeHtml(doc.facebook_url || '').replace(/'/g, "\\'")}')" 
+                                    style="background: rgba(239, 68, 68, 0.05); color: #dc2626; border: 1px dashed rgba(239, 68, 68, 0.35); border-radius: 5px; padding: 2px 7px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                <span>+</span> Add YT
+                            </button>
+                        `}
                     </div>
-                `;
-            } else {
-                fbCell = `
-                    <button type="button" 
-                            class="btn-sm" 
-                            onclick="openDigitalLinksModal(${doc.id}, '${escapeHtml(doc.title).replace(/'/g, "\\'")}', '${escapeHtml(doc.youtube_url || '').replace(/'/g, "\\'")}', '')" 
-                            style="background: rgba(24, 119, 242, 0.06); color: #1877f2; border: 1px dashed rgba(24, 119, 242, 0.35); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                        <span>+</span> Add FB
-                    </button>
-                `;
-            }
+                </div>
+            `;
 
             // Network path clean preview with copy button
             const rawTitle = doc.title || '';
@@ -243,11 +230,9 @@
                     <td style="padding: 10px 12px; text-align: center;">
                         ${getTypeBadge(doc.doc_type)}
                     </td>
-                    <td style="padding: 10px 12px; white-space: nowrap; color: var(--text-muted); font-size: 12px;">
-                        ${formatDateDisplay(doc.doc_date)}
-                    </td>
-                    <td style="padding: 10px 12px; white-space: nowrap; color: var(--text-muted); font-size: 12px;">
-                        ${escapeHtml(doc.doc_time || '—')}
+                    <td style="padding: 10px 12px; white-space: nowrap; font-size: 12px;">
+                        <div style="font-weight: 700; color: var(--text-main); line-height: 1.2;">${escapeHtml(doc.doc_time || '—')}</div>
+                        <div style="color: var(--text-muted); font-size: 11px; margin-top: 3px; line-height: 1.2;">${formatDateDisplay(doc.doc_date)}</div>
                     </td>
                     <td style="padding: 10px 12px; white-space: nowrap; color: var(--text-main); font-weight: 600;">
                         ${escapeHtml(doc.city || 'Lahore')}
@@ -255,11 +240,8 @@
                     <td style="padding: 10px 12px; color: var(--text-main); font-weight: 700;">
                         ${escapeHtml(doc.producer_name || '—')}
                     </td>
-                    <td style="padding: 10px 12px;">
-                        ${ytCell}
-                    </td>
-                    <td style="padding: 10px 12px;">
-                        ${fbCell}
+                    <td style="padding: 8px 12px;">
+                        ${linksCell}
                     </td>
                     <td style="padding: 10px 12px; text-align: right; white-space: nowrap;">
                         <button type="button" class="btn-sm" onclick="editDocumentary(${doc.id})" style="background: rgba(2, 132, 199, 0.1); color: #0284c7; border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 6px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; font-weight: 700; margin-right: 4px;" title="Full Edit">
@@ -644,6 +626,39 @@
         }
     }
     window.deleteDocumentary = deleteDocumentary;
+
+    // Clear All Dummy Records
+    async function clearAllDocumentaries() {
+        if (!confirm('Are you sure you want to remove all dummy records? This will clear the table so you can start with fresh entries.')) {
+            return;
+        }
+
+        try {
+            const res = await fetch('api/documentaries.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'clear_all' })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                if (typeof showToast === 'function') {
+                    showToast('All dummy records removed successfully! 🧹', 'success');
+                }
+                await loadDocumentaries();
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast(data.message || 'Failed to clear records.', 'error');
+                }
+            }
+        } catch (e) {
+            console.error('Error clearing documentaries:', e);
+            if (typeof showToast === 'function') {
+                showToast('Server connection failed.', 'error');
+            }
+        }
+    }
+    window.clearAllDocumentaries = clearAllDocumentaries;
 
     // CSV Export
     function exportDocumentariesCsv() {

@@ -25,6 +25,9 @@
             </div>
 
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-outline" onclick="clearAllDocumentaries()" style="font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 8px; color: #dc2626; border-color: rgba(239, 68, 68, 0.35); display: inline-flex; align-items: center; gap: 6px;" title="Clear all dummy records">
+                    <span>🗑️</span> Clear Dummy Data
+                </button>
                 <button type="button" class="btn btn-outline" onclick="exportDocumentariesCsv()" style="font-size: 12px; font-weight: 700; padding: 7px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
                     <span>📥</span> Export CSV
                 </button>
@@ -127,12 +130,10 @@
                         <th style="padding: 10px 12px; width: 23%; font-weight: 700;">Title / Path</th>
                         <th style="padding: 10px 12px; width: 19%; font-weight: 700;">Topic & Guest</th>
                         <th style="padding: 10px 12px; width: 85px; text-align: center; font-weight: 700;">Type</th>
-                        <th style="padding: 10px 12px; width: 95px; font-weight: 700;">Date</th>
-                        <th style="padding: 10px 12px; width: 85px; font-weight: 700;">Time</th>
+                        <th style="padding: 10px 12px; width: 105px; font-weight: 700;">Time & Date</th>
                         <th style="padding: 10px 12px; width: 80px; font-weight: 700;">City</th>
                         <th style="padding: 10px 12px; width: 130px; font-weight: 700;">Producer</th>
-                        <th style="padding: 10px 12px; width: 135px; font-weight: 700;">YouTube Status</th>
-                        <th style="padding: 10px 12px; width: 135px; font-weight: 700;">Facebook Status</th>
+                        <th style="padding: 10px 12px; width: 155px; font-weight: 700;">FB & YT Links</th>
                         <th style="padding: 10px 12px; width: 80px; text-align: right; font-weight: 700;">Action</th>
                     </tr>
                 </thead>
@@ -171,20 +172,18 @@
 
         <form id="doc-form" onsubmit="submitDocumentaryForm(event)" style="padding: 20px 22px; max-height: 75vh; overflow-y: auto;">
             <input type="hidden" id="doc-form-id" value="">
+            <input type="hidden" id="doc-form-sr" value="">
 
-            <div style="display: grid; grid-template-columns: 120px 1fr; gap: 12px; margin-bottom: 14px;">
-                <div>
-                    <label class="form-label" style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">Sr # (Optional)</label>
-                    <input type="text" id="doc-form-sr" class="input-control" placeholder="e.g. 40" style="width: 100%; font-size: 12.5px; padding: 8px 10px; border-radius: 8px;">
-                </div>
-                <div>
-                    <label class="form-label" style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">Type <span style="color:#ef4444;">*</span></label>
-                    <select id="doc-form-type" class="input-control" style="width: 100%; font-size: 12.5px; padding: 8px 10px; border-radius: 8px; font-weight: 700;" required>
-                        <option value="Full">🟢 Full Documentary</option>
-                        <option value="Half">🔵 Half Documentary</option>
-                        <option value="Short">🟠 Short Documentary</option>
-                    </select>
-                </div>
+            <div style="margin-bottom: 14px;">
+                <label class="form-label" style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">
+                    <span>Documentary Type <span style="color:#ef4444;">*</span></span>
+                    <span style="font-weight: 600; color: #059669; font-size: 11px; background: rgba(16, 185, 129, 0.1); padding: 1px 7px; border-radius: 4px;">⚡ Sr # Auto-Generated</span>
+                </label>
+                <select id="doc-form-type" class="input-control" style="width: 100%; font-size: 12.5px; padding: 8px 10px; border-radius: 8px; font-weight: 700;" required>
+                    <option value="Full">🟢 Full Documentary (1-Hour)</option>
+                    <option value="Half">🔵 Half Documentary (30-Min)</option>
+                    <option value="Short">🟠 Short Documentary (Feature / Clip)</option>
+                </select>
             </div>
 
             <!-- Title / File Path -->
