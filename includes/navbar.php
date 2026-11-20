@@ -197,6 +197,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">🎬</span>
                 <span class="nav-label">Fresh Programs</span>
             </a>
+            <a href="documentaries.php" class="nav-btn <?= ($activeNavPage === 'documentaries') ? 'active' : '' ?>" data-tab="tab-documentaries" data-route="documentaries">
+                <span class="nav-icon">📽️</span>
+                <span class="nav-label">Documentaries</span>
+            </a>
         </div>
 
         <!-- People & Services Category -->
@@ -394,6 +398,10 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <a href="fresh_programs.php" class="nav-btn <?= ($activeNavPage === 'fresh_programs') ? 'active' : '' ?>" data-tab="tab-fresh-programs" data-route="fresh_programs">
                 <span class="nav-icon">🎬</span>
                 <span class="nav-label">Fresh Programs</span>
+            </a>
+            <a href="documentaries.php" class="nav-btn <?= ($activeNavPage === 'documentaries') ? 'active' : '' ?>" data-tab="tab-documentaries" data-route="documentaries">
+                <span class="nav-icon">📽️</span>
+                <span class="nav-label">Documentaries</span>
             </a>
         </div>
 

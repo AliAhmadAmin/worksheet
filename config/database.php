@@ -886,6 +886,49 @@ function ensureDepartmentAndTeamsSchema($pdo) {
             INDEX idx_mistake_logged_by (logged_by)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+        // Documentaries Desk: Programming Submissions & Digital Social Links Collaboration
+        $pdo->exec("CREATE TABLE IF NOT EXISTS documentaries (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sr_no VARCHAR(50) NULL,
+            title VARCHAR(500) NOT NULL,
+            topic_guest TEXT NULL,
+            doc_type ENUM('Full', 'Half', 'Short') NOT NULL DEFAULT 'Full',
+            doc_date DATE NOT NULL,
+            doc_time VARCHAR(50) NULL,
+            city VARCHAR(100) DEFAULT 'Lahore',
+            producer_id INT NULL,
+            producer_name VARCHAR(150) NULL,
+            youtube_url VARCHAR(1000) NULL,
+            facebook_url VARCHAR(1000) NULL,
+            filed_by INT NULL,
+            digital_updated_by INT NULL,
+            notes TEXT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_doc_date (doc_date),
+            INDEX idx_doc_type (doc_type),
+            INDEX idx_producer (producer_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Preload historical documentaries if table is newly created
+        try {
+            $docCount = (int)$pdo->query("SELECT COUNT(*) FROM documentaries")->fetchColumn();
+            if ($docCount === 0) {
+                $seedSql = "INSERT INTO documentaries (sr_no, title, topic_guest, doc_type, doc_date, doc_time, city, producer_name, youtube_url, facebook_url) VALUES 
+                    ('39', '\\\\10.0.0.4\\transmission\\Transmission\\Documentary\\1-Full Documentry\\JUNIPER CAVE', 'Secret Cave Exploration Documentary', 'Full', '2026-10-29', '03:35 PM', 'Lahore', 'Umair Manzoor', NULL, NULL),
+                    ('38', '\\\\10.0.0.4\\transmission\\Transmission\\Documentary\\1-Full Documentry\\ABANDONED TRACKS OF CHAKWAL', 'Abandoned Tracks of Chakwal', 'Full', '2026-10-16', '06:55 PM', 'Lahore', 'Tabish Noor Khan', NULL, NULL),
+                    ('37', 'DOC-SHORT-RESCUE-1122-10OCT26-TX', 'Topic: Rescue 1122', 'Short', '2026-10-10', NULL, 'Lahore', 'Abdul Mueez', NULL, NULL),
+                    ('36', 'DOC-FULL-MEETHAS-OF-PAKISTAN-30SEP26-TX', 'TOPIC: MEETHAS OF PAKISTAN', 'Full', '2026-10-01', '04:52 PM', 'Lahore', 'Maisha Aslam', NULL, NULL),
+                    ('35', '\\\\10.0.0.4\\transmission\\Transmission\\Documentary\\3-Short Documentary\\WIND MILL', 'A centuray of History -- Wind Mill', 'Short', '2026-09-29', '04:15 PM', 'Lahore', 'Umair Manzoor', NULL, NULL),
+                    ('34', 'DOC-SHORT-MARKAZ-E-MUSTAFA-RELLY-01S EP26-TX', 'MARKAZ-E-MUSTAFAI RELLY', 'Short', '2026-09-29', '04:00 PM', 'Lahore', 'Mehar Usman', NULL, NULL),
+                    ('33', 'DOC FULL TAXILA GANDHARA ART VILLAGE 19AUG26 TX', 'Taxila gandhara art village', 'Full', '2026-09-28', '07:45 PM', 'Lahore', 'Maisha Aslam', 'https://youtu.be/4gwlhimmFRU', 'https://www.facebook.com/share'),
+                    ('32', 'DOC-SHORT-HASRAT-MOHANI-LIBRARY-25SEP26-TX', 'HASRAT MOHANI LIBRARY', 'Short', '2026-09-25', '05:30 PM', 'Lahore', 'Abdul Mueez', 'https://youtu.be/s3uzAzEUEZE', NULL),
+                    ('31', 'DOC FULL WOMEN MOUNTAINEERING 11SEP26 TX', 'WOMEN MOUNTAINEERING SKARDU', 'Full', '2026-09-11', '09:45 PM', 'Lahore', 'Tabish Noor Khan', 'https://youtu.be/lHkEb7bVD-A', 'https://www.facebook.com/share'),
+                    ('30', 'DOC FULL SAKHI LAL SHAHBAZ QALANDAR 01MAY26-TX', 'Topic: Sakhi Lal Shahbaz Qalandar', 'Full', '2026-05-01', '05:12 AM', 'Lahore', 'Ali Kashif', 'https://youtu.be/-BM70C3qy1Q', 'https://www.facebook.com/share')";
+                $pdo->exec($seedSql);
+            }
+        } catch (Exception $e) {}
+
         try {
             $checkCD = $pdo->query("SHOW COLUMNS FROM sheet_entries LIKE 'custom_data'")->fetch();
             if (!$checkCD) {
