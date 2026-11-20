@@ -392,7 +392,7 @@ switch ($action) {
                         // Inverted punch or genuine overnight shift
                         $inH = (int)date('H', $checkInTs);
                         $outH = (int)date('H', $checkOutTs);
-                        if ($inH >= 14 && $outH < 12) {
+                        if ($inH >= 11 && $outH < 12) {
                             // Genuine overnight shift (e.g. 6 PM to 2 AM next day)
                             $dutySeconds = ($checkOutTs + 86400) - $checkInTs;
                         } else {
@@ -474,7 +474,7 @@ switch ($action) {
                     } else {
                         $inH = (int)date('H', $inTs);
                         $outH = (int)date('H', $outTs);
-                        if ($inH >= 14 && $outH < 12) {
+                        if ($inH >= 11 && $outH < 12) {
                             $dutySeconds = ($outTs + 86400) - $inTs;
                         } else {
                             $dutySeconds = 0;
@@ -766,7 +766,7 @@ switch ($action) {
                 if ($cInTs && $cOutTs && $cOutTs < $cInTs) {
                     $inH = (int)date('H', $cInTs);
                     $outH = (int)date('H', $cOutTs);
-                    if (!($inH >= 14 && $outH < 12)) {
+                    if (!($inH >= 11 && $outH < 12)) {
                         // Inverted punch on same day! Clear checkout and restore to active on-duty
                         $r['check_out_time'] = null;
                         $r['total_duty_hours'] = null;
@@ -804,7 +804,7 @@ switch ($action) {
                 if ($cOutTs < $cInTs) {
                     $inH = (int)date('H', $cInTs);
                     $outH = (int)date('H', $cOutTs);
-                    if ($inH >= 14 && $outH < 12) {
+                    if ($inH >= 11 && $outH < 12) {
                         $cOutTs = strtotime($date . ' ' . $r['check_out_time'] . ' +1 day');
                     } else {
                         $cOutTs = $cInTs;

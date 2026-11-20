@@ -96,7 +96,7 @@ switch ($action) {
             if ($inTs && $outTs && $outTs < $inTs) {
                 $inH = (int)date('H', $inTs);
                 $outH = (int)date('H', $outTs);
-                $isLegitOvernight = ($inH >= 14 && $outH < 12 && $date < date('Y-m-d'));
+                $isLegitOvernight = ($inH >= 11 && $outH < 12);
                 if (!$isLegitOvernight) {
                     $pdo->prepare("
                         UPDATE daily_sheets 
@@ -121,6 +121,57 @@ switch ($action) {
                     $sheet['locked_at'] = null;
                 }
             }
+        }
+
+        // Auto-heal missing check_out_time from biometric logs if a valid checkout punch exists
+        if ($sheet && !empty($sheet['check_in_time']) && empty($sheet['check_out_time'])) {
+            try {
+                $inTs = strtotime($date . ' ' . $sheet['check_in_time']);
+                $nextDay = date('Y-m-d', strtotime($date . ' +1 day'));
+                // Look for checkout punch between in_time and next day noon (12:00 PM)
+                $stmtFindOut = $pdo->prepare("
+                    SELECT punch_time, formatted_time 
+                    FROM zkteco_attendance_logs 
+                    WHERE employee_id = ? 
+                      AND punch_time > ? 
+                      AND punch_time <= ? 
+                      AND punch_state IN ('check_out', 'auto') 
+                    ORDER BY punch_time DESC 
+                    LIMIT 1
+                ");
+                $stmtFindOut->execute([$empId, date('Y-m-d H:i:s', $inTs), $nextDay . ' 12:00:00']);
+                $foundOut = $stmtFindOut->fetch(PDO::FETCH_ASSOC);
+
+                if ($foundOut && !empty($foundOut['punch_time'])) {
+                    $outTs = strtotime($foundOut['punch_time']);
+                    $dutySec = max(0, $outTs - $inTs);
+                    $h = floor($dutySec / 3600);
+                    $m = floor(($dutySec % 3600) / 60);
+                    $dutyFmt = sprintf('%02d:%02d:00', $h, $m);
+                    $outFmt = date('h:i A', $outTs);
+
+                    $pdo->prepare("
+                        UPDATE daily_sheets 
+                        SET check_out_time = ?, 
+                            biometric_out_time = ?, 
+                            biometric_duty_hours = ?, 
+                            biometric_duty_seconds = ?, 
+                            total_duty_hours = ?, 
+                            total_duty_seconds = ?, 
+                            is_locked = 1, 
+                            locked_at = CURRENT_TIMESTAMP 
+                        WHERE id = ?
+                    ")->execute([$outFmt, $outFmt, $dutyFmt, $dutySec, $dutyFmt, $dutySec, $sheet['id']]);
+
+                    $sheet['check_out_time'] = $outFmt;
+                    $sheet['biometric_out_time'] = $outFmt;
+                    $sheet['biometric_duty_hours'] = $dutyFmt;
+                    $sheet['biometric_duty_seconds'] = $dutySec;
+                    $sheet['total_duty_hours'] = $dutyFmt;
+                    $sheet['total_duty_seconds'] = $dutySec;
+                    $sheet['is_locked'] = 1;
+                }
+            } catch (Throwable $e) {}
         }
 
         $entries = [];

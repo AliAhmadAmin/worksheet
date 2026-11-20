@@ -629,8 +629,8 @@ class ZKTecoAttendanceService {
                 if ($outTs < $inTs) {
                     $inH = (int)date('H', $inTs);
                     $outH = (int)date('H', $outTs);
-                    // Only treat as overnight shift if in is afternoon/evening (>= 14) and out is morning (< 12)
-                    if ($inH >= 14 && $outH < 12) {
+                    // Only treat as overnight shift if in is afternoon/evening (>= 11) and out is morning (< 12)
+                    if ($inH >= 11 && $outH < 12) {
                         $outTs += 86400; // Overnight shift
                         $dutySeconds = max(0, $outTs - $inTs);
                     } else {
