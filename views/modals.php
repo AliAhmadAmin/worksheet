@@ -97,7 +97,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                         <div class="form-grid-2">
                             <div class="form-group">
                                 <label class="form-label">OrbitSend Secret Key *</label>
-                                <input type="password" id="hod-wa-api-secret" class="input-control" placeholder="Enter OrbitSend Secret Key" style="font-family: monospace;" autocomplete="new-password">
+                                <input type="password" id="hod-wa-api-secret" class="input-control" placeholder="Enter OrbitSend Secret Key" style="font-family: monospace;" autocomplete="off">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Account / Unique ID *</label>
@@ -129,7 +129,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                             </div>
                             <div class="form-group">
                                 <label class="form-label">AI API Key</label>
-                                <input type="password" id="hod-ai-api-key" class="input-control" placeholder="AI API Key (or leave empty for company key)" style="font-family: monospace;" autocomplete="new-password">
+                                <input type="password" id="hod-ai-api-key" class="input-control" placeholder="AI API Key (or leave empty for company key)" style="font-family: monospace;" autocomplete="off">
                             </div>
                         </div>
                     </div>
@@ -459,7 +459,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                             <div class="form-grid-2">
                                 <div class="form-group">
                                     <label class="form-label">Official Email Address <span id="add-emp-email-required-mark" style="color: #ef4444;">*</span></label>
-                                    <input type="email" id="add-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv">
+                                    <input type="email" id="add-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv" autocomplete="username">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label" for="add-emp-password">🔑 Initial Password <span style="color: #ef4444;">*</span></label>
@@ -756,7 +756,7 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                             <div class="form-grid-2">
                                 <div class="form-group">
                                     <label class="form-label">Official Email Address <span id="edit-emp-email-required-mark" style="color: #ef4444;">*</span></label>
-                                    <input type="email" id="edit-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv">
+                                    <input type="email" id="edit-emp-email" class="input-control" placeholder="e.g. employee@discoverpakistan.tv" autocomplete="username">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label" for="edit-emp-password">🔑 Set / Reset Password <small style="color: var(--text-muted); font-weight: 400;">(Leave blank to keep)</small></label>
