@@ -613,11 +613,11 @@ try {
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label class="form-label" style="font-size: 11px;">OrbitSend Secret Key</label>
-                                    <input type="password" id="wa-api-secret" class="input-control" placeholder="Enter API Secret" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="new-password">
+                                    <input type="password" id="wa-api-secret" class="input-control" placeholder="Enter API Secret" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="off">
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label class="form-label" style="font-size: 11px;">Webhook Secret Token</label>
-                                    <input type="password" id="wa-webhook-secret" class="input-control" placeholder="Enter Webhook Secret" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="new-password">
+                                    <input type="password" id="wa-webhook-secret" class="input-control" placeholder="Enter Webhook Secret" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="off">
                                 </div>
                             </div>
 
@@ -652,7 +652,7 @@ try {
                                 </div>
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label class="form-label" style="font-size: 11px;">AI API Key</label>
-                                    <input type="password" id="wa-ai-api-key" class="input-control" placeholder="Enter Gemini or OpenAI API Key" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="new-password">
+                                    <input type="password" id="wa-ai-api-key" class="input-control" placeholder="Enter Gemini or OpenAI API Key" style="width: 100%; font-family: monospace; font-size: 12px;" autocomplete="off">
                                 </div>
                             </div>
                             <small style="font-size: 10.5px; color: var(--text-muted);">Auto-NLP runs instantly locally. Adding an AI key enables deep Roman Urdu/conversational text understanding.</small>
