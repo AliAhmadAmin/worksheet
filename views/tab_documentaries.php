@@ -25,15 +25,23 @@
             </div>
 
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <?php if (!empty($canFileDocumentary)): ?>
                 <button type="button" class="btn btn-outline" onclick="clearAllDocumentaries()" style="font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 8px; color: #dc2626; border-color: rgba(239, 68, 68, 0.35); display: inline-flex; align-items: center; gap: 6px;" title="Clear all dummy records">
                     <span>🗑️</span> Clear Dummy Data
                 </button>
+                <?php endif; ?>
                 <button type="button" class="btn btn-outline" onclick="exportDocumentariesCsv()" style="font-size: 12px; font-weight: 700; padding: 7px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
                     <span>📥</span> Export CSV
                 </button>
+                <?php if (!empty($canFileDocumentary)): ?>
                 <button type="button" class="btn btn-primary" onclick="openDocumentaryModal()" style="font-size: 12.5px; font-weight: 800; padding: 7px 16px; border-radius: 8px; background: #0284c7; border-color: #0284c7; color: #fff; display: inline-flex; align-items: center; gap: 6px;">
                     <span>+</span> File Documentary
                 </button>
+                <?php else: ?>
+                <span style="font-size: 12px; font-weight: 700; background: rgba(2, 132, 199, 0.1); color: #0284c7; padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(2, 132, 199, 0.25); display: inline-flex; align-items: center; gap: 6px;">
+                    <span>📱</span> Digital Desk (Link Updates Only)
+                </span>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -214,15 +222,19 @@
                 </div>
             </div>
 
-            <!-- Producer -->
-            <div style="margin-bottom: 16px;">
-                <label class="form-label" style="display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">Producer</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <select id="doc-form-producer-select" class="input-control" style="font-size: 12px; padding: 7px 8px; border-radius: 8px;" onchange="onProducerSelectChange()">
-                        <option value="">-- Select from Staff List --</option>
+            <!-- Producer (Auto for filer, Main Admin can select) -->
+            <div style="margin-bottom: 16px;" id="doc-producer-container">
+                <label class="form-label" style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; margin-bottom: 4px; color: var(--text-main);">
+                    <span>Producer</span>
+                    <span id="doc-producer-badge" style="font-weight: 600; color: #0284c7; font-size: 11px; background: rgba(2, 132, 199, 0.1); padding: 1px 7px; border-radius: 4px;">👤 Auto-Assigned (Filer)</span>
+                </label>
+                <!-- Main Admin selector (hidden for standard staff) -->
+                <div id="doc-producer-admin-picker" style="display: none; margin-bottom: 6px;">
+                    <select id="doc-form-producer-select" class="input-control" style="width: 100%; font-size: 12px; padding: 7px 8px; border-radius: 8px;" onchange="onProducerSelectChange()">
+                        <option value="">-- Select Producer from Staff List --</option>
                     </select>
-                    <input type="text" id="doc-form-producer-text" class="input-control" placeholder="Or type producer name..." style="font-size: 12px; padding: 7px 8px; border-radius: 8px;">
                 </div>
+                <input type="text" id="doc-form-producer-text" class="input-control" placeholder="Producer name" style="width: 100%; font-size: 12.5px; padding: 8px 10px; border-radius: 8px; font-weight: 700;" readonly>
             </div>
 
             <!-- Social Media Distribution Links (Digital Desk) -->

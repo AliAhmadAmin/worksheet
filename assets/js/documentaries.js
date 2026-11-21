@@ -244,12 +244,18 @@
                         ${linksCell}
                     </td>
                     <td style="padding: 10px 12px; text-align: right; white-space: nowrap;">
-                        <button type="button" class="btn-sm" onclick="editDocumentary(${doc.id})" style="background: rgba(2, 132, 199, 0.1); color: #0284c7; border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 6px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; font-weight: 700; margin-right: 4px;" title="Full Edit">
-                            ✏️
-                        </button>
-                        <button type="button" class="btn-sm" onclick="deleteDocumentary(${doc.id}, '${escapeHtml(rawTitle).replace(/'/g, "\\'")}')" style="background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 6px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; font-weight: 700;" title="Delete Record">
-                            🗑️
-                        </button>
+                        ${(window.DOC_AUTH_CONFIG && !window.DOC_AUTH_CONFIG.canFileDocs) ? `
+                            <button type="button" class="btn-sm" onclick="openDigitalLinksModal(${doc.id}, '${escapeHtml(rawTitle).replace(/'/g, "\\'")}', '${escapeHtml(doc.youtube_url || '').replace(/'/g, "\\'")}', '${escapeHtml(doc.facebook_url || '').replace(/'/g, "\\'")}')" style="background: rgba(2, 132, 199, 0.08); color: #0284c7; border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 6px; padding: 3px 8px; font-size: 11px; cursor: pointer; font-weight: 700;" title="Update Links">
+                                🔗 Links
+                            </button>
+                        ` : `
+                            <button type="button" class="btn-sm" onclick="editDocumentary(${doc.id})" style="background: rgba(2, 132, 199, 0.1); color: #0284c7; border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 6px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; font-weight: 700; margin-right: 4px;" title="Full Edit">
+                                ✏️
+                            </button>
+                            <button type="button" class="btn-sm" onclick="deleteDocumentary(${doc.id}, '${escapeHtml(rawTitle).replace(/'/g, "\\'")}')" style="background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 6px; padding: 3px 8px; font-size: 11.5px; cursor: pointer; font-weight: 700;" title="Delete Record">
+                                🗑️
+                            </button>
+                        `}
                     </td>
                 </tr>
             `;
@@ -346,6 +352,14 @@
 
     // Modal: Open for File / Edit
     function openDocumentaryModal(docData = null) {
+        // Enforce role check: digital-only users cannot file/edit documentaries
+        if (window.DOC_AUTH_CONFIG && !window.DOC_AUTH_CONFIG.canFileDocs) {
+            if (typeof showToast === 'function') {
+                showToast('Documentary filing is restricted to Programming Desk. Digital desk can update social links.', 'info');
+            }
+            return;
+        }
+
         const modal = document.getElementById('modal-doc-form');
         const titleEl = document.getElementById('doc-modal-title');
         const formId = document.getElementById('doc-form-id');
@@ -363,6 +377,37 @@
 
         if (!modal) return;
 
+        const isAdmin = Boolean(window.DOC_AUTH_CONFIG && window.DOC_AUTH_CONFIG.canSelectProducer);
+        const currentFilerName = (window.DOC_AUTH_CONFIG && window.DOC_AUTH_CONFIG.userName) || 'Staff';
+        const currentFilerId = (window.DOC_AUTH_CONFIG && window.DOC_AUTH_CONFIG.userId) || '';
+
+        const adminPicker = document.getElementById('doc-producer-admin-picker');
+        const producerBadge = document.getElementById('doc-producer-badge');
+
+        if (isAdmin) {
+            if (adminPicker) adminPicker.style.display = 'block';
+            if (producerBadge) {
+                producerBadge.textContent = '👑 Admin Selection';
+                producerBadge.style.color = '#7c3aed';
+                producerBadge.style.background = 'rgba(124, 58, 237, 0.1)';
+            }
+            if (formProducerText) {
+                formProducerText.readOnly = false;
+                formProducerText.style.background = 'var(--bg-card, #fff)';
+            }
+        } else {
+            if (adminPicker) adminPicker.style.display = 'none';
+            if (producerBadge) {
+                producerBadge.textContent = '👤 Auto (Filer)';
+                producerBadge.style.color = '#0284c7';
+                producerBadge.style.background = 'rgba(2, 132, 199, 0.1)';
+            }
+            if (formProducerText) {
+                formProducerText.readOnly = true;
+                formProducerText.style.background = 'var(--bg-card-elevated, #f1f5f9)';
+            }
+        }
+
         if (docData) {
             if (titleEl) titleEl.textContent = 'Edit Documentary Details';
             if (formId) formId.value = docData.id || '';
@@ -373,7 +418,7 @@
             if (formDate) formDate.value = docData.doc_date || new Date().toISOString().substring(0, 10);
             if (formTime) formTime.value = docData.doc_time || '';
             if (formCity) formCity.value = docData.city || 'Lahore';
-            if (formProducerText) formProducerText.value = docData.producer_name || '';
+            if (formProducerText) formProducerText.value = docData.producer_name || currentFilerName;
             if (formYt) formYt.value = docData.youtube_url || '';
             if (formFb) formFb.value = docData.facebook_url || '';
 
@@ -392,8 +437,8 @@
             if (formDate) formDate.value = new Date().toISOString().substring(0, 10);
             if (formTime) formTime.value = '';
             if (formCity) formCity.value = 'Lahore';
-            if (formProducerSelect) formProducerSelect.value = '';
-            if (formProducerText) formProducerText.value = '';
+            if (formProducerSelect) formProducerSelect.value = isAdmin ? currentFilerId : '';
+            if (formProducerText) formProducerText.value = currentFilerName;
             if (formYt) formYt.value = '';
             if (formFb) formFb.value = '';
         }

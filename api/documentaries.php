@@ -153,6 +153,16 @@ switch ($action) {
         break;
 
     case 'save':
+        // Digital employees can only add links, cannot file documentaries
+        if ($isDigital && !$isSuperAdmin && !$isProgramming) {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false, 
+                'message' => 'Digital department members can only update social broadcast links. Documentary filing is restricted to Programming Desk.'
+            ]);
+            exit;
+        }
+
         $id = !empty($data['id']) ? (int)$data['id'] : null;
         $srNo = trim($data['sr_no'] ?? '');
         $title = trim($data['title'] ?? '');
@@ -177,11 +187,22 @@ switch ($action) {
             exit;
         }
 
-        // Auto-resolve producer name if producer_id provided
-        if ($producerId && empty($producerName)) {
-            $pStmt = $pdo->prepare("SELECT name FROM employees WHERE id = ?");
-            $pStmt->execute([$producerId]);
-            $producerName = $pStmt->fetchColumn() ?: '';
+        // Producer assignment:
+        // Standard filers: auto-set to the logged-in user who is filling
+        // Main Admin: has the option to select/change name
+        if (!$isSuperAdmin) {
+            $producerId = $currentUserId ?: null;
+            $producerName = $currentUser['name'] ?? 'Staff';
+        } else {
+            if ($producerId && empty($producerName)) {
+                $pStmt = $pdo->prepare("SELECT name FROM employees WHERE id = ?");
+                $pStmt->execute([$producerId]);
+                $producerName = $pStmt->fetchColumn() ?: '';
+            }
+            if (empty($producerName)) {
+                $producerName = $currentUser['name'] ?? 'Admin';
+                $producerId = $currentUserId ?: null;
+            }
         }
 
         if ($id) {

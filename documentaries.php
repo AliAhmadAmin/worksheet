@@ -21,6 +21,10 @@ if (!$canAccess) {
 $currentPage = 'documentaries';
 $currentPortal = ($isProgMemberDoc && !$isDigitalMemberDoc) ? 'programming' : 'digital';
 
+$canFileDocumentary = $isGlobalAdminDoc || $isProgMemberDoc || ($userRoleDoc === 'hod' && !$isDigitalMemberDoc);
+$canSelectProducer = $isGlobalAdminDoc;
+$isDigitalOnly = $isDigitalMemberDoc && !$isGlobalAdminDoc && !$isProgMemberDoc;
+
 $pageScripts = ['assets/js/documentaries.js'];
 
 // 1. Header (HTML DocType, Head, Shared Styling)
@@ -32,6 +36,16 @@ require_once __DIR__ . '/includes/navbar.php';
 
 <!-- Dedicated Documentaries Application Workspace Container -->
 <main class="main-content">
+    <script>
+        window.DOC_AUTH_CONFIG = {
+            userId: <?= (int)($authUser['id'] ?? 0) ?>,
+            userName: <?= json_encode($authUser['name'] ?? 'Staff') ?>,
+            isAdmin: <?= $isGlobalAdminDoc ? 'true' : 'false' ?>,
+            canFileDocs: <?= $canFileDocumentary ? 'true' : 'false' ?>,
+            canSelectProducer: <?= $canSelectProducer ? 'true' : 'false' ?>,
+            isDigitalOnly: <?= $isDigitalOnly ? 'true' : 'false' ?>
+        };
+    </script>
     <?php
     require_once __DIR__ . '/views/tab_documentaries.php';
     ?>
