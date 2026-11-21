@@ -516,8 +516,7 @@ const ZKTecoAtt = {
     copyAdmsUrl() {
         const urlEl = document.getElementById('zk-setup-url');
         if (urlEl && urlEl.textContent) {
-            navigator.clipboard.writeText(urlEl.textContent.trim());
-            showToast('ADMS Webhook URL copied to clipboard!', 'success');
+            safeCopyToClipboard(urlEl.textContent.trim(), 'ADMS Webhook URL copied to clipboard!');
         }
     },
 

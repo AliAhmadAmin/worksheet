@@ -107,6 +107,74 @@ window.alert = function(message) {
     }
 };
 
+/**
+ * Universal cross-browser clipboard copy helper.
+ * Works seamlessly in both Secure Contexts (HTTPS, localhost) and Non-Secure Contexts (HTTP on local network IP/VM).
+ */
+function safeCopyToClipboard(text, successToastMsg = null) {
+    if (!text && text !== 0) return Promise.resolve(false);
+    const strText = String(text);
+
+    // 1. Try modern Clipboard API if supported and within a secure context (HTTPS / localhost)
+    if (window.isSecureContext && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        return navigator.clipboard.writeText(strText).then(() => {
+            if (successToastMsg && typeof showToast === 'function') {
+                showToast(successToastMsg, 'success');
+            }
+            return true;
+        }).catch(() => {
+            return fallbackExecCommandCopy(strText, successToastMsg);
+        });
+    }
+
+    // 2. Fallback for non-secure contexts (e.g. local IP HTTP in VMs, LAN)
+    return Promise.resolve(fallbackExecCommandCopy(strText, successToastMsg));
+}
+
+function fallbackExecCommandCopy(text, successToastMsg = null) {
+    let success = false;
+    try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.top = '0';
+        textArea.style.left = '-9999px';
+        textArea.style.width = '2em';
+        textArea.style.height = '2em';
+        textArea.style.padding = '0';
+        textArea.style.border = 'none';
+        textArea.style.outline = 'none';
+        textArea.style.boxShadow = 'none';
+        textArea.style.background = 'transparent';
+        textArea.setAttribute('readonly', '');
+        document.body.appendChild(textArea);
+
+        textArea.focus();
+        textArea.select();
+        textArea.setSelectionRange(0, text.length);
+
+        success = document.execCommand('copy');
+        document.body.removeChild(textArea);
+
+        if (success && successToastMsg && typeof showToast === 'function') {
+            showToast(successToastMsg, 'success');
+        }
+    } catch (err) {
+        console.warn('Fallback copy command failed:', err);
+    }
+
+    if (!success) {
+        try {
+            window.prompt('Copy to clipboard (Ctrl+C, Enter):', text);
+            success = true;
+        } catch (e) {}
+    }
+
+    return success;
+}
+
+window.safeCopyToClipboard = safeCopyToClipboard;
+
 // Professional Asynchronous Confirmation Dialog
 function showConfirmDialog({
     title = 'Confirm Action',
@@ -1604,14 +1672,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         e.stopPropagation();
                         const body = previewCard.querySelector('#preview-card-body');
                         if (body && body.textContent) {
-                            navigator.clipboard.writeText(body.textContent).then(() => {
+                            safeCopyToClipboard(body.textContent).then(() => {
                                 copyBtn.innerHTML = '✅ Copied!';
                                 copyBtn.style.background = 'rgba(22, 163, 74, 0.85)';
                                 setTimeout(() => {
                                     copyBtn.innerHTML = '📋 Copy';
                                     copyBtn.style.background = '';
                                 }, 1500);
-                            }).catch(() => {});
+                            });
                         }
                     });
                 }

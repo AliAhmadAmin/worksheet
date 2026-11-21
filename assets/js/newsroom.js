@@ -305,11 +305,11 @@ function renderNewsroomMatrix(dispatches) {
             let popoverItems = '<div class="preview-links-container">';
             if (hasDpLink) {
                 const escapedDp = escapeHtml(d.link.trim());
-                popoverItems += `<div class="preview-link-row dp-theme"><div class="preview-link-top"><span class="preview-link-label" style="color:#4ade80;">🟢 Discover Pakistan</span><div class="preview-link-actions"><button type="button" class="preview-card-copy-btn" onclick="navigator.clipboard.writeText('${escapedDp.replace(/'/g, "\\'")}'); this.textContent='✅ Copied!'; setTimeout(()=>this.textContent='📋 Copy', 1500);" title="Copy DP link">📋 Copy</button><a href="${escapedDp}" target="_blank" rel="noopener noreferrer" style="background:rgba(22,163,74,0.85);border:1px solid rgba(74,222,128,0.5);color:#fff;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:4px;text-decoration:none;display:inline-flex;align-items:center;gap:2px;">Open ↗</a></div></div><div class="preview-link-url" title="${escapedDp}">${escapedDp}</div></div>`;
+                popoverItems += `<div class="preview-link-row dp-theme"><div class="preview-link-top"><span class="preview-link-label" style="color:#4ade80;">🟢 Discover Pakistan</span><div class="preview-link-actions"><button type="button" class="preview-card-copy-btn" onclick="safeCopyToClipboard('${escapedDp.replace(/'/g, "\\'")}'); this.textContent='✅ Copied!'; setTimeout(()=>this.textContent='📋 Copy', 1500);" title="Copy DP link">📋 Copy</button><a href="${escapedDp}" target="_blank" rel="noopener noreferrer" style="background:rgba(22,163,74,0.85);border:1px solid rgba(74,222,128,0.5);color:#fff;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:4px;text-decoration:none;display:inline-flex;align-items:center;gap:2px;">Open ↗</a></div></div><div class="preview-link-url" title="${escapedDp}">${escapedDp}</div></div>`;
             }
             if (hasPtLink) {
                 const escapedPt = escapeHtml(d.pt_link.trim());
-                popoverItems += `<div class="preview-link-row pt-theme"><div class="preview-link-top"><span class="preview-link-label" style="color:#f87171;">🔴 Pakistan Today</span><div class="preview-link-actions"><button type="button" class="preview-card-copy-btn" onclick="navigator.clipboard.writeText('${escapedPt.replace(/'/g, "\\'")}'); this.textContent='✅ Copied!'; setTimeout(()=>this.textContent='📋 Copy', 1500);" title="Copy PT link">📋 Copy</button><a href="${escapedPt}" target="_blank" rel="noopener noreferrer" style="background:rgba(220,38,38,0.85);border:1px solid rgba(248,113,113,0.5);color:#fff;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:4px;text-decoration:none;display:inline-flex;align-items:center;gap:2px;">Open ↗</a></div></div><div class="preview-link-url" title="${escapedPt}">${escapedPt}</div></div>`;
+                popoverItems += `<div class="preview-link-row pt-theme"><div class="preview-link-top"><span class="preview-link-label" style="color:#f87171;">🔴 Pakistan Today</span><div class="preview-link-actions"><button type="button" class="preview-card-copy-btn" onclick="safeCopyToClipboard('${escapedPt.replace(/'/g, "\\'")}'); this.textContent='✅ Copied!'; setTimeout(()=>this.textContent='📋 Copy', 1500);" title="Copy PT link">📋 Copy</button><a href="${escapedPt}" target="_blank" rel="noopener noreferrer" style="background:rgba(220,38,38,0.85);border:1px solid rgba(248,113,113,0.5);color:#fff;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:4px;text-decoration:none;display:inline-flex;align-items:center;gap:2px;">Open ↗</a></div></div><div class="preview-link-url" title="${escapedPt}">${escapedPt}</div></div>`;
             }
             if (canManage) {
                 popoverItems += `<div style="text-align:right;padding-top:2px;"><button type="button" onclick="openEditNewsDispatchModal(${d.id})" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);color:#cbd5e1;font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:4px;cursor:pointer;">✏️ Edit Links & Status</button></div>`;
@@ -501,20 +501,43 @@ async function claimNewsStory(id) {
 
 // 📋 Clipboard Path Copying
 function copyNewsPath(event, text) {
-    if (event) event.stopPropagation();
-    if (!text) return;
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    if (!text && text !== 0) return;
 
-    navigator.clipboard.writeText(text).then(() => {
-        showToast("📋 Network Path copied to clipboard!", "success");
-    }).catch(() => {
+    if (typeof safeCopyToClipboard === 'function') {
+        safeCopyToClipboard(text, "📋 Network Path copied to clipboard!");
+        return;
+    }
+
+    // Direct fallback if app.js helper not present
+    if (window.isSecureContext && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).then(() => {
+            if (typeof showToast === 'function') showToast("📋 Network Path copied to clipboard!", "success");
+        }).catch(() => fallbackNewsCopy(text));
+    } else {
+        fallbackNewsCopy(text);
+    }
+}
+
+function fallbackNewsCopy(text) {
+    try {
         const el = document.createElement('textarea');
         el.value = text;
+        el.style.position = 'fixed';
+        el.style.top = '0';
+        el.style.left = '-9999px';
+        el.setAttribute('readonly', '');
         document.body.appendChild(el);
+        el.focus();
         el.select();
-        document.execCommand('copy');
+        const ok = document.execCommand('copy');
         document.body.removeChild(el);
-        showToast("📋 Path copied!", "success");
-    });
+        if (ok && typeof showToast === 'function') {
+            showToast("📋 Network Path copied to clipboard!", "success");
+        }
+    } catch (e) {
+        window.prompt('Copy path (Ctrl+C, Enter):', text);
+    }
 }
 
 // ⚡ Quick Status Update

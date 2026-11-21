@@ -295,24 +295,40 @@
     window.clearDocSearch = clearDocSearch;
 
     // Clipboard copy helper
-    async function copyFilePath(path) {
-        if (!path) return;
+    function copyFilePath(path) {
+        if (!path && path !== 0) return;
+        if (typeof safeCopyToClipboard === 'function') {
+            safeCopyToClipboard(path, 'Path copied to clipboard! 📋');
+            return;
+        }
+
+        if (window.isSecureContext && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(path).then(() => {
+                if (typeof showToast === 'function') showToast('Path copied to clipboard! 📋', 'success');
+            }).catch(() => fallbackDocCopy(path));
+        } else {
+            fallbackDocCopy(path);
+        }
+    }
+
+    function fallbackDocCopy(text) {
         try {
-            await navigator.clipboard.writeText(path);
-            if (typeof showToast === 'function') {
+            const el = document.createElement('textarea');
+            el.value = text;
+            el.style.position = 'fixed';
+            el.style.top = '0';
+            el.style.left = '-9999px';
+            el.setAttribute('readonly', '');
+            document.body.appendChild(el);
+            el.focus();
+            el.select();
+            const ok = document.execCommand('copy');
+            document.body.removeChild(el);
+            if (ok && typeof showToast === 'function') {
                 showToast('Path copied to clipboard! 📋', 'success');
             }
         } catch (e) {
-            // Fallback for non-HTTPS / restricted contexts
-            const el = document.createElement('textarea');
-            el.value = path;
-            document.body.appendChild(el);
-            el.select();
-            document.execCommand('copy');
-            document.body.removeChild(el);
-            if (typeof showToast === 'function') {
-                showToast('Path copied to clipboard! 📋', 'success');
-            }
+            window.prompt('Copy path (Ctrl+C, Enter):', text);
         }
     }
     window.copyFilePath = copyFilePath;
