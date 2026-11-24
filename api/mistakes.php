@@ -53,14 +53,17 @@ switch ($action) {
 
         // Role-based visibility
         if (!$isSuperAdmin && !$isHr) {
-            if ($isHod) {
-                if (!empty($managedDeptIds)) {
+            if ($isHod || $canLogMistakes || $canInspect) {
+                if ($empId > 0) {
+                    // Authorized: can view this inspected employee's mistakes
+                } elseif (!empty($managedDeptIds)) {
                     $inDepts = implode(',', array_fill(0, count($managedDeptIds), '?'));
                     $where[] = "(e.department_id IN ($inDepts) OR em.employee_id = ?)";
                     foreach ($managedDeptIds as $d) { $params[] = $d; }
                     $params[] = $currentUserId;
                 } else {
-                    $where[] = "em.employee_id = ?";
+                    $where[] = "(e.department_id = ? OR em.employee_id = ?)";
+                    $params[] = $userDeptId;
                     $params[] = $currentUserId;
                 }
             } else {
