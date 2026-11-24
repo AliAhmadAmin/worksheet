@@ -405,7 +405,8 @@ function renderLiveAttendanceTable() {
         AppState.currentUser.role === 'super_admin' ||
         AppState.currentUser.role === 'admin' ||
         AppState.currentUser.role === 'hod' ||
-        AppState.currentUser.can_inspect_sheets
+        hasPermission('can_inspect_sheets') ||
+        hasPermission('can_log_mistakes')
     );
 
     filteredEmployees.forEach(emp => {

@@ -859,7 +859,7 @@ function getInspectableEmployees() {
     const isGlobal = user.role === 'super_admin' || user.role === 'admin' || user.role === 'hr' || hasPermission('can_manage_hr');
     if (isGlobal) return list;
 
-    if (user.role === 'hod' || hasPermission('can_inspect_sheets')) {
+    if (user.role === 'hod' || hasPermission('can_inspect_sheets') || hasPermission('can_log_mistakes')) {
         const userDeptId = parseInt(user.department_id || 0, 10);
         const managedDeptIds = new Set();
         if (userDeptId > 0) managedDeptIds.add(userDeptId);

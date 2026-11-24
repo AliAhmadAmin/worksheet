@@ -28,7 +28,8 @@ $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
 $isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
 $isHod = ($currentUserRole === 'hod' || $currentUserRole === 'deputy_hod');
 $isHr = ($currentUserRole === 'hr' || (isset($currentUserObj['department_name']) && strtolower($currentUserObj['department_name']) === 'hr') || (!empty($currentUserObj['can_manage_hr']) && $currentUserRole !== 'hod'));
-$canInspect = $isSuperAdmin || $isHod || $isHr || !empty($currentUserObj['can_inspect_sheets']);
+$canInspect = $isSuperAdmin || $isHod || $isHr || !empty($currentUserObj['can_inspect_sheets']) || !empty($currentUserObj['can_log_mistakes']);
+$canLogMistakes = $isSuperAdmin || $isHod || $isHr || !empty($currentUserObj['can_log_mistakes']) || !empty($currentUserObj['can_inspect_sheets']);
 
 $userDeptId = (int)($currentUserObj['department_id'] ?? 0);
 $managedDeptIds = $userDeptId > 0 ? [$userDeptId] : [];
@@ -229,13 +230,25 @@ switch ($action) {
 
     case 'create':
     case 'add':
-        if (!$canInspect) {
+        if (!$canLogMistakes) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Unauthorized: Only Supervisors, HODs, or Admins can log mistakes.']);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized: Only Supervisors, HODs, or staff with Log Mistake access can log mistakes.']);
             exit;
         }
 
         $empId = (int)($data['employee_id'] ?? 0);
+
+        // Department scope validation for delegated users and HODs
+        if (!$isSuperAdmin && !$isHr && $empId > 0) {
+            $stmtTargetDept = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $stmtTargetDept->execute([$empId]);
+            $targetDeptId = (int)$stmtTargetDept->fetchColumn();
+            if ($targetDeptId && !in_array($targetDeptId, $managedDeptIds, true) && $targetDeptId !== $userDeptId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Unauthorized: You can only log mistakes for employees in your department.']);
+                exit;
+            }
+        }
         $mistakeDate = trim($data['mistake_date'] ?? date('Y-m-d'));
         $category = trim($data['category'] ?? 'General / Other');
         $severity = trim($data['severity'] ?? 'minor');

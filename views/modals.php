@@ -1333,6 +1333,15 @@ $canViewSalaryModal = in_array($userRoleModal, ['super_admin', 'admin', 'hr']) |
                                 </div>
                             </label>
 
+                            <!-- Perm 5: Log Quality Mistakes -->
+                            <label class="perm-checkbox-card" style="display: flex; align-items: flex-start; gap: 9px; padding: 9px 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s ease;">
+                                <input type="checkbox" id="perm-can-log-mistakes" style="margin-top: 2px; cursor: pointer; transform: scale(1.1);">
+                                <div>
+                                    <strong style="font-size: 12.5px; color: var(--text-main); display: block;">⚠️ Log Quality Mistakes</strong>
+                                    <span style="font-size: 11px; color: var(--text-muted); line-height: 1.3; display: block; margin-top: 2px;">Can log defect notes, quality errors, and penalty points on team members' task rows & worksheets.</span>
+                                </div>
+                            </label>
+
                             <!-- Perm 5: Print Unverified Sheets -->
                             <label class="perm-checkbox-card" style="display: flex; align-items: flex-start; gap: 9px; padding: 9px 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s ease;">
                                 <input type="checkbox" id="perm-can-print-unverified-sheets" style="margin-top: 2px; cursor: pointer; transform: scale(1.1);">

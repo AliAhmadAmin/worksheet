@@ -246,19 +246,34 @@ switch ($action) {
         break;
 
     case 'update_permissions':
-        // STRICT SECURITY: Only Super Admin can modify roles and delegate access permissions
-        if (!$isSuperAdmin) {
+        $targetId = (int)($data['id'] ?? 0);
+        $role = trim($data['role'] ?? 'employee');
+
+        // Check authorization: Super Admin OR HOD managing this employee's department
+        $isHodForTarget = false;
+        if ($isHod && $targetId > 0) {
+            $stmtTargetDept = $pdo->prepare("SELECT department_id FROM employees WHERE id = ?");
+            $stmtTargetDept->execute([$targetId]);
+            $tDeptId = (int)$stmtTargetDept->fetchColumn();
+            $isHodForTarget = in_array($tDeptId, $managedDeptIds, true);
+        }
+
+        if (!$isSuperAdmin && !$isHodForTarget) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Unauthorized: Only Super Admin can modify organizational roles and permissions.']);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized: Only Super Admin or Department HOD can modify organizational roles and permissions.']);
             exit;
         }
 
-        $targetId = (int)($data['id'] ?? 0);
-        $role = trim($data['role'] ?? 'employee');
+        // HODs cannot promote anyone to super_admin or hr
+        if (!$isSuperAdmin && in_array($role, ['super_admin', 'admin', 'hr'], true)) {
+            $role = 'employee';
+        }
+
         $canAssignTasks = !empty($data['can_assign_tasks']) ? 1 : 0;
         $canEditTasks = !empty($data['can_edit_tasks']) ? 1 : 0;
         $canUnlockSheets = !empty($data['can_unlock_sheets']) ? 1 : 0;
         $canInspectSheets = !empty($data['can_inspect_sheets']) ? 1 : 0;
+        $canLogMistakes = !empty($data['can_log_mistakes']) ? 1 : 0;
         $canPrintUnverifiedSheets = !empty($data['can_print_unverified_sheets']) ? 1 : 0;
         $canViewReports = !empty($data['can_view_reports']) ? 1 : 0;
         $canViewAttendance = !empty($data['can_view_attendance']) ? 1 : 0;
@@ -283,6 +298,7 @@ switch ($action) {
             $canEditTasks = 1;
             $canUnlockSheets = 1;
             $canInspectSheets = 1;
+            $canLogMistakes = 1;
             $canPrintUnverifiedSheets = 1;
             $canViewReports = 1;
             $canViewAttendance = 1;
@@ -292,13 +308,13 @@ switch ($action) {
         $stmt = $pdo->prepare("
             UPDATE employees 
             SET role = ?, can_assign_tasks = ?, can_edit_tasks = ?, can_unlock_sheets = ?, 
-                can_inspect_sheets = ?, can_print_unverified_sheets = ?, can_view_reports = ?, can_view_attendance = ?, 
+                can_inspect_sheets = ?, can_log_mistakes = ?, can_print_unverified_sheets = ?, can_view_reports = ?, can_view_attendance = ?, 
                 can_manage_employees = ?
             WHERE id = ?
         ");
         $stmt->execute([
             $role, $canAssignTasks, $canEditTasks, $canUnlockSheets,
-            $canInspectSheets, $canPrintUnverifiedSheets, $canViewReports, $canViewAttendance,
+            $canInspectSheets, $canLogMistakes, $canPrintUnverifiedSheets, $canViewReports, $canViewAttendance,
             $canManageEmployees, $targetId
         ]);
 

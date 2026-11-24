@@ -1003,6 +1003,12 @@ function updateLockBadge(isLocked, canEdit) {
         }
     }
 
+    const btnLogMistake = document.getElementById('admin-btn-log-mistake');
+    if (btnLogMistake) {
+        const canLog = hasPermission('can_log_mistakes');
+        btnLogMistake.style.display = canLog ? 'inline-flex' : 'none';
+    }
+
     // Save button stays enabled so employees can paste/save links even when sheet is locked!
     const btnSave = document.getElementById('btn-save-sheet');
     if (btnSave) {
@@ -1285,7 +1291,8 @@ function addTableRow(data = {}, canEdit = true, focusNew = false) {
     // Action column with row-level quality mistake button for supervisors
     const rowEntryId = data?.id || null;
     let mistakeBtnHtml = '';
-    if (isAdmin && rowEntryId) {
+    const canLogMistakes = hasPermission('can_log_mistakes');
+    if (canLogMistakes && rowEntryId) {
         const rowMistakes = (Array.isArray(AppState.currentSheetMistakes))
             ? AppState.currentSheetMistakes.filter(m => m.entry_id == rowEntryId)
             : [];

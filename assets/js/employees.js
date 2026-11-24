@@ -437,7 +437,7 @@ function renderDirectoryTable(employees) {
                             </button>
                         ` : ''}
                     ` : `
-                        ${(isSuperAdmin && hasLogin && isActive) ? `
+                        ${((isSuperAdmin || isManagedByHod) && hasLogin && isActive) ? `
                             <button type="button" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; font-weight: 700; border-color: rgba(59, 130, 246, 0.4); color: var(--primary); white-space: nowrap;" onclick="event.stopPropagation(); openPermissionsModal(${emp.id})" title="Role & Access Delegation">
                                 🛡️ Roles
                             </button>
@@ -2733,8 +2733,10 @@ async function handleMyProfileSubmit(e) {
 }
 
 function openPermissionsModal(empId) {
-    if (!AppState.currentUser || (AppState.currentUser.role !== 'super_admin' && AppState.currentUser.role !== 'admin')) {
-        showToast("Only Super Admin can manage roles & permissions.", "error");
+    const isSuper = AppState.currentUser && (AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'admin');
+    const isHod = AppState.currentUser && AppState.currentUser.role === 'hod';
+    if (!AppState.currentUser || (!isSuper && !isHod)) {
+        showToast("Only Super Admin and HODs can delegate roles & permissions.", "error");
         return;
     }
 
@@ -2765,6 +2767,14 @@ function openPermissionsModal(empId) {
         let r = emp.role || 'employee';
         if (r === 'admin') r = 'super_admin';
         roleSelect.value = r;
+
+        // If current user is HOD (not super admin), restrict options so they cannot promote to Super Admin or HR
+        Array.from(roleSelect.options).forEach(opt => {
+            if (opt.value === 'super_admin' || opt.value === 'hr') {
+                opt.disabled = !isSuper;
+                opt.style.display = isSuper ? '' : 'none';
+            }
+        });
     }
 
     const isFullAccess = (emp.role === 'super_admin' || emp.role === 'admin' || emp.role === 'hr');
@@ -2773,6 +2783,10 @@ function openPermissionsModal(empId) {
     document.getElementById('perm-can-edit-tasks').checked = !!parseInt(emp.can_edit_tasks || (isFullAccess ? 1 : 0));
     document.getElementById('perm-can-unlock-sheets').checked = !!parseInt(emp.can_unlock_sheets || (isFullAccess ? 1 : 0));
     document.getElementById('perm-can-inspect-sheets').checked = !!parseInt(emp.can_inspect_sheets || (isFullAccess ? 1 : 0));
+    const chkLogMistakes = document.getElementById('perm-can-log-mistakes');
+    if (chkLogMistakes) {
+        chkLogMistakes.checked = !!parseInt(emp.can_log_mistakes || (isFullAccess ? 1 : 0));
+    }
     const chkPrintUnverified = document.getElementById('perm-can-print-unverified-sheets');
     if (chkPrintUnverified) {
         chkPrintUnverified.checked = !!parseInt(emp.can_print_unverified_sheets || (isFullAccess ? 1 : 0));
@@ -2789,6 +2803,7 @@ function applyRolePreset(roleValue) {
     const isEdit = document.getElementById('perm-can-edit-tasks');
     const isUnlock = document.getElementById('perm-can-unlock-sheets');
     const isInspect = document.getElementById('perm-can-inspect-sheets');
+    const isLogMistakes = document.getElementById('perm-can-log-mistakes');
     const isPrintUnverified = document.getElementById('perm-can-print-unverified-sheets');
     const isReports = document.getElementById('perm-can-view-reports');
     const isAttendance = document.getElementById('perm-can-view-attendance');
@@ -2799,6 +2814,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isLogMistakes) isLogMistakes.checked = true;
         if (isPrintUnverified) isPrintUnverified.checked = true;
         if (isReports) isReports.checked = true;
         if (isAttendance) isAttendance.checked = true;
@@ -2808,6 +2824,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isLogMistakes) isLogMistakes.checked = true;
         if (isPrintUnverified) isPrintUnverified.checked = true;
         if (isReports) isReports.checked = true;
         if (isAttendance) isAttendance.checked = true;
@@ -2817,6 +2834,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isLogMistakes) isLogMistakes.checked = true;
         if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = true;
         if (isAttendance) isAttendance.checked = true;
@@ -2826,6 +2844,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isLogMistakes) isLogMistakes.checked = true;
         if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = false;
         if (isAttendance) isAttendance.checked = true;
@@ -2835,6 +2854,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = true;
         if (isInspect) isInspect.checked = true;
+        if (isLogMistakes) isLogMistakes.checked = true;
         if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = false;
         if (isAttendance) isAttendance.checked = true;
@@ -2844,6 +2864,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = true;
         if (isUnlock) isUnlock.checked = false;
         if (isInspect) isInspect.checked = false;
+        if (isLogMistakes) isLogMistakes.checked = false;
         if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = false;
         if (isAttendance) isAttendance.checked = false;
@@ -2853,6 +2874,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = false;
         if (isUnlock) isUnlock.checked = false;
         if (isInspect) isInspect.checked = true;
+        if (isLogMistakes) isLogMistakes.checked = true;
         if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = true;
         if (isAttendance) isAttendance.checked = true;
@@ -2862,6 +2884,7 @@ function applyRolePreset(roleValue) {
         if (isEdit) isEdit.checked = false;
         if (isUnlock) isUnlock.checked = false;
         if (isInspect) isInspect.checked = false;
+        if (isLogMistakes) isLogMistakes.checked = false;
         if (isPrintUnverified) isPrintUnverified.checked = false;
         if (isReports) isReports.checked = false;
         if (isAttendance) isAttendance.checked = false;
@@ -2878,6 +2901,7 @@ async function handleSavePermissionsSubmit(e) {
     const canEdit = document.getElementById('perm-can-edit-tasks')?.checked ? 1 : 0;
     const canUnlock = document.getElementById('perm-can-unlock-sheets')?.checked ? 1 : 0;
     const canInspect = document.getElementById('perm-can-inspect-sheets')?.checked ? 1 : 0;
+    const canLogMistakes = document.getElementById('perm-can-log-mistakes')?.checked ? 1 : 0;
     const canPrintUnverified = document.getElementById('perm-can-print-unverified-sheets')?.checked ? 1 : 0;
     const canReports = document.getElementById('perm-can-view-reports')?.checked ? 1 : 0;
     const canAttendance = document.getElementById('perm-can-view-attendance')?.checked ? 1 : 0;
@@ -2900,6 +2924,7 @@ async function handleSavePermissionsSubmit(e) {
                 can_edit_tasks: canEdit,
                 can_unlock_sheets: canUnlock,
                 can_inspect_sheets: canInspect,
+                can_log_mistakes: canLogMistakes,
                 can_print_unverified_sheets: canPrintUnverified,
                 can_view_reports: canReports,
                 can_view_attendance: canAttendance,

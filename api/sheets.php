@@ -30,7 +30,7 @@ $currentUserRole = $currentUserObj['role'] ?? ($_SESSION['role'] ?? 'employee');
 $isSuperAdmin = ($currentUserRole === 'super_admin' || $currentUserRole === 'admin');
 $isHod = ($currentUserRole === 'hod');
 $canUnlock = $isSuperAdmin || $isHod || !empty($currentUserObj['can_unlock_sheets']);
-$canInspect = $isSuperAdmin || $isHod || !empty($currentUserObj['can_inspect_sheets']);
+$canInspect = $isSuperAdmin || $isHod || !empty($currentUserObj['can_inspect_sheets']) || !empty($currentUserObj['can_log_mistakes']);
 
 if (in_array($action, ['get_sheet', 'get_day_summary', 'get_range_summary', 'print_sheet'])) {
     session_write_close();

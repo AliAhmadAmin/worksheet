@@ -1,7 +1,7 @@
         <!-- TAB 1: DASHBOARD / HOURLY WORKSHEET (DEDICATED PAGE) -->
         <?php
         $userRoleWs = strtolower($authUser['role'] ?? '');
-        $canInspectWs = in_array($userRoleWs, ['super_admin', 'admin', 'hod']) || !empty($authUser['can_inspect_sheets']);
+        $canInspectWs = in_array($userRoleWs, ['super_admin', 'admin', 'hod']) || !empty($authUser['can_inspect_sheets']) || !empty($authUser['can_log_mistakes']);
         $isHodWs = in_array($userRoleWs, ['hod', 'deputy_hod']);
         ?>
         <section id="tab-worksheet" class="tab-section <?= (($currentPage ?? '') === 'worksheet' || (!$isHodWs && ($currentPortal ?? '') === 'digital')) ? 'active' : '' ?>">
