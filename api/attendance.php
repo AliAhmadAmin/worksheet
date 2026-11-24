@@ -490,6 +490,10 @@ switch ($action) {
         $sheet = $stmt->fetch();
 
         $isLocked = isset($data['is_locked']) ? (int)$data['is_locked'] : ($sheet ? (int)$sheet['is_locked'] : 0);
+        // If check_out_time is explicitly cleared (empty), ensure sheet is unlocked so employee can work
+        if (empty($outTime)) {
+            $isLocked = 0;
+        }
 
         // Effective day type logic
         $effectiveDayType = $dayType !== null ? $dayType : ($sheet['day_type'] ?? 'working');

@@ -645,6 +645,16 @@ class ZKTecoAttendanceService {
                 $dutyFormatted = ($dutySeconds > 0) ? sprintf('%02d:%02d:00', $h, $m) : null;
             }
 
+            // Accidental double-punch guard on arrival:
+            // If check-in exists on the same day and checkout occurs within 5 minutes (or duty < 300s), ignore it so shift is not closed immediately.
+            if ($sheet && !empty($sheet['check_in_time']) && $dutySeconds < 300) {
+                return [
+                    'status' => 'ignored',
+                    'sheet_id' => $sheet['id'],
+                    'remarks' => "Ignored accidental checkout punch within 5 minutes of Check-In ({$sheet['check_in_time']}). Employee remains On Duty."
+                ];
+            }
+
             if (!$sheet) {
                 // First punch of the day is a Check-Out
                 $stmtInsert = $this->pdo->prepare("
@@ -931,23 +941,26 @@ class ZKTecoAttendanceService {
                             $inTs = strtotime($sh['sheet_date'] . ' ' . $inStr);
                             $outTs = strtotime($op['punch_time']);
                             $dutySecs = max(0, $outTs - $inTs);
-                            $h = floor($dutySecs / 3600);
-                            $m = floor(($dutySecs % 3600) / 60);
-                            $dutyF = sprintf('%02d:%02d:00', $h, $m);
+                            // Accidental double-punch guard: only restore checkout if at least 5 minutes of duty
+                            if ($dutySecs >= 300) {
+                                $h = floor($dutySecs / 3600);
+                                $m = floor(($dutySecs % 3600) / 60);
+                                $dutyF = sprintf('%02d:%02d:00', $h, $m);
 
-                            $this->pdo->prepare("
-                                UPDATE daily_sheets
-                                SET biometric_out_time = ?,
-                                    biometric_duty_hours = ?,
-                                    biometric_duty_seconds = ?,
-                                    check_out_time = ?,
-                                    total_duty_hours = ?,
-                                    total_duty_seconds = ?,
-                                    is_locked = 1,
-                                    locked_at = COALESCE(locked_at, CURRENT_TIMESTAMP),
-                                    remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?)
-                                WHERE id = ?
-                            ")->execute([$pTime, $dutyF, $dutySecs, $pTime, $dutyF, $dutySecs, "[Biometric Restored] Overnight Out at {$pTime} (Duty: {$dutyF})", $sheetId]);
+                                $this->pdo->prepare("
+                                    UPDATE daily_sheets
+                                    SET biometric_out_time = ?,
+                                        biometric_duty_hours = ?,
+                                        biometric_duty_seconds = ?,
+                                        check_out_time = ?,
+                                        total_duty_hours = ?,
+                                        total_duty_seconds = ?,
+                                        is_locked = 1,
+                                        locked_at = COALESCE(locked_at, CURRENT_TIMESTAMP),
+                                        remarks = CONCAT(COALESCE(remarks, ''), IF(remarks IS NULL OR remarks = '', '', '\n'), ?)
+                                    WHERE id = ?
+                                ")->execute([$pTime, $dutyF, $dutySecs, $pTime, $dutyF, $dutySecs, "[Biometric Restored] Overnight Out at {$pTime} (Duty: {$dutyF})", $sheetId]);
+                            }
                         }
                     }
                 }

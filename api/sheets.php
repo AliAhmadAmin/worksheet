@@ -145,31 +145,34 @@ switch ($action) {
                 if ($foundOut && !empty($foundOut['punch_time'])) {
                     $outTs = strtotime($foundOut['punch_time']);
                     $dutySec = max(0, $outTs - $inTs);
-                    $h = floor($dutySec / 3600);
-                    $m = floor(($dutySec % 3600) / 60);
-                    $dutyFmt = sprintf('%02d:%02d:00', $h, $m);
-                    $outFmt = date('h:i A', $outTs);
+                    // Accidental double-punch guard: only treat as checkout if at least 5 minutes of duty elapsed
+                    if ($dutySec >= 300) {
+                        $h = floor($dutySec / 3600);
+                        $m = floor(($dutySec % 3600) / 60);
+                        $dutyFmt = sprintf('%02d:%02d:00', $h, $m);
+                        $outFmt = date('h:i A', $outTs);
 
-                    $pdo->prepare("
-                        UPDATE daily_sheets 
-                        SET check_out_time = ?, 
-                            biometric_out_time = ?, 
-                            biometric_duty_hours = ?, 
-                            biometric_duty_seconds = ?, 
-                            total_duty_hours = ?, 
-                            total_duty_seconds = ?, 
-                            is_locked = 1, 
-                            locked_at = CURRENT_TIMESTAMP 
-                        WHERE id = ?
-                    ")->execute([$outFmt, $outFmt, $dutyFmt, $dutySec, $dutyFmt, $dutySec, $sheet['id']]);
+                        $pdo->prepare("
+                            UPDATE daily_sheets 
+                            SET check_out_time = ?, 
+                                biometric_out_time = ?, 
+                                biometric_duty_hours = ?, 
+                                biometric_duty_seconds = ?, 
+                                total_duty_hours = ?, 
+                                total_duty_seconds = ?, 
+                                is_locked = 1, 
+                                locked_at = CURRENT_TIMESTAMP 
+                            WHERE id = ?
+                        ")->execute([$outFmt, $outFmt, $dutyFmt, $dutySec, $dutyFmt, $dutySec, $sheet['id']]);
 
-                    $sheet['check_out_time'] = $outFmt;
-                    $sheet['biometric_out_time'] = $outFmt;
-                    $sheet['biometric_duty_hours'] = $dutyFmt;
-                    $sheet['biometric_duty_seconds'] = $dutySec;
-                    $sheet['total_duty_hours'] = $dutyFmt;
-                    $sheet['total_duty_seconds'] = $dutySec;
-                    $sheet['is_locked'] = 1;
+                        $sheet['check_out_time'] = $outFmt;
+                        $sheet['biometric_out_time'] = $outFmt;
+                        $sheet['biometric_duty_hours'] = $dutyFmt;
+                        $sheet['biometric_duty_seconds'] = $dutySec;
+                        $sheet['total_duty_hours'] = $dutyFmt;
+                        $sheet['total_duty_seconds'] = $dutySec;
+                        $sheet['is_locked'] = 1;
+                    }
                 }
             } catch (Throwable $e) {}
         }
