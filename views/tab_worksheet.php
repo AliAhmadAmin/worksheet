@@ -135,9 +135,10 @@
                             </div>
 
                             <!-- Group 2: Date Navigation -->
+                            <?php $wsInitDate = !empty($_GET['date']) ? htmlspecialchars($_GET['date']) : (!empty($_GET['sheet_date']) ? htmlspecialchars($_GET['sheet_date']) : date('Y-m-d')); ?>
                             <div class="admin-ctrl-group admin-ctrl-date">
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="goToPrevDay()" title="Previous Day">◀</button>
-                                <input type="date" id="worksheet-date-picker" class="input-control worksheet-date-input" value="<?= date('Y-m-d') ?>" style="padding: 6px 10px; font-weight: 600;" onchange="changeWorksheetDate(this.value)">
+                                <input type="date" id="worksheet-date-picker" class="input-control worksheet-date-input" value="<?= $wsInitDate ?>" style="padding: 6px 10px; font-weight: 600;" onchange="changeWorksheetDate(this.value)">
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="goToNextDay()" title="Next Day">▶</button>
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 11.5px;" onclick="goToToday()" title="Jump to Today">Today</button>
                             </div>
@@ -206,7 +207,7 @@
                         <div class="controls-group">
                             <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="goToPrevDay()" title="Previous Day">◀</button>
-                                <input type="date" class="input-control worksheet-date-input" value="<?= date('Y-m-d') ?>" style="padding: 6px 10px;" onchange="changeWorksheetDate(this.value)">
+                                <input type="date" class="input-control worksheet-date-input" value="<?= $wsInitDate ?>" style="padding: 6px 10px;" onchange="changeWorksheetDate(this.value)">
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 12px;" onclick="goToNextDay()" title="Next Day">▶</button>
                                 <button type="button" class="btn btn-outline" style="padding: 6px 10px; font-size: 11.5px;" onclick="goToToday()" title="Jump to Today">Today</button>
                             </div>

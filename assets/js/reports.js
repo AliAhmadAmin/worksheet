@@ -1156,7 +1156,9 @@ function renderSingleEmployeeTimesheet(item, globalData) {
             rowsHtml += `
                 <tr ${rowBg}>
                     <td style="white-space: nowrap;">
-                        <strong style="font-size: 12.5px;">${r.date}</strong> 
+                        <a href="javascript:void(0)" onclick="inspectEmployeeWorksheet(${emp.id}, '${r.date}')" style="font-size: 12.5px; font-weight: 700; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Inspect Worksheet for ${r.date}">
+                            <span>${r.date}</span>
+                        </a> 
                         <span style="font-size: 11px; color: ${r.is_weekend ? '#f59e0b' : 'var(--text-muted)'}; font-weight: 600; margin-left: 3px;">(${escapeHtml(fullDay)})</span>
                     </td>
                     <td colspan="4" style="text-align: center; padding: 8px;">
@@ -1204,7 +1206,9 @@ function renderSingleEmployeeTimesheet(item, globalData) {
             rowsHtml += `
                 <tr ${rowBg}>
                     <td style="white-space: nowrap;">
-                        <strong style="font-size: 12.5px;">${r.date}</strong> 
+                        <a href="javascript:void(0)" onclick="inspectEmployeeWorksheet(${emp.id}, '${r.date}')" style="font-size: 12.5px; font-weight: 700; color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Inspect Worksheet for ${r.date}">
+                            <span>${r.date}</span>
+                        </a> 
                         <span style="font-size: 11px; color: ${r.is_weekend ? '#f59e0b' : 'var(--text-muted)'}; font-weight: 600; margin-left: 3px;">(${escapeHtml(fullDay)})</span>
                     </td>
                     <td>
@@ -2160,6 +2164,11 @@ function printAttendanceReport() {
 }
 
 function viewEmployeeSheet(empId, date) {
+    if (typeof inspectEmployeeWorksheet === 'function') {
+        inspectEmployeeWorksheet(empId, date);
+        return;
+    }
+
     if (AppState.currentUser && (AppState.currentUser.role === 'admin' || AppState.currentUser.role === 'super_admin' || AppState.currentUser.role === 'hr' || AppState.currentUser.role === 'hod' || hasPermission('can_inspect_sheets'))) {
         AppState.adminSelectedEmpId = parseInt(empId);
         if (date) AppState.selectedDate = date;

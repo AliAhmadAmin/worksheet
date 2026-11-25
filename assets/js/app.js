@@ -61,13 +61,44 @@ function goToToday() {
     changeWorksheetDate(getLocalDateString());
 }
 
+function getInitialWorksheetDate() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const qDate = urlParams.get('date') || urlParams.get('sheet_date');
+        if (qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate)) {
+            return qDate;
+        }
+        const sDate = sessionStorage.getItem('pending_inspect_date');
+        if (sDate && /^\d{4}-\d{2}-\d{2}$/.test(sDate)) {
+            return sDate;
+        }
+    } catch (e) {}
+    return getLocalDateString();
+}
+
+function getInitialInspectedEmpId() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const qEmp = urlParams.get('emp_id') || urlParams.get('employee_id');
+        if (qEmp && !isNaN(parseInt(qEmp, 10))) {
+            return parseInt(qEmp, 10);
+        }
+        const sEmp = sessionStorage.getItem('pending_inspect_emp_id');
+        if (sEmp && !isNaN(parseInt(sEmp, 10))) {
+            return parseInt(sEmp, 10);
+        }
+    } catch (e) {}
+    return null;
+}
+
 const AppState = {
     currentUser: null,
     employees: [],
     departments: [],
     teams: [],
     contentTypes: [],
-    selectedDate: getLocalDateString(),
+    selectedDate: getInitialWorksheetDate(),
+    adminSelectedEmpId: getInitialInspectedEmpId(),
     currentSheet: null,
     currentEntries: [],
     isLocked: 0,
@@ -768,22 +799,53 @@ async function loadUserData(shouldLoadActiveTab = true) {
     const isHr = (AppState.currentUser.role === 'hr' || (AppState.currentUser.department_name && AppState.currentUser.department_name.toLowerCase() === 'hr') || hasPermission('can_manage_hr')) && AppState.currentUser.role !== 'hod';
     const canInspect = isSuperAdmin || isHod || isHr || hasPermission('can_inspect_sheets');
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryEmpId = urlParams.get('emp_id') || urlParams.get('employee_id');
+    const queryDate = urlParams.get('date') || urlParams.get('sheet_date');
+
+    let pendingEmpId = queryEmpId;
+    let pendingDate = queryDate;
+    try {
+        if (!pendingEmpId) pendingEmpId = sessionStorage.getItem('pending_inspect_emp_id');
+        if (!pendingDate) pendingDate = sessionStorage.getItem('pending_inspect_date');
+        sessionStorage.removeItem('pending_inspect_emp_id');
+        sessionStorage.removeItem('pending_inspect_date');
+    } catch (e) {}
+
+    if (pendingDate && /^\d{4}-\d{2}-\d{2}$/.test(pendingDate)) {
+        AppState.selectedDate = pendingDate;
+        document.querySelectorAll('.worksheet-date-input, #worksheet-date-picker').forEach(input => {
+            input.value = pendingDate;
+        });
+    }
+
     if (canInspect) {
-        populateAdminEmployeeSelector();
-        if (typeof populateTaskEmployeeFilter === 'function') {
-            populateTaskEmployeeFilter();
-        }
-        // Validate and default inspected employee to first staff member of their department (or self)
         const inspectable = getInspectableEmployees();
-        if (AppState.adminSelectedEmpId && !inspectable.some(e => e.id == AppState.adminSelectedEmpId)) {
+
+        if (pendingEmpId && inspectable.some(e => e.id == pendingEmpId)) {
+            AppState.adminSelectedEmpId = parseInt(pendingEmpId, 10);
+        } else if (AppState.adminSelectedEmpId && !inspectable.some(e => e.id == AppState.adminSelectedEmpId)) {
             AppState.adminSelectedEmpId = null;
         }
+
         if (!AppState.adminSelectedEmpId) {
             const firstStaff = inspectable.find(e => e.id !== AppState.currentUser.id && e.role !== 'super_admin');
             AppState.adminSelectedEmpId = firstStaff ? firstStaff.id : (inspectable[0] ? inspectable[0].id : AppState.currentUser.id);
         }
+
+        populateAdminEmployeeSelector();
+        if (typeof populateTaskEmployeeFilter === 'function') {
+            populateTaskEmployeeFilter();
+        }
+
         const adminSelect = document.getElementById('admin-employee-select');
         if (adminSelect && AppState.adminSelectedEmpId) adminSelect.value = AppState.adminSelectedEmpId;
+
+        const currentSelectedEmp = inspectable.find(e => e.id == AppState.adminSelectedEmpId);
+        const selectedNameSpan = document.getElementById('admin-emp-dropdown-selected-name');
+        if (selectedNameSpan && currentSelectedEmp) {
+            selectedNameSpan.textContent = currentSelectedEmp.name + (currentSelectedEmp.id === AppState.currentUser?.id ? ' (My Sheet)' : '');
+        }
     } else {
         AppState.adminSelectedEmpId = null;
     }
@@ -1193,15 +1255,54 @@ function handleAdminSelectEmployee(empId) {
     loadDailyWorksheet();
 }
 
-// Seamless one-click inspection from Attendance & Dashboard
+// Seamless one-click inspection from Attendance, Reports, Roster & Dashboard
 function inspectEmployeeWorksheet(empId, date = null) {
+    if (!empId) return;
+
+    // Check if target worksheet tab/container exists on the current page (e.g. index.php)
+    const worksheetTab = document.getElementById('tab-worksheet');
+
+    if (!worksheetTab) {
+        // We are on a standalone page (e.g. attendance.php, roster.php, reports.php, hr.php)
+        try {
+            sessionStorage.setItem('pending_inspect_emp_id', String(empId));
+            if (date) {
+                sessionStorage.setItem('pending_inspect_date', String(date));
+            }
+        } catch (e) {}
+
+        let destUrl = `index.php?emp_id=${encodeURIComponent(empId)}`;
+        if (date) {
+            destUrl += `&date=${encodeURIComponent(date)}`;
+        }
+        destUrl += '#worksheet';
+        window.location.href = destUrl;
+        return;
+    }
+
+    // We are on index.php (the worksheet page)
     if (date) {
         AppState.selectedDate = date;
-        const picker = document.getElementById('worksheet-date-picker');
-        if (picker) picker.value = date;
+        document.querySelectorAll('.worksheet-date-input, #worksheet-date-picker').forEach(input => {
+            input.value = date;
+        });
     }
-    navigateToTab('tab-worksheet');
-    handleAdminSelectEmployee(empId);
+
+    AppState.adminSelectedEmpId = parseInt(empId, 10);
+    const adminSelect = document.getElementById('admin-employee-select');
+    if (adminSelect) adminSelect.value = empId;
+
+    const inspectable = typeof getInspectableEmployees === 'function' ? getInspectableEmployees() : [];
+    const currentSelectedEmp = inspectable.find(e => e.id == empId);
+    const selectedNameSpan = document.getElementById('admin-emp-dropdown-selected-name');
+    if (selectedNameSpan && currentSelectedEmp) {
+        selectedNameSpan.textContent = currentSelectedEmp.name + (currentSelectedEmp.id === AppState.currentUser?.id ? ' (My Sheet)' : '');
+    }
+
+    navigateToTab('tab-worksheet', true);
+    if (typeof loadDailyWorksheet === 'function') {
+        loadDailyWorksheet();
+    }
 
     // Smooth scroll to the live inspector
     setTimeout(() => {
