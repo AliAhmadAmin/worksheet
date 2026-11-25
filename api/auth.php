@@ -128,6 +128,8 @@ switch ($action) {
         $redirectUrl = 'index.php';
         if ($_SESSION['active_portal'] === 'hr') {
             $redirectUrl = 'hr.php';
+        } elseif (in_array($userRole, ['hod', 'deputy_hod'])) {
+            $redirectUrl = 'attendance.php';
         }
 
         // Remove sensitive fields from output

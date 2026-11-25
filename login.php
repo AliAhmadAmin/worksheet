@@ -25,6 +25,9 @@ if (!empty($_SESSION['user_id'])) {
         if ($userRole === 'hr' || $deptLower === 'hr' || $deptLower === 'human resources') {
             header('Location: hr.php');
             exit;
+        } elseif (in_array($userRole, ['hod', 'deputy_hod'])) {
+            header('Location: attendance.php');
+            exit;
         }
         header('Location: index.php');
         exit;

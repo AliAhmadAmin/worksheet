@@ -13,6 +13,13 @@ $canSwitchPortals = $isGlobalAdminIdx;
 
 $currentPage = 'worksheet';
 
+// When HOD lands on the root index page without explicit tab/date/emp inspection query parameters,
+// redirect directly to their Team Dashboard (attendance.php)
+if (in_array($userRoleIdx, ['hod', 'deputy_hod']) && empty($_GET)) {
+    header('Location: attendance.php');
+    exit;
+}
+
 // Handle explicit portal switch via ?portal= (Global Admins only)
 if (!empty($_GET['portal']) && $canSwitchPortals) {
     $req = strtolower(trim($_GET['portal']));

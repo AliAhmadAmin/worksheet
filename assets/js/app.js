@@ -685,6 +685,10 @@ async function handleLoginSubmit(e) {
             showToast(`Welcome back, ${data.user.name}!`, "success");
 
             // Redirect to appropriate workspace page if needed
+            if (data.redirect_url) {
+                window.location.href = data.redirect_url;
+                return;
+            }
             const isHrPage = window.location.pathname.includes('hr.php');
             if (selectedLoginWorkspace === 'hr' && !isHrPage) {
                 window.location.href = 'hr.php';

@@ -24,6 +24,9 @@ $navRoleTag = strtoupper($authUser['role'] ?? 'EMPLOYEE');
 $navDesig = htmlspecialchars($authUser['designation'] ?? ($authUser['role'] ?? 'Staff'));
 $navAvatar = $authUser['avatar'] ?? null;
 $navRoleClass = strtolower($authUser['role'] ?? 'employee');
+$userRole = strtolower($authUser['role'] ?? '');
+$isHodNav = in_array($userRole, ['hod', 'deputy_hod']);
+$brandHomeUrl = $isHodNav ? 'attendance.php' : 'index.php';
 ?>
 
 <!-- Mobile Top Header Bar -->
@@ -34,7 +37,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
             <span class="toggle-bar"></span>
             <span class="toggle-bar"></span>
         </button>
-        <a href="index.php" class="mobile-brand">
+        <a href="<?= $brandHomeUrl ?>" class="mobile-brand">
             <img src="assets/img/logo.svg" alt="Discover Pakistan UHD TV" class="mobile-brand-logo">
         </a>
     </div>
@@ -60,7 +63,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
     <!-- Sidebar Header (Brand & Portal Selector) -->
     <div class="sidebar-header">
         <div class="sidebar-brand-wrapper">
-            <a href="index.php" class="sidebar-brand-link">
+            <a href="<?= $brandHomeUrl ?>" class="sidebar-brand-link">
                 <img src="assets/img/logo.svg" alt="Discover Pakistan UHD TV" class="brand-logo-img">
             </a>
             <button type="button" class="sidebar-close-btn" onclick="toggleMobileSidebar()" aria-label="Close sidebar">✕</button>
@@ -164,7 +167,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Team Dashboard</span>
             </a>
-            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
+            <a href="index.php?tab=worksheet" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
             </a>
@@ -266,7 +269,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Team Dashboard</span>
             </a>
-            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
+            <a href="index.php?tab=worksheet" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
             </a>
@@ -363,7 +366,7 @@ $navRoleClass = strtolower($authUser['role'] ?? 'employee');
                 <span class="nav-icon">📊</span>
                 <span class="nav-label">Team Dashboard</span>
             </a>
-            <a href="index.php" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
+            <a href="index.php?tab=worksheet" class="nav-btn <?= ($activeNavPage === 'worksheet') ? 'active' : '' ?>" data-tab="tab-worksheet" data-route="worksheet">
                 <span class="nav-icon" id="main-nav-tab-icon">📝</span>
                 <span class="nav-label" id="main-nav-tab-label">WorkSheets</span>
             </a>
